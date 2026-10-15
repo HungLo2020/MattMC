@@ -9,9 +9,12 @@ removed. Rust also assigns reusable callable slots from the primary task arena.
 The temporary Java adapter keeps callable references in those rows;
 it does not rebuild the native queue from Java state.
 
-`ChunkTaskDispatcher` still owns its consecutive executor, future completion,
-level-change callbacks and execution throttling. General simulation, holders and
-task bodies remain Java. This is a queue migration, not a completed server port.
+`ChunkTaskDispatcher` still owns its consecutive executor, future completion
+and effectful level-change callbacks. The throttling dispatcher's position set
+and admission decision belong to the native
+[player-loading policy](RUST-PLAYER-LOADING.md). General simulation and task
+bodies remain Java; holder policy has its separate
+[native owner](RUST-CHUNK-HOLDERS.md). This is not a completed server port.
 
 Source ownership and fixture definitions were reviewed at
 [`2003b118`](https://github.com/HungLo2020/MattMC/commit/2003b118dfac30ca501dc135b9de0e2d7e2567fb).

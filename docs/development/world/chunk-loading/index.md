@@ -18,6 +18,8 @@
 - [Rust tick-selection views](RUST-TICK-SELECTION.md): native simulation and
   natural-spawn level views, live walks for block-tick and spawn-candidate order,
   and verification.
+- [Player-loading policy and admission](RUST-PLAYER-LOADING.md): native ticket
+  transitions, delayed dispatch decisions, readiness release and verification.
 - [Rust ticket storage](RUST-TICKET-STORAGE.md): native-owned ticket lists, expiry,
   forced chunks and persistence, direct tracker notification and verification.
 - [Rust POI village distance](RUST-POI-DISTANCE.md): native-owned section

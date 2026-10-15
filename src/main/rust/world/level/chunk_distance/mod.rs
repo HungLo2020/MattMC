@@ -7,6 +7,8 @@ mod ffi;
 pub(crate) mod graph;
 pub(crate) mod level_view;
 mod level_view_ffi;
+pub(crate) mod player_loading;
+mod player_loading_ffi;
 mod position_map;
 mod poi;
 mod poi_ffi;

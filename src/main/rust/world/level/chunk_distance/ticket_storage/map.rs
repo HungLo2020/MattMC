@@ -57,6 +57,12 @@ impl ListMap {
         self.size
     }
 
+    /// Owned array capacity, excluding this struct and allocator bookkeeping.
+    pub(crate) fn allocation_bytes(&self) -> usize {
+        self.keys.capacity() * std::mem::size_of::<i64>()
+            + self.values.capacity() * std::mem::size_of::<u32>()
+    }
+
     fn mask(&self) -> usize {
         self.n - 1
     }
@@ -153,11 +159,18 @@ impl ListMap {
             return Vec::new();
         }
         let dropped = self.ordered().into_iter().map(|(_, v)| v).collect();
+        self.clear_membership();
+        dropped
+    }
+
+    /// Clear a primitive map/set whose values need no retirement. Retain the
+    /// original table capacity without allocating a discarded value vector.
+    pub(crate) fn clear_membership(&mut self) {
+        if self.size == 0 { return; }
         self.size = 0;
         self.zero = false;
         self.keys.fill(0);
         self.values.fill(NONE);
-        dropped
     }
 
     fn shift(&mut self, mut pos: usize, mut wrapped: Option<&mut Option<Vec<i64>>>) {

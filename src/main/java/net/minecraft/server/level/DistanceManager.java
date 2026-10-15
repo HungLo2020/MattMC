@@ -3,17 +3,11 @@ package net.minecraft.server.level;
 import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2IntMap;
-import it.unimi.dsi.fastutil.longs.Long2IntMaps;
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongConsumer;
 import it.unimi.dsi.fastutil.longs.LongIterator;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import it.unimi.dsi.fastutil.longs.LongSet;
-import it.unimi.dsi.fastutil.longs.Long2ByteMap.Entry;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
@@ -46,7 +40,6 @@ public abstract class DistanceManager {
 	);
 	protected final Set<ChunkHolder> chunksToUpdateFutures = new ReferenceOpenHashSet<>();
 	final ThrottlingChunkTaskDispatcher ticketDispatcher;
-	final LongSet ticketsToRelease = new LongOpenHashSet();
 	final Executor mainThreadExecutor;
 	private int simulationDistance = 10;
 
@@ -99,25 +92,7 @@ public abstract class DistanceManager {
 			this.chunksToUpdateFutures.clear();
 			return true;
 		} else {
-			if (!this.ticketsToRelease.isEmpty()) {
-				LongIterator longIterator = this.ticketsToRelease.iterator();
-
-				while (longIterator.hasNext()) {
-					long l = longIterator.nextLong();
-					if (this.ticketStorage.getTickets(l).stream().anyMatch(ticket -> ticket.getType() == TicketType.PLAYER_LOADING)) {
-						ChunkHolder chunkHolder2 = chunkMap.getUpdatingChunkIfPresent(l);
-						if (chunkHolder2 == null) {
-							throw new IllegalStateException();
-						}
-
-						CompletableFuture<ChunkResult<LevelChunk>> completableFuture = chunkHolder2.getEntityTickingChunkFuture();
-						completableFuture.thenAccept(chunkResult -> this.mainThreadExecutor.execute(() -> this.ticketDispatcher.release(l, () -> {}, false)));
-					}
-				}
-
-				this.ticketsToRelease.clear();
-			}
-
+			this.playerTicketManager.releaseReady(chunkMap);
 			return bl;
 		}
 	}
@@ -263,79 +238,78 @@ public abstract class DistanceManager {
 		}
 	}
 
-	class PlayerTicketTracker extends DistanceManager.FixedPlayerDistanceChunkTracker {
-		private int viewDistance;
-		private final Long2IntMap queueLevels = Long2IntMaps.synchronize(new Long2IntOpenHashMap());
-		private final LongSet toUpdate = new LongOpenHashSet();
+	/** Effect adapter for the native player-loading decision owner. */
+	class PlayerTicketTracker {
+		private final PlayerChunkDistances distances;
+		private final int field;
+		private final NativePlayerLoading policy;
 
 		protected PlayerTicketTracker(PlayerChunkDistances distances, int field) {
-			super(distances, field);
-			this.viewDistance = 0;
-			this.queueLevels.defaultReturnValue(this.maxDistance + 2);
-		}
-
-		@Override
-		protected void onLevelChange(long l, int i, int j) {
-			this.toUpdate.add(l);
+			this.distances = distances;
+			this.field = field;
+			this.policy = new NativePlayerLoading(distances.maxDistance(field));
 		}
 
 		public void updateViewDistance(int i) {
-			for (Entry entry : this.chunks.long2ByteEntrySet()) {
-				byte b = entry.getByteValue();
-				long l = entry.getLongKey();
-				this.onLevelChange(l, b, this.haveTicketFor(b), b <= i);
-			}
-
-			this.viewDistance = i;
-		}
-
-		private void onLevelChange(long l, int i, boolean bl, boolean bl2) {
-			if (bl != bl2) {
-				Ticket ticket = new Ticket(TicketType.PLAYER_LOADING, DistanceManager.PLAYER_TICKET_LEVEL);
-				if (bl2) {
-					DistanceManager.this.ticketDispatcher.submit(() -> DistanceManager.this.mainThreadExecutor.execute(() -> {
-						if (this.haveTicketFor(this.getLevel(l))) {
-							DistanceManager.this.ticketStorage.addTicket(l, ticket);
-							DistanceManager.this.ticketsToRelease.add(l);
-						} else {
-							DistanceManager.this.ticketDispatcher.release(l, () -> {}, false);
-						}
-					}), l, () -> i);
-				} else {
-					DistanceManager.this.ticketDispatcher
-						.release(l, () -> DistanceManager.this.mainThreadExecutor.execute(() -> DistanceManager.this.ticketStorage.removeTicket(l, ticket)), true);
-				}
+			try (NativePlayerLoading.Walk walk = this.policy.walk(1, i)) {
+				this.execute(walk, null);
 			}
 		}
 
-		@Override
 		public void runAllUpdates() {
-			super.runAllUpdates();
-			if (!this.toUpdate.isEmpty()) {
-				LongIterator longIterator = this.toUpdate.iterator();
-
-				while (longIterator.hasNext()) {
-					long l = longIterator.nextLong();
-					int i = this.queueLevels.get(l);
-					int j = this.getLevel(l);
-					if (i != j) {
-						DistanceManager.this.ticketDispatcher.onLevelChange(new ChunkPos(l), () -> this.queueLevels.get(l), j, ix -> {
-							if (ix >= this.queueLevels.defaultReturnValue()) {
-								this.queueLevels.remove(l);
-							} else {
-								this.queueLevels.put(l, ix);
-							}
-						});
-						this.onLevelChange(l, j, this.haveTicketFor(i), this.haveTicketFor(j));
-					}
-				}
-
-				this.toUpdate.clear();
+			this.distances.runIntoLoading(this.field, this.policy);
+			try (NativePlayerLoading.Walk walk = this.policy.walk(0, 0)) {
+				this.execute(walk, null);
 			}
 		}
 
-		private boolean haveTicketFor(int i) {
-			return i <= this.viewDistance;
+		void releaseReady(ChunkMap chunkMap) {
+			try (NativePlayerLoading.Walk walk = this.policy.walk(2, 0)) {
+				this.execute(walk, chunkMap);
+			}
+		}
+
+		/** Effects run only after the native walk has dropped its guard. The next
+		 * step rereads live policy where the original would resume after a callback. */
+		private void execute(NativePlayerLoading.Walk walk, @Nullable ChunkMap chunkMap) {
+			int answer = -1;
+			while (true) {
+				int action = walk.next(answer);
+				answer = -1;
+				long key = walk.key();
+				int level = walk.level();
+				switch (action) {
+					case NativePlayerLoading.DONE -> { return; }
+					case NativePlayerLoading.RESORT -> DistanceManager.this.ticketDispatcher.onLevelChange(
+						new ChunkPos(key), () -> this.policy.queueLevel(key), level, next -> this.policy.queueLevel(key, next));
+					case NativePlayerLoading.ENTER -> {
+						Ticket ticket = new Ticket(TicketType.PLAYER_LOADING, DistanceManager.PLAYER_TICKET_LEVEL);
+						DistanceManager.this.ticketDispatcher.submit(() -> DistanceManager.this.mainThreadExecutor.execute(() -> {
+							if (this.policy.admits(key)) {
+								DistanceManager.this.ticketStorage.addTicket(key, ticket);
+								this.policy.markRelease(key);
+							} else {
+								DistanceManager.this.ticketDispatcher.release(key, () -> {}, false);
+							}
+						}), key, () -> level);
+					}
+					case NativePlayerLoading.LEAVE -> {
+						Ticket ticket = new Ticket(TicketType.PLAYER_LOADING, DistanceManager.PLAYER_TICKET_LEVEL);
+						DistanceManager.this.ticketDispatcher.release(key, () -> DistanceManager.this.mainThreadExecutor.execute(
+							() -> DistanceManager.this.ticketStorage.removeTicket(key, ticket)), true);
+					}
+					case NativePlayerLoading.HAS_TICKET -> answer = DistanceManager.this.ticketStorage.getTickets(key).stream()
+						.anyMatch(ticket -> ticket.getType() == TicketType.PLAYER_LOADING) ? 1 : 0;
+					case NativePlayerLoading.ATTACH -> {
+						ChunkHolder holder = chunkMap.getUpdatingChunkIfPresent(key);
+						if (holder == null) throw new IllegalStateException();
+						CompletableFuture<ChunkResult<LevelChunk>> future = holder.getEntityTickingChunkFuture();
+						future.thenAccept(result -> DistanceManager.this.mainThreadExecutor.execute(
+							() -> DistanceManager.this.ticketDispatcher.release(key, () -> {}, false)));
+					}
+					default -> throw new IllegalStateException("Native player-loading action " + action);
+				}
+			}
 		}
 	}
 }

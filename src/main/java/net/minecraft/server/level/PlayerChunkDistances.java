@@ -152,6 +152,21 @@ final class PlayerChunkDistances {
         } finally { this.access.unlock(); }
     }
 
+    /** Apply the player-ticket field directly to its native policy owner. */
+    void runIntoLoading(int field, NativePlayerLoading policy) {
+        if (!this.hasWork(field)) return;
+        this.access.lock();
+        try {
+            try {
+                long status = (long)RUN.invokeExact(this.handleId, field, Integer.MAX_VALUE);
+                this.check(status);
+                policy.takePlayer(this.handleId, field);
+            } catch (RuntimeException | Error error) { throw error; }
+            catch (Throwable error) { throw new IllegalStateException("Cannot run player loading distances", error); }
+            finally { Reference.reachabilityFence(this.handle); }
+        } finally { this.access.unlock(); }
+    }
+
     private void check(long status) {
         this.work = (int)(status >>> 8) & 3;
         switch ((int)status & 255) {

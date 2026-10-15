@@ -9,9 +9,11 @@ and propagation. [`PlayerChunkDistances`](https://github.com/HungLo2020/MattMC/b
 is the Java lifetime/exception adapter. There is no Java graph or fallback for
 these two trackers.
 
-Java keeps `playersPerChunk`, each tracker's published `chunks` map and every
-downstream reaction: spawn candidate iteration, `hasPlayersNearby`, the ticket
-tracker's `toUpdate`/view-distance logic and ticket dispatch. The
+Java keeps `playersPerChunk`'s actual player objects and effectful callbacks.
+The natural-spawn published view and its walks are native
+[tick-selection views](RUST-TICK-SELECTION.md); the player-ticket published view,
+changed-key set and dispatch decisions belong to the
+[player-loading owner](RUST-PLAYER-LOADING.md). The
 [simulation](RUST-SIMULATION-DISTANCE.md), [loading](RUST-LOADING-DISTANCE.md)
 and [POI village](RUST-POI-DISTANCE.md) trackers share this graph code over the
 native [work queue](../lighting/RUST-PRIORITY-QUEUE.md).
@@ -27,12 +29,11 @@ native [work queue](../lighting/RUST-PRIORITY-QUEUE.md).
   `chunkVacated` only when the chunk's player set empties. Change any of those
   call sites together, or presence and the Java map will diverge.
 - A run produces that field's `setLevel(pos, level)` calls in their original
-  order. The player-ticket field returns them, and Java replays them through the
-  original `setLevel`/`onLevelChange`, so its map layout and `toUpdate` contents
-  match the original. The natural-spawn field applies them natively to its
-  [tick-selection view](RUST-TICK-SELECTION.md) (`runInto`), so spawn-candidate
-  iteration order matches. Nothing in Java reads levels during propagation, so
-  applying after the run is equivalent. Sinks must not reenter the adapter.
+  order. Production applies them natively to the player-loading owner or the
+  natural-spawn tick-selection view. Nothing in Java reads levels during
+  propagation, so applying after the run is equivalent. The generic published
+  map/sink adapter remains for verification and compatibility callers; it is
+  not the production player-loading state. Sinks must not reenter the adapter.
 - `runAllUpdates` skips the downcall when the last native result reported no
   queued work for that field, as the original returned on an empty queue.
 - The Java adapter owns handle lifetime: an auto arena owns release, every
