@@ -275,6 +275,60 @@ impl SurfaceChunk {
         }
     }
 
+    /// Whether the stage has the preliminary surface program `pass` needs.
+    pub(super) fn has_levels(&self) -> bool {
+        !self.inputs.levels.is_null()
+    }
+
+    /// The storage's block state id at (x, y, z) (-1 outside the sections,
+    /// -2 in an only-air section) and its flags, for the extensions.
+    pub(super) fn block(&self, x: i32, y: i32, z: i32) -> Result<(i32, u8), Error> {
+        let storage = self.storage();
+        let state = storage.get(x, y, z);
+        // ProtoChunk answers VOID_AIR outside the sections and AIR in an only-air one.
+        if state < 0 {
+            return Ok((state, FLAG_AIR));
+        }
+        Ok((state, storage.flag(state)?))
+    }
+
+    /// The extensions' `BlockColumn.setBlock` over the storage.
+    pub(super) fn set_column_block(&mut self, x: i32, y: i32, z: i32, state: i32) -> Result<(), Error> {
+        self.set_block(x, y, z, state)
+    }
+
+    /// `getHeight(WORLD_SURFACE_WG, x, z)` on the storage.
+    pub(super) fn height(&self, x: i32, z: i32) -> i32 {
+        self.storage().height(x, z)
+    }
+
+    /// The storage's minimum Y.
+    pub(super) fn min_y(&self) -> i32 {
+        self.storage().min_y()
+    }
+
+    /// `BiomeManager.getBiome` over the quart table: the selected quart's
+    /// registry id (-1 for a biome without a key).
+    pub(super) fn biome_at(&self, x: i32, y: i32, z: i32) -> Result<i32, Error> {
+        let b = self.biomes.as_ref().ok_or(Error::Input)?;
+        let [qx, qy, qz] = crate::world::level::biome::fiddled_distance::quart(b.seed, [x, y, z]);
+        let (qx, qy, qz) = (qx - b.qx, qy - b.qy, qz - b.qz);
+        if qx < 0 || qy < 0 || qz < 0 || qx as usize >= b.size_x || qy as usize >= b.size_y || qz as usize >= b.size_z {
+            return Err(Error::Input);
+        }
+        Ok(b.ids[(qx as usize * b.size_z + qz as usize) * b.size_y + qy as usize])
+    }
+
+    /// `Context.getMinSurfaceLevel` at (x, z) with the column's surface depth,
+    /// sharing the corner cache the rules' requests use.
+    pub(super) fn min_surface(&mut self, x: i32, z: i32, surface_depth: i32) -> Result<i32, Error> {
+        if self.inputs.levels.is_null() {
+            return Err(Error::Input);
+        }
+        let levels = unsafe { &*self.inputs.levels };
+        min_surface_level(levels, &mut self.corners, x, z, surface_depth)
+    }
+
     /// Answers the evaluator's request natively when its inputs are native;
     /// false leaves it to Java.
     fn answer(&mut self, frame: &mut [i32]) -> Result<bool, Error> {

@@ -104,7 +104,14 @@ public class SurfaceSystem {
 		NativeSurfaceChunk owned = NativeSurfaceChunk.create(chunkAccess, surfaceRule, biomeManager, registry, this.defaultBlock);
 		if (owned != null) {
 			try {
-				this.buildOwnedSurface(owned, biomeManager, bl, chunkAccess, context, surfaceRule, mutableBlockPos);
+				// Rust runs the whole column loop when every input is native; the
+				// choice is made before the first write.
+				long pass = owned.createPass(this, surfaceRule, registry, bl, chunkAccess);
+				if (pass != 0) {
+					surfaceRule.pass(owned, pass);
+				} else {
+					this.buildOwnedSurface(owned, biomeManager, bl, chunkAccess, context, surfaceRule, mutableBlockPos);
+				}
 				owned.install();
 			} finally {
 				owned.close();
@@ -393,6 +400,21 @@ public class SurfaceSystem {
 
 	PositionalRandomFactory noiseRandom() {
 		return this.noiseRandom;
+	}
+
+	/** The stage's default block, for the native surface pass. */
+	BlockState defaultBlock() {
+		return this.defaultBlock;
+	}
+
+	/** The eroded badlands extension's surface, pillar and pillar roof noises, for the native surface pass. */
+	NormalNoise[] badlandsNoises() {
+		return new NormalNoise[]{this.badlandsSurfaceNoise, this.badlandsPillarNoise, this.badlandsPillarRoofNoise};
+	}
+
+	/** The frozen ocean extension's surface, pillar and pillar roof noises, for the native surface pass. */
+	NormalNoise[] icebergNoises() {
+		return new NormalNoise[]{this.icebergSurfaceNoise, this.icebergPillarNoise, this.icebergPillarRoofNoise};
 	}
 
 	int bandOffset(int x, int z) {

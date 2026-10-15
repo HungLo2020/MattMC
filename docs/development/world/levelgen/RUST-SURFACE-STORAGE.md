@@ -32,13 +32,54 @@ and answers the evaluator's requests itself:
   program at the surface cell's corners (kept across columns, as the context's
   cache keeps them), `Mth.lerp2`, `Mth.floor`, plus surface depth − 8.
 
-Java still drives the X/Z column loop, updates the context and looks up each
-column's biome for the extensions. It answers only temperature and extension
-conditions, and any of the above whose noise, random factory or noise chunk is
-not the built-in kind. The eroded badlands and frozen ocean extensions read and write
-through a block column backed by the Rust storage. At the end Java installs
-the modified sections through the [native handoff](RUST-STAGE-HANDOFF.md), both heightmaps and the fluid
+On eligible chunks the whole X/Z column loop runs in Rust too (the
+[column pass](#column-pass)); otherwise Java drives it, updates the context,
+looks up each column's biome for the extensions and runs the eroded badlands
+and frozen ocean extensions through a block column backed by the Rust storage.
+Java answers only temperature and extension conditions, and any of the above
+whose noise, random factory or noise chunk is not the built-in kind. At the
+end Java installs the modified sections through the
+[native handoff](RUST-STAGE-HANDOFF.md), both heightmaps and the fluid
 post-processing marks, in write order.
+
+## Column pass
+
+[`surface/pass.rs`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/surface/pass.rs)
+runs `SurfaceSystem.buildOwnedSurface`'s 256 columns (X outer, Z inner) in one
+resumable call. Per column, in Java's order: the `WORLD_SURFACE_WG` height,
+the column biome (`BiomeManager.getBiome` over the quart table, at Y 0 with
+the legacy random source), the eroded badlands extension, `Context.updateXZ`'s
+surface depth (surface noise plus `noiseRandom`), the re-read height, the rule
+column, then the frozen ocean extension (its minimum surface level from the
+same corner cache the rules use, its noises and positional random).
+
+The pass returns to Java only for answers Java owns, and nothing native is
+borrowed or locked while Java runs:
+
+- status 2: a rule request, answered by `NativeSurface.respond` as before.
+  Before a column's first answer Java sets the context to what its loop
+  would have left after that column's `updateXZ` (block X/Z, surface depth,
+  `lastUpdateXZ`, `lastUpdateY`), so lazy conditions see the same counters;
+- status 3: `shouldMeltFrozenOceanIcebergSlightly` at (x, sea level, z), which
+  reads the biome's per-thread temperature cache; the extension's random draws
+  follow the answer.
+
+`NativeSurfaceChunk.createPass` decides before the first write; it returns 0,
+keeping Java's loop on the Rust storage, unless every noise (surface,
+three badlands, three iceberg) has a native state, `noiseRandom` is Xoroshiro
+or Legacy, the stage has the preliminary surface program and a quart biome
+table (the rule uses biomes), and Y 0 lies inside the table when the column
+biome is read there. A chunk never switches routes mid-pass. A Java answer
+that throws ends the pass; nothing is installed, as with Java's loop.
+`-Dmattmc.worldgen.javaSurfacePass=true` keeps Java's loop for comparisons.
+`surfacePasses=` and `surfaceMelts=` in the decoration statistics count
+passes and melt checks.
+
+`NativeSurfacePassTest` compares the pass with Java's loop and with plain Java
+storage on every vanilla setting (blocks, heightmaps, marks, and every biome's
+temperature cache entries and order), the context before every Java answer of
+a rule that asks temperature at every block, a rule without biomes (Java's
+loop), and an answer that throws.
 
 ## Shared chunk storage
 

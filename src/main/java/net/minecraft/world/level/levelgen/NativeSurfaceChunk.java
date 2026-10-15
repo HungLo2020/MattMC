@@ -35,6 +35,19 @@ final class NativeSurfaceChunk implements AutoCloseable {
     static final MethodHandle RUN = bind("run", true, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
         ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_DOUBLE));
     private static final MethodHandle RELEASE = bind("release", false, FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+    private static final MethodHandle PASS_CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_surface_pass_create",
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
+        Linker.Option.critical(true));
+    // Runs until every column is done or Java must answer; borrows the frame, cache and state.
+    static final MethodHandle PASS_RUN = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_surface_pass_run",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS, ValueLayout.JAVA_DOUBLE, ValueLayout.ADDRESS), Linker.Option.critical(true));
+    static final MethodHandle PASS_RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_surface_pass_release",
+        FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+    // Production reads the property once; tests compare the pass with Java's column loop.
+    private static volatile boolean passEnabled = !Boolean.getBoolean("mattmc.worldgen.javaSurfacePass");
+    // Chunks whose column loop ran in Rust, and the frozen ocean melt checks it asked Java.
+    static final AtomicLong PASS_CHUNKS = new AtomicLong(), PASS_MELT_CALLS = new AtomicLong();
     // Tests compare both routes in one JVM; production reads the property once.
     private static volatile boolean enabled = !Boolean.getBoolean("mattmc.worldgen.javaSurfaceStorage");
     // Comparison runs keep Java answering conditions and surface inputs on Rust storage.
@@ -50,6 +63,10 @@ final class NativeSurfaceChunk implements AutoCloseable {
 
     static void setEnabled(boolean value) {
         enabled = value;
+    }
+
+    static void setPassEnabled(boolean value) {
+        passEnabled = value;
     }
 
     final long handle;
@@ -144,6 +161,49 @@ final class NativeSurfaceChunk implements AutoCloseable {
         }
         if (count < 0) throw new IllegalStateException("Native surface column rejected: " + count);
         return count;
+    }
+
+    /** The Rust column loop for this stage (a pass handle), or 0 to keep Java's
+     * loop. Decided before any write: every noise, the positional random, the
+     * preliminary surface program and the quart biome table must be native, and
+     * the column biome's Y must fall inside the table. */
+    long createPass(SurfaceSystem system, NativeSurface rule, Registry<Biome> registry, boolean biomeAtZero, ChunkAccess chunk) {
+        if (!passEnabled || !nativeConditions || !rule.usesBiomes() || system.getClass() != SurfaceSystem.class) return 0L;
+        // buildSurface reads the column biome at Y 0 with the legacy random; the table covers the chunk's height.
+        if (biomeAtZero && (0 < chunk.getMinY() || 0 >= chunk.getMinY() + chunk.getHeight())) return 0L;
+        long[] random = NativeTopMaterial.positional(system.noiseRandom());
+        if (random == null) return 0L;
+        NormalNoise[] badlands = system.badlandsNoises(), iceberg = system.icebergNoises();
+        long[] longs = {address(system.surfaceNoise(), this.keep), address(badlands[0], this.keep), address(badlands[1], this.keep),
+            address(badlands[2], this.keep), address(iceberg[0], this.keep), address(iceberg[1], this.keep), address(iceberg[2], this.keep),
+            random[0], random[1], random[2]};
+        for (int at = 0; at < 7; at++) if (longs[at] == 0) return 0L;
+        int[] defaults = stateIds(system.defaultBlock().getBlock()), water = stateIds(net.minecraft.world.level.block.Blocks.WATER);
+        int[] head = {1, chunk.getPos().getMinBlockX(), chunk.getPos().getMinBlockZ(), system.getSeaLevel(), biomeAtZero ? 1 : 0,
+            biomeId(registry, net.minecraft.world.level.biome.Biomes.ERODED_BADLANDS), biomeId(registry, net.minecraft.world.level.biome.Biomes.FROZEN_OCEAN),
+            biomeId(registry, net.minecraft.world.level.biome.Biomes.DEEP_FROZEN_OCEAN), Block.getId(system.defaultBlock()),
+            Block.getId(net.minecraft.world.level.block.Blocks.SNOW_BLOCK.defaultBlockState()),
+            Block.getId(net.minecraft.world.level.block.Blocks.PACKED_ICE.defaultBlockState()),
+            net.minecraft.world.level.dimension.DimensionType.WAY_BELOW_MIN_Y, defaults.length, water.length};
+        int[] ints = new int[head.length + defaults.length + water.length];
+        System.arraycopy(head, 0, ints, 0, head.length);
+        System.arraycopy(defaults, 0, ints, head.length, defaults.length);
+        System.arraycopy(water, 0, ints, head.length + defaults.length, water.length);
+        try {
+            return (long)PASS_CREATE.invokeExact(this.handle, MemorySegment.ofArray(ints), ints.length, MemorySegment.ofArray(longs), longs.length);
+        } catch (Throwable error) {
+            throw new IllegalStateException("Cannot create native surface pass", error);
+        }
+    }
+
+    private static int biomeId(Registry<Biome> registry, net.minecraft.resources.ResourceKey<Biome> key) {
+        Biome biome = registry.getValue(key);
+        return biome == null ? -1 : registry.getId(biome);
+    }
+
+    /** Every state id of the block, sorted (BlockState.is(block)). */
+    private static int[] stateIds(Block block) {
+        return block.getStateDefinition().getPossibleStates().stream().mapToInt(Block::getId).sorted().toArray();
     }
 
     /** Installs every modified section, both heightmaps and the fluid marks. */

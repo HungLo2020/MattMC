@@ -432,6 +432,59 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
         }
     }
 
+    /**
+     * {@code SurfaceSystem.buildOwnedSurface}'s whole column loop in Rust
+     * ({@code pass}, from {@link NativeSurfaceChunk#createPass}, released here).
+     * Rust yields only for Java's answers: a rule request (status 2) and the
+     * frozen ocean's melt check (status 3). Before the first request of a column
+     * the context is brought to where Java's loop would have left it after that
+     * column's {@code updateXZ}: block X/Z, surface depth and both update
+     * counters; the rest of its state follows from {@link #respond} as before.
+     */
+    void pass(NativeSurfaceChunk owned, long pass) {
+        long startXZ = context.lastUpdateXZ, startY = context.lastUpdateY;
+        long[] state = new long[8];
+        net.minecraft.core.BlockPos.MutableBlockPos melt = new net.minecraft.core.BlockPos.MutableBlockPos();
+        int seaLevel = context.system.getSeaLevel();
+        try {
+            for (;;) {
+                int status;
+                try {
+                    status = (int)NativeSurfaceChunk.PASS_RUN.invokeExact(pass, MemorySegment.ofArray(program), program.length,
+                        MemorySegment.ofArray(frame), MemorySegment.ofArray(cache), secondary, MemorySegment.ofArray(state));
+                } catch (Throwable t) { throw failure(t); }
+                int x = (int)state[0], z = (int)state[1];
+                if (status == 0) {
+                    context.lastUpdateXZ = startXZ + state[3];
+                    context.lastUpdateY = startY + state[7];
+                    NativeSurfaceChunk.PASS_CHUNKS.incrementAndGet();
+                    return;
+                } else if (status == 2) {
+                    if (state[5] != 0) {
+                        // Context.updateXZ for this column, then NativeSurface.reset's Java fields.
+                        context.blockX = x; context.blockZ = z; context.surfaceDepth = (int)state[2];
+                        context.lastUpdateXZ = startXZ + state[3];
+                        context.lastUpdateY = startY + state[4];
+                        updateBase = context.lastUpdateY; syncedY = Integer.MIN_VALUE; secondary = 0;
+                    }
+                    respond(x, z);
+                } else if (status == 3) {
+                    // frozenOceanExtension's biome.shouldMeltFrozenOceanIcebergSlightly(pos(x, seaLevel, z), seaLevel).
+                    Biome biome = registry.byId((int)state[6]);
+                    if (biome == null) throw new IllegalStateException("Native surface pass: unknown biome " + state[6]);
+                    state[6] = biome.shouldMeltFrozenOceanIcebergSlightly(melt.set(x, seaLevel, z), seaLevel) ? 1 : 0;
+                    NativeSurfaceChunk.PASS_MELT_CALLS.incrementAndGet();
+                } else {
+                    throw new IllegalStateException("Native surface pass: " + status);
+                }
+            }
+        } finally {
+            try {
+                NativeSurfaceChunk.PASS_RELEASE.invokeExact(pass);
+            } catch (Throwable t) { throw failure(t); }
+        }
+    }
+
     private void reset(int minY, int count) {
         Arrays.fill(frame, 0); Arrays.fill(cache, -1); secondary = 0;
         frame[0] = count - 1; frame[2] = Integer.MIN_VALUE; frame[3] = Integer.MAX_VALUE;
@@ -462,7 +515,12 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
         JAVA_ANSWERS.incrementAndGet(kind);
     }
 
+    // Tests only: sees the context before each Java answer.
+    static volatile java.util.function.Consumer<SurfaceRules.Context> respondHook;
+
     private void respond(int x, int z) {
+        var hook = respondHook;
+        if (hook != null) hook.accept(context);
         if (frame[17] >= -3 && frame[17] < conditionSources.length) count(frame[17]);
         int y = frame[12] + frame[0];
         if (syncedY != y) {

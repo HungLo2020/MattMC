@@ -238,7 +238,7 @@ final class NativeTopMaterial {
 
     /** A positional random's ABI [kind, a, b] (1 Xoroshiro, 2 Legacy), or null. */
     @Nullable
-    private static long[] positional(PositionalRandomFactory factory) {
+    static long[] positional(PositionalRandomFactory factory) {
         if (factory.getClass() == XoroshiroRandomSource.XoroshiroPositionalRandomFactory.class) {
             var xoroshiro = (XoroshiroRandomSource.XoroshiroPositionalRandomFactory)factory;
             return new long[]{1, xoroshiro.seedLo(), xoroshiro.seedHi()};

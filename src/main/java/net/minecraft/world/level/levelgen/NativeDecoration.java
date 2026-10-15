@@ -272,6 +272,7 @@ public final class NativeDecoration {
 			+ (VERIFY ? " verified=" + VERIFIED.sum() + " mismatched=" + MISMATCHED.sum() : "")
 			+ " templates=" + TEMPLATES.sum() + " javaTemplates=" + new java.util.TreeMap<>(JAVA_TEMPLATES).toString().replace(' ', '_') + " pieces=" + PIECES.sum()
 			+ " javaPieces=" + new java.util.TreeMap<>(JAVA_PIECES).toString().replace(' ', '_') + " " + NativeCarvers.statistics() + " javaBiomeSets=" + JAVA_BIOME_SETS.sum() + " columnHeights=" + NativeColumns.HEIGHTS.get() + " freezeWarmCalls=" + WARM_CALLS.sum()
+			+ " surfaceChunks=" + NativeSurfaceChunk.CHUNKS.get() + " surfacePasses=" + NativeSurfaceChunk.PASS_CHUNKS.get() + " surfaceMelts=" + NativeSurfaceChunk.PASS_MELT_CALLS.get()
 			+ (VERIFY ? " freezeHistoryVerified=" + NativeFreezeVerification.VERIFIED.sum() + " freezeHistoryMismatched=" + NativeFreezeVerification.MISMATCHED.sum() : "")
 			+ " " + NativeJigsaw.statistics() + " structureStubs=" + NativeStructureStubs.PLANNED.get() + " monumentsRegenerated=" + NativeStructureStubs.MONUMENTS_REGENERATED.get() + " sequenced=" + SEQUENCED.sum() + " sequenceDeclined=" + SEQUENCE_DECLINED.sum() + " sequenceResumed=" + SEQUENCE_RESUMED.sum()
 			+ " txOverlaps=" + net.minecraft.world.level.chunk.DecorationTransaction.OVERLAPS.sum() + " txConflicts=" + net.minecraft.world.level.chunk.DecorationTransaction.CONFLICTS.sum()

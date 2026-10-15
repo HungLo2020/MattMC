@@ -249,3 +249,103 @@ pub unsafe extern "C" fn mattmc_surface_chunk_release(handle: u64) {
         drop(unsafe { Box::from_raw(handle as *mut SurfaceChunk) });
     }
 }
+
+use super::pass::{Pass, PassInputs, STATE_WORDS};
+
+/// `buildOwnedSurface`'s column loop over a stage (`mattmc_surface_chunk_create`).
+/// `ints`: [usesBiomes, chunk min block X, Z, sea level, biome-at-zero,
+/// eroded badlands id, frozen ocean id, deep frozen ocean id, default block
+/// state, snow block state, packed ice state, WAY_BELOW_MIN_Y,
+/// default-state count, water-state count, then the default block's and
+/// water's sorted state ids]. `longs`: [surface noise, badlands surface,
+/// pillar, pillar roof, iceberg surface, pillar, pillar roof (state
+/// addresses), random kind, random a, random b]. Returns 0 if invalid.
+/// # Safety
+/// `ints`/`longs` are borrowed for this call; `stage` is live, outlives the
+/// pass and is used only through it while the pass runs; the noise states stay
+/// live and unchanged.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_surface_pass_create(stage: u64, ints: *const i32, int_count: i32, longs: *const i64, long_count: i32) -> u64 {
+    if stage == 0 || ints.is_null() || longs.is_null() || int_count < 14 || long_count != 10 {
+        return 0;
+    }
+    let i = unsafe { std::slice::from_raw_parts(ints, int_count as usize) };
+    let l = unsafe { std::slice::from_raw_parts(longs, 10) };
+    let (Ok(defaults), Ok(waters)) = (usize::try_from(i[12]), usize::try_from(i[13])) else { return 0 };
+    if 14 + defaults + waters != i.len() {
+        return 0;
+    }
+    let default_states = i[14..14 + defaults].to_vec();
+    let water_states = i[14 + defaults..].to_vec();
+    if !default_states.is_sorted() || !water_states.is_sorted() {
+        return 0;
+    }
+    let Some(random) = Positional::from_abi(l[7] as i32, l[8], l[9]) else { return 0 };
+    let state = |at: usize| l[at] as *const State;
+    let inputs = PassInputs {
+        surface: state(0),
+        random,
+        badlands: [state(1), state(2), state(3)],
+        iceberg: [state(4), state(5), state(6)],
+        sea_level: i[3],
+        biome_at_zero: i[4] != 0,
+        eroded_badlands: i[5],
+        frozen_ocean: i[6],
+        deep_frozen_ocean: i[7],
+        default_states,
+        water_states,
+        default_block: i[8],
+        snow_block: i[9],
+        packed_ice: i[10],
+        way_below_min_y: i[11],
+    };
+    match unsafe { Pass::new(stage as *mut SurfaceChunk, inputs, i[0] != 0, i[1], i[2]) } {
+        Ok(pass) => Box::into_raw(Box::new(pass)) as u64,
+        Err(_) => 0,
+    }
+}
+
+/// Runs the pass: 0 when every column is done, 2 for a rule request (the
+/// frame, as `mattmc_surface_chunk_run`), 3 for the frozen ocean's melt check
+/// (answer 0/1 in state word 6), negative on errors. `state` holds
+/// `STATE_WORDS` words, written on every return.
+/// # Safety
+/// `program` is a validated surface program of `program_len` words; `frame`
+/// 24 words, `cache` `program[0] / 8` words and `state` 8 words, all borrowed
+/// for this call.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_surface_pass_run(pass: u64, program: *const i32, program_len: i32, frame: *mut i32, cache: *mut i32, secondary: f64,
+    state: *mut i64) -> i32 {
+    if pass == 0 || program.is_null() || frame.is_null() || cache.is_null() || state.is_null() || program_len < 16 {
+        return -1;
+    }
+    let program = unsafe { std::slice::from_raw_parts(program, program_len as usize) };
+    let cache_len = (program[0] / 8).max(0) as usize;
+    let frame = unsafe { std::slice::from_raw_parts_mut(frame, 24) };
+    let cache = unsafe { std::slice::from_raw_parts_mut(cache, cache_len) };
+    let state = unsafe { std::slice::from_raw_parts_mut(state, STATE_WORDS) };
+    let pass = unsafe { &mut *(pass as *mut Pass) };
+    match pass.run(program, frame, cache, secondary, state) {
+        Ok(status) => status,
+        Err(super::chunk::Error::State(_)) => -3,
+        Err(super::chunk::Error::Evaluation(status)) => status.min(-4),
+        Err(super::chunk::Error::Input) => -2,
+    }
+}
+
+/// Melt checks the pass asked Java for.
+/// # Safety
+/// A live pass handle.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_surface_pass_temperature_calls(pass: u64) -> i32 {
+    if pass == 0 { 0 } else { unsafe { &*(pass as *const Pass) }.temperature_calls as i32 }
+}
+
+/// # Safety
+/// A handle from create, not used afterwards. The stage stays live.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_surface_pass_release(pass: u64) {
+    if pass != 0 {
+        drop(unsafe { Box::from_raw(pass as *mut Pass) });
+    }
+}
