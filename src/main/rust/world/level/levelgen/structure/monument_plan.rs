@@ -159,10 +159,22 @@ fn world_pos(bb: &[i32; 6], direction: i32, i: i32, j: i32, k: i32) -> [i32; 3] 
 }
 
 pub(crate) fn plan(random: &mut Legacy, chunk: [i32; 2], _stub: [i32; 3], _params: &[i32]) -> Result<Vec<i32>, ()> {
-    // createTopPiece: Direction.Plane.HORIZONTAL [N, E, S, W].
-    let x0 = chunk[0] * 16 - 29;
-    let z0 = chunk[1] * 16 - 29;
-    let direction = [NORTH2, EAST2, SOUTH2, WEST2][random.next_int_bound(4) as usize];
+    // createTopPiece: the building at (chunk * 16 - 29) with the drawn direction.
+    plan_at(random, chunk[0] * 16 - 29, chunk[1] * 16 - 29, None)
+}
+
+/// `new MonumentBuilding(random, x0, z0, direction)` after the caller's
+/// `Direction.Plane.HORIZONTAL.getRandomDirection(random)`: that draw is always
+/// consumed, then `orientation` (a 2D data value) replaces it when given, as
+/// `regeneratePiecesAfterLoad` keeps a saved building's orientation.
+pub(crate) fn plan_at(random: &mut Legacy, x0: i32, z0: i32, orientation: Option<i32>) -> Result<Vec<i32>, ()> {
+    // Direction.Plane.HORIZONTAL [N, E, S, W].
+    let drawn = [NORTH2, EAST2, SOUTH2, WEST2][random.next_int_bound(4) as usize];
+    let direction = match orientation {
+        Some(value) if (0..4).contains(&value) => value,
+        Some(_) => return Err(()),
+        None => drawn,
+    };
     let bb = [x0, 39, z0, x0 + 57, 39 + 22, z0 + 57];
 
     // generateRoomGraph.

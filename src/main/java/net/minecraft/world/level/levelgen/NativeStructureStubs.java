@@ -42,8 +42,15 @@ public final class NativeStructureStubs {
     private static final MethodHandle STUB = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_structure_stub",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
             ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    private static final MethodHandle MONUMENT_REGENERATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_structure_monument_regenerate",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final boolean ENABLED = !Boolean.getBoolean("mattmc.worldgen.javaStructureStubs");
+    // Tests compare both routes in one JVM; production reads the property once.
+    static volatile boolean monumentRegeneration = ENABLED;
     public static final AtomicLong PLANNED = new AtomicLong();
+    // Saved ocean monuments whose building Rust re-planned on load.
+    public static final AtomicLong MONUMENTS_REGENERATED = new AtomicLong();
     // Per structure and climate parameter list: the structure's biomes and the monument's surrounding tag, per node.
     private static final Map<Structure, Map<Climate.ParameterList<?>, byte[][]>> ACCEPT = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
@@ -61,6 +68,32 @@ public final class NativeStructureStubs {
         byte[] inSet = new byte[list.size()];
         for (int i = 0; i < inSet.length; i++) inSet[i] = (byte)(biomes.test(list.get(i)) ? 1 : 0);
         return new byte[][]{inSet, new byte[list.size()]};
+    }
+
+    /**
+     * {@code OceanMonumentStructure.regeneratePiecesAfterLoad}'s building for a
+     * non-empty saved start: Rust re-plans it from {@code setLargeFeatureSeed(seed,
+     * chunk)}, consuming the direction draw, at the saved box's minX/minZ with the
+     * saved {@code orientation} (null keeps the drawn one). Returns the piece words
+     * for {@code OceanMonumentPieces.addNativePieces}, with the final random state
+     * in {@code state[0]}, or null to regenerate in Java (whose random is its own).
+     */
+    @Nullable
+    public static int[] regenerateMonument(long seed, net.minecraft.world.level.ChunkPos chunk, int minX, int minZ,
+                                           @Nullable net.minecraft.core.Direction orientation, long[] state) {
+        if (!monumentRegeneration) return null;
+        try (var arena = java.lang.foreign.Arena.ofConfined()) {
+            var words = arena.allocate(ValueLayout.JAVA_INT, PIECE_WORDS);
+            var out = arena.allocate(ValueLayout.JAVA_LONG, 1);
+            int count = (int)MONUMENT_REGENERATE.invokeExact(seed, chunk.x, chunk.z, minX, minZ, orientation == null ? -1 : orientation.get2DDataValue(),
+                words, PIECE_WORDS, out);
+            if (count < 0) return null;
+            state[0] = out.get(ValueLayout.JAVA_LONG, 0);
+            MONUMENTS_REGENERATED.incrementAndGet();
+            return words.asSlice(0, count * 4L).toArray(ValueLayout.JAVA_INT);
+        } catch (Throwable error) {
+            throw new IllegalStateException("Native monument regeneration failed", error);
+        }
     }
 
     /** {@code structure.generate(...)} with a native start position, or null for Java's path (nothing drawn or changed). */

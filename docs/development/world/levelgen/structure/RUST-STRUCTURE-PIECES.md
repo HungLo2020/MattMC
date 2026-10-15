@@ -93,8 +93,17 @@ and a missing or unexpected template keeps Java's planner. Base columns come
 from the [native column source](../RUST-NOISE-FILL.md#base-heights). Plain
 multi-noise biome sources and the End's source only; `structureStubs=` counts
 the starts and `-Dmattmc.worldgen.javaStructureStubs=true` keeps Java's search
-and planners. Monuments loaded from disk still regenerate their pieces in
-Java (`regeneratePiecesAfterLoad`).
+and planners. A monument loaded from disk regenerates its building in Rust too
+(`OceanMonumentStructure.regeneratePiecesAfterLoad` through
+`monument_plan::plan_at`): `setLargeFeatureSeed(seed, chunk)`, the direction draw
+(always consumed), then the building at the saved first piece's box minX/minZ
+with its saved orientation (the drawn one when none was saved), rebuilt by
+`OceanMonumentPieces.addNativePieces`. An empty saved start is returned as it
+is; a declined call runs Java's own body, whose random is local to it.
+`monumentsRegenerated=` counts them, and
+[`NativeMonumentRegenerationTest`](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/minecraft/world/level/levelgen/structure/structures/NativeMonumentRegenerationTest.java)
+compares the regenerated building, rooms, child pieces and final random state
+with Java's over seeds, positions, saved origins and orientations.
 
 ## Verify
 

@@ -127,6 +127,11 @@ impl Legacy {
         self.seed
     }
 
+    /// The scrambled 48-bit state, as `LegacyRandomSource.seed` holds it.
+    pub fn state(&self) -> i64 {
+        self.seed
+    }
+
     /// `setSeed`: the scrambled 48-bit seed.
     pub fn set_seed(&mut self, seed: i64) {
         *self = Legacy::new(seed);

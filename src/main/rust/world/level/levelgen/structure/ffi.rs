@@ -649,3 +649,32 @@ pub unsafe extern "C" fn mattmc_structure_stub(
         Err(_) => -1,
     }
 }
+
+/// `OceanMonumentStructure.regeneratePiecesAfterLoad` for a non-empty saved
+/// start: `setLargeFeatureSeed(seed, chunk)`, the direction draw, then the
+/// building at the saved first piece's box minX/minZ with its saved
+/// orientation (2D data value, or -1 for none: the drawn direction). Writes the
+/// piece words (`OceanMonumentPieces.addNativePieces`) to `out` and the final
+/// Legacy seed to `state[0]`. Returns the word count, or negative when `out`
+/// is too small or the input is invalid (Java then regenerates).
+/// # Safety
+/// `out` has `capacity` writable i32s; `state` one writable i64.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_structure_monument_regenerate(seed: i64, chunk_x: i32, chunk_z: i32, min_x: i32, min_z: i32, orientation: i32,
+    out: *mut i32, capacity: i32, state: *mut i64) -> i32 {
+    if out.is_null() || state.is_null() || capacity < 0 {
+        return -1;
+    }
+    let mut random = crate::world::level::levelgen::random::Legacy::new(0);
+    random.set_large_feature_seed(seed, chunk_x, chunk_z);
+    let orientation = if orientation < 0 { None } else { Some(orientation) };
+    let Ok(words) = super::monument_plan::plan_at(&mut random, min_x, min_z, orientation) else { return -1 };
+    if words.len() > capacity as usize {
+        return -2;
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(words.as_ptr(), out, words.len());
+        *state = random.state();
+    }
+    words.len() as i32
+}
