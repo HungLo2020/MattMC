@@ -24,7 +24,8 @@ public class SimulationChunkTracker {
 			long l = iterator.nextLong();
 			this.distance.seed(l, ticketStorage.getTicketLevelAt(l, true));
 		}
-		ticketStorage.setSimulationChunkUpdatedListener(this::update);
+		// The storage notifies the native graph directly; update() is the same call from Java.
+		ticketStorage.setSimulationChunkUpdatedListener(this.distance.listener(ticketStorage, this::update));
 		this.chunks.defaultReturnValue((byte)33);
 	}
 

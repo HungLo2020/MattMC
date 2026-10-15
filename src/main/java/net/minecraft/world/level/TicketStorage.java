@@ -5,19 +5,16 @@ import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Arrays;
 import java.util.List;
-import java.util.function.BiConsumer;
-import java.util.function.Predicate;
+import java.util.function.LongConsumer;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
@@ -40,106 +37,111 @@ public class TicketStorage extends SavedData {
 			.apply(instance, TicketStorage::fromPacked)
 	);
 	public static final SavedDataType<TicketStorage> TYPE = new SavedDataType<>("chunks", TicketStorage::new, CODEC, DataFixTypes.SAVED_DATA_FORCED_CHUNKS);
-	private final Long2ObjectOpenHashMap<List<Ticket>> tickets;
-	private final Long2ObjectOpenHashMap<List<Ticket>> deactivatedTickets;
+	/** {@code ChunkLevel.MAX_LEVEL + 1}: the level of a chunk without a ticket of a kind. */
+	static final int ABSENT_LEVEL = ChunkLevel.MAX_LEVEL + 1;
+	/** Rust owns the ticket lists, their table order, expiry and deactivation. */
+	private final NativeTicketStorage tickets;
 	private LongSet chunksWithForcedTickets = new LongOpenHashSet();
 	@Nullable
 	private TicketStorage.ChunkUpdated loadingChunkUpdatedListener;
 	@Nullable
 	private TicketStorage.ChunkUpdated simulationChunkUpdatedListener;
+	private final int[] count = new int[1];
+	/** Listener slots bound to a native tracker graph. */
+	private final boolean[] nativeListener = new boolean[2];
 
-	private TicketStorage(Long2ObjectOpenHashMap<List<Ticket>> long2ObjectOpenHashMap, Long2ObjectOpenHashMap<List<Ticket>> long2ObjectOpenHashMap2) {
-		this.tickets = long2ObjectOpenHashMap;
-		this.deactivatedTickets = long2ObjectOpenHashMap2;
+	private TicketStorage(NativeTicketStorage nativeTicketStorage) {
+		this.tickets = nativeTicketStorage;
 		this.updateForcedChunks();
 	}
 
 	public TicketStorage() {
-		this(new Long2ObjectOpenHashMap<>(4), new Long2ObjectOpenHashMap<>());
+		this(new NativeTicketStorage());
 	}
 
 	private static TicketStorage fromPacked(List<Pair<ChunkPos, Ticket>> list) {
-		Long2ObjectOpenHashMap<List<Ticket>> long2ObjectOpenHashMap = new Long2ObjectOpenHashMap<>();
+		NativeTicketStorage nativeTicketStorage = new NativeTicketStorage();
 
 		for (Pair<ChunkPos, Ticket> pair : list) {
-			ChunkPos chunkPos = pair.getFirst();
-			List<Ticket> list2 = long2ObjectOpenHashMap.computeIfAbsent(chunkPos.toLong(), (Long2ObjectFunction<? extends List<Ticket>>)(l -> new ObjectArrayList<>(4)));
-			list2.add(pair.getSecond());
+			nativeTicketStorage.addDeactivated(pair.getFirst().toLong(), pair.getSecond());
 		}
 
-		return new TicketStorage(new Long2ObjectOpenHashMap<>(4), long2ObjectOpenHashMap);
+		return new TicketStorage(nativeTicketStorage);
 	}
 
 	private List<Pair<ChunkPos, Ticket>> packTickets() {
-		List<Pair<ChunkPos, Ticket>> list = new ArrayList();
-		this.forEachTicket((chunkPos, ticket) -> {
-			if (ticket.getType().persist()) {
-				list.add(new Pair<>(chunkPos, ticket));
+		long[] pairs = this.tickets.export(3, 0, this.count);
+		List<Pair<ChunkPos, Ticket>> list = new ArrayList(this.count[0] / 2);
+		ChunkPos chunkPos = null;
+
+		for (int i = 0; i < this.count[0]; i += 2) {
+			if (chunkPos == null || chunkPos.toLong() != pairs[i]) {
+				chunkPos = new ChunkPos(pairs[i]);
 			}
-		});
+
+			list.add(new Pair<>(chunkPos, NativeTicketStorage.Cells.ticket((int)pairs[i + 1])));
+		}
+
 		return list;
 	}
 
-	private void forEachTicket(BiConsumer<ChunkPos, Ticket> biConsumer) {
-		forEachTicket(biConsumer, this.tickets);
-		forEachTicket(biConsumer, this.deactivatedTickets);
-	}
-
-	private static void forEachTicket(BiConsumer<ChunkPos, Ticket> biConsumer, Long2ObjectOpenHashMap<List<Ticket>> long2ObjectOpenHashMap) {
-		for (Entry<List<Ticket>> entry : Long2ObjectMaps.fastIterable(long2ObjectOpenHashMap)) {
-			ChunkPos chunkPos = new ChunkPos(entry.getLongKey());
-
-			for (Ticket ticket : (List<Ticket>)entry.getValue()) {
-				biConsumer.accept(chunkPos, ticket);
-			}
-		}
-	}
-
 	public void activateAllDeactivatedTickets() {
-		for (Entry<List<Ticket>> entry : Long2ObjectMaps.fastIterable(this.deactivatedTickets)) {
-			for (Ticket ticket : (List<Ticket>)entry.getValue()) {
-				this.addTicket(entry.getLongKey(), ticket);
-			}
-		}
-
-		this.deactivatedTickets.clear();
+		// The original loops over the live deactivated map and lists; Rust iterates
+		// them positionally and returns each ticket for addTicket.
+		this.walk(NativeTicketStorage.ACTIVATE, null, null, null);
+		this.tickets.clearDeactivated();
 	}
 
 	public void setLoadingChunkUpdatedListener(@Nullable TicketStorage.ChunkUpdated chunkUpdated) {
 		this.loadingChunkUpdatedListener = chunkUpdated;
+		this.bindListener(NativeTicketStorage.LOADING, chunkUpdated);
 	}
 
 	public void setSimulationChunkUpdatedListener(@Nullable TicketStorage.ChunkUpdated chunkUpdated) {
 		this.simulationChunkUpdatedListener = chunkUpdated;
+		this.bindListener(NativeTicketStorage.SIMULATION, chunkUpdated);
+	}
+
+	/** A production tracker of this storage is notified natively; any other listener by Java. */
+	private void bindListener(int which, @Nullable TicketStorage.ChunkUpdated chunkUpdated) {
+		if (chunkUpdated instanceof TicketStorage.NativeChunkUpdated nativeChunkUpdated && nativeChunkUpdated.ticketStorage() == this) {
+			nativeChunkUpdated.withGraph(graph -> this.tickets.listen(which, 0, graph));
+			this.nativeListener[which] = true;
+		} else {
+			this.tickets.listen(which, chunkUpdated == null ? 0 : 1, 0L);
+			this.nativeListener[which] = false;
+		}
+	}
+
+	@Nullable
+	private TicketStorage.ChunkUpdated listener(int which) {
+		return which == NativeTicketStorage.LOADING ? this.loadingChunkUpdatedListener : this.simulationChunkUpdatedListener;
+	}
+
+	/** {@code listener.update(l, i, bl)} for a notification native delivery left to Java. */
+	private void deliver(int which, long l, int i, boolean bl) {
+		TicketStorage.ChunkUpdated chunkUpdated = this.listener(which);
+		if (chunkUpdated != null && !(this.nativeListener[which] && this.tickets.notify(which, l, i, bl))) {
+			chunkUpdated.update(l, i, bl);
+		}
 	}
 
 	public boolean hasTickets() {
-		return !this.tickets.isEmpty();
+		return (this.tickets.state() & 1) != 0;
 	}
 
 	public boolean shouldKeepDimensionActive() {
-		for (List<Ticket> list : this.tickets.values()) {
-			for (Ticket ticket : list) {
-				if (ticket.getType().shouldKeepDimensionActive()) {
-					return true;
-				}
-			}
-		}
-
-		return false;
+		return (this.tickets.state() & 2) != 0;
 	}
 
 	/** Chunks holding active tickets, so a listener attached after tickets exist can seed its state. */
 	public LongIterator activeTicketChunks() {
-		return this.tickets.keySet().iterator();
+		long[] keys = this.tickets.export(0, 0, this.count);
+		return LongArrayList.wrap(Arrays.copyOf(keys, this.count[0])).iterator();
 	}
 
 	public List<Ticket> getTickets(long l) {
-		return this.tickets.getOrDefault(l, List.of());
-	}
-
-	private List<Ticket> getOrCreateTickets(long l) {
-		return this.tickets.computeIfAbsent(l, (Long2ObjectFunction<? extends List<Ticket>>)(lx -> new ObjectArrayList<>(4)));
+		return this.tickets.tickets(l);
 	}
 
 	public void addTicketWithRadius(TicketType ticketType, ChunkPos chunkPos, int i) {
@@ -152,29 +154,24 @@ public class TicketStorage extends SavedData {
 	}
 
 	public boolean addTicket(long l, Ticket ticket) {
-		List<Ticket> list = this.getOrCreateTickets(l);
-
-		for (Ticket ticket2 : list) {
-			if (isTicketSameTypeAndLevel(ticket, ticket2)) {
-				ticket2.resetTicksLeft();
-				this.setDirty();
-				return false;
-			}
+		long status = this.tickets.add(l, ticket);
+		if ((status & NativeTicketStorage.RESULT) == 0) {
+			this.setDirty();
+			return false;
 		}
 
-		int i = getTicketLevelAt(list, true);
-		int j = getTicketLevelAt(list, false);
-		list.add(ticket);
 		if (SharedConstants.DEBUG_VERBOSE_SERVER_EVENTS) {
 			LOGGER.debug("ATI {} {}", new ChunkPos(l), ticket);
 		}
 
-		if (ticket.getType().doesSimulate() && ticket.getTicketLevel() < i && this.simulationChunkUpdatedListener != null) {
-			this.simulationChunkUpdatedListener.update(l, ticket.getTicketLevel(), true);
+		// Native delivery covered the notifications before the first Java listener.
+		int resume = NativeTicketStorage.resume(status);
+		if (resume <= 0 && (status & NativeTicketStorage.WANT_SIMULATION) != 0) {
+			this.deliver(NativeTicketStorage.SIMULATION, l, ticket.getTicketLevel(), true);
 		}
 
-		if (ticket.getType().doesLoad() && ticket.getTicketLevel() < j && this.loadingChunkUpdatedListener != null) {
-			this.loadingChunkUpdatedListener.update(l, ticket.getTicketLevel(), true);
+		if (resume <= 1 && (status & NativeTicketStorage.WANT_LOADING) != 0) {
+			this.deliver(NativeTicketStorage.LOADING, l, ticket.getTicketLevel(), true);
 		}
 
 		if (ticket.getType().equals(TicketType.FORCED)) {
@@ -185,38 +182,8 @@ public class TicketStorage extends SavedData {
 		return true;
 	}
 
-	private static boolean isTicketSameTypeAndLevel(Ticket ticket, Ticket ticket2) {
-		return ticket2.getType() == ticket.getType() && ticket2.getTicketLevel() == ticket.getTicketLevel();
-	}
-
 	public int getTicketLevelAt(long l, boolean bl) {
-		return getTicketLevelAt(this.getTickets(l), bl);
-	}
-
-	private static int getTicketLevelAt(List<Ticket> list, boolean bl) {
-		Ticket ticket = getLowestTicket(list, bl);
-		return ticket == null ? ChunkLevel.MAX_LEVEL + 1 : ticket.getTicketLevel();
-	}
-
-	@Nullable
-	private static Ticket getLowestTicket(@Nullable List<Ticket> list, boolean bl) {
-		if (list == null) {
-			return null;
-		} else {
-			Ticket ticket = null;
-
-			for (Ticket ticket2 : list) {
-				if (ticket == null || ticket2.getTicketLevel() < ticket.getTicketLevel()) {
-					if (bl && ticket2.getType().doesSimulate()) {
-						ticket = ticket2;
-					} else if (!bl && ticket2.getType().doesLoad()) {
-						ticket = ticket2;
-					}
-				}
-			}
-
-			return ticket;
-		}
+		return this.tickets.level(l, bl);
 	}
 
 	public void removeTicketWithRadius(TicketType ticketType, ChunkPos chunkPos, int i) {
@@ -229,154 +196,166 @@ public class TicketStorage extends SavedData {
 	}
 
 	public boolean removeTicket(long l, Ticket ticket) {
-		List<Ticket> list = this.tickets.get(l);
-		if (list == null) {
+		long status = this.tickets.remove(l, ticket);
+		if ((status & NativeTicketStorage.RESULT) == 0) {
 			return false;
 		} else {
-			boolean bl = false;
-			Iterator<Ticket> iterator = list.iterator();
-
-			while (iterator.hasNext()) {
-				Ticket ticket2 = (Ticket)iterator.next();
-				if (isTicketSameTypeAndLevel(ticket, ticket2)) {
-					iterator.remove();
-					if (SharedConstants.DEBUG_VERBOSE_SERVER_EVENTS) {
-						LOGGER.debug("RTI {} {}", new ChunkPos(l), ticket2);
-					}
-
-					bl = true;
-					break;
-				}
+			long list = this.tickets.io[0];
+			if (SharedConstants.DEBUG_VERBOSE_SERVER_EVENTS) {
+				LOGGER.debug("RTI {} {}", new ChunkPos(l), ticket);
 			}
 
-			if (!bl) {
-				return false;
-			} else {
-				if (list.isEmpty()) {
-					this.tickets.remove(l);
-				}
-
-				if (ticket.getType().doesSimulate() && this.simulationChunkUpdatedListener != null) {
-					this.simulationChunkUpdatedListener.update(l, getTicketLevelAt(list, true), false);
-				}
-
-				if (ticket.getType().doesLoad() && this.loadingChunkUpdatedListener != null) {
-					this.loadingChunkUpdatedListener.update(l, getTicketLevelAt(list, false), false);
-				}
-
-				if (ticket.getType().equals(TicketType.FORCED)) {
-					this.updateForcedChunks();
-				}
-
-				this.setDirty();
-				return true;
+			// Each level is read from the emptied-or-shrunk list when delivered, as before.
+			int resume = NativeTicketStorage.resume(status);
+			if (resume <= 0 && ticket.getType().doesSimulate() && this.simulationChunkUpdatedListener != null) {
+				this.deliver(NativeTicketStorage.SIMULATION, l, this.tickets.listLevel(list, true), false);
 			}
+
+			if (resume <= 1 && ticket.getType().doesLoad() && this.loadingChunkUpdatedListener != null) {
+				this.deliver(NativeTicketStorage.LOADING, l, this.tickets.listLevel(list, false), false);
+			}
+
+			if (ticket.getType().equals(TicketType.FORCED)) {
+				this.updateForcedChunks();
+			}
+
+			this.setDirty();
+			return true;
 		}
 	}
 
 	private void updateForcedChunks() {
-		this.chunksWithForcedTickets = this.getAllChunksWithTicketThat(ticket -> ticket.getType().equals(TicketType.FORCED));
+		long[] keys = this.tickets.export(1, 0, this.count);
+		LongOpenHashSet longOpenHashSet = new LongOpenHashSet();
+
+		for (int i = 0; i < this.count[0]; i++) {
+			longOpenHashSet.add(keys[i]);
+		}
+
+		this.chunksWithForcedTickets = longOpenHashSet;
 	}
 
 	public String getTicketDebugString(long l, boolean bl) {
-		List<Ticket> list = this.getTickets(l);
-		Ticket ticket = getLowestTicket(list, bl);
-		return ticket == null ? "no_ticket" : ticket.toString();
+		int cell = this.tickets.lowest(l, bl);
+		return cell < 0 ? "no_ticket" : NativeTicketStorage.Cells.ticket(cell).toString();
 	}
 
 	public void purgeStaleTickets(ChunkMap chunkMap) {
-		this.removeTicketIf((ticket, l) -> {
-			if (this.canTicketExpire(chunkMap, ticket, l)) {
-				ticket.decreaseTicksLeft();
-				return ticket.isTimedOut();
-			} else {
-				return false;
-			}
-		}, null);
+		this.walk(NativeTicketStorage.PURGE, null, null, chunkMap);
 		this.setDirty();
 	}
 
-	private boolean canTicketExpire(ChunkMap chunkMap, Ticket ticket, long l) {
-		if (!ticket.getType().hasTimeout()) {
-			return false;
-		} else if (ticket.getType().canExpireIfUnloaded()) {
-			return true;
-		} else {
-			ChunkHolder chunkHolder = chunkMap.getUpdatingChunkIfPresent(l);
-			return chunkHolder == null || chunkHolder.isReadyForSaving();
-		}
-	}
-
 	public void deactivateTicketsOnClosing() {
-		this.removeTicketIf((ticket, l) -> ticket.getType() != TicketType.UNKNOWN, this.deactivatedTickets);
+		this.walk(NativeTicketStorage.DEACTIVATE, null, null, null);
 	}
 
 	public void removeTicketIf(TicketStorage.TicketPredicate ticketPredicate, @Nullable Long2ObjectOpenHashMap<List<Ticket>> long2ObjectOpenHashMap) {
-		ObjectIterator<Entry<List<Ticket>>> objectIterator = this.tickets.long2ObjectEntrySet().fastIterator();
-		boolean bl = false;
+		this.walk(NativeTicketStorage.JAVA_PREDICATE, ticketPredicate, long2ObjectOpenHashMap, null);
+	}
 
-		while (objectIterator.hasNext()) {
-			Entry<List<Ticket>> entry = (Entry<List<Ticket>>)objectIterator.next();
-			Iterator<Ticket> iterator = ((List)entry.getValue()).iterator();
-			long l = entry.getLongKey();
-			boolean bl2 = false;
-			boolean bl3 = false;
+	/**
+	 * The original removeTicketIf walk, run natively. It returns here only to ask
+	 * Java: whether a chunk is ready for saving (purge's canTicketExpire, in walk
+	 * order), a Java predicate, or a Java listener's notification.
+	 */
+	private void walk(
+		int kind,
+		@Nullable TicketStorage.TicketPredicate ticketPredicate,
+		@Nullable Long2ObjectOpenHashMap<List<Ticket>> long2ObjectOpenHashMap,
+		@Nullable ChunkMap chunkMap
+	) {
+		long walk = this.tickets.walk(kind);
+		long[] io = this.tickets.io;
+		boolean released = false;
 
-			while (iterator.hasNext()) {
-				Ticket ticket = (Ticket)iterator.next();
-				if (ticketPredicate.test(ticket, l)) {
-					if (long2ObjectOpenHashMap != null) {
-						List<Ticket> list = long2ObjectOpenHashMap.computeIfAbsent(
-							l, (Long2ObjectFunction<? extends List<Ticket>>)(lx -> new ObjectArrayList<>(((List)entry.getValue()).size()))
-						);
-						list.add(ticket);
-					}
+		try {
+			int answer = 0;
 
-					iterator.remove();
-					if (ticket.getType().doesLoad()) {
-						bl3 = true;
-					}
+			while (true) {
+				long status = this.tickets.step(walk, answer);
+				if ((status & NativeTicketStorage.DIRTY) != 0) {
+					this.setDirty();
+				}
 
-					if (ticket.getType().doesSimulate()) {
-						bl2 = true;
-					}
+				released |= NativeTicketStorage.released(status);
+				NativeTicketStorage.checkInWalk(status);
 
-					if (ticket.getType().equals(TicketType.FORCED)) {
-						bl = true;
-					}
+				switch (NativeTicketStorage.event(status)) {
+					case NativeTicketStorage.DONE:
+						if (kind != NativeTicketStorage.ACTIVATE && (status & NativeTicketStorage.RESULT) != 0) {
+							this.updateForcedChunks();
+						}
+
+						return;
+					case NativeTicketStorage.READY:
+						ChunkHolder chunkHolder = chunkMap.getUpdatingChunkIfPresent(io[0]);
+						answer = chunkHolder == null || chunkHolder.isReadyForSaving() ? 1 : 0;
+						break;
+					case NativeTicketStorage.BATCH:
+						// The next tickets the original would test, in order. Stop at the
+						// first match, or once a predicate changed the lists.
+						answer = -1;
+						long[] batch = this.tickets.batch;
+						int n = (int)(status >>> 32);
+
+						for (int i = 0; i < n; i++) {
+							long l = batch[i * 2];
+							Ticket ticket = NativeTicketStorage.Cells.ticket((int)batch[i * 2 + 1]);
+							long modifications = this.tickets.modifications;
+							boolean matched = ticketPredicate.test(ticket, l);
+							if (matched && long2ObjectOpenHashMap != null) {
+								long walkHandle = walk;
+								int index = i;
+								// The original sized a new list by entry.getValue(), read positionally here.
+								long2ObjectOpenHashMap.computeIfAbsent(l, (Long2ObjectFunction<? extends List<Ticket>>)(lx -> {
+									this.tickets.checkBatchValue(walkHandle, index);
+									return new ObjectArrayList<>(4);
+								})).add(ticket);
+							}
+
+							if (matched || modifications != this.tickets.modifications) {
+								answer = i << 1 | (matched ? 1 : 0);
+								break;
+							}
+						}
+
+						this.tickets.consumed(answer < 0 ? n : (answer >> 1) + 1, n);
+						break;
+					case NativeTicketStorage.NOTIFY_EVENT:
+						long key = io[0];
+						int then = (int)io[3];
+						long modifications = this.tickets.modifications;
+						this.listener((int)io[2]).update(key, (int)io[1], false);
+						answer = 0;
+						// The simulation notification that follows, unless the lists changed.
+						if ((status & NativeTicketStorage.PAIRED) != 0 && modifications == this.tickets.modifications) {
+							TicketStorage.ChunkUpdated chunkUpdated = this.simulationChunkUpdatedListener;
+							if (chunkUpdated != null && !this.nativeListener[NativeTicketStorage.SIMULATION]) {
+								chunkUpdated.update(key, then, false);
+								answer = 1;
+							}
+						}
+
+						break;
+					case NativeTicketStorage.ACTIVATE_EVENT:
+						this.addTicket(io[0], NativeTicketStorage.Cells.ticket((int)io[1]));
+						break;
+					default:
+						throw new IllegalStateException("Unknown ticket walk event " + status);
 				}
 			}
-
-			if (bl3 || bl2) {
-				if (bl3 && this.loadingChunkUpdatedListener != null) {
-					this.loadingChunkUpdatedListener.update(l, getTicketLevelAt((List<Ticket>)entry.getValue(), false), false);
-				}
-
-				if (bl2 && this.simulationChunkUpdatedListener != null) {
-					this.simulationChunkUpdatedListener.update(l, getTicketLevelAt((List<Ticket>)entry.getValue(), true), false);
-				}
-
-				this.setDirty();
-				if (((List)entry.getValue()).isEmpty()) {
-					objectIterator.remove();
-				}
-			}
-		}
-
-		if (bl) {
-			this.updateForcedChunks();
+		} finally {
+			NativeTicketStorage.endWalk(walk, released);
 		}
 	}
 
 	public void replaceTicketLevelOfType(int i, TicketType ticketType) {
-		List<Pair<Ticket, Long>> list = new ArrayList();
+		long[] pairs = this.tickets.export(2, NativeTicketStorage.Types.id(ticketType), this.count).clone();
+		int n = this.count[0];
+		List<Pair<Ticket, Long>> list = new ArrayList(n / 2);
 
-		for (Entry<List<Ticket>> entry : this.tickets.long2ObjectEntrySet()) {
-			for (Ticket ticket : (List<Ticket>)entry.getValue()) {
-				if (ticket.getType() == ticketType) {
-					list.add(Pair.of(ticket, entry.getLongKey()));
-				}
-			}
+		for (int j = 0; j < n; j += 2) {
+			list.add(Pair.of(NativeTicketStorage.Cells.ticket((int)pairs[j + 1]), pairs[j]));
 		}
 
 		for (Pair<Ticket, Long> pair : list) {
@@ -397,19 +376,16 @@ public class TicketStorage extends SavedData {
 		return this.chunksWithForcedTickets;
 	}
 
-	private LongSet getAllChunksWithTicketThat(Predicate<Ticket> predicate) {
-		LongOpenHashSet longOpenHashSet = new LongOpenHashSet();
+	/**
+	 * A production tracker's listener: the storage it reads, and its native
+	 * graph, which that storage then notifies directly. Calling
+	 * {@link #update} is equivalent.
+	 */
+	public interface NativeChunkUpdated extends TicketStorage.ChunkUpdated {
+		TicketStorage ticketStorage();
 
-		for (Entry<List<Ticket>> entry : Long2ObjectMaps.fastIterable(this.tickets)) {
-			for (Ticket ticket : (List<Ticket>)entry.getValue()) {
-				if (predicate.test(ticket)) {
-					longOpenHashSet.add(entry.getLongKey());
-					break;
-				}
-			}
-		}
-
-		return longOpenHashSet;
+		/** Runs {@code binder} with the live native graph handle. */
+		void withGraph(LongConsumer binder);
 	}
 
 	@FunctionalInterface

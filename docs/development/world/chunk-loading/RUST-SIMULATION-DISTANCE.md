@@ -9,7 +9,8 @@ simulating ticket level. [`TicketChunkDistance`](https://github.com/HungLo2020/M
 is the lifetime/exception adapter; the tracker keeps only its published
 `chunks` view. There is no Java graph or fallback.
 
-`TicketStorage` still owns tickets, timeouts and persistence. The
+The [native ticket storage](RUST-TICKET-STORAGE.md) notifies the graph directly
+under the graph's own lock, which every adapter call also takes. The
 [loading tracker](RUST-LOADING-DISTANCE.md) shares this adapter and graph.
 
 ## Preserve these contracts
@@ -22,8 +23,9 @@ is the lifetime/exception adapter; the tracker keeps only its published
   could read it:
   - The constructor seeds every chunk with active tickets before attaching the
     listener. In production none exist yet, but a later attach must not lose them.
-  - Every listener call passes the storage's current level at that chunk, read
-    in Java, plus the notified level the graph propagates. `TicketStorage`
+  - Every notification passes the storage's current level at that chunk, read
+    when it is delivered (natively for the production listener), plus the
+    notified level the graph propagates. `TicketStorage`
     notifies for changes relevant to the minimum; duplicate or non-minimum
     additions need not emit a notification. See the [addition guard](https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/TicketStorage.java#L154-L184)
     and [removal callback](https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/TicketStorage.java#L231-L265).
@@ -31,7 +33,8 @@ is the lifetime/exception adapter; the tracker keeps only its published
     replacing the listener) breaks this; neither happens in production.
 - Runs replay the original ordered `setLevel` calls into the published map, so
   hot range queries stay in Java and entity-ticking iteration order is unchanged.
-- `TicketStorage.activeTicketChunks()` is the only storage change.
+- The tracker binds `TicketChunkDistance.listener(...)`, so its storage
+  notifies the graph natively; calling `update` from Java is equivalent.
 
 ## Verify and measure
 

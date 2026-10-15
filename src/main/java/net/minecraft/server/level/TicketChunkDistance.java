@@ -7,14 +7,16 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.ref.Reference;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.LongConsumer;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.TicketStorage;
 
 /** Lifetime and exception adapter for a native-owned ticket distance graph
  * (simulation or loading) and its mirror of each chunk's lowest ticket level of
- * that kind. Callers use one instance exclusively, as with the original
- * trackers; a lock still serializes native access. Sinks must not reenter. */
+ * that kind. The graph's native lock is its one synchronization domain: every
+ * call here takes it, as does the ticket storage notifying the graph directly.
+ * No lock is held while the sink runs. */
 final class TicketChunkDistance {
     private static final MethodHandle CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_ticket_distance_create",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
@@ -33,10 +35,8 @@ final class TicketChunkDistance {
         Linker.Option.critical(true));
     static final int SIMULATION = 0;
     static final int LOADING = 1;
-    private final ReentrantLock access = new ReentrantLock();
     private final MemorySegment handle;
     private final long handleId;
-    private boolean work;
     private long[] changes = new long[512];
 
     TicketChunkDistance(int kind, int absentTicketLevel) {
@@ -59,66 +59,73 @@ final class TicketChunkDistance {
         catch (Throwable error) { throw new IllegalStateException("Cannot release ticket chunk distance", error); }
     }
 
-    boolean hasWork() {
-        return this.work;
+    /** The listener a tracker binds to its storage: the storage notifies this graph natively. */
+    TicketStorage.NativeChunkUpdated listener(TicketStorage ticketStorage, TicketStorage.ChunkUpdated update) {
+        return new TicketStorage.NativeChunkUpdated() {
+            @Override
+            public void update(long l, int i, boolean bl) {
+                update.update(l, i, bl);
+            }
+
+            @Override
+            public TicketStorage ticketStorage() {
+                return ticketStorage;
+            }
+
+            @Override
+            public void withGraph(LongConsumer binder) {
+                try { binder.accept(TicketChunkDistance.this.handleId); }
+                finally { Reference.reachabilityFence(TicketChunkDistance.this.handle); }
+            }
+        };
     }
 
     /** Records a chunk's current ticket level without scheduling graph work. */
     void seed(long position, int ticketLevel) {
-        this.access.lock();
-        try {
-            long status;
-            try { status = (long)SEED.invokeExact(this.handleId, position, ticketLevel); }
-            catch (Throwable error) { throw new IllegalStateException("Cannot seed ticket chunk distance", error); }
-            finally { Reference.reachabilityFence(this.handle); }
-            this.check(status);
-        } finally { this.access.unlock(); }
+        long status;
+        try { status = (long)SEED.invokeExact(this.handleId, position, ticketLevel); }
+        catch (Throwable error) { throw new IllegalStateException("Cannot seed ticket chunk distance", error); }
+        finally { Reference.reachabilityFence(this.handle); }
+        check(status);
     }
 
     /** {@code update(pos, level, decrease)} with the storage's current ticket level at {@code pos}. */
     void update(long position, int ticketLevel, int level, boolean decrease) {
-        this.access.lock();
-        try {
-            long status;
-            try { status = (long)UPDATE.invokeExact(this.handleId, position, ticketLevel, level, decrease ? 1 : 0); }
-            catch (Throwable error) { throw new IllegalStateException("Cannot update ticket chunk distance", error); }
-            finally { Reference.reachabilityFence(this.handle); }
-            this.check(status);
-        } finally { this.access.unlock(); }
+        long status;
+        try { status = (long)UPDATE.invokeExact(this.handleId, position, ticketLevel, level, decrease ? 1 : 0); }
+        catch (Throwable error) { throw new IllegalStateException("Cannot update ticket chunk distance", error); }
+        finally { Reference.reachabilityFence(this.handle); }
+        check(status);
     }
 
     /** {@code runUpdates(budget)}, then replays its {@code setLevel} calls into
      * {@code sink} in their original order; returns the remaining budget. */
     int runUpdates(int budget, PlayerChunkDistances.LevelSink sink) {
-        if (!this.work) return budget;
         int count, remaining;
         long[] changes;
-        this.access.lock();
         try {
-            try {
-                long status = (long)RUN.invokeExact(this.handleId, budget);
-                this.check(status);
-                remaining = (int)(status >>> 32);
+            // Queued work may come from storage notifications Java never saw.
+            long status = (long)RUN.invokeExact(this.handleId, budget);
+            check(status);
+            remaining = (int)(status >>> 32);
+            count = (int)DRAIN.invokeExact(this.handleId, MemorySegment.ofArray(this.changes), this.changes.length / 2);
+            if (count < 0) {
+                this.changes = new long[Math.max(-count * 2, this.changes.length * 2)];
                 count = (int)DRAIN.invokeExact(this.handleId, MemorySegment.ofArray(this.changes), this.changes.length / 2);
-                if (count < 0) {
-                    this.changes = new long[Math.max(-count * 2, this.changes.length * 2)];
-                    count = (int)DRAIN.invokeExact(this.handleId, MemorySegment.ofArray(this.changes), this.changes.length / 2);
-                }
-                if (count < 0) throw new IllegalStateException("Ticket chunk distance changes were not drained");
-                changes = this.changes;
             }
-            catch (RuntimeException | Error error) { throw error; }
-            catch (Throwable error) { throw new IllegalStateException("Cannot run ticket chunk distance", error); }
-            finally { Reference.reachabilityFence(this.handle); }
-        } finally { this.access.unlock(); }
+            if (count < 0) throw new IllegalStateException("Ticket chunk distance changes were not drained");
+            changes = this.changes;
+        }
+        catch (RuntimeException | Error error) { throw error; }
+        catch (Throwable error) { throw new IllegalStateException("Cannot run ticket chunk distance", error); }
+        finally { Reference.reachabilityFence(this.handle); }
         for (int index = 0; index < count; index++) {
             sink.setLevel(changes[index * 2], (int)changes[index * 2 + 1]);
         }
         return remaining;
     }
 
-    private void check(long status) {
-        this.work = (status & 256) != 0;
+    private static void check(long status) {
         switch ((int)status & 255) {
             case 0: return;
             case 3: throw new OutOfMemoryError("Native ticket chunk distance allocation failed");

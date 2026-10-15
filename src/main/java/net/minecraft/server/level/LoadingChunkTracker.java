@@ -25,7 +25,8 @@ class LoadingChunkTracker {
 			long l = iterator.nextLong();
 			this.distance.seed(l, ticketStorage.getTicketLevelAt(l, false));
 		}
-		ticketStorage.setLoadingChunkUpdatedListener(this::update);
+		// The storage notifies the native graph directly; update() is the same call from Java.
+		ticketStorage.setLoadingChunkUpdatedListener(this.distance.listener(ticketStorage, this::update));
 	}
 
 	public void update(long l, int i, boolean bl) {

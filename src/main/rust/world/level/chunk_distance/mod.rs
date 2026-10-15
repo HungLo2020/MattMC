@@ -9,7 +9,8 @@ mod position_map;
 mod poi;
 mod poi_ffi;
 pub(crate) mod ticket;
-mod ticket_ffi;
+pub(crate) mod ticket_storage;
+pub(crate) mod ticket_ffi;
 #[cfg(test)]
 mod tests;
 

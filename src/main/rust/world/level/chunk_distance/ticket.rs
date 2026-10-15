@@ -3,6 +3,7 @@
 //! `TicketStorage.getTicketLevelAt(pos, simulate)` for the tracker's ticket kind.
 use super::graph::{DistanceField, Error, SourceLevels};
 use super::position_map::PositionMap;
+use std::sync::{Mutex, MutexGuard};
 
 /// Lowest ticket level of the tracker's kind per chunk; absent chunks report
 /// `ChunkLevel.MAX_LEVEL + 1`, as `getTicketLevelAt` does without a ticket.
@@ -73,5 +74,23 @@ impl TicketDistance {
 
     pub fn field_mut(&mut self) -> &mut DistanceField {
         &mut self.field
+    }
+}
+
+/// One graph's synchronization domain. Java's adapter and the ticket storage
+/// that notifies it directly both lock it for every access, including reads;
+/// neither calls Java while holding it. The last of the adapter's and the
+/// storages' references frees it.
+pub(crate) struct SharedTicketDistance(Mutex<TicketDistance>);
+
+impl SharedTicketDistance {
+    pub fn new(distance: TicketDistance) -> Self {
+        Self(Mutex::new(distance))
+    }
+
+    pub fn lock(&self) -> MutexGuard<'_, TicketDistance> {
+        // A panic cannot unwind across the C ABI, so the lock is never poisoned
+        // with a half-applied update that Java could observe.
+        self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 }

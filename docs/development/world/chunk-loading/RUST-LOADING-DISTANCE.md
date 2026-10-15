@@ -8,7 +8,9 @@ chunk's lowest loading ticket level. [`TicketChunkDistance`](https://github.com/
 is the lifetime/exception adapter, shared with the [simulation tracker](RUST-SIMULATION-DISTANCE.md).
 There is no Java graph or fallback.
 
-`ChunkMap` still owns holders, scheduling and unloading; `TicketStorage` owns tickets.
+`ChunkMap` still owns holders, scheduling and unloading. The
+[native ticket storage](RUST-TICKET-STORAGE.md) owns tickets and notifies this
+graph directly under the graph's lock.
 
 ## Preserve these contracts
 
