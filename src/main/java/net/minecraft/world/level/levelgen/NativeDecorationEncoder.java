@@ -992,6 +992,14 @@ public final class NativeDecorationEncoder {
 		} else if (feature == Feature.SIMPLE_BLOCK && feature.getClass() == SimpleBlockFeature.class && config.getClass() == SimpleBlockConfiguration.class) {
 			kind = 11;
 			if (!this.simpleBlock((SimpleBlockConfiguration)config)) return this.javaLeaf(configured, header);
+		} else if (feature == Feature.END_SPIKE && feature.getClass() == net.minecraft.world.level.levelgen.feature.SpikeFeature.class
+                && config.getClass() == net.minecraft.world.level.levelgen.feature.configurations.SpikeConfiguration.class) {
+            // Descriptor lists (including the seed cache's returned list) are
+            // retained mutable Java authority. Resolve/iterate on each call;
+            // the End executor still owns geometry and placement decisions.
+            kind = 99;
+            this.words.add(this.javaFeatures.size());
+            this.javaFeatures.add(configured);
 		} else if ((kind = vegetationKind(feature, config)) != 0) {
 			if (!this.vegetation(kind, config)) return this.javaLeaf(configured, header);
 		} else if (this.javaLeafAllowed) {

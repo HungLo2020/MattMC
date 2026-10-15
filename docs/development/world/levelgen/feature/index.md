@@ -7,3 +7,5 @@ runs whole placed features; the older geometry kernels are shared by both routes
   [Recorded results](RUST-DECORATION-RESULTS.md).
 - [Rust ore geometry](RUST-ORE.md): ownership, parity checks and placement benchmarks.
 - [Rust geode density fields](RUST-GEODE.md): batched numeric evaluation, seed compatibility and verification.
+
+- [End feature computations](RUST-END-FEATURES.md): shared geometry, Java effect boundaries and targeted Frozen verification.

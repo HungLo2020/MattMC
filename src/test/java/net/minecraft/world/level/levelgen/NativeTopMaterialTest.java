@@ -26,6 +26,7 @@ class NativeTopMaterialTest {
     }
 
     @AfterAll static void close() {
+        NativeTopMaterial.beforePublish = null;
         NativeTopMaterial.setVerify(false);
         NativeTopMaterial.setEnabled(true);
         NativeCarversTest.close();
@@ -361,6 +362,109 @@ class NativeTopMaterialTest {
         var accessor = entry.getClass().getDeclaredMethod("binding");
         accessor.setAccessible(true);
         return accessor.invoke(entry);
+    }
+
+    @Test void concurrentFirstUsersPublishOneBindingAndImmediatelyReleaseLosers() throws Exception {
+        var overworld = NativeNoiseFillTest.settings.stream().filter(holder -> holder.is(NoiseGeneratorSettings.OVERWORLD)).findFirst().orElseThrow();
+        var setting = everyKind(overworld);
+        var positions = new ArrayList<>(positions(overworld, SEEDS[2], 9000));
+        for (int i = 0; i < 9; i++) positions.add(new ChunkPos(9100 + i * 3, 9100 - i * 5));
+        for (int round = 0; round < 3; round++) {
+            var created = new java.util.concurrent.CopyOnWriteArrayList<NativeTopMaterial>();
+            var gate = new java.util.concurrent.CyclicBarrier(4);
+            NativeTopMaterial.beforePublish = (system, candidate) -> {
+                assertFalse(Thread.holdsLock(system), "construction/verification must run outside the cache lock");
+                assertNotNull(candidate);
+                created.add(candidate);
+                try { gate.await(30, java.util.concurrent.TimeUnit.SECONDS); }
+                catch (Exception failure) { throw new AssertionError(failure); }
+            };
+            SharedRun run;
+            try { run = carveShared(setting, overworld.value().surfaceRule(), SEEDS[2], positions); }
+            finally { NativeTopMaterial.beforePublish = null; }
+            assertEquals(4, created.size(), "the barrier must actually force four racing allocations");
+            assertEquals(1, run.bindings(), "only the canonical binding is retained");
+            Object canonical = run.binding().get();
+            assertNotNull(canonical);
+            int losers = 0;
+            for (var candidate : created) {
+                if (candidate == canonical) assertFalse(candidate.releasedForVerification());
+                else {
+                    losers++;
+                    assertTrue(candidate.releasedForVerification(), "losing handles are freed while their Java objects remain reachable");
+                    var field = NativeTopMaterial.class.getDeclaredField("cleanable"); field.setAccessible(true);
+                    ((java.lang.ref.Cleaner.Cleanable)field.get(candidate)).clean();
+                    assertTrue(candidate.releasedForVerification(), "a second cleanup is harmless");
+                }
+            }
+            assertEquals(3, losers);
+            // The existing shared-run test independently compares Java carving,
+            // cache reuse after reload, and GC of the canonical binding.
+            java.lang.ref.Reference.reachabilityFence(created);
+        }
+    }
+
+    record DelegatingRule(SurfaceRules.RuleSource delegate) implements SurfaceRules.RuleSource {
+        public net.minecraft.util.KeyDispatchDataCodec<? extends SurfaceRules.RuleSource> codec() { return delegate.codec(); }
+        public SurfaceRules.SurfaceRule apply(SurfaceRules.Context context) { return delegate.apply(context); }
+    }
+
+    @Test void declinedBindingsKeepIdentityKeysAndTheEightEntryPolicy() {
+        var setting = NativeNoiseFillTest.settings.stream().filter(holder -> holder.is(NoiseGeneratorSettings.OVERWORLD)).findFirst().orElseThrow();
+        var random = RandomState.create(setting.value(), NativeNoiseFillTest.registries.lookupOrThrow(Registries.NOISE), SEEDS[2]);
+        var filled = NativeNoiseFillTest.fill(setting, random, new ChunkPos(0, 0), true);
+        var registry = NativeNoiseFillTest.registries.lookupOrThrow(Registries.BIOME);
+        var plains = registry.getOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS);
+        var generator = new NoiseBasedChunkGenerator(new net.minecraft.world.level.biome.FixedBiomeSource(plains), setting);
+        var manager = new net.minecraft.world.level.biome.BiomeManager((x, y, z) -> plains,
+            net.minecraft.world.level.biome.BiomeManager.obfuscateSeed(SEEDS[2]));
+        var delegate = SurfaceRules.state(net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
+        var first = new DelegatingRule(delegate);
+        var second = new DelegatingRule(delegate);
+        assertEquals(first, second, "equal-valued rule objects must still use distinct identity keys");
+        var misses = new java.util.concurrent.atomic.AtomicInteger();
+        NativeTopMaterial.beforePublish = (system, candidate) -> { assertNull(candidate); misses.incrementAndGet(); };
+        long declined = NativeTopMaterial.DECLINED.get();
+        int calls = 0;
+        try {
+            for (var rule : List.of(first, first, second, new DelegatingRule(delegate), new DelegatingRule(delegate),
+                new DelegatingRule(delegate), new DelegatingRule(delegate), new DelegatingRule(delegate), new DelegatingRule(delegate),
+                new DelegatingRule(delegate), first)) {
+                var context = new net.minecraft.world.level.levelgen.carver.CarvingContext(generator, NativeNoiseFillTest.registries,
+                    filled.chunk(), filled.noise(), random, rule);
+                assertNull(NativeTopMaterial.create(context, filled.chunk(), filled.noise(), manager, pos -> plains, null, plains));
+                calls++;
+            }
+        } finally { NativeTopMaterial.beforePublish = null; }
+        assertEquals(10, misses.get(), "same-object hit, distinct equal-valued rules, and eviction/retry");
+        assertEquals(8, ((List<?>)random.surfaceSystem().nativeTopMaterials).size());
+        assertEquals(calls, NativeTopMaterial.DECLINED.get() - declined);
+    }
+
+    @Test void failedPublicationReleasesItsAllocationAndCanRetry() {
+        var setting = NativeNoiseFillTest.settings.stream().filter(holder -> holder.is(NoiseGeneratorSettings.OVERWORLD)).findFirst().orElseThrow();
+        var random = RandomState.create(setting.value(), NativeNoiseFillTest.registries.lookupOrThrow(Registries.NOISE), SEEDS[2]);
+        var filled = NativeNoiseFillTest.fill(setting, random, new ChunkPos(0, 0), true);
+        var plains = NativeNoiseFillTest.registries.lookupOrThrow(Registries.BIOME).getOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS);
+        var generator = new NoiseBasedChunkGenerator(new net.minecraft.world.level.biome.FixedBiomeSource(plains), setting);
+        var manager = new net.minecraft.world.level.biome.BiomeManager((x, y, z) -> plains,
+            net.minecraft.world.level.biome.BiomeManager.obfuscateSeed(SEEDS[2]));
+        var context = new net.minecraft.world.level.levelgen.carver.CarvingContext(generator, NativeNoiseFillTest.registries,
+            filled.chunk(), filled.noise(), random, SurfaceRules.state(net.minecraft.world.level.block.Blocks.STONE.defaultBlockState()));
+        var attempted = new java.util.concurrent.atomic.AtomicReference<NativeTopMaterial>();
+        var failure = new IllegalStateException("publication sentinel");
+        NativeTopMaterial.beforePublish = (system, candidate) -> { attempted.set(candidate); throw failure; };
+        try {
+            assertSame(failure, assertThrows(IllegalStateException.class,
+                () -> NativeTopMaterial.create(context, filled.chunk(), filled.noise(), manager, pos -> plains, null, plains)));
+        } finally { NativeTopMaterial.beforePublish = null; }
+        assertNotNull(attempted.get());
+        assertTrue(attempted.get().releasedForVerification(), "failed publication must not retain a native allocation");
+        assertNull(random.surfaceSystem().nativeTopMaterials, "failure must not install a cache entry");
+        var retried = NativeTopMaterial.create(context, filled.chunk(), filled.noise(), manager, pos -> plains, null, plains);
+        assertNotNull(retried);
+        assertFalse(retried.releasedForVerification(), "a successful retry stays alive");
+        java.lang.ref.Reference.reachabilityFence(attempted);
     }
 
     /** The native route alone: no Java upcall, and the chunk equals Java's carving. */

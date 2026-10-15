@@ -34,7 +34,7 @@ time.
 | Float providers | constant, uniform, clamped normal, trapezoid | `program.rs`, `simple.rs` |
 | State providers | simple, weighted, rule-based, randomized int | `tree/mod.rs`, `vegetation.rs` |
 | Predicates | true/all/any/not, matching blocks/tags/fluids, solid, replaceable, inside world bounds, has sturdy face, would-survive (saplings); anything else asks Java | `program.rs`, `placement.rs` |
-| Features | ore, replace blobs, glowstone, springs, the three selectors, trees (every vanilla trunk, foliage, root placer and decorator, pale moss), random patch and flower patches, simple block, block column, seagrass, sea pickle, kelp, disk, vines, forest rock, underwater magma, multiface growth (glow lichen, sculk vein), geode, monster room, delta, basalt columns, coral claw/tree/mushroom, lake, sculk patch, pointed and large dripstone, dripstone cluster, blue ice, ice spike, iceberg, `freeze_top_layer`, bamboo, huge mushrooms, huge fungi, weeping and twisting vines, basalt pillar, scattered ore, chorus plant, End island, vegetation patches (moss, pale moss, clay pools), desert well | `ore.rs`, `simple.rs`, `tree/`, `vegetation.rs`, `geode.rs`, `rooms.rs`, `nether.rs`, `coral.rs`, `lakes.rs`, `sculk.rs`, `dripstone.rs`, `ice.rs`, `freeze.rs`, `plants.rs`, `end.rs`, `patch.rs`, `rooms.rs` |
+| Features | ore, replace blobs, glowstone, springs, the three selectors, trees (every vanilla trunk, foliage, root placer and decorator, pale moss), random patch and flower patches, simple block, block column, seagrass, sea pickle, kelp, disk, vines, forest rock, underwater magma, multiface growth (glow lichen, sculk vein), geode, monster room, delta, basalt columns, coral claw/tree/mushroom, lake, sculk patch, pointed and large dripstone, dripstone cluster, blue ice, ice spike, iceberg, `freeze_top_layer`, bamboo, huge mushrooms, huge fungi, weeping and twisting vines, basalt pillar, scattered ore, chorus plant, End island, End spikes/gateway/platform, vegetation patches (moss, pale moss, clay pools), desert well | `ore.rs`, `simple.rs`, `tree/`, `vegetation.rs`, `geode.rs`, `rooms.rs`, `nether.rs`, `coral.rs`, `lakes.rs`, `sculk.rs`, `dripstone.rs`, `ice.rs`, `freeze.rs`, `plants.rs`, `end.rs`, `patch.rs`, `rooms.rs` |
 | Templates | `StructureTemplate.placeInWorld` for structure pieces ([guide](../structure/RUST-STRUCTURE-TEMPLATES.md)) | `template.rs` |
 | Region | 3×3 proto chunks: live block/counter/biome owners, WG and final heightmaps, sky-light sources | `region.rs` |
 | `setBlock` | `WorldGenRegion.setBlock` → `ProtoChunk.setBlockState` | `write.rs`, `facts.rs` |
@@ -45,11 +45,15 @@ Java places it and returns the state. Top-level programs use Java leaves only
 under `count_on_every_layer` or `environment_scan`, where the eager scans pay
 for the upcall. **Java steps** run small pieces that need block entities or
 registries (monster-room loot and spawner mob, desert-well suspicious sand,
-pale moss patches, a water lake's freezing pass) the same way.
+pale moss patches, a water lake's freezing pass, gateway exits and crystal effects) the same way.
 
-Still Java: End spikes (crystal entities), the End gateway and platform,
-fossils (their two template placements run natively), planted huge fungi, and
-features without an encoder. Java retains structure-step dispatch in the original
+End spikes, gateways and the platform already have native geometry. Their
+[shared End executor](RUST-END-FEATURES.md) also serves direct feature calls;
+Java retains the descriptor cache/iterator, crystal effects and gateway exit
+mutation. Spike programs resolve the retained mutable descriptor list on each
+invocation through the configured-feature adapter. Still Java: fossils (their
+two template placements run natively), planted huge fungi, and features
+without an encoder. Java retains structure-step dispatch in the original
 order and the piece objects, but supported starts and legacy pieces, including
 mineshafts, now use [native structure planning and placement](../structure/RUST-STRUCTURE-PIECES.md).
 Unsupported paths retain Java fallbacks. The earlier mineshaft estimate, roughly 3% of the Overworld feature step,

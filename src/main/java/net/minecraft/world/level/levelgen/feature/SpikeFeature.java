@@ -52,6 +52,7 @@ public class SpikeFeature extends Feature<SpikeConfiguration> {
 
 	@Override
 	public boolean place(FeaturePlaceContext<SpikeConfiguration> featurePlaceContext) {
+		if (net.minecraft.world.level.levelgen.NativeEndFeatures.spikes(this, featurePlaceContext)) return true;
 		SpikeConfiguration spikeConfiguration = featurePlaceContext.config();
 		WorldGenLevel worldGenLevel = featurePlaceContext.level();
 		RandomSource randomSource = featurePlaceContext.random();
@@ -62,15 +63,19 @@ public class SpikeFeature extends Feature<SpikeConfiguration> {
 		}
 
 		for (SpikeFeature.EndSpike endSpike : list) {
-			if (endSpike.isCenterWithinChunk(blockPos)) {
-				this.placeSpike(worldGenLevel, randomSource, spikeConfiguration, endSpike);
-			}
+			this.placeSpikeIfMatchingJava(worldGenLevel, randomSource, spikeConfiguration, endSpike, blockPos);
 		}
 
 		return true;
 	}
 
-	private void placeSpike(
+	/** Compatibility boundary for custom descriptors, retaining the original filter and errors. */
+	public void placeSpikeIfMatchingJava(ServerLevelAccessor level, RandomSource random, SpikeConfiguration config, SpikeFeature.EndSpike endSpike, BlockPos blockPos) {
+		if (endSpike.isCenterWithinChunk(blockPos)) this.placeSpikeJava(level, random, config, endSpike);
+	}
+
+	/** Original per-spike effects, also used for custom/overflowing descriptors. */
+	public void placeSpikeJava(
 		ServerLevelAccessor serverLevelAccessor, RandomSource randomSource, SpikeConfiguration spikeConfiguration, SpikeFeature.EndSpike endSpike
 	) {
 		int i = endSpike.getRadius();
@@ -114,6 +119,11 @@ public class SpikeFeature extends Feature<SpikeConfiguration> {
 			}
 		}
 
+		this.placeCrystalJava(serverLevelAccessor, randomSource, spikeConfiguration, endSpike);
+	}
+
+	/** Effect boundary shared with the native End executor; the actual caller random stays Java. */
+	public void placeCrystalJava(ServerLevelAccessor serverLevelAccessor, RandomSource randomSource, SpikeConfiguration spikeConfiguration, SpikeFeature.EndSpike endSpike) {
 		EndCrystal endCrystal = EntityType.END_CRYSTAL.create(serverLevelAccessor.getLevel(), EntitySpawnReason.STRUCTURE);
 		if (endCrystal != null) {
 			endCrystal.setBeamTarget(spikeConfiguration.getCrystalBeamTarget());

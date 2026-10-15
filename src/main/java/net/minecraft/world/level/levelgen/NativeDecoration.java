@@ -99,6 +99,14 @@ public final class NativeDecoration {
 	private static final MethodHandle SET_BLOCK = handle("program_set_block", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
 	/** The placement running on this thread, for Rust's sync upcalls. */
 	private static final ThreadLocal<Call> CURRENT = new ThreadLocal<>();
+	/** An End Java leaf may reuse this invocation's admitted generation storage.
+	 * It never obtains a binding for a live ServerLevel or another level. */
+	static NativeDecorationRegion endRegion(net.minecraft.world.level.ServerLevelAccessor level) {
+		var call = CURRENT.get();
+		if (call == null || !call.region.isFor(level)) return null;
+		return call.region.refresh(true, true) == NativeDecorationRegion.REFRESHED ? call.region : null;
+	}
+	static MemorySegment endCallback() { return UPCALL; }
 	private static final MemorySegment UPCALL;
 
 	static {
@@ -1032,6 +1040,7 @@ public final class NativeDecoration {
 			replayEvents(region);
 			region.resetAfterSync();
 			int result = switch (op) {
+				case 23 -> NativeEndFeatures.generationEffect(args, count);
 				case OP_UPDATE_SHAPE_AT_EDGE -> {
 					int xs = (int)a[4], ys = (int)a[5], zs = (int)a[6];
 					var shape = new net.minecraft.world.phys.shapes.BitSetDiscreteVoxelShape(xs, ys, zs);
@@ -1103,6 +1112,10 @@ public final class NativeDecoration {
 				default -> throw new IllegalStateException("Unknown native decoration upcall " + op);
 			};
 			if (op == OP_PLACE_FEATURE && result == 2) return result;
+			// End op0 is the final flush: there are no further native reads.
+			// Effects/metadata were installed above; the next native invocation
+			// will refresh before accessing this binding again.
+			if (op == 23 && a[0] == 0) return result;
 			int refresh = region.refresh(true, true);
 			if (refresh != NativeDecorationRegion.REFRESHED) throw new IllegalStateException("Native decoration binding changed during upcall " + op + ": " + refresh);
 			return result;

@@ -121,6 +121,17 @@ also uses a floor rule that reaches every request kind, because vanilla
 rules reach only biomes and the preliminary surface from the carvers. It
 checks that the native route makes no Java upcall and that disabling the
 binding keeps the upcall.
+The top-material cache keeps the newest eight identity keys per surface system.
+Construction runs outside its publication lock. Concurrent first users recheck
+the key under that lock and receive the canonical binding; an unpublished
+loser's native allocation is released immediately through an idempotent
+Cleaner action. Declined (null) entries follow the same identity and eviction
+rules. Canonical bindings retain their existing system/in-flight lifetimes.
+The tests force four simultaneous first users behind a barrier, check immediate
+loser cleanup while the Java objects are still retained, repeat cleanup, and
+check equal-valued distinct keys, null caching and eviction. This correction
+addresses a duplicate-publication failure reproduced on unchanged `683ab835`;
+it does not change carving geometry or investigate the separate End timings.
 `-Dmattmc.worldgen.javaCarvers=true` keeps Java's carvers for comparisons.
 
 ## Preserve these contracts

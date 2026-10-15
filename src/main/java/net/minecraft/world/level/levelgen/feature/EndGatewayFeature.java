@@ -14,6 +14,7 @@ public class EndGatewayFeature extends Feature<EndGatewayConfiguration> {
 
 	@Override
 	public boolean place(FeaturePlaceContext<EndGatewayConfiguration> featurePlaceContext) {
+		if (net.minecraft.world.level.levelgen.NativeEndFeatures.gateway(this, featurePlaceContext)) return true;
 		BlockPos blockPos = featurePlaceContext.origin();
 		WorldGenLevel worldGenLevel = featurePlaceContext.level();
 		EndGatewayConfiguration endGatewayConfiguration = featurePlaceContext.config();

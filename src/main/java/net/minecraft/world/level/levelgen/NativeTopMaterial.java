@@ -55,6 +55,8 @@ final class NativeTopMaterial {
     // Chunks whose rule kept Java's upcall.
     static final AtomicLong DECLINED = new AtomicLong();
     private static final java.lang.ref.Cleaner CLEANER = java.lang.ref.Cleaner.create();
+    /** Verification only: after construction, before publication, without the cache lock. */
+    static volatile java.util.function.BiConsumer<SurfaceSystem, NativeTopMaterial> beforePublish;
 
     /** What a binding depends on besides its surface system, by identity. */
     private record Key(Object rule, Object registry, @Nullable Object list, @Nullable Object fixed, long zoomSeed, Object levels) {
@@ -78,6 +80,8 @@ final class NativeTopMaterial {
     final int seaLevel;
     // The noise states and preliminary surface program Rust reads.
     private final List<Object> keep;
+    private final Release release;
+    private final java.lang.ref.Cleaner.Cleanable cleanable;
 
     private NativeTopMaterial(long handle, @Nullable int[] leafBiomes, int fixedBiome, long zoomSeed, Registry<Biome> registry, int seaLevel, List<Object> keep) {
         this.handle = handle;
@@ -87,6 +91,8 @@ final class NativeTopMaterial {
         this.registry = registry;
         this.seaLevel = seaLevel;
         this.keep = keep;
+        this.release = new Release(handle);
+        this.cleanable = CLEANER.register(this, this.release);
     }
 
     static void setEnabled(boolean value) {
@@ -159,17 +165,38 @@ final class NativeTopMaterial {
             }
         }
         NativeTopMaterial binding = bind(context, chunk, noise, biomeManager, biomes, list, fixed);
-        if (binding == null) DECLINED.incrementAndGet();
-        synchronized (system) {
-            @SuppressWarnings("unchecked")
-            List<Cached> current = (List<Cached>)system.nativeTopMaterials;
-            List<Cached> next = current == null ? new ArrayList<>() : new ArrayList<>(current);
-            // A few inputs per system (one per dimension using it); keep the newest.
-            if (next.size() >= 8) next.remove(0);
-            next.add(new Cached(key, binding));
-            system.nativeTopMaterials = List.copyOf(next);
+        boolean retained = false;
+        try {
+            var hook = beforePublish;
+            if (hook != null) hook.accept(system, binding);
+            synchronized (system) {
+                @SuppressWarnings("unchecked")
+                List<Cached> current = (List<Cached>)system.nativeTopMaterials;
+                // Another first user may have completed the same immutable
+                // binding while this one was constructed outside the lock.
+                if (current != null) {
+                    for (Cached entry : current) {
+                        if (entry.key().matches(key)) {
+                            if (entry.binding() == null) DECLINED.incrementAndGet();
+                            return entry.binding();
+                        }
+                    }
+                }
+                List<Cached> next = current == null ? new ArrayList<>() : new ArrayList<>(current);
+                // A few inputs per system (one per dimension using it); keep the newest.
+                if (next.size() >= 8) next.remove(0);
+                next.add(new Cached(key, binding));
+                system.nativeTopMaterials = List.copyOf(next);
+                retained = true;
+            }
+            if (binding == null) DECLINED.incrementAndGet();
+            return binding;
+        } finally {
+            // Unpublished allocations have no readers. Cleanable.clean is
+            // idempotent, so their later GC cannot free the native Box twice.
+            // This also runs if a verification callback or publication throws.
+            if (!retained && binding != null) binding.cleanable.clean();
         }
-        return binding;
     }
 
     @Nullable
@@ -220,7 +247,6 @@ final class NativeTopMaterial {
         }
         if (handle == 0) return null;
         NativeTopMaterial binding = new NativeTopMaterial(handle, leafBiomes, fixedBiome, biomeManager.biomeZoomSeed, registry, system.getSeaLevel(), keep);
-        CLEANER.register(binding, new Release(handle));
         return binding;
     }
 
@@ -250,16 +276,22 @@ final class NativeTopMaterial {
     }
 
     /** Frees the Rust binding once its NativeTopMaterial is unreachable. */
-    private record Release(long handle) implements Runnable {
+    private static final class Release implements Runnable {
+        final long handle;
+        volatile boolean released;
+        Release(long handle) { this.handle = handle; }
         @Override
         public void run() {
             try {
                 RELEASE.invokeExact(this.handle);
+                this.released = true;
             } catch (Throwable error) {
                 throw new IllegalStateException("Cannot release native top material", error);
             }
         }
     }
+
+    boolean releasedForVerification() { return this.release.released; }
 
     /** Keeps the inputs Rust reads reachable until the carvers finish. */
     List<Object> keep() {

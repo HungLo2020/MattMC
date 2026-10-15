@@ -26,6 +26,7 @@ pub(crate) mod dripstone;
 pub(crate) mod ice;
 pub(crate) mod plants;
 pub(crate) mod end;
+mod end_ffi;
 pub(crate) mod freeze;
 pub(crate) mod patch;
 pub(crate) mod template;
