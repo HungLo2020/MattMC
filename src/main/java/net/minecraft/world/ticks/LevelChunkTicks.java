@@ -1,23 +1,20 @@
 package net.minecraft.world.ticks;
 
-import it.unimi.dsi.fastutil.objects.ObjectOpenCustomHashSet;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import net.minecraft.core.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 public class LevelChunkTicks<T> implements SerializableTickContainer<T>, TickContainerAccess<T> {
-	private final Queue<ScheduledTick<T>> tickQueue = new PriorityQueue(ScheduledTick.DRAIN_ORDER);
+	/** Native queue (PriorityQueue array order under DRAIN_ORDER) plus the per-position dedup keys. */
+	private final NativeChunkTicks<T> ticks = new NativeChunkTicks<>();
 	@Nullable
 	private List<SavedTick<T>> pendingTicks;
-	private final Set<ScheduledTick<?>> ticksPerPosition = new ObjectOpenCustomHashSet<>(ScheduledTick.UNIQUE_TICK_HASH);
 	@Nullable
 	private BiConsumer<LevelChunkTicks<T>, ScheduledTick<T>> onTickAdded;
 
@@ -28,8 +25,12 @@ public class LevelChunkTicks<T> implements SerializableTickContainer<T>, TickCon
 		this.pendingTicks = list;
 
 		for (SavedTick<T> savedTick : list) {
-			this.ticksPerPosition.add(ScheduledTick.probe(savedTick.type(), savedTick.pos()));
+			this.ticks.addKey(savedTick.type(), savedTick.pos());
 		}
+	}
+
+	NativeChunkTicks<T> nativeTicks() {
+		return this.ticks;
 	}
 
 	public void setOnTickAdded(@Nullable BiConsumer<LevelChunkTicks<T>, ScheduledTick<T>> biConsumer) {
@@ -38,28 +39,27 @@ public class LevelChunkTicks<T> implements SerializableTickContainer<T>, TickCon
 
 	@Nullable
 	public ScheduledTick<T> peek() {
-		return (ScheduledTick<T>)this.tickQueue.peek();
+		return this.ticks.peek();
 	}
 
 	@Nullable
 	public ScheduledTick<T> poll() {
-		ScheduledTick<T> scheduledTick = (ScheduledTick<T>)this.tickQueue.poll();
-		if (scheduledTick != null) {
-			this.ticksPerPosition.remove(scheduledTick);
-		}
-
-		return scheduledTick;
+		return this.ticks.poll();
 	}
 
 	@Override
 	public void schedule(ScheduledTick<T> scheduledTick) {
-		if (this.ticksPerPosition.add(scheduledTick)) {
-			this.scheduleUnchecked(scheduledTick);
+		if (this.ticks.schedule(scheduledTick, false)) {
+			this.tickAdded(scheduledTick);
 		}
 	}
 
 	private void scheduleUnchecked(ScheduledTick<T> scheduledTick) {
-		this.tickQueue.add(scheduledTick);
+		this.ticks.schedule(scheduledTick, true);
+		this.tickAdded(scheduledTick);
+	}
+
+	private void tickAdded(ScheduledTick<T> scheduledTick) {
 		if (this.onTickAdded != null) {
 			this.onTickAdded.accept(this, scheduledTick);
 		}
@@ -67,39 +67,46 @@ public class LevelChunkTicks<T> implements SerializableTickContainer<T>, TickCon
 
 	@Override
 	public boolean hasScheduledTick(BlockPos blockPos, T object) {
-		return this.ticksPerPosition.contains(ScheduledTick.probe(object, blockPos));
+		return this.ticks.containsKey(object, blockPos);
 	}
 
 	public void removeIf(Predicate<ScheduledTick<T>> predicate) {
-		Iterator<ScheduledTick<T>> iterator = this.tickQueue.iterator();
+		// The native iterator's remove also drops the removed tick's dedup key.
+		Iterator<ScheduledTick<T>> iterator = this.ticks.iterator();
 
 		while (iterator.hasNext()) {
 			ScheduledTick<T> scheduledTick = (ScheduledTick<T>)iterator.next();
 			if (predicate.test(scheduledTick)) {
 				iterator.remove();
-				this.ticksPerPosition.remove(scheduledTick);
 			}
 		}
 	}
 
+	/** LevelTicks.clearArea's box removal; same effect as removeIf with a box.isInside predicate. */
+	void removeInBox(net.minecraft.world.level.levelgen.structure.BoundingBox box) {
+		this.ticks.removeInBox(box);
+	}
+
 	public Stream<ScheduledTick<T>> getAll() {
-		return this.tickQueue.stream();
+		return StreamSupport.stream(this.ticks.spliterator(), false);
 	}
 
 	@Override
 	public int count() {
-		return this.tickQueue.size() + (this.pendingTicks != null ? this.pendingTicks.size() : 0);
+		return this.ticks.size() + (this.pendingTicks != null ? this.pendingTicks.size() : 0);
 	}
 
 	@Override
 	public List<SavedTick<T>> pack(long l) {
-		List<SavedTick<T>> list = new ArrayList(this.tickQueue.size());
+		List<SavedTick<T>> list = new ArrayList(this.ticks.size());
 		if (this.pendingTicks != null) {
 			list.addAll(this.pendingTicks);
 		}
 
-		for (ScheduledTick<T> scheduledTick : this.tickQueue) {
-			list.add(scheduledTick.toSavedTick(l));
+		Iterator<ScheduledTick<T>> iterator = this.ticks.iterator();
+
+		while (iterator.hasNext()) {
+			list.add(iterator.next().toSavedTick(l));
 		}
 
 		return list;

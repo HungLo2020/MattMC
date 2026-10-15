@@ -17,6 +17,9 @@
   Java/native parity checks.
 - [World Generation](levelgen/index.md): noise, density, surface evaluation,
   seed compatibility, and verification workflows.
+- [Scheduled block and fluid ticks](scheduled-ticks/index.md): native per-chunk
+  queues, container registry and collection heap, exact PriorityQueue and
+  exception contracts, and Frozen differential verification.
 - [World time and weather](time-weather/index.md): native clock, weather-cycle
   and sleep-threshold ownership, shared-random and derived-dimension contracts,
   and Frozen/pre-change differential verification.

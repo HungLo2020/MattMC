@@ -2,6 +2,7 @@ package net.minecraft.world.ticks;
 
 import it.unimi.dsi.fastutil.longs.Long2LongMap;
 import it.unimi.dsi.fastutil.longs.Long2LongMaps;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -10,10 +11,8 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectOpenCustomHashSet;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.LongSummaryStatistics;
-import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -29,14 +28,20 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 public class LevelTicks<T> implements LevelTickAccess<T> {
-	private static final Comparator<LevelChunkTicks<?>> CONTAINER_DRAIN_ORDER = (levelChunkTicks, levelChunkTicks2) -> ScheduledTick.INTRA_TICK_DRAIN_ORDER
-		.compare(levelChunkTicks.peek(), levelChunkTicks2.peek());
+	// containersToTick (INTRA_TICK_DRAIN_ORDER on container heads, retained until
+	// cleanupAfterTick) and the drain loop are native: see NativeChunkTicks.Registry.
 	private final LongPredicate tickCheck;
 	private final Long2ObjectMap<LevelChunkTicks<T>> allContainers = new Long2ObjectOpenHashMap<>();
 	private final Long2LongMap nextTickForContainer = Util.make(
 		new Long2LongOpenHashMap(), long2LongOpenHashMap -> long2LongOpenHashMap.defaultReturnValue(Long.MAX_VALUE)
 	);
-	private final Queue<LevelChunkTicks<T>> containersToTick = new PriorityQueue(CONTAINER_DRAIN_ORDER);
+	/** Native container bindings and the persistent containersToTick heap. */
+	private final NativeChunkTicks.Registry registry = new NativeChunkTicks.Registry();
+	/** Registry binding per chunk key, alongside allContainers. */
+	private final Long2IntOpenHashMap handleByKey = Util.make(new Long2IntOpenHashMap(), map -> map.defaultReturnValue(-1));
+	/** Whether the last tick reached cleanupAfterTick (the native heap is then cleared). */
+	private boolean cleanedUp = true;
+	private int retainedContainers;
 	private final Queue<ScheduledTick<T>> toRunThisTick = new ArrayDeque();
 	private final List<ScheduledTick<T>> alreadyRunThisTick = new ArrayList();
 	private final Set<ScheduledTick<?>> toRunThisTickSet = new ObjectOpenCustomHashSet<>(ScheduledTick.UNIQUE_TICK_HASH);
@@ -53,6 +58,11 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
 	public void addContainer(ChunkPos chunkPos, LevelChunkTicks<T> levelChunkTicks) {
 		long l = chunkPos.toLong();
 		this.allContainers.put(l, levelChunkTicks);
+		int replaced = this.handleByKey.put(l, this.registry.register(levelChunkTicks));
+		if (replaced >= 0) {
+			// The key was rebound without removeContainer; the old binding is unreachable.
+			this.registry.unregister(replaced);
+		}
 		ScheduledTick<T> scheduledTick = levelChunkTicks.peek();
 		if (scheduledTick != null) {
 			this.nextTickForContainer.put(l, scheduledTick.triggerTick());
@@ -65,6 +75,10 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
 		long l = chunkPos.toLong();
 		LevelChunkTicks<T> levelChunkTicks = this.allContainers.remove(l);
 		this.nextTickForContainer.remove(l);
+		int handle = this.handleByKey.remove(l);
+		if (handle >= 0) {
+			this.registry.unregister(handle);
+		}
 		if (levelChunkTicks != null) {
 			levelChunkTicks.setOnTickAdded(null);
 		}
@@ -102,9 +116,8 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
 
 	private void collectTicks(long l, int i, ProfilerFiller profilerFiller) {
 		this.sortContainersToTick(l);
-		profilerFiller.incrementCounter("containersToTick", this.containersToTick.size());
+		profilerFiller.incrementCounter("containersToTick", (this.cleanedUp ? 0 : this.retainedContainers) + this.registry.eligibleCount());
 		this.drainContainers(l, i);
-		this.rescheduleLeftoverContainers();
 	}
 
 	private void sortContainersToTick(long l) {
@@ -126,65 +139,32 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
 						entry.setValue(scheduledTick.triggerTick());
 					} else if (this.tickCheck.test(m)) {
 						objectIterator.remove();
-						this.containersToTick.add(levelChunkTicks);
+						this.registry.addEligible(this.handleByKey.get(m));
 					}
 				}
 			}
 		}
 	}
 
+	/**
+	 * drainContainers + rescheduleLeftoverContainers in one native call: the retained
+	 * heap array plus this tick's eligible containers in scan order, drained with the
+	 * remaining budget. Drained ticks and next-head map updates are applied here in
+	 * the original order, before any callback runs.
+	 */
 	private void drainContainers(long l, int i) {
-		LevelChunkTicks<T> levelChunkTicks;
-		while (this.canScheduleMoreTicks(i) && (levelChunkTicks = (LevelChunkTicks<T>)this.containersToTick.poll()) != null) {
-			ScheduledTick<T> scheduledTick = levelChunkTicks.poll();
-			this.scheduleForThisTick(scheduledTick);
-			this.drainFromCurrentContainer(this.containersToTick, levelChunkTicks, l, i);
-			ScheduledTick<T> scheduledTick2 = levelChunkTicks.peek();
-			if (scheduledTick2 != null) {
-				if (scheduledTick2.triggerTick() <= l && this.canScheduleMoreTicks(i)) {
-					this.containersToTick.add(levelChunkTicks);
-				} else {
-					this.updateContainerScheduling(scheduledTick2);
-				}
-			}
-		}
-	}
-
-	private void rescheduleLeftoverContainers() {
-		for (LevelChunkTicks<T> levelChunkTicks : this.containersToTick) {
-			this.updateContainerScheduling(levelChunkTicks.peek());
-		}
+		boolean cleaned = this.cleanedUp;
+		this.cleanedUp = false;
+		this.retainedContainers = this.registry.collect(cleaned, l, (long)i - this.toRunThisTick.size(),
+			this::scheduleForThisTick, this.nextTickForContainer::put);
 	}
 
 	private void updateContainerScheduling(ScheduledTick<T> scheduledTick) {
 		this.nextTickForContainer.put(ChunkPos.asLong(scheduledTick.pos()), scheduledTick.triggerTick());
 	}
 
-	private void drainFromCurrentContainer(Queue<LevelChunkTicks<T>> queue, LevelChunkTicks<T> levelChunkTicks, long l, int i) {
-		if (this.canScheduleMoreTicks(i)) {
-			LevelChunkTicks<T> levelChunkTicks2 = (LevelChunkTicks<T>)queue.peek();
-			ScheduledTick<T> scheduledTick = levelChunkTicks2 != null ? levelChunkTicks2.peek() : null;
-
-			while (this.canScheduleMoreTicks(i)) {
-				ScheduledTick<T> scheduledTick2 = levelChunkTicks.peek();
-				if (scheduledTick2 == null
-					|| scheduledTick2.triggerTick() > l
-					|| scheduledTick != null && ScheduledTick.INTRA_TICK_DRAIN_ORDER.compare(scheduledTick2, scheduledTick) > 0) {
-					break;
-				}
-
-				levelChunkTicks.poll();
-				this.scheduleForThisTick(scheduledTick2);
-			}
-		}
-	}
-
 	private void scheduleForThisTick(ScheduledTick<T> scheduledTick) {
 		this.toRunThisTick.add(scheduledTick);
-	}
-
-	private boolean canScheduleMoreTicks(int i) {
-		return this.toRunThisTick.size() < i;
 	}
 
 	private void runCollectedTicks(BiConsumer<BlockPos, T> biConsumer) {
@@ -201,7 +181,7 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
 
 	private void cleanupAfterTick() {
 		this.toRunThisTick.clear();
-		this.containersToTick.clear();
+		this.cleanedUp = true;
 		this.alreadyRunThisTick.clear();
 		this.toRunThisTickSet.clear();
 	}
@@ -245,7 +225,8 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
 		Predicate<ScheduledTick<T>> predicate = scheduledTick -> boundingBox.isInside(scheduledTick.pos());
 		this.forContainersInArea(boundingBox, (l, levelChunkTicks) -> {
 			ScheduledTick<T> scheduledTick = levelChunkTicks.peek();
-			levelChunkTicks.removeIf(predicate);
+			// Native PriorityQueue iterator-removal over the same inclusive box predicate.
+			levelChunkTicks.removeInBox(boundingBox);
 			ScheduledTick<T> scheduledTick2 = levelChunkTicks.peek();
 			if (scheduledTick2 != scheduledTick) {
 				if (scheduledTick2 != null) {
