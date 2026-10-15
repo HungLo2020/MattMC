@@ -32,10 +32,14 @@ nautilus variants.
   (`GROUP_ORDER`, measured from DFU 8.0.16). Defaults are omitted as DFU omits
   them, and `"type"` is written last.
 - **Delegated values:** values belonging to registries Java still owns are
-  resolved and encoded by those registries' codecs. These are text components,
-  holders and enchantment effect components. Int providers and particle
-  options are [native value types](NATIVE-VALUES.md), decoded inline. Sounds
-  are parsed by Rust and looked up by ID.
+  resolved and encoded by those registries' codecs. These are text components
+  and holders. Int providers, particle options and enchantment effect
+  components are [native value types](NATIVE-VALUES.md), decoded inline.
+  Sounds are parsed by Rust and looked up by ID.
+- **Java-owned leaves** inside a native value (for example an enchantment
+  effect's requirements) are decoded by Rust calling their Java codec while
+  it decodes. A file Rust parsed itself sends the leaf's JSON text, and the
+  loader's ops decode it, so errors, partials and exceptions are the same.
 - **Holder sets** (carvers, features, item and enchantment sets, spawn-condition
   biomes and structures) are parsed by Rust as `HolderSetCodec` reads them: a
   `#tag`, one ID, or a list of IDs. Java looks each one up in the decode
@@ -125,7 +129,6 @@ regression.
   keys. Worldgen ownership is a separate migration goal.
 - Packet stream codecs (`DIRECT_STREAM_CODEC`, used for inline holders in
   item stacks) are unchanged Java packet code.
-- Text components and enchantment effects still decode through Java codecs.
 
 ## Verification (2026-10-13)
 

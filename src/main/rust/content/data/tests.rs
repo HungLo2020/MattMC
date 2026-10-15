@@ -209,7 +209,7 @@ fn decode_cost() {
 
 fn value(kind: usize, text: &str, mode: Mode, bounds: Option<values::Bounds>) -> schema::DR {
     let node: Node = json::parse_into(text.as_bytes()).unwrap();
-    values::decode(kind, &node, mode, bounds).0
+    values::decode(kind, &node, mode, false, bounds).0
 }
 
 #[test]
@@ -249,7 +249,7 @@ fn int_providers_decode_as_java() {
 fn nbt_messages_follow_nbt_ops() {
     let tree = |members: Vec<(&str, Value)>| Node::new(Value::Map(members.into_iter().map(|(k, v)| (k.to_owned(), Node::new(v))).collect::<Vec<_>>().into()));
     let input = tree(vec![("type", Value::String("uniform".into())), ("max_inclusive", Value::Number(Num::Byte(1)))]);
-    let err = values::decode(0, &input, Mode::Nbt, None).0.unwrap_err();
+    let err = values::decode(0, &input, Mode::Nbt, false, None).0.unwrap_err();
     assert_eq!(err.msg, "Failed to parse either. First: Not a number; Second: No key min_inclusive in MapLike[{max_inclusive:1b,type:\"uniform\"}]");
 }
 
@@ -299,7 +299,7 @@ fn level_based_values_round_trip() {
     for text in [r#"2.5"#, r#"{"type":"linear","base":2.0,"per_level_above_first":0.5}"#, r#"{"type":"lookup","values":[1.0,2.5],"fallback":{"type":"levels_squared","added":1.0}}"#] {
         let d = value(2, text, Mode::Json, None).unwrap();
         let o = values::encode(2, &d, None).unwrap();
-        assert_eq!(values::decode(2, &schema::to_node(&o), Mode::Json, None).0.unwrap(), d);
+        assert_eq!(values::decode(2, &schema::to_node(&o), Mode::Json, false, None).0.unwrap(), d);
     }
     assert_eq!(value(2, r#"{"type":"clamped","value":3,"min":4,"max":4}"#, Mode::Json, None).unwrap_err().msg,
         "Failed to parse either. First: Not a number: {\"type\":\"clamped\",\"value\":3,\"min\":4,\"max\":4}; Second: Max must be larger than min, min: 4.0, max: 4.0");
@@ -312,11 +312,11 @@ fn value_cost() {
     let stack = r#"{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":{"text":"Item 4","color":"gold"},"minecraft:lore":["line",{"translate":"item.minecraft.stick"}],"minecraft:damage":3}}"#;
     let node: Node = json::parse_into(stack.as_bytes()).unwrap();
     let kind = values::VALUES.iter().position(|k| k.name == "item_stack").unwrap();
-    let d = values::decode(kind, &node, Mode::Json, None).0.unwrap();
+    let d = values::decode(kind, &node, Mode::Json, false, None).0.unwrap();
     let rounds = 200_000;
     let t = std::time::Instant::now();
     for _ in 0..rounds {
-        std::hint::black_box(values::decode(kind, &node, Mode::Json, None).0.unwrap());
+        std::hint::black_box(values::decode(kind, &node, Mode::Json, false, None).0.unwrap());
     }
     let decode = t.elapsed();
     let t = std::time::Instant::now();
@@ -346,11 +346,11 @@ fn value_cost_parts() {
     ] {
         let k = kind(name);
         let node: Node = json::parse_into(text.as_bytes()).unwrap();
-        let d = values::decode(k, &node, Mode::Json, None).0.unwrap();
+        let d = values::decode(k, &node, Mode::Json, false, None).0.unwrap();
         let rounds = 500_000;
         let t = std::time::Instant::now();
         for _ in 0..rounds {
-            std::hint::black_box(values::decode(k, &node, Mode::Json, None).0.unwrap());
+            std::hint::black_box(values::decode(k, &node, Mode::Json, false, None).0.unwrap());
         }
         let decode = t.elapsed();
         let t = std::time::Instant::now();
@@ -442,4 +442,27 @@ fn a_missing_block_registry_ends_the_call_without_further_callbacks() {
     assert_eq!(thrown.map(|t| t.0), Some(schema::BLOCKS_MISSING));
     // Installed: the registry is returned without calling Java.
     assert_eq!(schema::blocks_from(|| Some(7u8), || panic!("installed already")), Ok(7));
+}
+
+#[test]
+fn vanilla_enchantment_effects_decode_natively_and_round_trip() {
+    let index = REGISTRIES.iter().position(|r| r.name == "enchantment").unwrap();
+    let files = files("enchantment");
+    assert_eq!(files.len(), 43);
+    let (mut components, mut slots) = (0, 0);
+    for (name, bytes) in &files {
+        let def = decode_file(index, false, bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let D::Record(fields) = &def.value else { panic!("{name}: not a record") };
+        let D::Map(effects) = fields.last().unwrap() else { panic!("{name}: effects not native: {:?}", fields.last()) };
+        components += effects.len();
+        slots += def.slots.len();
+        // Encoding gives back a value that decodes to the same definition.
+        let encoded = encode(&def, false).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let again = decode(index, false, &node(&encoded), Mode::Json, true).unwrap_or_else(|e| panic!("{name}: re-decode {e}"));
+        assert!(def.value == again.value, "{name}: round trip differs");
+    }
+    // 29 components across the vanilla files; Java-owned leaves (requirements,
+    // damage types, attributes...) remain delegated slots.
+    assert!(components >= 43, "components {components}");
+    println!("components {components} delegated slots {slots}");
 }

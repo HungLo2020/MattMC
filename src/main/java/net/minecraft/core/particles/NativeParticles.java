@@ -13,7 +13,7 @@ import net.minecraft.world.level.gameevent.PositionSource;
  * (`content/data/values.rs` {@code PARTICLE}): a case per particle type, in
  * registry order, which Rust's case names must match.
  */
-final class NativeParticles {
+public final class NativeParticles {
 	private static final ParticleType<?>[] TYPES = types();
 
 	private NativeParticles() {
@@ -36,7 +36,7 @@ final class NativeParticles {
 	}
 
 	@SuppressWarnings("unchecked")
-	static ParticleOptions project(Object value, NativeData.Context context) {
+	public static ParticleOptions project(Object value, NativeData.Context context) {
 		NativeData.Variant variant = (NativeData.Variant)value;
 		ParticleType<?> type = TYPES[variant.index()];
 		Object[] f = variant.fields();
@@ -85,7 +85,7 @@ final class NativeParticles {
 		throw new IllegalStateException("No projection for particle type " + BuiltInRegistries.PARTICLE_TYPE.getKey(type));
 	}
 
-	static Object unproject(ParticleOptions options, NativeData.Builder builder) {
+	public static Object unproject(ParticleOptions options, NativeData.Builder builder) {
 		int index = BuiltInRegistries.PARTICLE_TYPE.getId(options.getType());
 		Object[] fields = switch (options) {
 			case SimpleParticleType simple -> new Object[0];

@@ -199,32 +199,46 @@ public final class NativeData {
 			int mode = ops.getBooleanValue(ops.createInt(1)).isSuccess() ? 1 : 0;
 			boolean registryOps = ops instanceof RegistryOps<?>;
 			byte[] bytes = out.toByteArray();
-			long handle;
+			NativeValues.DataCall call;
 			try (Arena arena = Arena.ofConfined()) {
 				MemorySegment segment = copy(arena, bytes);
-				handle = (long)DECODE_TREE.invokeExact(this.kind.ordinal(), this.network ? 1 : 0, mode, registryOps ? 1 : 0, segment, (long)bytes.length);
+				call = NativeValues.dataCall(ops, nodes, JAVA_THROWN_HANDLE, () ->
+					(long)DECODE_TREE.invokeExact(this.kind.ordinal(), this.network ? 1 : 0, mode, registryOps ? 1 : 0, segment, (long)bytes.length));
 			} catch (Throwable e) {
 				throw new IllegalStateException("Rust data decode failed", e);
 			}
+			long handle = call.handle();
 			this.checkBlocks(handle, "Decoding");
-			return this.project(handle, new Source<>(ops, nodes), ops instanceof RegistryOps<?> r ? r.withParent(JsonOps.INSTANCE) : null)
+			if (call.thrown() != null) {
+				// A Java codec Rust called back threw: the decode throws that same exception.
+				throw NativeData.<RuntimeException>rethrow(call.thrown());
+			}
+			return this.project(handle, new Source<>(ops, nodes), ops instanceof RegistryOps<?> r ? r.withParent(JsonOps.INSTANCE) : null, call.resolved())
 				.map(e -> Pair.of(e, ops.empty()));
 		}
 
 		/** Decodes a data pack file's bytes; references resolve against {@code ops}. */
 		public DataResult<E> decodeFile(RegistryOps<JsonElement> ops, byte[] bytes) {
 			requireBlocks();
-			long handle;
+			NativeValues.DataCall call;
 			try (Arena arena = Arena.ofConfined()) {
-				handle = (long)DECODE_FILE.invokeExact(this.kind.ordinal(), this.network ? 1 : 0, copy(arena, bytes), (long)bytes.length);
+				MemorySegment segment = copy(arena, bytes);
+				// Java codecs Rust calls back decode the file's JSON with the loader's ops.
+				call = NativeValues.dataCall(ops, List.of(), JAVA_THROWN_HANDLE, () ->
+					(long)DECODE_FILE.invokeExact(this.kind.ordinal(), this.network ? 1 : 0, segment, (long)bytes.length));
 			} catch (Throwable e) {
 				throw new IllegalStateException("Rust data decode failed", e);
 			}
+			long handle = call.handle();
 			this.checkBlocks(handle, "Decoding");
-			return this.project(handle, null, ops);
+			if (call.thrown() != null) {
+				// A Java codec Rust called back threw: the decode throws that same exception.
+				throw NativeData.<RuntimeException>rethrow(call.thrown());
+			}
+			return this.project(handle, null, ops, call.resolved());
 		}
 
-		private DataResult<E> project(long handle, @Nullable Source<?> source, @Nullable RegistryOps<JsonElement> jsonOps) {
+		private DataResult<E> project(long handle, @Nullable Source<?> source, @Nullable RegistryOps<JsonElement> jsonOps, List<Object> resolved) {
 			E value;
 			Context context;
 			try {
@@ -236,6 +250,7 @@ public final class NativeData {
 				}
 				Object decoded = decoded(in);
 				context = new Context(source, jsonOps, in);
+				context.resolved(resolved);
 				for (int i = in.getInt(); i > 0; i--) {
 					LOGGER.error(string(in));
 				}
@@ -1557,6 +1572,13 @@ public final class NativeData {
 
 	/** A data call's handle when it met a block state the registry couldn't be installed for. */
 	static final long BLOCKS_MISSING_HANDLE = -2;
+	/** A data call's handles when a Java codec it called back threw: {@code -3 - id}. */
+	static final long JAVA_THROWN_HANDLE = -3;
+
+	@SuppressWarnings("unchecked")
+	private static <X extends Throwable> RuntimeException rethrow(Throwable e) throws X {
+		throw (X)e;
+	}
 	/** The status-2 exception class Rust reports for that (`schema::BLOCKS_MISSING`). */
 	static final int BLOCKS_MISSING = 4;
 

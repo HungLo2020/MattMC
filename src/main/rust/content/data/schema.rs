@@ -189,7 +189,8 @@ pub enum JavaAnswer {
 
 /// The Java callback: `(kind, id, name, len, node, slot, out, capacity)`
 /// decodes Java's preorder `node` of the current decode with codec `id`
-/// (kind 0) or the persistent data component named `name` (kind 1), keeps
+/// (kind 0; with `node` -1, the JSON text in `name` instead) or the
+/// persistent data component named `name` (kind 1), keeps
 /// the value (or partial) at `slot`, and returns the answer's length:
 /// u8 status (0 error, 1 ok, 2 lazy, 3 exception), then for an error the
 /// message and u8 partial, for an exception u32 Java's id for the original
@@ -250,11 +251,22 @@ fn java_answer(kind: i32, id: i32, name: &str, node: &Node, slot: u32) -> JavaAn
     if let Some(msg) = pending_thrown() {
         return JavaAnswer::Err { msg, partial: false };
     }
-    let (Some(index), Some(call)) = (node.index, JAVA_DECODE.get()) else { return JavaAnswer::Lazy };
+    let Some(call) = JAVA_DECODE.get() else { return JavaAnswer::Lazy };
+    // A node Java holds is named by its index; one Rust parsed (a data pack
+    // file) is sent as its JSON text, numbers verbatim, for a Java codec.
+    let shown;
+    let (index, name) = match node.index {
+        Some(index) => (index as i32, name),
+        None if kind == JAVA_CODEC => {
+            shown = node.show(super::value::Mode::Json);
+            (-1, shown.as_str())
+        }
+        None => return JavaAnswer::Lazy,
+    };
     let mut buffer = vec![0u8; 256];
     loop {
         // SAFETY: the callback reads `name` and writes at most `capacity` bytes.
-        let n = unsafe { call(kind, id, name.as_ptr(), name.len() as i64, index as i32, slot as i32, buffer.as_mut_ptr(), buffer.len() as i64) } as usize;
+        let n = unsafe { call(kind, id, name.as_ptr(), name.len() as i64, index, slot as i32, buffer.as_mut_ptr(), buffer.len() as i64) } as usize;
         if n > buffer.len() {
             buffer.resize(n, 0);
             continue;
@@ -347,6 +359,12 @@ pub enum Dv {
     Name(&'static str),
     EmptyMap,
     EmptyList,
+    /// A normalized float provider's plain constant (`Variant(0, [float])`).
+    Variant0Float(f32),
+    /// `Vec3i.ZERO` / `BlockPos.ZERO`.
+    ZeroInts3,
+    /// `Vec3.ZERO`.
+    ZeroDoubles3,
 }
 
 impl Dv {
@@ -360,6 +378,9 @@ impl Dv {
             Dv::Name(v) => D::Str(v.into()),
             Dv::EmptyMap => D::Map(Vec::new()),
             Dv::EmptyList => D::List(Vec::new()),
+            Dv::Variant0Float(v) => D::Variant(0, vec![D::Float(v)]),
+            Dv::ZeroInts3 => D::List(vec![D::Int(0); 3]),
+            Dv::ZeroDoubles3 => D::List(vec![D::Double(0.0); 3]),
         }
     }
 }

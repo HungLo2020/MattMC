@@ -398,6 +398,161 @@ public final class ValueFuzzReference {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
+    /** Effect maps covering every component, effect type, requirement context and restriction. */
+    static final String[] EFFECT_MAP_INPUTS = {
+        """
+        {"minecraft:damage_protection":[{"effect":{"type":"minecraft:add","value":{"type":"minecraft:linear","base":2,"per_level_above_first":1}},
+           "requirements":{"condition":"minecraft:damage_source_properties","predicate":{"tags":[{"id":"minecraft:is_fire","expected":true}]}}}],
+         "minecraft:damage_immunity":[{"effect":{},"requirements":{"condition":"minecraft:inverted","term":{"condition":"minecraft:random_chance","chance":0.5}}}],
+         "minecraft:damage":[{"effect":{"type":"minecraft:all_of","effects":[{"type":"minecraft:multiply","factor":1.5},{"type":"minecraft:set","value":3},
+           {"type":"minecraft:all_of","effects":[{"type":"minecraft:remove_binomial","chance":0.25}]}]}}],
+         "minecraft:knockback":[{"effect":{"type":"minecraft:add","value":1}}],
+         "minecraft:item_damage":[{"effect":{"type":"minecraft:remove_binomial","chance":{"type":"minecraft:fraction","numerator":1,"denominator":2}},
+           "requirements":{"condition":"minecraft:match_tool","predicate":{"items":"minecraft:stick"}}}],
+         "minecraft:attributes":[{"id":"minecraft:enchantment.x","attribute":"minecraft:movement_speed","amount":0.1,"operation":"add_multiplied_base"}],
+         "minecraft:equipment_drops":[{"enchanted":"attacker","effect":{"type":"minecraft:add","value":0.01}}],
+         "minecraft:projectile_count":[{"effect":{"type":"minecraft:add","value":2}}],
+         "minecraft:crossbow_charge_time":{"type":"minecraft:add","value":-0.25},
+         "minecraft:crossbow_charging_sounds":[{"start":"minecraft:item.crossbow.quick_charge_1","end":"minecraft:item.crossbow.loading_end"}],
+         "minecraft:trident_sound":["minecraft:item.trident.riptide_1",{"sound_id":"minecraft:x","range":4}],
+         "minecraft:prevent_equipment_drop":{},"minecraft:prevent_armor_change":{},
+         "minecraft:trident_spin_attack_strength":{"type":"minecraft:add","value":0.5}}
+        """,
+        """
+        {"minecraft:post_attack":[{"enchanted":"attacker","affected":"victim","effect":{"type":"minecraft:all_of","effects":[
+           {"type":"minecraft:apply_mob_effect","to_apply":"minecraft:slowness","min_duration":1.5,"max_duration":{"type":"minecraft:linear","base":1.5,"per_level_above_first":0.5},
+             "min_amplifier":3,"max_amplifier":3},
+           {"type":"minecraft:damage_entity","min_damage":1,"max_damage":5,"damage_type":"minecraft:thorns"},
+           {"type":"minecraft:ignite","duration":{"type":"minecraft:linear","base":4,"per_level_above_first":4}},
+           {"type":"minecraft:change_item_damage","amount":2},
+           {"type":"minecraft:play_sound","sound":"minecraft:item.trident.thunder","volume":5,"pitch":1},
+           {"type":"minecraft:summon_entity","entity":"minecraft:lightning_bolt"},
+           {"type":"minecraft:run_function","function":"minecraft:f"}]},
+           "requirements":[{"condition":"minecraft:weather_check","thundering":true},{"condition":"minecraft:entity_properties","entity":"this","predicate":{"location":{"can_see_sky":true}}}]}],
+         "minecraft:hit_block":[{"effect":{"type":"minecraft:explode","attribute_to_user":true,"radius":3.5,"block_interaction":"trigger","small_particle":{"type":"minecraft:gust_emitter_small"},
+           "large_particle":{"type":"minecraft:gust_emitter_large"},"sound":"minecraft:entity.wind_charge.wind_burst","knockback_multiplier":{"type":"minecraft:lookup","values":[1.2,1.75,2.2],"fallback":{"type":"minecraft:linear","base":1.5,"per_level_above_first":0.35}},
+           "immune_blocks":"#minecraft:blocks_wind_charge_explosions","offset":[0,0.5,0],"create_fire":false,"block_particles":[{"data":{"particle":{"type":"minecraft:poof"},"scaling":1,"speed":1},"weight":1}]},
+           "requirements":{"condition":"minecraft:location_check","predicate":{"block":{"blocks":"minecraft:lightning_rod"}}}}],
+         "minecraft:tick":[{"effect":{"type":"minecraft:spawn_particles","particle":{"type":"minecraft:soul"},"horizontal_position":{"type":"in_bounding_box"},
+           "vertical_position":{"type":"entity_position","offset":0.1},"horizontal_velocity":{"base":{"type":"minecraft:uniform","min_inclusive":-0.2,"max_exclusive":0.2}},
+           "vertical_velocity":{"movement_scale":-0.2},"speed":1},"requirements":{"condition":"minecraft:all_of","terms":[{"condition":"minecraft:enchantment_active_check","active":true}]}}],
+         "minecraft:location_changed":[{"effect":{"type":"minecraft:replace_disk","block_state":{"type":"minecraft:simple_state_provider","state":{"Name":"minecraft:frosted_ice","Properties":{"age":"0"}}},
+           "predicate":{"type":"minecraft:all_of","predicates":[{"type":"minecraft:matching_blocks","offset":[0,1,0],"blocks":"minecraft:air"}]},"radius":{"type":"minecraft:clamped","value":{"type":"minecraft:linear","base":3,"per_level_above_first":1},"min":0,"max":16},
+           "height":1,"offset":[0,-1,0],"trigger_game_event":"minecraft:block_place"},"requirements":{"condition":"minecraft:entity_properties","entity":"this","predicate":{"flags":{"is_on_ground":true}}}},
+           {"effect":{"type":"minecraft:attribute","id":"minecraft:enchantment.y","attribute":"minecraft:movement_efficiency","amount":0.5,"operation":"add_value"}},
+           {"effect":{"type":"minecraft:replace_block","block_state":{"type":"minecraft:simple_state_provider","state":{"Name":"minecraft:fire"}},"offset":[1,2,3]}},
+           {"effect":{"type":"minecraft:set_block_properties","properties":{"lit":"true"},"trigger_game_event":"minecraft:block_change"}}]}
+        """,
+        """
+        {"minecraft:equipment_drops":[{"enchanted":"damaging_entity","effect":{"type":"minecraft:add","value":1}}],
+         "minecraft:damage":[{"effect":{"type":"minecraft:add","value":1},"requirements":{"condition":"minecraft:entity_properties","entity":"block_entity_x"}}],
+         "minecraft:hit_block":[{"effect":{"type":"minecraft:ignite","duration":1},"requirements":{"condition":"minecraft:damage_source_properties"}}],
+         "minecraft:post_attack":[{"enchanted":"attacker","affected":"nobody","effect":{"type":"minecraft:unknown"}}],
+         "minecraft:unknown_component":[],"minecraft:knockback":[{"effect":{"type":"minecraft:play_sound","sound":"minecraft:x","volume":0,"pitch":3}}]}
+        """,
+    };
+
+    /** The enchantment effect codecs over registry ops, as data packs decode them. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static void enchant(List<String> out) throws ReflectiveOperationException {
+        var packs = new net.minecraft.server.packs.resources.MultiPackResourceManager(net.minecraft.server.packs.PackType.SERVER_DATA,
+            List.of(net.minecraft.server.packs.repository.ServerPacksSource.createVanillaPackSource()));
+        var layers = net.minecraft.server.RegistryLayer.createRegistryAccess();
+        var tags = net.minecraft.tags.TagLoader.loadTagsForExistingRegistries(packs, layers.getLayer(net.minecraft.server.RegistryLayer.STATIC));
+        var lookups = net.minecraft.tags.TagLoader.buildUpdatedLookups(layers.getAccessForLoading(net.minecraft.server.RegistryLayer.WORLDGEN), tags);
+        var loaded = net.minecraft.resources.RegistryDataLoader.load(packs, lookups, net.minecraft.resources.RegistryDataLoader.WORLDGEN_REGISTRIES);
+        var access = layers.replaceFrom(net.minecraft.server.RegistryLayer.WORLDGEN, loaded).compositeAccess();
+        var json = access.createSerializationContext(JsonOps.INSTANCE);
+        var nbt = access.createSerializationContext(NbtOps.INSTANCE);
+        Codec<Object> effects = field(net.minecraft.world.item.enchantment.EnchantmentEffectComponents.class, "CODEC");
+        // Every vanilla enchantment's effects, then every path of eight rich ones mutated.
+        var files = new java.util.TreeMap<String, JsonElement>();
+        packs.listResources("enchantment", id -> id.getPath().endsWith(".json")).forEach((id, resource) -> {
+            try (var reader = resource.openAsReader()) {
+                files.put(id.toString(), com.google.gson.JsonParser.parseReader(reader).getAsJsonObject().get("effects"));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        var mutated = java.util.Set.of("thorns", "frost_walker", "wind_burst", "channeling", "fire_aspect", "efficiency", "looting", "swift_sneak");
+        for (var entry : files.entrySet()) {
+            String name = entry.getKey().substring(entry.getKey().lastIndexOf('/') + 1).replace(".json", "");
+            decodeOps(out, "effects/" + name, effects, entry.getValue(), mutated.contains(name), json, nbt);
+        }
+        for (int i = 0; i < EFFECT_MAP_INPUTS.length; i++) decodeOps(out, "effects/input" + i, effects, json(EFFECT_MAP_INPUTS[i]), true, json, nbt);
+        // The registered effect types: each registry's MapCodec decodes its case's fields.
+        for (var key : List.of(net.minecraft.core.registries.Registries.ENCHANTMENT_VALUE_EFFECT_TYPE, net.minecraft.core.registries.Registries.ENCHANTMENT_ENTITY_EFFECT_TYPE,
+                net.minecraft.core.registries.Registries.ENCHANTMENT_LOCATION_BASED_EFFECT_TYPE)) {
+            net.minecraft.core.Registry<com.mojang.serialization.MapCodec<?>> registry = (net.minecraft.core.Registry)net.minecraft.core.registries.BuiltInRegistries.REGISTRY.getValue(key.location());
+            var names = new java.util.TreeSet<String>();
+            registry.keySet().forEach(id -> names.add(id.toString()));
+            for (String id : names) {
+                Codec<Object> codec = (Codec<Object>)registry.getValue(net.minecraft.resources.ResourceLocation.parse(id)).codec();
+                for (String fields : CASE_FIELDS) decodeOps(out, "case " + key.location().getPath() + " " + id, codec, json(fields), false, json, nbt);
+            }
+        }
+    }
+
+    /** Field maps every case codec is given: most fail, some match a case. */
+    static final String[] CASE_FIELDS = {
+        "{\"value\":2}", "{\"factor\":0.5}", "{\"chance\":0.1}", "{\"effects\":[]}", "{\"amount\":1}", "{\"duration\":2}", "{\"function\":\"minecraft:f\"}",
+        "{\"entity\":\"minecraft:pig\",\"join_team\":true}", "{\"min_damage\":1,\"max_damage\":2,\"damage_type\":\"minecraft:magic\"}",
+        "{\"id\":\"minecraft:a\",\"attribute\":\"minecraft:armor\",\"amount\":1,\"operation\":\"add_value\"}", "{\"properties\":{}}", "{}",
+    };
+
+    /** Decodes {@code root} (and, when {@code mutate}, every path replaced) with registry ops, encoding back the same way. */
+    static void decodeOps(List<String> out, String name, Codec<Object> codec, JsonElement root, boolean mutate,
+            com.mojang.serialization.DynamicOps<JsonElement> json, com.mojang.serialization.DynamicOps<net.minecraft.nbt.Tag> nbt) {
+        List<JsonElement> cases = new ArrayList<>();
+        cases.add(root);
+        if (mutate) {
+            var paths = new ArrayList<List<Object>>();
+            paths(root, List.of(), paths);
+            for (var path : paths) for (JsonElement r : REPLACEMENTS) cases.add(mutate(root, path, r));
+        }
+        for (JsonElement input : cases) {
+            String j;
+            try {
+                j = outcomeOps(codec, codec.parse(json, input), json, nbt);
+            } catch (Throwable e) {
+                j = thrown(e);
+            }
+            String n;
+            try {
+                n = outcomeOps(codec, codec.parse(nbt, JsonOps.INSTANCE.convertTo(NbtOps.INSTANCE, input)), json, nbt);
+            } catch (Throwable e) {
+                n = thrown(e);
+            }
+            out.add("enchant " + name + " " + input + " json=" + j + " | nbt=" + n);
+        }
+    }
+
+    /**
+     * A component map of 8 or more entries iterates in identity-hash order
+     * (`DataComponentMap.buildFromMapTrusted` uses a hash map), which differs
+     * between runs; its keys are compared sorted. Smaller maps keep their order.
+     */
+    static JsonElement unordered(JsonElement element) {
+        if (!(element instanceof JsonObject object) || object.size() < 8) {
+            return element;
+        }
+        JsonObject sorted = new JsonObject();
+        object.keySet().stream().sorted().forEach(key -> sorted.add(key, object.get(key)));
+        return sorted;
+    }
+
+    static String outcomeOps(Codec<Object> codec, DataResult<?> result, com.mojang.serialization.DynamicOps<JsonElement> json,
+            com.mojang.serialization.DynamicOps<net.minecraft.nbt.Tag> nbt) {
+        if (result.isError()) {
+            return "ERR " + result.error().orElseThrow().message() + (result.hasResultOrPartial() ? " (partial)" : "");
+        }
+        Object value = result.getOrThrow();
+        DataResult<JsonElement> j = codec.encodeStart(json, value);
+        DataResult<?> n = codec.encodeStart(nbt, value);
+        return "OK " + (j.isError() ? "ERR " + j.error().orElseThrow().message() : unordered(j.getOrThrow()).toString()) + " nbt="
+            + (n.isError() ? "ERR " + n.error().orElseThrow().message() : n.getOrThrow().toString());
+    }
+
     static void worldgen(List<String> out) {
         var packs = new net.minecraft.server.packs.resources.MultiPackResourceManager(net.minecraft.server.packs.PackType.SERVER_DATA,
             List.of(net.minecraft.server.packs.repository.ServerPacksSource.createVanillaPackSource()));
@@ -427,8 +582,10 @@ public final class ValueFuzzReference {
         var sections = new LinkedHashMap<String, List<String>>();
         sections.put("values", new ArrayList<>());
         sections.put("worldgen", new ArrayList<>());
+        sections.put("enchant", new ArrayList<>());
         values(sections.get("values"));
         worldgen(sections.get("worldgen"));
+        enchant(sections.get("enchant"));
         var selected = args.length > 1 ? List.of(args).subList(1, args.length) : List.copyOf(sections.keySet());
         var text = new StringBuilder();
         var summary = new StringBuilder("VALUE_FUZZ_REFERENCE");

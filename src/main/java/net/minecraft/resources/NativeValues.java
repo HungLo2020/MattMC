@@ -43,14 +43,63 @@ public final class NativeValues {
 	public enum JavaCodec {
 		DIALOG,
 		NBT,
-		PROFILE;
+		PROFILE,
+		/** Enchantment effect requirements, validated against each component's context (`content/data/enchant.rs`). */
+		CONDITION_ENCHANTED_DAMAGE,
+		CONDITION_ENCHANTED_ITEM,
+		CONDITION_ENCHANTED_ENTITY,
+		CONDITION_ENCHANTED_LOCATION,
+		CONDITION_HIT_BLOCK,
+		DAMAGE_TYPE,
+		ATTRIBUTE,
+		GAME_EVENT,
+		BLOCK_STATE_PROVIDER,
+		BLOCK_PREDICATE,
+		EXPLOSION_PARTICLES,
+		MOB_EFFECTS,
+		BLOCKS,
+		ENTITY_TYPES,
+		SOUND_EVENT;
 
-		Codec<?> codec() {
+		public Codec<?> codec() {
 			return switch (this) {
 				case DIALOG -> net.minecraft.server.dialog.Dialog.CODEC;
 				case NBT -> net.minecraft.util.ExtraCodecs.NBT;
 				case PROFILE -> net.minecraft.world.item.component.ResolvableProfile.CODEC;
+				case CONDITION_ENCHANTED_DAMAGE -> Conditions.ENCHANTED_DAMAGE;
+				case CONDITION_ENCHANTED_ITEM -> Conditions.ENCHANTED_ITEM;
+				case CONDITION_ENCHANTED_ENTITY -> Conditions.ENCHANTED_ENTITY;
+				case CONDITION_ENCHANTED_LOCATION -> Conditions.ENCHANTED_LOCATION;
+				case CONDITION_HIT_BLOCK -> Conditions.HIT_BLOCK;
+				case DAMAGE_TYPE -> net.minecraft.world.damagesource.DamageType.CODEC;
+				case ATTRIBUTE -> net.minecraft.world.entity.ai.attributes.Attribute.CODEC;
+				case GAME_EVENT -> net.minecraft.world.level.gameevent.GameEvent.CODEC;
+				case BLOCK_STATE_PROVIDER -> net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider.CODEC;
+				case BLOCK_PREDICATE -> net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate.CODEC;
+				case EXPLOSION_PARTICLES -> Conditions.EXPLOSION_PARTICLES;
+				case MOB_EFFECTS -> Conditions.MOB_EFFECTS;
+				case BLOCKS -> Conditions.BLOCKS;
+				case ENTITY_TYPES -> Conditions.ENTITY_TYPES;
+				case SOUND_EVENT -> net.minecraft.sounds.SoundEvent.CODEC;
 			};
+		}
+
+		/** One codec instance each, as each component's codec held its own. */
+		private static final class Conditions {
+			static final Codec<?> ENCHANTED_DAMAGE = net.minecraft.world.item.enchantment.ConditionalEffect.conditionCodec(
+				net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.ENCHANTED_DAMAGE);
+			static final Codec<?> ENCHANTED_ITEM = net.minecraft.world.item.enchantment.ConditionalEffect.conditionCodec(
+				net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.ENCHANTED_ITEM);
+			static final Codec<?> ENCHANTED_ENTITY = net.minecraft.world.item.enchantment.ConditionalEffect.conditionCodec(
+				net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.ENCHANTED_ENTITY);
+			static final Codec<?> ENCHANTED_LOCATION = net.minecraft.world.item.enchantment.ConditionalEffect.conditionCodec(
+				net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.ENCHANTED_LOCATION);
+			static final Codec<?> HIT_BLOCK = net.minecraft.world.item.enchantment.ConditionalEffect.conditionCodec(
+				net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.HIT_BLOCK);
+			static final Codec<?> EXPLOSION_PARTICLES = net.minecraft.util.random.WeightedList.codec(net.minecraft.core.particles.ExplosionParticleInfo.CODEC);
+			static final Codec<?> MOB_EFFECTS = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.MOB_EFFECT);
+			static final Codec<?> BLOCKS = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.BLOCK);
+			static final Codec<?> ENTITY_TYPES = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.ENTITY_TYPE);
 		}
 	}
 
@@ -126,6 +175,43 @@ public final class NativeValues {
 		}
 	}
 
+	private static String text(MemorySegment text, long length) {
+		byte[] bytes = new byte[(int)length];
+		text.reinterpret(length).asByteBuffer().get(bytes);
+		return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+	}
+
+	/** A data definition call's handle, the values Java's codecs decoded for its slots, and what a callback threw. */
+	record DataCall(long handle, List<Object> resolved, @Nullable Throwable thrown) {
+	}
+
+	@FunctionalInterface
+	interface NativeCall {
+		long call() throws Throwable;
+	}
+
+	/**
+	 * Runs a data definition decode with a frame, so the Java codecs Rust
+	 * calls back decode synchronously ({@code ops}; {@code nodes} are the
+	 * input's Java nodes, empty for a file Rust parsed). A handle of
+	 * {@code thrownHandle - id} reports the exception a callback kept.
+	 */
+	static DataCall dataCall(DynamicOps<?> ops, List<?> nodes, long thrownHandle, NativeCall call) throws Throwable {
+		ThreadState state = STATE.get();
+		Frame frame = new Frame();
+		frame.ops = (DynamicOps<Object>)ops;
+		frame.nodes.addAll(nodes);
+		state.enter();
+		state.frames.push(frame);
+		try {
+			long handle = call.call();
+			return new DataCall(handle, frame.resolved, handle <= thrownHandle ? state.thrown.get((int)(thrownHandle - handle)) : null);
+		} finally {
+			state.frames.pop();
+			state.exit();
+		}
+	}
+
 	/** Rethrows a callback's original exception unchanged. */
 	@SuppressWarnings("unchecked")
 	private static <X extends Throwable> RuntimeException rethrow(Throwable e) throws X {
@@ -180,7 +266,9 @@ public final class NativeValues {
 					String type = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
 					codec = net.minecraft.core.registries.BuiltInRegistries.DATA_COMPONENT_TYPE.getValue(ResourceLocation.parse(type)).codecOrThrow();
 				}
-				DataResult<Pair<Object, Object>> result = ((Codec)testDelegates.apply(codec)).decode(frame.ops, frame.nodes.get(node));
+				// A node Rust parsed itself (a data pack file) arrives as its JSON text.
+				Object input = node >= 0 ? frame.nodes.get(node) : com.google.gson.JsonParser.parseString(text(name, nameLength));
+				DataResult<Pair<Object, Object>> result = ((Codec)testDelegates.apply(codec)).decode(frame.ops, input);
 				Optional<Pair<Object, Object>> value = result.resultOrPartial();
 				while (frame.resolved.size() <= slot) {
 					frame.resolved.add(null);
@@ -233,7 +321,11 @@ public final class NativeValues {
 		ITEM_STACK(false),
 		SINGLE_ITEM(false),
 		COMPONENT_PATCH(false),
-		ITEM_STACK_WITH_SLOT(false);
+		ITEM_STACK_WITH_SLOT(false),
+		ENCHANTMENT_EFFECTS(true),
+		ENCHANTMENT_VALUE_EFFECT(false),
+		ENCHANTMENT_ENTITY_EFFECT(true),
+		ENCHANTMENT_LOCATION_EFFECT(true);
 
 		/** Whether values embed block states, read from Rust's installed block registry. */
 		final boolean blocks;
@@ -394,9 +486,10 @@ public final class NativeValues {
 				NativeData.Out out = scratch.out;
 				out.reset();
 				NativeData.write(ops, input, (List<T>)frame.nodes, out);
-				// NbtOps reads numbers as booleans; JsonOps does not.
 				DynamicOps<?> base = NativeData.opsBase(ops);
-				int mode = base == net.minecraft.nbt.NbtOps.INSTANCE ? 1 : base == JsonOps.INSTANCE ? 0 : ops.getBooleanValue(ops.createInt(1)).isSuccess() ? 1 : 0;
+				// Bit 0: NbtOps reads numbers as booleans; bit 1: RegistryOps, whose registry file codecs (sounds) take references.
+				int mode = (base == net.minecraft.nbt.NbtOps.INSTANCE ? 1 : base == JsonOps.INSTANCE ? 0 : ops.getBooleanValue(ops.createInt(1)).isSuccess() ? 1 : 0)
+					| (ops instanceof RegistryOps<?> ? 2 : 0);
 				state.frames.push(frame);
 				ByteBuffer in;
 				try {

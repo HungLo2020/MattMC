@@ -457,11 +457,15 @@ unsafe fn copy_out(table: &[u8], out: *mut u8, capacity: i64) -> i64 {
 /// A data call's handle when it met a block state the block registry could
 /// not be installed for (`schema::BLOCKS_MISSING`); nothing is stored.
 const BLOCKS_MISSING_HANDLE: i64 = -2;
+/// A data call's handle when a Java codec it called back threw: `-3 - id`,
+/// Java's id for that `Throwable`, which Java rethrows.
+const JAVA_THROWN_HANDLE: i64 = -3;
 
 fn guarded(f: impl FnOnce() -> R<Definition>) -> i64 {
     let (entry, thrown) = super::schema::thrown_scope(|| catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|_| Err("data decode panicked".into())));
     let entry = match thrown {
         Some((super::schema::BLOCKS_MISSING, _, _)) => return BLOCKS_MISSING_HANDLE,
+        Some((super::schema::JAVA_THROWN, _, id)) => return JAVA_THROWN_HANDLE - i64::from(id),
         Some((_, message, _)) => Err(message),
         None => entry,
     };
@@ -538,8 +542,10 @@ pub unsafe extern "C" fn mattmc_data_encode(handle: i64, network: i32, out: *mut
 pub unsafe extern "C" fn mattmc_value_decode(kind: i32, mode: i32, bounded: i32, min: f64, max: f64, bytes: *const u8, len: i64, out: *mut u8, capacity: i64) -> i64 {
     let input = slice(bytes, len);
     let bounds = (bounded != 0).then_some(super::values::Bounds { min, max });
-    let mode = if mode == 1 { Mode::Nbt } else { Mode::Json };
-    value_result(input, out, capacity, |node| super::values::decode(kind as usize, node, mode, bounds))
+    // Bit 0: NbtOps; bit 1: RegistryOps (registry file codecs take references).
+    let registry_ops = mode & 2 != 0;
+    let mode = if mode & 1 == 1 { Mode::Nbt } else { Mode::Json };
+    value_result(input, out, capacity, |node| super::values::decode(kind as usize, node, mode, registry_ops, bounds))
 }
 
 /// Decodes one dispatch case of a value kind from a map without `type`
@@ -548,8 +554,9 @@ pub unsafe extern "C" fn mattmc_value_decode(kind: i32, mode: i32, bounded: i32,
 pub unsafe extern "C" fn mattmc_value_decode_case(kind: i32, mode: i32, case: *const u8, case_len: i64, bytes: *const u8, len: i64, out: *mut u8, capacity: i64) -> i64 {
     let input = slice(bytes, len);
     let case = String::from_utf8_lossy(slice(case, case_len)).into_owned();
-    let mode = if mode == 1 { Mode::Nbt } else { Mode::Json };
-    value_result(input, out, capacity, |node| super::values::decode_case(kind as usize, &case, node, mode))
+    let registry_ops = mode & 2 != 0;
+    let mode = if mode & 1 == 1 { Mode::Nbt } else { Mode::Json };
+    value_result(input, out, capacity, |node| super::values::decode_case(kind as usize, &case, node, mode, registry_ops))
 }
 
 /// Data component types whose value codecs are native (u32 count, paths).

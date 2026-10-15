@@ -4,6 +4,7 @@
 //! The definitions stay data: files in data packs define them, and data
 //! packs can override or add them. Java's registry objects are projections.
 //! See docs/development/game-model/DATA-DEFINITIONS.md.
+pub mod enchant;
 pub mod ffi;
 pub mod items;
 pub mod registries;

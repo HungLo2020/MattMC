@@ -11,9 +11,10 @@ import net.minecraft.world.item.enchantment.EnchantedItemInUse;
 import net.minecraft.world.phys.Vec3;
 
 public interface EnchantmentEntityEffect extends EnchantmentLocationBasedEffect {
-	Codec<EnchantmentEntityEffect> CODEC = BuiltInRegistries.ENCHANTMENT_ENTITY_EFFECT_TYPE
-		.byNameCodec()
-		.dispatch(EnchantmentEntityEffect::codec, Function.identity());
+	/** Rust decodes, validates and encodes EntityEffects (`content/data/enchant.rs`); each registered type is one of its cases. */
+	net.minecraft.resources.NativeValues.ValueCodec<EnchantmentEntityEffect> CODEC = net.minecraft.resources.NativeValues.codec(
+		net.minecraft.resources.NativeValues.Kind.ENCHANTMENT_ENTITY_EFFECT, net.minecraft.world.item.enchantment.NativeEnchantmentEffects::entityEffect, net.minecraft.world.item.enchantment.NativeEnchantmentEffects::entityEffectOut
+	);
 
 	static MapCodec<? extends EnchantmentEntityEffect> bootstrap(Registry<MapCodec<? extends EnchantmentEntityEffect>> registry) {
 		Registry.register(registry, "all_of", AllOf.EntityEffects.CODEC);

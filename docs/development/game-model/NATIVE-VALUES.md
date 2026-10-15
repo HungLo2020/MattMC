@@ -19,11 +19,14 @@ Current kinds (`NativeValues.Kind`, the order of `VALUES` in Rust):
 - **Item stacks** (`ItemStack.CODEC`/`MAP_CODEC`, `SINGLE_ITEM_CODEC`), slotted
   stacks (`ItemStackWithSlot.CODEC`) and component patches (`DataComponentPatch.CODEC`)
   ([`items.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/data/items.rs)).
+- **Enchantment effects**: the effect component map (`EnchantmentEffectComponents.CODEC`)
+  and the value, entity and location effect types
+  ([`enchant.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/data/enchant.rs)).
 
 Definitions decoded by Rust use these schemas directly. Biome particles and
 enchantment provider costs are decoded inline, with no Java round trip.
-Java codecs that still embed a value, such as features, effects and loot,
-call the native codec.
+Java codecs that still embed a value, such as features and loot, call the
+native codec.
 
 ## How it works
 
@@ -82,6 +85,32 @@ call the native codec.
 - **Leaf parsers:** selector patterns and untrusted URIs are checked by
   Java's own parsers, which Rust calls back while decoding (`schema::Leaf`).
 
+## Enchantment effects
+
+- **Native:** the component map, every effect type and their records, with
+  the projection in
+  [`NativeEnchantmentEffects`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/item/enchantment/NativeEnchantmentEffects.java).
+  The effect type registries hold `dispatchCase` entries, so the entity and
+  location registries now hold distinct `MapCodec` objects for shared names.
+- **Delegated leaves:** these still run their original Java codec while
+  Rust decodes (`S::Java`, `NativeValues.JavaCodec`): requirements (loot
+  conditions, validated against the component's context), damage types,
+  attributes, game events, block state providers, block predicates,
+  explosion particles, holder sets and sound events.
+- **Data packs:** for a file Rust parsed, a leaf's JSON text is sent to the
+  callback; `NativeValues.dataCall` gives the decode a frame, and an
+  exception the leaf throws leaves the load as that same exception.
+- **Ordering:** a component map of eight or more entries iterates in identity
+  hash order, as vanilla's did, so it differs between JVM runs. The
+  differential compares such maps sorted.
+- **Registry ops:** sound references need `RegistryOps`; the value FFI mode
+  carries it (bit 1).
+- **Verified (2026-10-15, at `186614ce` plus this change):** the `enchant`
+  section matches Frozen (10,728 rows), and the full value fuzz matches
+  pre-change (42,944 rows). Content and data fuzz differentials are
+  unchanged. `worldgen_load`, which loads every enchantment, was within 10%
+  of Frozen and level with pre-change (`TimeContent.py`, 9 pairs).
+
 ## DFU behavior Rust reproduces
 
 These rules live in [`schema.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/data/schema.rs)
@@ -133,6 +162,9 @@ compiles unchanged against both builds. It covers:
 - Encoding of Java-built values.
 - Its `worldgen` section, which dumps every loaded worldgen element: features,
   carvers, biomes and enchantments embed these types.
+- Its `enchant` section: every effect component and case over generated
+  inputs, including `equipment_drops` restrictions, recursive `all_of`,
+  invalid requirements and exceptions thrown by delegated leaves.
 
 ## Verification (2026-10-14)
 

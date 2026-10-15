@@ -174,7 +174,7 @@ static ENCHANTMENT: S = S::Record(&[
         f("slots", &S::List(&S::Enum(SLOT_GROUPS)), Required),
     ]), Inline),
     f("exclusive_set", &HOLDERS, JavaDefault),
-    f("effects", &S::Delegate, JavaDefault),
+    f("effects", &super::enchant::EFFECTS, Default(Dv::EmptyMap)),
 ]);
 static ENCHANTMENT_PROVIDER: S = S::Dispatch("enchantment_provider_type", &[
     case("by_cost", &[f("enchantments", &HOLDERS, Required), f("cost", &INT_PROVIDER, Required)]),

@@ -25,17 +25,9 @@ public record ReplaceDisk(
 	BlockStateProvider blockState,
 	Optional<Holder<GameEvent>> triggerGameEvent
 ) implements EnchantmentEntityEffect {
-	public static final MapCodec<ReplaceDisk> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				LevelBasedValue.CODEC.fieldOf("radius").forGetter(ReplaceDisk::radius),
-				LevelBasedValue.CODEC.fieldOf("height").forGetter(ReplaceDisk::height),
-				Vec3i.CODEC.optionalFieldOf("offset", Vec3i.ZERO).forGetter(ReplaceDisk::offset),
-				BlockPredicate.CODEC.optionalFieldOf("predicate").forGetter(ReplaceDisk::predicate),
-				BlockStateProvider.CODEC.fieldOf("block_state").forGetter(ReplaceDisk::blockState),
-				GameEvent.CODEC.optionalFieldOf("trigger_game_event").forGetter(ReplaceDisk::triggerGameEvent)
-			)
-			.apply(instance, ReplaceDisk::new)
-	);
+	/** The native codec's `replace_disk` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<ReplaceDisk> CODEC = (MapCodec<ReplaceDisk>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:replace_disk");
 
 	@Override
 	public void apply(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3) {

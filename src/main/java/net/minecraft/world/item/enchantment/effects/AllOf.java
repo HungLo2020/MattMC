@@ -12,10 +12,6 @@ import net.minecraft.world.item.enchantment.EnchantedItemInUse;
 import net.minecraft.world.phys.Vec3;
 
 public interface AllOf {
-	static <T, A extends T> MapCodec<A> codec(Codec<T> codec, Function<List<T>, A> function, Function<A, List<T>> function2) {
-		return RecordCodecBuilder.mapCodec(instance -> instance.group(codec.listOf().fieldOf("effects").forGetter(function2)).apply(instance, function));
-	}
-
 	static AllOf.EntityEffects entityEffects(EnchantmentEntityEffect... enchantmentEntityEffects) {
 		return new AllOf.EntityEffects(List.of(enchantmentEntityEffects));
 	}
@@ -29,7 +25,8 @@ public interface AllOf {
 	}
 
 	public record EntityEffects(List<EnchantmentEntityEffect> effects) implements EnchantmentEntityEffect {
-		public static final MapCodec<AllOf.EntityEffects> CODEC = AllOf.codec(EnchantmentEntityEffect.CODEC, AllOf.EntityEffects::new, AllOf.EntityEffects::effects);
+		@SuppressWarnings("unchecked")
+		public static final MapCodec<AllOf.EntityEffects> CODEC = (MapCodec<AllOf.EntityEffects>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:all_of");
 
 		@Override
 		public void apply(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3) {
@@ -45,9 +42,8 @@ public interface AllOf {
 	}
 
 	public record LocationBasedEffects(List<EnchantmentLocationBasedEffect> effects) implements EnchantmentLocationBasedEffect {
-		public static final MapCodec<AllOf.LocationBasedEffects> CODEC = AllOf.codec(
-			EnchantmentLocationBasedEffect.CODEC, AllOf.LocationBasedEffects::new, AllOf.LocationBasedEffects::effects
-		);
+		@SuppressWarnings("unchecked")
+		public static final MapCodec<AllOf.LocationBasedEffects> CODEC = (MapCodec<AllOf.LocationBasedEffects>)(MapCodec<?>)EnchantmentLocationBasedEffect.CODEC.dispatchCase("minecraft:all_of");
 
 		@Override
 		public void onChangedBlock(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3, boolean bl) {
@@ -70,7 +66,8 @@ public interface AllOf {
 	}
 
 	public record ValueEffects(List<EnchantmentValueEffect> effects) implements EnchantmentValueEffect {
-		public static final MapCodec<AllOf.ValueEffects> CODEC = AllOf.codec(EnchantmentValueEffect.CODEC, AllOf.ValueEffects::new, AllOf.ValueEffects::effects);
+		@SuppressWarnings("unchecked")
+		public static final MapCodec<AllOf.ValueEffects> CODEC = (MapCodec<AllOf.ValueEffects>)(MapCodec<?>)EnchantmentValueEffect.CODEC.dispatchCase("minecraft:all_of");
 
 		@Override
 		public float process(int i, RandomSource randomSource, float f) {

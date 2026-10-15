@@ -149,7 +149,7 @@ public final class NativeDataProjections {
 			text(context, f[0]),
 			definition,
 			context.holderSetOrDefault(f[2], Registries.ENCHANTMENT, ENCHANTMENTS, HolderSet.direct()),
-			context.slotOrDefault(f[3], EnchantmentEffectComponents.CODEC, DataComponentMap.EMPTY)
+			net.minecraft.world.item.enchantment.NativeEnchantmentEffects.effects(f[3], context)
 		);
 	}
 
@@ -301,7 +301,7 @@ public final class NativeDataProjections {
 			b.slot(v.description(), ComponentSerialization.CODEC),
 			definition,
 			b.slotWithDefault(v.exclusiveSet(), ENCHANTMENTS, HolderSet.direct()),
-			b.slotWithDefault(v.effects(), EnchantmentEffectComponents.CODEC, DataComponentMap.EMPTY)
+			net.minecraft.world.item.enchantment.NativeEnchantmentEffects.effectsOut(v.effects(), b)
 		};
 	}
 

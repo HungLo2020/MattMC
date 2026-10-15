@@ -6,9 +6,9 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.enchantment.LevelBasedValue;
 
 public record AddValue(LevelBasedValue value) implements EnchantmentValueEffect {
-	public static final MapCodec<AddValue> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(LevelBasedValue.CODEC.fieldOf("value").forGetter(AddValue::value)).apply(instance, AddValue::new)
-	);
+	/** The native codec's `add` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<AddValue> CODEC = (MapCodec<AddValue>)(MapCodec<?>)EnchantmentValueEffect.CODEC.dispatchCase("minecraft:add");
 
 	@Override
 	public float process(int i, RandomSource randomSource, float f) {

@@ -6,9 +6,9 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.enchantment.LevelBasedValue;
 
 public record MultiplyValue(LevelBasedValue factor) implements EnchantmentValueEffect {
-	public static final MapCodec<MultiplyValue> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(LevelBasedValue.CODEC.fieldOf("factor").forGetter(MultiplyValue::factor)).apply(instance, MultiplyValue::new)
-	);
+	/** The native codec's `multiply` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<MultiplyValue> CODEC = (MapCodec<MultiplyValue>)(MapCodec<?>)EnchantmentValueEffect.CODEC.dispatchCase("minecraft:multiply");
 
 	@Override
 	public float process(int i, RandomSource randomSource, float f) {

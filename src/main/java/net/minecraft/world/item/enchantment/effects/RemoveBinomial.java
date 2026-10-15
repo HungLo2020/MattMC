@@ -6,9 +6,9 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.enchantment.LevelBasedValue;
 
 public record RemoveBinomial(LevelBasedValue chance) implements EnchantmentValueEffect {
-	public static final MapCodec<RemoveBinomial> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(LevelBasedValue.CODEC.fieldOf("chance").forGetter(RemoveBinomial::chance)).apply(instance, RemoveBinomial::new)
-	);
+	/** The native codec's `remove_binomial` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<RemoveBinomial> CODEC = (MapCodec<RemoveBinomial>)(MapCodec<?>)EnchantmentValueEffect.CODEC.dispatchCase("minecraft:remove_binomial");
 
 	@Override
 	public float process(int i, RandomSource randomSource, float f) {
