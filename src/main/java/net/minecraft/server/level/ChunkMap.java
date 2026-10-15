@@ -118,9 +118,10 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	public static final int MIN_VIEW_DISTANCE = 2;
 	public static final int MAX_VIEW_DISTANCE = 32;
 	public static final int FORCED_TICKET_LEVEL = ChunkLevel.byStatus(FullChunkStatus.ENTITY_TICKING);
-	private final Long2ObjectLinkedOpenHashMap<ChunkHolder> updatingChunkMap = new Long2ObjectLinkedOpenHashMap<>();
-	private volatile Long2ObjectLinkedOpenHashMap<ChunkHolder> visibleChunkMap = this.updatingChunkMap.clone();
-	private final Long2ObjectLinkedOpenHashMap<ChunkHolder> pendingUnloads = new Long2ObjectLinkedOpenHashMap<>();
+	// Rust owns the holder registry (updating/visible/pending maps, drop and eager-save
+	// sets, save throttle); visibleChunkMap is the promoted map's published projection.
+	private NativeChunkHolders holders = new NativeChunkHolders(ChunkLevel.MAX_LEVEL);
+	private volatile Long2ObjectLinkedOpenHashMap<ChunkHolder> visibleChunkMap = new Long2ObjectLinkedOpenHashMap<>();
 	private final List<ChunkGenerationTask> pendingGenerationTasks = new ArrayList();
 	final ServerLevel level;
 	private final ThreadedLevelLightEngine lightEngine;
@@ -130,8 +131,6 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	private final Supplier<DimensionDataStorage> overworldDataStorage;
 	private final TicketStorage ticketStorage;
 	private final PoiManager poiManager;
-	final LongSet toDrop = new LongOpenHashSet();
-	private boolean modified;
 	private final ChunkTaskDispatcher worldgenTaskDispatcher;
 	private final ChunkTaskDispatcher lightTaskDispatcher;
 	private final ChunkStatusUpdateListener chunkStatusListener;
@@ -140,8 +139,6 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	private final PlayerMap playerMap = new PlayerMap();
 	private final Int2ObjectMap<ChunkMap.TrackedEntity> entityMap = new Int2ObjectOpenHashMap<>();
 	private final Long2ByteMap chunkTypeCache = new Long2ByteOpenHashMap();
-	private final Long2LongMap nextChunkSaveTime = new Long2LongOpenHashMap();
-	private final LongSet chunksToEagerlySave = new LongLinkedOpenHashSet();
 	private final Queue<Runnable> unloadQueue = Queues.<Runnable>newConcurrentLinkedQueue();
 	private final AtomicInteger activeChunkWrites = new AtomicInteger();
 	private int serverViewDistance;
@@ -206,7 +203,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	private void setChunkUnsaved(ChunkPos chunkPos) {
-		this.chunksToEagerlySave.add(chunkPos.toLong());
+		this.holders.markUnsaved(chunkPos.toLong());
 	}
 
 	protected ChunkGenerator generator() {
@@ -247,7 +244,13 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 
 	@Nullable
 	public ChunkHolder getUpdatingChunkIfPresent(long l) {
-		return this.updatingChunkMap.get(l);
+		return this.holders.updating(l);
+	}
+
+	/** Verification only: the state a constructor would create, for a ChunkMap built without one. */
+	private void initializeVerification() {
+		this.holders = new NativeChunkHolders(ChunkLevel.MAX_LEVEL);
+		this.visibleChunkMap = new Long2ObjectLinkedOpenHashMap<>();
 	}
 
 	@Nullable
@@ -354,7 +357,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 				}
 			);
 		stringBuilder.append("Updating:").append(System.lineSeparator());
-		this.updatingChunkMap.values().forEach(consumer);
+		this.holders.forEach(0, (key, chunkHolder) -> consumer.accept(chunkHolder));
 		stringBuilder.append("Visible:").append(System.lineSeparator());
 		this.visibleChunkMap.values().forEach(consumer);
 		CrashReport crashReport = CrashReport.forThrowable(illegalStateException, "Chunk loading");
@@ -371,34 +374,30 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 
 	@Nullable
 	ChunkHolder updateChunkScheduling(long l, int i, @Nullable ChunkHolder chunkHolder, int j) {
-		if (!ChunkLevel.isLoaded(j) && !ChunkLevel.isLoaded(i)) {
-			return chunkHolder;
-		} else {
-			if (chunkHolder != null) {
+		// Rust decides and updates the drop set, pending unloads and updating map;
+		// Java sets holder levels and constructs new holders.
+		long action = this.holders.schedule(l, i, chunkHolder != null, j);
+		switch ((int)(action & 255)) {
+			case NativeChunkHolders.LEVEL:
 				chunkHolder.setTicketLevel(i);
-			}
-
-			if (chunkHolder != null) {
-				if (!ChunkLevel.isLoaded(i)) {
-					this.toDrop.add(l);
-				} else {
-					this.toDrop.remove(l);
-				}
-			}
-
-			if (ChunkLevel.isLoaded(i) && chunkHolder == null) {
-				chunkHolder = this.pendingUnloads.remove(l);
-				if (chunkHolder != null) {
-					chunkHolder.setTicketLevel(i);
-				} else {
+				return chunkHolder;
+			case NativeChunkHolders.REVIVED:
+				chunkHolder = this.holders.holder((int)(action >>> 8));
+				chunkHolder.setTicketLevel(i);
+				return chunkHolder;
+			case NativeChunkHolders.NEW:
+				int holderId = (int)(action >>> 8);
+				try {
 					chunkHolder = new ChunkHolder(new ChunkPos(l), i, this.level, this.lightEngine, this::onLevelChange, this);
+				} catch (Throwable throwable) {
+					this.holders.abortNew(holderId);
+					throw throwable;
 				}
 
-				this.updatingChunkMap.put(l, chunkHolder);
-				this.modified = true;
-			}
-
-			return chunkHolder;
+				this.holders.commitNew(l, holderId, chunkHolder);
+				return chunkHolder;
+			default:
+				return chunkHolder;
 		}
 	}
 
@@ -444,7 +443,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 			this.processUnloads(() -> true);
 			this.flushWorker();
 		} else {
-			this.nextChunkSaveTime.clear();
+			this.holders.setNextSave(2, 0L, 0L);
 			long l = Util.getMillis();
 
 			for (ChunkHolder chunkHolder : this.visibleChunkMap.values()) {
@@ -467,10 +466,8 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 
 	public boolean hasWork() {
 		return this.lightEngine.hasLightWork()
-			|| !this.pendingUnloads.isEmpty()
-			|| !this.updatingChunkMap.isEmpty()
+			|| this.holders.work() != 0
 			|| this.poiManager.hasWork()
-			|| !this.toDrop.isEmpty()
 			|| !this.unloadQueue.isEmpty()
 			|| this.worldgenTaskDispatcher.hasWork()
 			|| this.lightTaskDispatcher.hasWork()
@@ -478,15 +475,13 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	private void processUnloads(BooleanSupplier booleanSupplier) {
-		for (LongIterator longIterator = this.toDrop.iterator(); longIterator.hasNext(); longIterator.remove()) {
-			long l = longIterator.nextLong();
-			ChunkHolder chunkHolder = this.updatingChunkMap.get(l);
-			if (chunkHolder != null) {
-				this.updatingChunkMap.remove(l);
-				this.pendingUnloads.put(l, chunkHolder);
-				this.modified = true;
-				this.scheduleUnload(l, chunkHolder);
-			}
+		// Rust empties the drop set in its order, moving updating holders to the
+		// pending unloads; scheduling an unload only attaches its save-future callback.
+		int[] count = new int[1];
+		long[] dropped = this.holders.dropPass(count);
+
+		for (int k = 0; k < count[0]; k++) {
+			this.scheduleUnload(dropped[k * 2], this.holders.holder((int)dropped[k * 2 + 1]));
 		}
 
 		int i = Math.max(0, this.unloadQueue.size() - 2000);
@@ -503,17 +498,21 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	private void saveChunksEagerly(BooleanSupplier booleanSupplier) {
 		long l = Util.getMillis();
 		int i = 0;
-		LongIterator longIterator = this.chunksToEagerlySave.iterator();
+		this.holders.eagerStart();
 
-		while (i < 20 && this.activeChunkWrites.get() < 128 && booleanSupplier.getAsBoolean() && longIterator.hasNext()) {
-			long m = longIterator.nextLong();
+		while (i < 20 && this.activeChunkWrites.get() < 128 && booleanSupplier.getAsBoolean()) {
+			long m = this.holders.eagerNext();
+			if (this.holders.eagerDone()) {
+				break;
+			}
+
 			ChunkHolder chunkHolder = this.visibleChunkMap.get(m);
 			ChunkAccess chunkAccess = chunkHolder != null ? chunkHolder.getLatestChunk() : null;
 			if (chunkAccess == null || !chunkAccess.isUnsaved()) {
-				longIterator.remove();
+				this.holders.eagerRemove();
 			} else if (this.saveChunkIfNeeded(chunkHolder, l)) {
 				i++;
-				longIterator.remove();
+				this.holders.eagerRemove();
 			}
 		}
 	}
@@ -526,7 +525,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 				this.scheduleUnload(l, chunkHolder);
 			} else {
 				ChunkAccess chunkAccess = chunkHolder.getLatestChunk();
-				if (this.pendingUnloads.remove(l, chunkHolder) && chunkAccess != null) {
+				if (this.holders.finishUnload(l, chunkHolder) && chunkAccess != null) {
 					if (chunkAccess instanceof LevelChunk levelChunk) {
 						levelChunk.setLoaded(false);
 					}
@@ -538,7 +537,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 
 					this.lightEngine.updateChunkStatus(chunkAccess.getPos());
 					this.lightEngine.tryScheduleUpdate();
-					this.nextChunkSaveTime.remove(chunkAccess.getPos().toLong());
+					this.holders.setNextSave(1, chunkAccess.getPos().toLong(), 0L);
 				}
 			}
 		}, this.unloadQueue::add).whenComplete((void_, throwable) -> {
@@ -549,11 +548,11 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	protected boolean promoteChunkMap() {
-		if (!this.modified) {
+		Long2ObjectLinkedOpenHashMap<ChunkHolder> promoted = this.holders.promote();
+		if (promoted == null) {
 			return false;
 		} else {
-			this.visibleChunkMap = this.updatingChunkMap.clone();
-			this.modified = false;
+			this.visibleChunkMap = promoted;
 			return true;
 		}
 	}
@@ -616,7 +615,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 
 	@Override
 	public GenerationChunkHolder acquireGeneration(long l) {
-		ChunkHolder chunkHolder = this.updatingChunkMap.get(l);
+		ChunkHolder chunkHolder = this.holders.updating(l);
 		chunkHolder.increaseGenerationRefCount();
 		return chunkHolder;
 	}
@@ -730,14 +729,14 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 				return false;
 			} else {
 				long m = chunkAccess.getPos().toLong();
-				long n = this.nextChunkSaveTime.getOrDefault(m, -1L);
+				long n = this.holders.nextSave(m);
 				if (l < n) {
 					return false;
 				} else {
 					boolean bl = this.save(chunkAccess);
 					chunkHolder.refreshAccessibility();
 					if (bl) {
-						this.nextChunkSaveTime.put(m, l + 10000L);
+						this.holders.setNextSave(0, m, l + 10000L);
 					}
 
 					return bl;
@@ -1281,7 +1280,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 
 		@Override
 		protected boolean isChunkToRemove(long l) {
-			return ChunkMap.this.toDrop.contains(l);
+			return ChunkMap.this.holders.dropping(l);
 		}
 
 		@Nullable

@@ -12,6 +12,8 @@
   ticket-distance graph, ticket-level mirror contracts and verification.
 - [Rust loading distance](RUST-LOADING-DISTANCE.md): native-owned loading ticket
   graph, holder replay and failure contracts, and verification.
+- [Rust chunk holder registry](RUST-CHUNK-HOLDERS.md): native-owned holder maps,
+  scheduling, unload and eager-save decisions, off-thread lookups and verification.
 - [Rust ticket storage](RUST-TICKET-STORAGE.md): native-owned ticket lists, expiry,
   forced chunks and persistence, direct tracker notification and verification.
 - [Rust POI village distance](RUST-POI-DISTANCE.md): native-owned section

@@ -7,7 +7,7 @@
 use super::Fault;
 
 /// A `null` value slot.
-pub(super) const NONE: u32 = u32::MAX;
+pub(crate) const NONE: u32 = u32::MAX;
 const DEFAULT_INITIAL_SIZE: usize = 16;
 
 fn mix(key: i64) -> usize {
@@ -35,9 +35,9 @@ fn table(n: usize) -> Result<(Vec<i64>, Vec<u32>), Fault> {
     Ok((keys, values))
 }
 
-pub(super) struct ListMap {
-    pub(super) keys: Vec<i64>,
-    pub(super) values: Vec<u32>,
+pub(crate) struct ListMap {
+    pub(crate) keys: Vec<i64>,
+    pub(crate) values: Vec<u32>,
     n: usize,
     min_n: usize,
     max_fill: usize,
@@ -47,13 +47,13 @@ pub(super) struct ListMap {
 
 impl ListMap {
     /// `new Long2ObjectOpenHashMap<>(expected)`.
-    pub(super) fn with_expected(expected: usize) -> Result<Self, Fault> {
+    pub(crate) fn with_expected(expected: usize) -> Result<Self, Fault> {
         let n = array_size(expected).next_power_of_two();
         let (keys, values) = table(n)?;
         Ok(Self { keys, values, n, min_n: n, max_fill: max_fill(n), size: 0, zero: false })
     }
 
-    pub(super) fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.size
     }
 
@@ -75,7 +75,7 @@ impl ListMap {
         }
     }
 
-    pub(super) fn get(&self, key: i64) -> u32 {
+    pub(crate) fn get(&self, key: i64) -> u32 {
         match self.find(key) {
             Ok(pos) => self.values[pos],
             Err(_) => NONE,
@@ -84,7 +84,7 @@ impl ListMap {
 
     /// `computeIfAbsent(key, k -> new list)`: the existing value (even null) or
     /// `create()` inserted. Returns the value and whether it was created.
-    pub(super) fn compute_if_absent(&mut self, key: i64, create: impl FnOnce() -> Result<u32, Fault>) -> Result<(u32, bool), Fault> {
+    pub(crate) fn compute_if_absent(&mut self, key: i64, create: impl FnOnce() -> Result<u32, Fault>) -> Result<(u32, bool), Fault> {
         match self.find(key) {
             Ok(pos) => Ok((self.values[pos], false)),
             Err(pos) => {
@@ -105,7 +105,7 @@ impl ListMap {
     }
 
     /// `remove(key)`: the removed value, or `NONE`.
-    pub(super) fn remove(&mut self, key: i64) -> Result<u32, Fault> {
+    pub(crate) fn remove(&mut self, key: i64) -> Result<u32, Fault> {
         let Ok(pos) = self.find(key) else { return Ok(NONE) };
         let value = self.values[pos];
         self.values[pos] = NONE;
@@ -122,7 +122,7 @@ impl ListMap {
     }
 
     /// `clear()`; returns the values it dropped.
-    pub(super) fn clear(&mut self) -> Vec<u32> {
+    pub(crate) fn clear(&mut self) -> Vec<u32> {
         if self.size == 0 {
             return Vec::new();
         }
@@ -192,7 +192,7 @@ impl ListMap {
     }
 
     /// Iteration order of every map view: the zero key, then descending slots.
-    pub(super) fn ordered(&self) -> Vec<(i64, u32)> {
+    pub(crate) fn ordered(&self) -> Vec<(i64, u32)> {
         let mut out = Vec::with_capacity(self.size);
         if self.zero {
             out.push((0, self.values[self.n]));
@@ -205,23 +205,23 @@ impl ListMap {
         out
     }
 
-    pub(super) fn cursor(&self) -> Cursor {
+    pub(crate) fn cursor(&self) -> Cursor {
         Cursor { mark: Mark { pos: self.n as i32, last: -1, left: self.size, zero: self.zero }, wrapped: None }
     }
 
     /// A fast-iterator entry's positional `getValue()`.
-    pub(super) fn value_at(&self, index: i32) -> Result<u32, Fault> {
+    pub(crate) fn value_at(&self, index: i32) -> Result<u32, Fault> {
         self.values.get(index as usize).copied().ok_or(Fault::ArrayIndex)
     }
 
-    pub(super) fn key_at(&self, index: i32) -> Result<i64, Fault> {
+    pub(crate) fn key_at(&self, index: i32) -> Result<i64, Fault> {
         self.keys.get(index as usize).copied().ok_or(Fault::ArrayIndex)
     }
 }
 
 /// `MapIterator`'s position: everything but its wrapped-key list.
 #[derive(Clone, Copy)]
-pub(super) struct Mark {
+pub(crate) struct Mark {
     pos: i32,
     last: i32,
     left: usize,
@@ -230,7 +230,7 @@ pub(super) struct Mark {
 
 /// `MapIterator`, detached from the map so callbacks can mutate it between
 /// steps exactly as they could the Java table.
-pub(super) struct Cursor {
+pub(crate) struct Cursor {
     mark: Mark,
     /// Created on the first wrapped shift; reading it before is Java's NPE.
     /// Only removal through the cursor appends to it.
@@ -238,7 +238,7 @@ pub(super) struct Cursor {
 }
 
 impl Mark {
-    pub(super) fn has_next(&self) -> bool {
+    pub(crate) fn has_next(&self) -> bool {
         self.left != 0
     }
 
@@ -248,7 +248,7 @@ impl Mark {
     }
 
     /// `nextEntry()` over `wrapped`: the entry's table index.
-    pub(super) fn next_entry(&mut self, wrapped: &Option<Vec<i64>>, map: &ListMap) -> Result<i32, Fault> {
+    pub(crate) fn next_entry(&mut self, wrapped: &Option<Vec<i64>>, map: &ListMap) -> Result<i32, Fault> {
         if self.left == 0 {
             return Err(Fault::NoSuchElement);
         }
@@ -278,29 +278,29 @@ impl Mark {
 }
 
 impl Cursor {
-    pub(super) fn mark(&self) -> Mark {
+    pub(crate) fn mark(&self) -> Mark {
         self.mark
     }
 
-    pub(super) fn reset(&mut self, mark: Mark) {
+    pub(crate) fn reset(&mut self, mark: Mark) {
         self.mark = mark;
     }
 
-    pub(super) fn wrapped(&self) -> &Option<Vec<i64>> {
+    pub(crate) fn wrapped(&self) -> &Option<Vec<i64>> {
         &self.wrapped
     }
 
-    pub(super) fn has_next(&self) -> bool {
+    pub(crate) fn has_next(&self) -> bool {
         self.mark.has_next()
     }
 
     /// `nextEntry()`: the entry's table index.
-    pub(super) fn next_entry(&mut self, map: &ListMap) -> Result<i32, Fault> {
+    pub(crate) fn next_entry(&mut self, map: &ListMap) -> Result<i32, Fault> {
         self.mark.next_entry(&self.wrapped, map)
     }
 
     /// `remove()`: the removed value.
-    pub(super) fn remove(&mut self, map: &mut ListMap) -> Result<u32, Fault> {
+    pub(crate) fn remove(&mut self, map: &mut ListMap) -> Result<u32, Fault> {
         if self.mark.last == -1 {
             return Err(Fault::IllegalState);
         }

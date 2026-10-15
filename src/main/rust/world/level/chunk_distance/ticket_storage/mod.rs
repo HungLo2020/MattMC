@@ -10,7 +10,7 @@
 //! Java iterators were, so a callback may mutate the storage between steps.
 //! Production trackers are notified directly under their graph lock.
 mod ffi;
-mod map;
+pub(crate) mod map;
 pub(crate) mod slab;
 #[cfg(test)]
 mod tests;
