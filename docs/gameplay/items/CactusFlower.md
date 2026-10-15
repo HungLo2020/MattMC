@@ -6,7 +6,9 @@ Cactus Flower (`minecraft:cactus_flower`) is a decorative plant, a **Pink Dye** 
 
 Break a Cactus Flower **by hand or with an ordinary tool** to recover **one flower**. Shears and Silk Touch are unnecessary; Fortune adds no extra flower. [Registration][flower-reg] · [Loot][flower-loot] · [Tool gate][gate]
 
-Some generated cactus patches, including **Desert** patches, carry flowers; not every cactus has one. Flowers can also grow through the cactus's **age-8 flower attempt**. With air above and the prospective cactus position meeting its survival rules, that attempt has a **10% chance on a one- or two-block column**, or **25% on a column at least three blocks tall**. These are chances at that age, not every random tick. A flower blocks further upward growth until removed; a three-block-or-taller top that reaches age 15 does not repeat the age-8 attempt. See [Cactus growth and flowers](../blocks/Cactus.md#growth-and-flowers) and [generation routes](../blocks/Cactus.md#finding-and-collecting-cactus) for the full limits. [Growth routine][cactus-growth] · [Cactus survival][cactus-support] · [Desert features][desert] · [Generated cactus patch][cactus-patch]
+Some generated cactus patches, including **Desert** patches, carry flowers; not every cactus has one. The [Cactus guide](../blocks/Cactus.md#finding-and-collecting-cactus) covers generation routes. [Desert features][desert] · [Generated cactus patch][cactus-patch]
+
+For renewable collection, follow [Cactus growth and flower chances](../blocks/Cactus.md#growth-and-flowers), then [resetting the top and checking flower-height clearance](../blocks/Cactus.md#collecting-flowers-repeatedly). Picking a flower alone does not restart the cactus's flower attempt. [Current growth routine][repeat-growth]
 
 No bundled recipe makes the flower itself. Its Natural Blocks listing also supplies a [Creative inventory-browser route](../mechanics/InventoryBrowser.md); seeing it in Survival's catalog does not permit ordinary Survival insertion. [Category entry][flower-category]
 
@@ -29,6 +31,8 @@ This is the item form of `minecraft:cactus_flower`. The [Cactus guide](../blocks
 ## Sources and verification
 
 Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`, using the bundled recipes, loot and tags and the active behavior paths linked here. No gameplay test was run; custom data-pack changes are outside this review.
+
+Renewable-collection guidance was consolidated under the Cactus owner on **2026-10-15** at `6c069f5851cb3d6e1549ee478909559c2783cfe6`. This was a source review, not a flower-growing or harvesting test; other claims retain their earlier review scope.
 
 [items]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java
 [flower-loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/cactus_flower.json
@@ -53,3 +57,4 @@ Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`,
 [vegetation]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/VegetationBlock.java#L23-L47
 [support-loss]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Block.java#L213-L233
 [drops]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Block.java#L364-L420
+[repeat-growth]: https://github.com/HungLo2020/MattMC/blob/6c069f5851cb3d6e1549ee478909559c2783cfe6/src/main/java/net/minecraft/world/level/block/CactusBlock.java#L56-L84
