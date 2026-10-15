@@ -27,6 +27,18 @@ public class OceanMonumentStructure extends Structure {
 	}
 
 	@Override
+	public int[] nativeStub() {
+		return new int[]{0, 1, 0};
+	}
+
+	@Override
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext,
+		net.minecraft.core.BlockPos stub, net.minecraft.world.level.block.Rotation rotation, long[] extra, int[] pieces) {
+		// Rust planned the building's room graph and children (structure/monument_plan.rs).
+		OceanMonumentPieces.addNativePieces(structurePiecesBuilder, pieces);
+	}
+
+	@Override
 	public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext) {
 		int i = generationContext.chunkPos().getBlockX(9);
 		int j = generationContext.chunkPos().getBlockZ(9);

@@ -23,6 +23,12 @@ import net.minecraft.util.valueproviders.ConstantFloat;
 import net.minecraft.util.valueproviders.FloatProvider;
 import net.minecraft.util.valueproviders.UniformFloat;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeGenerationSettings;
+import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.biome.Climate;
+import net.minecraft.world.level.biome.MultiNoiseBiomeSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.NativeBlockRegistry;
 import net.minecraft.world.level.block.Blocks;
@@ -69,13 +75,19 @@ final class NativeCarvers {
     static final AtomicLong CHUNKS = new AtomicLong();
     // Top-material upcalls answered, so tests can prove the callback ran.
     static final AtomicLong TOP_CALLS = new AtomicLong();
+    // Neighbour carver biomes Rust sampled.
+    static final AtomicLong SAMPLED = new AtomicLong();
+
+    static String statistics() {
+        return "carvedChunks=" + CHUNKS.get() + " carverBiomesSampled=" + SAMPLED.get() + " carverTopCalls=" + TOP_CALLS.get();
+    }
 
     static {
         try {
             MethodHandle top = MethodHandles.lookup().findStatic(NativeCarvers.class, "top", MethodType.methodType(int.class, int.class, int.class,
-                int.class, int.class, MemorySegment.class, MemorySegment.class, int.class));
+                int.class, int.class, MemorySegment.class, MemorySegment.class, int.class, MemorySegment.class));
             TOP = Linker.nativeLinker().upcallStub(top, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
-                ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT), Arena.global());
+                ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS), Arena.global());
         } catch (ReflectiveOperationException error) {
             throw new ExceptionInInitializerError(error);
         }
@@ -90,14 +102,133 @@ final class NativeCarvers {
         return enabled;
     }
 
-    /** A chunk within 8 of the carved one and its carver biome's carvers. */
-    record Neighbour(int x, int z, List<ConfiguredWorldCarver<?>> carvers) {}
+    /**
+     * Per generator and biome source: the distinct carver settings of its biomes, the
+     * union of their carvers, each settings' carvers as indices into that union, and
+     * (for a plain multi-noise source) each climate-tree node's leaf settings.
+     */
+    record Tables(BiomeSource source, List<BiomeGenerationSettings> settings, java.util.IdentityHashMap<BiomeGenerationSettings, Integer> index,
+                  List<ConfiguredWorldCarver<?>> carvers, int[][] lists, @Nullable int[] leafSettings) {}
+
+    private static final java.util.Map<ChunkGenerator, Tables> TABLES = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    /**
+     * One chunk's carver selection: each neighbour's cached carver settings in
+     * {@code applyCarvers}' order, or -1 for Rust to sample as {@code carverBiome} would,
+     * with what sampling needs; Rust's choices fill the neighbours' caches afterwards.
+     */
+    static final class Selection {
+        final Tables tables;
+        final int[] chosen;
+        final boolean[] uncached;
+        final ChunkAccess[] chunks;
+        @Nullable
+        final NativeBiomeSearch.Program program;
+        @Nullable
+        final Climate.ParameterList<Holder<Biome>> list;
+
+        Selection(Tables tables, int[] chosen, boolean[] uncached, ChunkAccess[] chunks, @Nullable NativeBiomeSearch.Program program,
+                  @Nullable Climate.ParameterList<Holder<Biome>> list) {
+            this.tables = tables;
+            this.chosen = chosen;
+            this.uncached = uncached;
+            this.chunks = chunks;
+            this.program = program;
+            this.list = list;
+        }
+    }
+
+    @Nullable
+    private static Tables tables(ChunkGenerator generator, BiomeSource source) {
+        Tables cached = TABLES.get(generator);
+        if (cached != null && cached.source() == source) return cached;
+        List<BiomeGenerationSettings> settings = new ArrayList<>();
+        var index = new java.util.IdentityHashMap<BiomeGenerationSettings, Integer>();
+        java.util.function.Function<Holder<Biome>, Integer> settingsOf = biome -> index.computeIfAbsent(generator.getBiomeGenerationSettings(biome), s -> {
+            settings.add(s);
+            return settings.size() - 1;
+        });
+        for (Holder<Biome> biome : source.possibleBiomes()) settingsOf.apply(biome);
+        int[] leafSettings = null;
+        if (source.getClass() == MultiNoiseBiomeSource.class && ((MultiNoiseBiomeSource)source).nativeParameters().getClass() == Climate.ParameterList.class) {
+            var list = ((MultiNoiseBiomeSource)source).nativeParameters();
+            leafSettings = new int[list.nativeNodeCount()];
+            for (int node = 0; node < leafSettings.length; node++) {
+                Holder<Biome> value = list.nativeLeafValue(node);
+                leafSettings[node] = value == null ? -1 : settingsOf.apply(value);
+            }
+        }
+        List<ConfiguredWorldCarver<?>> carvers = new ArrayList<>();
+        var carverIndex = new java.util.IdentityHashMap<ConfiguredWorldCarver<?>, Integer>();
+        int[][] lists = new int[settings.size()][];
+        for (int s = 0; s < settings.size(); s++) {
+            List<Integer> list = new ArrayList<>();
+            for (Holder<ConfiguredWorldCarver<?>> holder : settings.get(s).getCarvers()) {
+                list.add(carverIndex.computeIfAbsent(holder.value(), c -> {
+                    carvers.add(c);
+                    return carvers.size() - 1;
+                }));
+            }
+            lists[s] = list.stream().mapToInt(Integer::intValue).toArray();
+        }
+        var tables = new Tables(source, settings, index, carvers, lists, leafSettings);
+        TABLES.put(generator, tables);
+        return tables;
+    }
+
+    /**
+     * The chunk's selection: neighbours' cached carver settings, the constant settings of a
+     * fixed source, or -1 for Rust to sample with a plain multi-noise source's climate. Null
+     * keeps Java's loop.
+     */
+    @Nullable
+    static Selection select(ChunkGenerator generator, BiomeSource source, RandomState randomState, NoiseBasedChunkGenerator.CarverChunks chunks, ChunkPos pos) {
+        Tables tables = tables(generator, source);
+        if (tables == null) return null;
+        NativeBiomeSearch.Program program = null;
+        Climate.ParameterList<Holder<Biome>> list = null;
+        int fixed = -1;
+        if (tables.leafSettings() != null) {
+            program = NativeBiomeSearch.climateProgram(randomState.sampler());
+            if (program == null) return null;
+            list = ((MultiNoiseBiomeSource)source).nativeParameters();
+        } else if (source.getClass() == net.minecraft.world.level.biome.FixedBiomeSource.class) {
+            Integer index = tables.index().get(generator.getBiomeGenerationSettings(source.possibleBiomes().iterator().next()));
+            if (index == null) return null;
+            fixed = index;
+        } else {
+            return null;
+        }
+        int[] chosen = new int[289];
+        boolean[] uncached = new boolean[289];
+        ChunkAccess[] neighbours = new ChunkAccess[289];
+        for (int j = -8; j <= 8; j++) {
+            for (int k = -8; k <= 8; k++) {
+                int n = (j + 8) * 17 + k + 8;
+                ChunkAccess neighbour = chunks.getChunk(pos.x + j, pos.z + k);
+                neighbours[n] = neighbour;
+                BiomeGenerationSettings cached = neighbour.cachedCarverBiome();
+                if (cached == null) {
+                    uncached[n] = true;
+                    chosen[n] = fixed;
+                } else {
+                    Integer index = tables.index().get(cached);
+                    if (index == null) return null;
+                    chosen[n] = index;
+                }
+            }
+        }
+        return new Selection(tables, chosen, uncached, neighbours, program, list);
+    }
 
     /** What the top-material upcall needs, and the first failure it saw. */
     private static final class Top {
         final CarvingContext context;
         final Function<BlockPos, Holder<Biome>> biomes;
         final ChunkAccess chunk;
+        /** The climate tree whose previous leaf Rust carries across this callback, or null. */
+        @Nullable
+        Climate.ParameterList<Holder<Biome>> list;
         final BlockPos.MutableBlockPos position = new BlockPos.MutableBlockPos();
         @Nullable
         Throwable failure;
@@ -112,10 +243,12 @@ final class NativeCarvers {
     /** {@code carvingContext.topMaterial(...)} for Rust: the Java chunk's
      * world-generation heightmaps take the storage's current values first (the
      * rule may test steep). Returns a state id, -1 for none, -2 on failure. */
-    private static int top(int x, int y, int z, int fluid, MemorySegment surface, MemorySegment floor, int words) {
+    private static int top(int x, int y, int z, int fluid, MemorySegment surface, MemorySegment floor, int words, MemorySegment previous) {
         Top top = CURRENT.get();
         if (top == null) return -2;
         TOP_CALLS.incrementAndGet();
+        var leaf = previous.reinterpret(4);
+        if (top.list != null) top.list.setPreviousNativeLeaf(leaf.get(ValueLayout.JAVA_INT, 0));
         try {
             long[] a = surface.reinterpret(words * 8L).toArray(ValueLayout.JAVA_LONG);
             long[] b = floor.reinterpret(words * 8L).toArray(ValueLayout.JAVA_LONG);
@@ -126,6 +259,8 @@ final class NativeCarvers {
         } catch (Throwable error) {
             if (top.failure == null) top.failure = error;
             return -2;
+        } finally {
+            if (top.list != null) leaf.set(ValueLayout.JAVA_INT, 0, top.list.previousNativeLeaf());
         }
     }
 
@@ -198,27 +333,24 @@ final class NativeCarvers {
     /** Carves the chunk natively: {@code neighbours} are the configured carvers of
      * every chunk within 8, in applyCarvers' order (x, z, carvers). False, with
      * the chunk untouched, leaves the carving to Java. */
-    static boolean run(CarvingContext context, ChunkAccess chunk, Aquifer aquifer, long seed, List<Neighbour> neighbours,
+    static boolean run(CarvingContext context, ChunkAccess chunk, Aquifer aquifer, long seed, Selection selection,
                        Function<BlockPos, Holder<Biome>> biomes) {
-        List<ConfiguredWorldCarver<?>> carvers = new ArrayList<>();
-        java.util.IdentityHashMap<ConfiguredWorldCarver<?>, Integer> indices = new java.util.IdentityHashMap<>();
-        IntArrayList neighbourInts = new IntArrayList();
-        neighbourInts.add(neighbours.size());
-        for (Neighbour neighbour : neighbours) {
-            neighbourInts.add(neighbour.x());
-            neighbourInts.add(neighbour.z());
-            neighbourInts.add(neighbour.carvers().size());
-            for (ConfiguredWorldCarver<?> carver : neighbour.carvers()) {
-                Integer index = indices.get(carver);
-                if (index == null) {
-                    if (!supports(carver)) return false;
-                    index = carvers.size();
-                    indices.put(carver, index);
-                    carvers.add(carver);
-                }
-                neighbourInts.add(index);
-            }
+        List<ConfiguredWorldCarver<?>> carvers = selection.tables.carvers();
+        for (ConfiguredWorldCarver<?> carver : carvers) {
+            if (!supports(carver)) return false;
         }
+        // Each settings' carvers, then each neighbour's settings (-1: Rust samples it) and the previous leaf.
+        IntArrayList neighbourInts = new IntArrayList();
+        int[][] lists = selection.tables.lists();
+        neighbourInts.add(lists.length);
+        for (int[] list : lists) {
+            neighbourInts.add(list.length);
+            neighbourInts.addElements(neighbourInts.size(), list);
+        }
+        neighbourInts.add(selection.chosen.length);
+        int chosenAt = neighbourInts.size();
+        neighbourInts.addElements(neighbourInts.size(), selection.chosen);
+        neighbourInts.add(selection.list != null ? selection.list.previousNativeLeaf() : -1);
         int configs = carvers.size();
         if (configs > 30) return false;
         boolean needsAquifer = false;
@@ -300,6 +432,7 @@ final class NativeCarvers {
             ints.add(BuiltInRegistries.BLOCK.getId(Blocks.MYCELIUM));
             ints.add(BuiltInRegistries.BLOCK.getId(Blocks.DIRT));
             ints.addElements(ints.size(), configInts);
+            int selectionAt = ints.size();
             ints.addElements(ints.size(), neighbourInts.toIntArray());
             ints.addElements(ints.size(), replaceable.toIntArray());
             double[] doubles = configDoubles;
@@ -307,11 +440,20 @@ final class NativeCarvers {
             long[] maskWords = java.util.Arrays.copyOf(mask.toArray(), chunk.getHeight() * 4);
             int status;
             Top top = new Top(context, biomes, chunk);
+            top.list = selection.list;
             try (Arena arena = Arena.ofConfined()) {
                 int[] intArray = ints.toIntArray();
                 MemorySegment intMemory = arena.allocateFrom(ValueLayout.JAVA_INT, intArray);
                 MemorySegment maskMemory = arena.allocateFrom(ValueLayout.JAVA_LONG, maskWords);
-                long[] pointers = new long[18];
+                long[] pointers = new long[22];
+                MemorySegment leafSettings = null;
+                if (selection.program != null) {
+                    leafSettings = arena.allocateFrom(ValueLayout.JAVA_INT, selection.tables.leafSettings());
+                    pointers[18] = selection.program.handle;
+                    pointers[19] = selection.list.nativeNodes().address();
+                    pointers[20] = selection.list.nativeNodeCount();
+                    pointers[21] = leafSettings.address();
+                }
                 pointers[0] = maskMemory.address();
                 pointers[1] = maskWords.length;
                 pointers[2] = SIN.address();
@@ -346,8 +488,21 @@ final class NativeCarvers {
                 } finally {
                     CURRENT.remove();
                     Reference.reachabilityFence(binding);
+                    Reference.reachabilityFence(selection.program);
                 }
                 if (status == 0) {
+                    // Rust's carver biome choices fill the neighbours' caches; its previous leaf is the thread's.
+                    int at = selectionAt + chosenAt;
+                    for (int n = 0; n < selection.chosen.length; n++) {
+                        if (selection.uncached[n]) {
+                            if (selection.chosen[n] < 0) SAMPLED.incrementAndGet();
+                            var chosen = selection.tables.settings().get(intMemory.getAtIndex(ValueLayout.JAVA_INT, at + n));
+                            selection.chunks[n].carverBiome(() -> chosen);
+                        }
+                    }
+                    if (selection.list != null) {
+                        selection.list.setPreviousNativeLeaf(intMemory.getAtIndex(ValueLayout.JAVA_INT, at + selection.chosen.length));
+                    }
                     mask.installGenerated(maskMemory.toArray(ValueLayout.JAVA_LONG));
                     if (binding != null) {
                         // The aquifer's caches are pure memos; keep what Rust filled.
@@ -371,6 +526,7 @@ final class NativeCarvers {
                 if (top.failure instanceof Error error) throw error;
                 throw new IllegalStateException("Native carving top material failed", top.failure);
             }
+            if (status == -5) throw new IllegalStateException("Native carver biome selection failed");
             if (status != 0) throw new IllegalStateException("Native carving rejected: " + status);
             storage.install();
             CHUNKS.incrementAndGet();

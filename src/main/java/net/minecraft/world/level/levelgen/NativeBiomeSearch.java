@@ -65,7 +65,7 @@ public final class NativeBiomeSearch {
         enabled = value;
     }
 
-    private static final class Program {
+    static final class Program {
         final long handle;
         // The program references these states; they stay reachable while it lives.
         final NativeNoiseState[] states;
@@ -85,6 +85,12 @@ public final class NativeBiomeSearch {
 
     /** The sampler's six functions as a point program, or null when one has a
      * node Rust does not model. */
+    /** The sampler's climate point program for other native stages, or null. */
+    @Nullable
+    static Program climateProgram(Climate.Sampler sampler) {
+        return enabled ? program(sampler) : null;
+    }
+
     @Nullable
     private static Program program(Climate.Sampler sampler) {
         Object cached = PROGRAMS.get(sampler);

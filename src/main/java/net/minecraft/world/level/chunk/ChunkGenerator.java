@@ -317,15 +317,19 @@ public abstract class ChunkGenerator {
 			List<FeatureSorter.StepFeatureData> list = (List<FeatureSorter.StepFeatureData>)this.featuresPerStep.get();
 			WorldgenRandom worldgenRandom = new WorldgenRandom(new XoroshiroRandomSource(RandomSupport.generateUniqueSeed()));
 			long l = worldgenRandom.setDecorationSeed(worldGenLevel.getSeed(), blockPos.getX(), blockPos.getZ());
-			Set<Holder<Biome>> set = new ObjectArraySet<>();
-			ChunkPos.rangeClosed(sectionPos.chunk(), 1).forEach(chunkPosx -> {
-				ChunkAccess chunkAccessx = worldGenLevel.getChunk(chunkPosx.x, chunkPosx.z);
+			// The 3x3's biomes: Rust gathers them for its loop; Java's loop gathers them on first use.
+			Supplier<Set<Holder<Biome>>> biomeSet = com.google.common.base.Suppliers.memoize(() -> {
+				Set<Holder<Biome>> gathered = new ObjectArraySet<>();
+				ChunkPos.rangeClosed(sectionPos.chunk(), 1).forEach(chunkPosx -> {
+					ChunkAccess chunkAccessx = worldGenLevel.getChunk(chunkPosx.x, chunkPosx.z);
 
-				for (LevelChunkSection levelChunkSection : chunkAccessx.getSectionsForRead()) {
-					levelChunkSection.getBiomes().getAll(set::add);
-				}
+					for (LevelChunkSection levelChunkSection : chunkAccessx.getSectionsForRead()) {
+						levelChunkSection.getBiomes().getAll(gathered::add);
+					}
+				});
+				gathered.retainAll(this.biomeSource.possibleBiomes());
+				return gathered;
 			});
-			set.retainAll(this.biomeSource.possibleBiomes());
 			int i = list.size();
 			NativeDecorationRegion nativeRegion = net.minecraft.world.level.levelgen.NativeDecoration.bind(worldGenLevel, chunkAccess, this);
 
@@ -338,8 +342,17 @@ public abstract class ChunkGenerator {
 				if (nativeRegion != null) {
 					long structureSteps = 0;
 					if (structureManager.shouldGenerateStructures()) {
-						for (int k = 0; k < j && k < 64; k++) {
-							if (!map.getOrDefault(k, Collections.emptyList()).isEmpty()) structureSteps |= 1L << k;
+						// Only steps with a structure this chunk references: startsForStructure finds
+						// nothing for the others, and each feature reseeds the random it would set.
+						var references = chunkAccess.getAllReferences();
+						for (int k = 0; k < j && k < 64 && !references.isEmpty(); k++) {
+							for (Structure structure : map.getOrDefault(k, Collections.emptyList())) {
+								var refs = references.get(structure);
+								if (refs != null && !refs.isEmpty()) {
+									structureSteps |= 1L << k;
+									break;
+								}
+							}
 						}
 					}
 					var sequence = new net.minecraft.world.level.levelgen.NativeDecoration.Sequence() {
@@ -381,7 +394,7 @@ public abstract class ChunkGenerator {
 						}
 					};
 					long decorated = net.minecraft.world.level.levelgen.NativeDecoration.decorate(this.nativeDecorationPrograms, nativeRegion, this, worldGenLevel,
-						worldgenRandom, l, set, structureSteps, blockPos, list, j, sequence);
+						worldgenRandom, l, biomeSet, structureSteps, blockPos, list, j, sequence);
 					if (decorated == net.minecraft.world.level.levelgen.NativeDecoration.DECORATION_DONE) {
 						startStep = j;
 					} else if (decorated != net.minecraft.world.level.levelgen.NativeDecoration.DECORATION_DECLINED) {
@@ -420,7 +433,7 @@ public abstract class ChunkGenerator {
 					if (k < i) {
 						IntSet intSet = new IntArraySet();
 
-						for (Holder<Biome> holder : set) {
+						for (Holder<Biome> holder : biomeSet.get()) {
 							List<HolderSet<PlacedFeature>> list3 = ((BiomeGenerationSettings)this.generationSettingsGetter.apply(holder)).features();
 							if (k < list3.size()) {
 								HolderSet<PlacedFeature> holderSet = (HolderSet<PlacedFeature>)list3.get(k);
@@ -538,9 +551,13 @@ public abstract class ChunkGenerator {
 			ChunkPos chunkPos = chunkAccess.getPos();
 			SectionPos sectionPos = SectionPos.bottomOf(chunkAccess);
 			RandomState randomState = chunkGeneratorStructureState.randomState();
+			// Which sets place here, from Rust's placement table (2: Java asks the placement).
+			byte[] structureChunks = chunkGeneratorStructureState.nativeStructureChunks(chunkPos.x, chunkPos.z);
+			int[] setIndex = {0};
 			chunkGeneratorStructureState.possibleStructureSets()
 				.forEach(
 					holder -> {
+						int set = setIndex[0]++;
 						StructurePlacement structurePlacement = ((StructureSet)holder.value()).placement();
 						List<StructureSet.StructureSelectionEntry> list = ((StructureSet)holder.value()).structures();
 
@@ -551,7 +568,9 @@ public abstract class ChunkGenerator {
 							}
 						}
 
-						if (structurePlacement.isStructureChunk(chunkGeneratorStructureState, chunkPos.x, chunkPos.z)) {
+						boolean structureChunk = structureChunks != null && structureChunks[set] != 2 ? structureChunks[set] == 1
+							: structurePlacement.isStructureChunk(chunkGeneratorStructureState, chunkPos.x, chunkPos.z);
+						if (structureChunk) {
 							if (list.size() == 1) {
 								this.tryGenerateStructure(
 									(StructureSet.StructureSelectionEntry)list.get(0),

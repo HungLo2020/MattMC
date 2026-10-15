@@ -120,6 +120,11 @@ public class WorldGenRegion implements WorldGenLevel {
 			if (chunkStatus.isOrBefore(chunkStatus2)) {
 				ChunkAccess chunkAccess = generationChunkHolder.getChunkIfPresentUnchecked(chunkStatus2);
 				if (chunkAccess != null) {
+					// A chunk handed out inside the write radius may be written: it joins the
+					// FEATURES transaction (if any) before the caller can change it.
+					if (!this.nativeUntracked && k <= this.generatingStep.blockStateWriteRadius()) {
+						net.minecraft.world.level.chunk.DecorationTransaction.touchCurrent(chunkAccess);
+					}
 					return chunkAccess;
 				}
 			}
@@ -155,13 +160,33 @@ public class WorldGenRegion implements WorldGenLevel {
 		return this.generatingStep.directDependencies().size() - 1;
 	}
 
+	private boolean nativeUntracked;
+
+	/** {@link #getChunk(int, int)} for native binding, which only reads: no transaction capture. */
+	public ChunkAccess nativeChunkUntracked(int x, int z) {
+		this.nativeUntracked = true;
+		try {
+			return this.getChunk(x, z);
+		} finally {
+			this.nativeUntracked = false;
+		}
+	}
+
 	public ChunkAccess nativeCenter() {
 		return this.center;
 	}
 
 	/** Native decoration replays {@link #setBlock}'s POI notification after its call. */
 	public void nativeUpdatePoi(BlockPos blockPos, BlockState old, BlockState state) {
-		this.level.updatePOIOnBlockStateChange(blockPos, old, state);
+		this.updatePoi(blockPos, old, state);
+	}
+
+	/** {@code updatePOIOnBlockStateChange}, after the FEATURES transaction commits when one is open. */
+	private void updatePoi(BlockPos blockPos, BlockState old, BlockState state) {
+		BlockPos pos = blockPos.immutable();
+		if (!net.minecraft.world.level.chunk.DecorationTransaction.defer(() -> this.level.updatePOIOnBlockStateChange(pos, old, state))) {
+			this.level.updatePOIOnBlockStateChange(pos, old, state);
+		}
 	}
 
 	@Override
@@ -302,7 +327,7 @@ public class WorldGenRegion implements WorldGenLevel {
 			ChunkAccess chunkAccess = this.getChunk(blockPos);
 			BlockState blockState2 = chunkAccess.setBlockState(blockPos, blockState, i);
 			if (blockState2 != null) {
-				this.level.updatePOIOnBlockStateChange(blockPos, blockState2, blockState);
+				this.updatePoi(blockPos, blockState2, blockState);
 			}
 
 			if (blockState.hasBlockEntity()) {

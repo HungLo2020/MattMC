@@ -276,3 +276,25 @@ does not close #775 or complete world-generation ownership. The later
 records slice ownership and evidence limits at `da1109de6`; the historical
 fill measurements above do not verify that later implementation or the
 [current native-stage changes](RUST-WORLDGEN-ORGANIZATION.md#verification).
+
+## Base heights
+
+`NoiseBasedChunkGenerator.getBaseHeight` asks
+[`NativeColumns`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/levelgen/NativeColumns.java)
+first. [`noise_fill/column.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/levelgen/noise_fill/column.rs)
+evaluates the column over its chunk's native router instance (the same corner
+slices as the fill, with the structure Beardifier marker's zero), the cell
+program at each block top down, and the chunk's aquifer substance with that
+density, until a state passes the heightmap's predicate. Each RandomState and
+height range exports its programs once; Rust caches recent chunks' routers and
+aquifers. Ore veins never change either world-generation heightmap's answer, so
+predicates where they would disagree with the default block keep Java's
+one-cell noise chunk. `NativeColumnsTest` compares both routes for every bundled
+setting; `columnHeights=` counts native answers and
+`-Dmattmc.worldgen.javaBaseHeight=true` keeps Java's columns.
+
+Rust structure starts also read whole base columns (`Columns::column`, the
+`getBaseColumn` states from the noise minimum up) for ruined portals'
+`findSuitableY` and Nether fossils' floor scan. Ore veins read as the default
+block, so Java declines those starts when a vein state would answer a
+predicate differently.

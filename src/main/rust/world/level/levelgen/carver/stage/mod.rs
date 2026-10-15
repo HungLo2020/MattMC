@@ -102,6 +102,8 @@ pub(crate) enum Error {
     Storage,
     Aquifer(i32),
     TopMaterial(i32),
+    /// A neighbour's carver biome could not be sampled.
+    Selection,
 }
 
 impl From<proto_chunk::Error> for Error {
@@ -195,9 +197,24 @@ impl Stage<'_> {
     /// `applyCarvers`' loop: for each chunk within 8 (in Java's order) and each
     /// of its carvers, `setLargeFeatureSeed(seed + index, x, z)`, the start
     /// check, then the carver.
-    pub(crate) fn run(&mut self, seed: i64, neighbours: &[(i32, i32, Vec<usize>)]) -> Result<(), Error> {
+    ///
+    /// `neighbours` holds each chunk's carver biome settings (an index into
+    /// `settings`, the configurations of each), or -1 when the chunk has not
+    /// cached it yet: `select` samples it then, in this order, as Java's
+    /// `carverBiome` would, and the result is written back.
+    pub(crate) fn run(
+        &mut self,
+        seed: i64,
+        neighbours: &mut [(i32, i32, i32)],
+        settings: &[Vec<usize>],
+        select: &mut dyn FnMut(i32, i32) -> Result<usize, Error>,
+    ) -> Result<(), Error> {
         let mut random = Legacy::new(0);
-        for (x, z, carvers) in neighbours {
+        for (x, z, chosen) in neighbours.iter_mut() {
+            if *chosen < 0 {
+                *chosen = select(*x, *z)? as i32;
+            }
+            let carvers = settings.get(*chosen as usize).ok_or(Error::Selection)?;
             for (index, &config) in carvers.iter().enumerate() {
                 random.set_large_feature_seed(seed.wrapping_add(index as i64), *x, *z);
                 let c = self.configs[config];

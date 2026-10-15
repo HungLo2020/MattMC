@@ -290,6 +290,56 @@ public class EndCityPieces {
 		recursiveChildren(structureTemplateManager, TOWER_GENERATOR, 1, endCityPiece, null, list, randomSource);
 	}
 
+	/** The template names native planning indexes, in {@code end_city_plan.rs} {@code TEMPLATES} order. */
+	private static final String[] NATIVE_TEMPLATES = {
+		"base_floor", "base_roof", "second_floor_1", "second_floor_2", "second_roof", "third_floor_1", "third_floor_2", "third_roof",
+		"tower_base", "tower_piece", "tower_top", "bridge_end", "bridge_piece", "bridge_steep_stairs", "bridge_gentle_stairs", "ship",
+		"fat_tower_base", "fat_tower_middle", "fat_tower_top"
+	};
+
+	/** Native planning params: each template's size (x, y, z) in {@link #NATIVE_TEMPLATES} order; null if one is missing. */
+	public static int[] nativePlanParams(StructureTemplateManager structureTemplateManager) {
+		int[] params = new int[NATIVE_TEMPLATES.length * 3];
+		for (int t = 0; t < NATIVE_TEMPLATES.length; t++) {
+			net.minecraft.core.Vec3i size = structureTemplateManager.getOrCreate(EndCityPieces.EndCityPiece.makeResourceLocation(NATIVE_TEMPLATES[t])).getSize();
+			if (size.getX() < 1 || size.getY() < 1 || size.getZ() < 1) {
+				return null;
+			}
+			params[t * 3] = size.getX();
+			params[t * 3 + 1] = size.getY();
+			params[t * 3 + 2] = size.getZ();
+		}
+		return params;
+	}
+
+	/**
+	 * Rebuilds the planned pieces with no draws. Words per piece: {@code [kind (0), gen depth, box (6),
+	 * orientation, field count (6), template index, rotation ordinal, overwrite, template x, y, z]}.
+	 */
+	public static void addNativePieces(
+		net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, StructureTemplateManager structureTemplateManager, int[] words
+	) {
+		Rotation[] rotations = Rotation.values();
+		int at = 0;
+		while (at < words.length) {
+			int f = at + 10;
+			if (f > words.length || words[at] != 0 || words[at + 9] != 6 || f + 6 > words.length) {
+				throw new IllegalArgumentException("Bad end city piece words at " + at);
+			}
+			EndCityPieces.EndCityPiece piece = new EndCityPieces.EndCityPiece(
+				structureTemplateManager, NATIVE_TEMPLATES[words[f]], new BlockPos(words[f + 3], words[f + 4], words[f + 5]), rotations[words[f + 1]], words[f + 2] != 0
+			);
+			piece.setGenDepth(words[at + 1]);
+			BoundingBox box = piece.getBoundingBox();
+			if (box.minX() != words[at + 2] || box.minY() != words[at + 3] || box.minZ() != words[at + 4]
+				|| box.maxX() != words[at + 5] || box.maxY() != words[at + 6] || box.maxZ() != words[at + 7]) {
+				throw new IllegalStateException("End city piece box mismatch at " + at + ": " + box);
+			}
+			builder.addPiece(piece);
+			at = f + 6;
+		}
+	}
+
 	static EndCityPieces.EndCityPiece addHelper(List<StructurePiece> list, EndCityPieces.EndCityPiece endCityPiece) {
 		list.add(endCityPiece);
 		return endCityPiece;
@@ -364,6 +414,11 @@ public class EndCityPieces {
 			super.addAdditionalSaveData(structurePieceSerializationContext, compoundTag);
 			compoundTag.store("Rot", Rotation.LEGACY_CODEC, this.placeSettings.getRotation());
 			compoundTag.putBoolean("OW", this.placeSettings.getProcessors().get(0) == BlockIgnoreProcessor.STRUCTURE_BLOCK);
+		}
+
+		@Override
+		protected long[] nativeTailWords() {
+			return this.nativeTailWords(3);
 		}
 
 		@Override

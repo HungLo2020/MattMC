@@ -6,8 +6,9 @@ use crate::world::level::levelgen::router::{Binding, Program};
 use crate::world::level::levelgen::synth::State;
 
 /// Java's top-material callback: (x, y, z, fluid, WORLD_SURFACE_WG raw,
-/// OCEAN_FLOOR_WG raw, words) to a state id, -1 for none, or -2 on failure.
-pub(crate) type TopCallback = unsafe extern "C" fn(i32, i32, i32, i32, *const i64, *const i64, i32) -> i32;
+/// OCEAN_FLOOR_WG raw, words, the climate search's previous leaf in and out)
+/// to a state id, -1 for none, or -2 on failure.
+pub(crate) type TopCallback = unsafe extern "C" fn(i32, i32, i32, i32, *const i64, *const i64, i32, *mut i32) -> i32;
 
 // Pointer block slots.
 const MASK: usize = 0;
@@ -28,7 +29,13 @@ const SEED_A: usize = 14;
 const SEED_B: usize = 15;
 const BARRIER_XZ: usize = 16;
 const BARRIER_Y: usize = 17;
-const POINTERS: usize = 18;
+/// The RandomState sampler's climate point program (0: every neighbour's settings are given).
+const CLIMATE: usize = 18;
+const NODES: usize = 19;
+const NODE_COUNT: usize = 20;
+/// Per climate-tree node: its leaf biome's carver settings index (-1 for branches).
+const LEAF_SETTINGS: usize = 21;
+const POINTERS: usize = 22;
 
 // Fixed int slots before the configurations and operations.
 const HEADER: usize = 39;
@@ -52,9 +59,11 @@ fn provider(v: &[f64]) -> Option<FloatProvider> {
 /// noise-based, 2 disabled), skipY, locationKind, shape (5), surface rect (4),
 /// FlatCache grid (3), wayBelow, policy (8), grass block, mycelium and dirt
 /// block ids, then per configuration (kind, lava level, height min, height
-/// max, width smoothness, replaceable block count), the neighbour count and
-/// per neighbour (x, z, carver count, configuration indices), then each
-/// configuration's replaceable block ids]; state to block ids come from the
+/// max, width smoothness, replaceable block count), the settings count and per
+/// settings (carver count, configuration indices), the neighbour count, each
+/// neighbour's settings index in `applyCarvers`' order (-1: sample its carver
+/// biome; written back), the climate search's previous leaf (written back),
+/// then each configuration's replaceable block ids]; state to block ids come from the
 /// installed block registry; `doubles` per configuration (probability, then the Y
 /// scale and four shape providers as [kind, a, b, c]: cave horizontal radius,
 /// vertical radius, floor level, unused; canyon vertical rotation, thickness,
@@ -116,23 +125,57 @@ pub unsafe extern "C" fn mattmc_carvers_run(storage_handle: u64, pointers: *cons
         configs.push(Config { kind, probability: cd[0] as f32, y_min: c[2], y_max: c[3], y_scale: providers[0], lava_level: c[1], bit: k as u32, cave, canyon });
     }
     let mut at = HEADER + config_count * CONFIG_INTS;
-    let Ok(neighbour_count) = usize::try_from(i[at]) else { return -1 };
+    let Ok(settings_count) = usize::try_from(i[at]) else { return -1 };
     at += 1;
-    let mut neighbours = Vec::with_capacity(neighbour_count);
-    for _ in 0..neighbour_count {
-        let Some(&[x, z, count]) = i.get(at..at + 3).map(|h| <&[i32; 3]>::try_from(h).unwrap()) else { return -1 };
-        let Ok(count) = usize::try_from(count) else { return -1 };
-        let Some(list) = i.get(at + 3..at + 3 + count) else { return -1 };
+    let mut settings = Vec::with_capacity(settings_count);
+    for _ in 0..settings_count {
+        let Some(Ok(count)) = i.get(at).map(|&c| usize::try_from(c)) else { return -1 };
+        let Some(list) = i.get(at + 1..at + 1 + count) else { return -1 };
         if list.iter().any(|k| *k < 0 || *k as usize >= config_count) {
             return -1;
         }
-        neighbours.push((x, z, list.iter().map(|k| *k as usize).collect::<Vec<_>>()));
-        at += 3 + count;
+        settings.push(list.iter().map(|k| *k as usize).collect::<Vec<_>>());
+        at += 1 + count;
     }
+    // applyCarvers' neighbours: x outer, z inner, within 8 of the chunk.
+    let Some(Ok(neighbour_count)) = i.get(at).map(|&n| usize::try_from(n)) else { return -1 };
+    if neighbour_count != 17 * 17 || i.len() < at + 2 + neighbour_count {
+        return -1;
+    }
+    let neighbour_at = at + 1;
+    let mut neighbours = Vec::with_capacity(neighbour_count);
+    for (n, &chosen) in i[neighbour_at..neighbour_at + neighbour_count].iter().enumerate() {
+        if chosen < -1 || chosen >= settings_count as i32 {
+            return -1;
+        }
+        neighbours.push((i[0].wrapping_add(n as i32 / 17 - 8), i[1].wrapping_add(n as i32 % 17 - 8), chosen));
+    }
+    let previous_at = neighbour_at + neighbour_count;
+    at = previous_at + 1;
     let replaceable: usize = (0..config_count).map(|k| i[HEADER + k * CONFIG_INTS + 5].max(0) as usize).sum();
     if i.len() != at + replaceable {
         return -1;
     }
+    // Carver biome sampling: the sampler's climate and the climate tree.
+    let climate = if p[CLIMATE] == 0 { None } else { Some(unsafe { &*(p[CLIMATE] as *const Program) }) };
+    let (nodes, leaf_settings): (&[crate::world::level::biome::climate::Node], &[i32]) = match climate {
+        Some(_) => {
+            let Ok(count) = usize::try_from(p[NODE_COUNT]) else { return -1 };
+            if p[NODES] == 0 || p[LEAF_SETTINGS] == 0 || count == 0 {
+                return -1;
+            }
+            unsafe {
+                (std::slice::from_raw_parts(p[NODES] as *const crate::world::level::biome::climate::Node, count),
+                    std::slice::from_raw_parts(p[LEAF_SETTINGS] as *const i32, count))
+            }
+        }
+        None if neighbours.iter().any(|n| n.2 < 0) => return -1,
+        None => (&[], &[]),
+    };
+    if leaf_settings.iter().any(|&l| l < -1 || l >= settings_count as i32) {
+        return -1;
+    }
+    let previous = std::cell::Cell::new(i[previous_at]);
     let block_of = registry.block_column();
     let mut blocks = vec![0u32; registry.blocks().len()];
     let mut set = |block: i32, bit: u32| -> bool {
@@ -180,8 +223,20 @@ pub unsafe extern "C" fn mattmc_carvers_run(storage_handle: u64, pointers: *cons
     let storage_ptr: *mut ProtoStorage = storage;
     let mut callback = |x: i32, y: i32, z: i32, fluid: bool, storage: &ProtoStorage| -> Result<i32, i32> {
         let (surface, floor) = (storage.heightmap_raw(false), storage.heightmap_raw(true));
-        let state = unsafe { top(x, y, z, fluid as i32, surface.as_ptr(), floor.as_ptr(), height_words as i32) };
+        // Java's top material searches the climate tree too: hand it the previous leaf and take it back.
+        let mut leaf = previous.get();
+        let state = unsafe { top(x, y, z, fluid as i32, surface.as_ptr(), floor.as_ptr(), height_words as i32, &mut leaf) };
+        previous.set(leaf);
         if state < -1 { Err(state) } else { Ok(state) }
+    };
+    let mut sampler = climate.map(|program| crate::world::level::biome::search::Sampler::new(program, nodes, previous.get()));
+    let mut select = |x: i32, z: i32| -> Result<usize, Error> {
+        let sampler = sampler.as_mut().ok_or(Error::Selection)?;
+        sampler.previous = previous.get();
+        // carverBiome: getNoiseBiome(QuartPos.fromBlock(minBlockX), 0, QuartPos.fromBlock(minBlockZ)).
+        let leaf = crate::world::level::biome::search::leaf_at(sampler, x.wrapping_mul(4), 0, z.wrapping_mul(4)).map_err(|_| Error::Selection)?;
+        previous.set(sampler.previous);
+        usize::try_from(leaf_settings[leaf as usize]).map_err(|_| Error::Selection)
     };
     let mut stage = Stage {
         storage: unsafe { &mut *storage_ptr },
@@ -200,14 +255,19 @@ pub unsafe extern "C" fn mattmc_carvers_run(storage_handle: u64, pointers: *cons
         schedule: i[11] != 0,
         top: &mut callback,
     };
-    let result = stage.run(seed, &neighbours);
+    let result = stage.run(seed, &mut neighbours, &settings, &mut select);
     let schedule = stage.schedule;
     i[11] = schedule as i32;
+    for (n, neighbour) in neighbours.iter().enumerate() {
+        i[neighbour_at + n] = neighbour.2;
+    }
+    i[previous_at] = previous.get();
     match result {
         Ok(()) => 0,
         Err(Error::Storage) => -2,
         Err(Error::Aquifer(_)) => -3,
         Err(Error::TopMaterial(_)) => -4,
+        Err(Error::Selection) => -5,
     }
 }
 

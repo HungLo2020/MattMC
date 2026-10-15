@@ -159,6 +159,24 @@ impl Owner {
         let state = self.state.lock().unwrap();
         (index < CELLS && self.is_valid()).then(|| state.generation.value(index))
     }
+    /// Every value stored in the section (`PalettedContainer.getAll`), under one lock; false when invalid.
+    pub(crate) fn for_each_present(&self, mut f: impl FnMut(u32)) -> bool {
+        let state = self.state.lock().unwrap();
+        if !self.is_valid() {
+            return false;
+        }
+        let g = &state.generation;
+        if g.bits == 0 {
+            // A single-value section stores that value in every cell.
+            f(g.value(0));
+            return true;
+        }
+        for index in 0..CELLS {
+            f(g.value(index));
+        }
+        true
+    }
+
     pub fn copy(&self) -> Self {
         let state = self.state.lock().unwrap();
         let g = &state.generation;

@@ -268,15 +268,107 @@ public final class FullGenAudit {
 			ChunkPos pos = margin.get(index);
 			if (index == injectAt) {
 				// Failure verification: this chunk's decoration fails a few writes in, on either route.
+				// Every chunk the step may write is captured as saved just before the step and again
+				// after its rollback: a step that publishes nothing leaves them identical.
+				Map<String, Map<String, String>> captures = new java.util.concurrent.ConcurrentHashMap<>();
+				java.util.function.BiConsumer<String, List<ChunkAccess>> hook = (phase, chunks) -> {
+					if (phase.equals("released")) {
+						// Ownership released, failure not yet rethrown: persist before any shutdown can start.
+						saveAfterFailure(server);
+						return;
+					}
+					if (phase.equals("rollback-failed")) {
+						try {
+							Files.writeString(OUTPUT.resolve("rollback-failed.txt"), "a rollback stage failed");
+						} catch (Exception e) {
+							throw new RuntimeException(e);
+						}
+						return;
+					}
+					Map<String, String> forms = new TreeMap<>();
+					for (var chunk : chunks) {
+						CompoundTag data = SerializableChunkData.copyOf(level, chunk).write();
+						data.remove("LastUpdate");
+						forms.put(chunk.getPos().x + "," + chunk.getPos().z, canonical(data));
+					}
+					// Serial generation: the latest begin before the rollback is the failing step's.
+					captures.put(phase, forms);
+					if (phase.equals("rollback")) {
+						Map<String, Object> report = new TreeMap<>();
+						var before = captures.get("begin");
+						forms.forEach((key, form) -> report.put(key, before != null && form.equals(before.get(key)) ? "identical" : "changed"));
+						try {
+							Files.writeString(OUTPUT.resolve("rollback.json"), GSON.toJson(report));
+						} catch (Exception e) {
+							throw new RuntimeException(e);
+						}
+
+					}
+				};
+				// Current only (Frozen has no transaction); reflective so the agent builds for both.
+				Class.forName("net.minecraft.world.level.chunk.DecorationTransaction").getField("TEST_HOOK").set(null, hook);
 				Class.forName("net.minecraft.world.level.levelgen.NativeDecoration").getMethod("armTestFailure", String.class)
 					.invoke(null, System.getProperty("audit.injectFailure"));
 				System.out.println("FULLGEN_INJECTED_AT " + pos);
+			}
+			if (index == Integer.getInteger("audit.cancelAtChunk", -1)) {
+				cancelAndDump(server, level, positions, margin.subList(0, index), margin.subList(index, margin.size()));
+				return;
 			}
 			server.submit(() -> level.getChunkSource().addTicketWithRadius(TicketType.PLAYER_LOADING, pos, FEATURES_RADIUS)).get();
 			level.getChunkSource().getChunkFuture(pos.x, pos.z, ChunkStatus.FEATURES, true)
 				.get(Integer.getInteger("audit.chunkTimeoutSeconds", 180), TimeUnit.SECONDS);
 		}
 		DECORATED.put(level, margin);
+	}
+
+	/**
+	 * Cancellation verification: requests every remaining chunk (and the region)
+	 * to FULL at once, removes every ticket after {@code audit.cancelDelayMs} so
+	 * the scheduled generation is cancelled mid-flight, waits until the chunks
+	 * unload and save, then dumps every persisted chunk around the region in its
+	 * saved form with its status, and halts.
+	 */
+	static void cancelAndDump(MinecraftServer server, ServerLevel level, List<ChunkPos> region, List<ChunkPos> decorated, List<ChunkPos> remaining) throws Exception {
+		int before = server.submit(() -> level.getChunkSource().chunkMap.size()).get();
+		List<ChunkPos> requested = new ArrayList<>(remaining);
+		for (ChunkPos pos : region) if (!requested.contains(pos)) requested.add(pos);
+		server.submit(() -> requested.forEach(p -> level.getChunkSource().addTicketWithRadius(TicketType.PLAYER_LOADING, p, 0))).get();
+		for (ChunkPos pos : requested) level.getChunkSource().getChunkFuture(pos.x, pos.z, ChunkStatus.FULL, true);
+		Thread.sleep(Integer.getInteger("audit.cancelDelayMs", 3000));
+		System.out.println("FULLGEN_CANCEL " + level.dimension().location());
+		server.submit(() -> {
+			requested.forEach(p -> level.getChunkSource().removeTicketWithRadius(TicketType.PLAYER_LOADING, p, 0));
+			decorated.forEach(p -> level.getChunkSource().removeTicketWithRadius(TicketType.PLAYER_LOADING, p, FEATURES_RADIUS));
+		}).get();
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(180);
+		int size;
+		do {
+			server.submit(() -> level.save(null, true, false)).get();
+			Thread.sleep(500);
+			size = server.submit(() -> level.getChunkSource().chunkMap.size()).get();
+		} while (size > before && System.nanoTime() < deadline);
+		server.submit(() -> level.save(null, true, false)).get();
+		level.getChunkSource().chunkMap.flushWorker();
+		Map<String, Integer> counts = new TreeMap<>();
+		try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(Files.newOutputStream(OUTPUT.resolve("cancelled.txt.gz"))), StandardCharsets.UTF_8))) {
+			for (ChunkPos pos : expand(region, 3)) {
+				var tag = level.getChunkSource().chunkMap.read(pos).get(60, TimeUnit.SECONDS);
+				String status = tag.map(t -> t.getStringOr("Status", "?")).orElse("absent");
+				counts.merge(status, 1, Integer::sum);
+				out.write(pos.x + "," + pos.z + " " + status + "\n");
+				if (tag.isPresent()) {
+					CompoundTag data = tag.get().copy();
+					data.remove("LastUpdate");
+					out.write(canonical(data));
+				}
+				out.write("\n");
+			}
+		}
+		Files.writeString(OUTPUT.resolve("cancelled.json"), GSON.toJson(Map.of("holders_before", before, "holders_after", size, "statuses", counts)));
+		Files.writeString(OUTPUT.resolve("complete.json"), GSON.toJson(Map.of("success", true, "cancelled", true)));
+		System.out.println("FULLGEN_COMPLETE");
+		Runtime.getRuntime().halt(0);
 	}
 
 	/**
@@ -375,6 +467,44 @@ public final class FullGenAudit {
 		Thread.sleep(1500);
 	}
 
+	private static final java.util.concurrent.atomic.AtomicBoolean SAVED_AFTER_FAILURE = new java.util.concurrent.atomic.AtomicBoolean();
+
+	/**
+	 * Failure verification: the in-memory statuses, then a flushed save of every
+	 * loaded chunk, once. A failed generation task keeps the chunk map busy, so
+	 * stopServer never saves. The crash escaping the worker calls System.exit,
+	 * whose shutdown hook runs stopServer: saving after that point races it (the
+	 * flush can wait on a save future the stopping server thread never runs). So
+	 * the failing step saves from its transaction's rollback hook, before the
+	 * crash leaves the step; the audit thread falls back to saving only when no
+	 * hook ran.
+	 */
+	static void saveAfterFailure(MinecraftServer server) {
+		if (!SAVED_AFTER_FAILURE.compareAndSet(false, true)) return;
+		try {
+			Map<String, String> memory = new TreeMap<>();
+			ServerLevel overworld = server.overworld();
+			server.submit(() -> {
+				for (ChunkPos pos : positions(64, -48, Integer.getInteger("audit.radius", 4) + 2)) {
+					var holder = overworld.getChunkSource().chunkMap.getVisibleChunkIfPresent(pos.toLong());
+					var chunk = holder == null ? null : holder.getLatestChunk();
+					memory.put(pos.x + "," + pos.z, chunk == null ? "unloaded" : chunk.getPersistedStatus().toString());
+				}
+			}).get(60, TimeUnit.SECONDS);
+			Files.writeString(OUTPUT.resolve("statuses-memory.json"), GSON.toJson(memory));
+			for (ServerLevel level : server.getAllLevels()) {
+				server.submit(() -> level.save(null, false, false)).get(120, TimeUnit.SECONDS);
+				level.getChunkSource().chunkMap.flushWorker();
+			}
+			Files.writeString(OUTPUT.resolve("saved.txt"), "saved after failure");
+		} catch (Exception e) {
+			try {
+				Files.writeString(OUTPUT.resolve("save-failed.txt"), e.toString());
+			} catch (Exception ignored) {
+			}
+		}
+	}
+
 	static void run(MinecraftServer server) {
 		try {
 			Files.createDirectories(OUTPUT);
@@ -420,6 +550,17 @@ public final class FullGenAudit {
 						// so a region overlapping them is not repeatable on either side.
 						List<ChunkPos> positions = positions(64 * (i + 1), -48 * (i + 1), radius);
 						rows.add(region(server, level, "measure-" + i, positions, dump));
+						Files.writeString(OUTPUT.resolve("regions.json"), GSON.toJson(rows));
+						release(server, level, positions);
+					}
+					// Regions at explicit chunks: dimension:chunkX:chunkZ entries (the End's origin island).
+					for (String entry : System.getProperty("audit.centers", "").split(",")) {
+						if (entry.isBlank()) continue;
+						int split = entry.lastIndexOf(':', entry.lastIndexOf(':') - 1);
+						if (!entry.substring(0, split).equals(level.dimension().location().toString())) continue;
+						String[] xz = entry.substring(split + 1).split(":");
+						List<ChunkPos> positions = positions(Integer.parseInt(xz[0]), Integer.parseInt(xz[1]), radius);
+						rows.add(region(server, level, "center-" + xz[0] + "_" + xz[1], positions, dump));
 						Files.writeString(OUTPUT.resolve("regions.json"), GSON.toJson(rows));
 						release(server, level, positions);
 					}
@@ -485,31 +626,9 @@ public final class FullGenAudit {
 			} catch (Exception ignored) {
 			}
 			if (!System.getProperty("audit.injectFailure", "").isBlank()) {
-				// A failed generation task keeps the chunk map busy, so stopServer never
-				// saves. Save what every loaded chunk holds now, as a save would publish it.
-				try {
-					// In-memory statuses at the failure, then a flushed save of the same chunks.
-					Map<String, String> memory = new TreeMap<>();
-					ServerLevel overworld = server.overworld();
-					server.submit(() -> {
-						for (ChunkPos pos : positions(64, -48, Integer.getInteger("audit.radius", 4) + 2)) {
-							var holder = overworld.getChunkSource().chunkMap.getVisibleChunkIfPresent(pos.toLong());
-							var chunk = holder == null ? null : holder.getLatestChunk();
-							memory.put(pos.x + "," + pos.z, chunk == null ? "unloaded" : chunk.getPersistedStatus().toString());
-						}
-					}).get(60, TimeUnit.SECONDS);
-					Files.writeString(OUTPUT.resolve("statuses-memory.json"), GSON.toJson(memory));
-					for (ServerLevel level : server.getAllLevels()) {
-						server.submit(() -> level.save(null, false, false)).get(120, TimeUnit.SECONDS);
-						level.getChunkSource().chunkMap.flushWorker();
-					}
-					Files.writeString(OUTPUT.resolve("saved.txt"), "saved after failure");
-				} catch (Exception e) {
-					try {
-						Files.writeString(OUTPUT.resolve("save-failed.txt"), e.toString());
-					} catch (Exception ignored) {
-					}
-				}
+				// Normally saved already, from the failing step's rollback hook (see
+				// saveAfterFailure); otherwise save here, racing the crash's shutdown.
+				saveAfterFailure(server);
 				Runtime.getRuntime().halt(3);
 			}
 		}

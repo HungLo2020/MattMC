@@ -198,6 +198,8 @@ pub(crate) enum Modifier {
     HeightBiasedToBottom(Anchor, Anchor, i32),
     /// `HeightRangePlacement` with `VeryBiasedToBottomHeight` and its inner value.
     HeightVeryBiasedToBottom(Anchor, Anchor, i32),
+    /// `FixedPlacement`: its positions, kept to those in the origin's chunk.
+    Fixed(Vec<[i32; 3]>),
     /// `BiomeFilter` against the program's biome set (top-level placements only).
     Biome,
     /// `RarityFilter` with its chance.
@@ -504,6 +506,10 @@ impl Placed {
                     allowed: Predicate::read(reader, 0)?,
                 },
                 16 => Modifier::RandomOffset(IntProvider::read(reader)?, IntProvider::read(reader)?),
+                21 => {
+                    let count = usize::try_from(m[1]).ok().filter(|&n| n <= 4096)?;
+                    Modifier::Fixed((0..count).map(|_| Some([reader.next()?, reader.next()?, reader.next()?])).collect::<Option<Vec<_>>>()?)
+                }
                 17 => Modifier::NoiseThresholdCount {
                     level: double(m[1], m[2]),
                     below: m[3],

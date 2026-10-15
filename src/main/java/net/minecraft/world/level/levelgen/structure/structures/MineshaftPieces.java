@@ -111,12 +111,37 @@ public class MineshaftPieces {
 		}
 
 		@Override
+		public long[] nativeWords() {
+			long[] words = this.nativeMineshaftWords(5, 4);
+			words[10] = this.hasRails ? 1 : 0;
+			words[11] = this.spiderCorridor ? 1 : 0;
+			words[12] = this.hasPlacedSpider ? 1 : 0;
+			words[13] = this.numSections;
+			return words;
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
+			this.hasPlacedSpider = words[12] != 0;
+		}
+
+		@Override
 		protected void addAdditionalSaveData(StructurePieceSerializationContext structurePieceSerializationContext, CompoundTag compoundTag) {
 			super.addAdditionalSaveData(structurePieceSerializationContext, compoundTag);
 			compoundTag.putBoolean("hr", this.hasRails);
 			compoundTag.putBoolean("sc", this.spiderCorridor);
 			compoundTag.putBoolean("hps", this.hasPlacedSpider);
 			compoundTag.putInt("Num", this.numSections);
+		}
+
+		/** A corridor Rust planned ({@code structure/mineshaft_plan.rs}). */
+		public MineShaftCorridor(int i, BoundingBox boundingBox, Direction direction, MineshaftStructure.Type type, boolean hasRails, boolean spiderCorridor,
+			int numSections) {
+			super(StructurePieceType.MINE_SHAFT_CORRIDOR, i, type, boundingBox);
+			this.setOrientation(direction);
+			this.hasRails = hasRails;
+			this.spiderCorridor = spiderCorridor;
+			this.numSections = numSections;
 		}
 
 		public MineShaftCorridor(int i, RandomSource randomSource, BoundingBox boundingBox, Direction direction, MineshaftStructure.Type type) {
@@ -581,6 +606,14 @@ public class MineshaftPieces {
 		}
 
 		@Override
+		public long[] nativeWords() {
+			long[] words = this.nativeMineshaftWords(6, 2);
+			words[10] = this.direction == null ? -1 : this.direction.get2DDataValue();
+			words[11] = this.isTwoFloored ? 1 : 0;
+			return words;
+		}
+
+		@Override
 		protected void addAdditionalSaveData(StructurePieceSerializationContext structurePieceSerializationContext, CompoundTag compoundTag) {
 			super.addAdditionalSaveData(structurePieceSerializationContext, compoundTag);
 			compoundTag.putBoolean("tf", this.isTwoFloored);
@@ -936,7 +969,7 @@ public class MineshaftPieces {
 		}
 	}
 
-	abstract static class MineShaftPiece extends StructurePiece {
+	abstract static class MineShaftPiece extends StructurePiece implements net.minecraft.world.level.levelgen.structure.NativeStructurePieces.Native {
 		protected MineshaftStructure.Type type;
 
 		public MineShaftPiece(StructurePieceType structurePieceType, int i, MineshaftStructure.Type type, BoundingBox boundingBox) {
@@ -947,6 +980,17 @@ public class MineshaftPieces {
 		public MineShaftPiece(StructurePieceType structurePieceType, CompoundTag compoundTag) {
 			super(structurePieceType, compoundTag);
 			this.type = MineshaftStructure.Type.byId(compoundTag.getIntOr("MST", 0));
+		}
+
+		/** {@link net.minecraft.world.level.levelgen.structure.NativeStructurePieces}: the header, the type, then {@code extra} fields. */
+		protected long[] nativeMineshaftWords(int kind, int extra) {
+			long[] words = net.minecraft.world.level.levelgen.structure.NativeStructurePieces.header(this, kind, 1 + extra);
+			words[9] = this.type.ordinal();
+			return words;
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
 		}
 
 		@Override
@@ -1046,6 +1090,12 @@ public class MineshaftPieces {
 				new BoundingBox(j, 50, k, j + 7 + randomSource.nextInt(6), 54 + randomSource.nextInt(6), k + 7 + randomSource.nextInt(6))
 			);
 			this.type = type;
+		}
+
+		/** A room Rust planned, with its moved child entrances. */
+		public MineShaftRoom(int i, BoundingBox boundingBox, MineshaftStructure.Type type, List<BoundingBox> entrances) {
+			super(StructurePieceType.MINE_SHAFT_ROOM, i, type, boundingBox);
+			this.childEntranceBoxes.addAll(entrances);
 		}
 
 		public MineShaftRoom(CompoundTag compoundTag) {
@@ -1248,6 +1298,19 @@ public class MineshaftPieces {
 			super.addAdditionalSaveData(structurePieceSerializationContext, compoundTag);
 			compoundTag.store("Entrances", BoundingBox.CODEC.listOf(), this.childEntranceBoxes);
 		}
+
+		@Override
+		public long[] nativeWords() {
+			long[] words = this.nativeMineshaftWords(7, 1 + this.childEntranceBoxes.size() * 6);
+			words[10] = this.childEntranceBoxes.size();
+			int at = 11;
+			for (BoundingBox entrance : this.childEntranceBoxes) {
+				long[] box = {entrance.minX(), entrance.minY(), entrance.minZ(), entrance.maxX(), entrance.maxY(), entrance.maxZ()};
+				System.arraycopy(box, 0, words, at, 6);
+				at += 6;
+			}
+			return words;
+		}
 	}
 
 	public static class MineShaftStairs extends MineshaftPieces.MineShaftPiece {
@@ -1258,6 +1321,11 @@ public class MineshaftPieces {
 
 		public MineShaftStairs(CompoundTag compoundTag) {
 			super(StructurePieceType.MINE_SHAFT_STAIRS, compoundTag);
+		}
+
+		@Override
+		public long[] nativeWords() {
+			return this.nativeMineshaftWords(8, 0);
 		}
 
 		@Nullable

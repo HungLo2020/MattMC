@@ -291,3 +291,67 @@ fn read_stamps_cover_alias_replacement_growth_writes_and_saturation_without_pinn
     assert!(owner.read_stamp().is_none()); owner.write(2, 3).unwrap(); assert!(owner.read_stamp().is_none());
     drop(owner); drop(alias); assert!(!initial.alive());
 }
+
+#[test]
+fn transactions_roll_back_writes_and_growth_exactly_and_commit_keeps_them() {
+    let mut rng = 0x2545_f491_4f6c_dd1du64;
+    let mut next = || {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        rng
+    };
+    for distinct in [1u32, 3, 20, 300] {
+        let owner = single();
+        for _ in 0..500 {
+            let r = next();
+            owner.write((r >> 20) as usize % ENTRIES, (r >> 40) as u32 % distinct).unwrap();
+        }
+        let export = |o: &Owner| {
+            let s = o.state.lock().unwrap();
+            let g = &s.generation;
+            let palette: Vec<u32> = (0..g.count.load(Ordering::Acquire) as usize).map(|i| g.palette[i].load(Ordering::Acquire)).collect();
+            let words: Vec<u64> = g.words.iter().map(|w| w.load(Ordering::Acquire)).collect();
+            let mut ids: Vec<_> = s.ids.iter().map(|(&a, &b)| (a, b)).collect();
+            ids.sort();
+            (g.bits, g.requested, g.global, palette, words, ids)
+        };
+        let before = export(&owner);
+        owner.tx_begin(1).unwrap();
+        for _ in 0..3000 {
+            let r = next();
+            owner.write((r >> 20) as usize % ENTRIES, (r >> 40) as u32 % 900).unwrap();
+        }
+        assert_eq!(owner.tx_end(1, true), Ok(true));
+        assert_eq!(export(&owner), before, "distinct={distinct}");
+        // Writes after the rollback behave as on the untouched section.
+        owner.tx_begin(2).unwrap();
+        owner.write(7, 899).unwrap();
+        let written = export(&owner);
+        assert_eq!(owner.tx_end(2, false), Ok(false));
+        assert_eq!(export(&owner), written);
+        // A transaction without writes restores nothing.
+        owner.tx_begin(3).unwrap();
+        assert_eq!(owner.tx_end(3, true), Ok(false));
+    }
+}
+
+#[test]
+fn another_transaction_never_shares_or_discards_saved_state() {
+    let owner = single();
+    owner.tx_begin(10).unwrap();
+    owner.write(5, 2).unwrap();
+    let saved_by_ten = owner.capture();
+    // A second transaction can neither arm nor end the first one's section.
+    assert_eq!(owner.tx_begin(11), Err(()));
+    assert_eq!(owner.tx_end(11, false), Err(()));
+    assert_eq!(owner.tx_end(11, true), Err(()));
+    assert_eq!(owner.capture(), saved_by_ten);
+    // Re-arming by the owner is idempotent and keeps its saved state.
+    owner.tx_begin(10).unwrap();
+    assert_eq!(owner.tx_end(10, true), Ok(true));
+    assert_ne!(owner.capture(), saved_by_ten);
+    // Once ended, the section is free for the next transaction.
+    owner.tx_begin(11).unwrap();
+    assert_eq!(owner.tx_end(11, false), Ok(false));
+}

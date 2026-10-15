@@ -27,6 +27,11 @@ public class ProtoChunkTicks<T> implements SerializableTickContainer<T>, TickCon
 		return this.ticksPerPosition.contains(SavedTick.probe(object, blockPos));
 	}
 
+	/** Drops every tick scheduled after the first {@code size} (a failed generation step's rollback). */
+	public void truncate(int size) {
+		while (this.ticks.size() > size) this.ticksPerPosition.remove(this.ticks.removeLast());
+	}
+
 	@Override
 	public int count() {
 		return this.ticks.size();

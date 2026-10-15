@@ -19,6 +19,31 @@ public abstract class SinglePieceStructure extends Structure {
 	}
 
 	@Override
+	public int[] nativeStub() {
+		return new int[]{1, this.width, this.depth};
+	}
+
+	@Override
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext,
+		net.minecraft.core.BlockPos stub, net.minecraft.world.level.block.Rotation rotation) {
+		this.generatePieces(structurePiecesBuilder, generationContext);
+	}
+
+	/**
+	 * {@code small_plan.rs}'s params for this structure's piece ({@code [family]}: 1 desert pyramid, 2 jungle temple),
+	 * or null when Rust can't plan it.
+	 */
+	@org.jetbrains.annotations.Nullable
+	public int[] nativePlanParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager) {
+		return null;
+	}
+
+	/** Rebuilds the piece {@code small_plan.rs} planned (with {@link #nativePlanParams}'s params), no draws. */
+	public void nativePlanPieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager, int[] words) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
 	public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext) {
 		return getLowestY(generationContext, this.width, this.depth) < generationContext.chunkGenerator().getSeaLevel()
 			? Optional.empty()

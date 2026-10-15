@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -24,8 +25,10 @@ import net.minecraft.world.level.block.LiquidBlockContainer;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.SimpleWaterloggedBlock;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.levelgen.NativeDecoration;
 import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
@@ -48,13 +51,29 @@ import org.slf4j.Logger;
  * loading recorded block entities in order, shape updates and entities.
  * Unsupported processors, liquid containers or randoms keep Java's path.
  */
-final class NativeTemplates {
+public final class NativeTemplates {
 	private static final Logger LOGGER = net.logging.LogUtils.getLogger();
-	private static final Object UNSUPPORTED = new Object();
-	/** By (template, palette, processors): compiled natives or {@link #UNSUPPORTED}. */
+	/** A palette Java places, and why. */
+	private record Unsupported(String reason) {
+	}
+	/** By (template, palette, processors): compiled natives or {@link Unsupported}. */
 	private static final Map<List<Object>, Object> CACHE = new ConcurrentHashMap<>();
 
+	/** The last native placement on this thread: (template, origin, compiled template object). */
+	private static final ThreadLocal<Object[]> PLACED = new ThreadLocal<>();
+
 	private NativeTemplates() {
+	}
+
+	/**
+	 * The compiled template object of this thread's last native {@code placeInWorld}, if it
+	 * placed {@code template} at {@code origin}; cleared either way.
+	 */
+	@Nullable
+	public static MemorySegment takePlaced(StructureTemplate template, BlockPos origin) {
+		Object[] placed = PLACED.get();
+		PLACED.remove();
+		return placed != null && placed[0] == template && origin.equals(placed[1]) ? (MemorySegment)placed[2] : null;
 	}
 
 	/** A compiled template palette with its processors and the Java tables their words index. */
@@ -63,6 +82,8 @@ final class NativeTemplates {
 		final List<CompoundTag> nbts = new ArrayList<>();
 		final List<ResourceKey<LootTable>> lootTables = new ArrayList<>();
 		final List<CompoundTag> statics = new ArrayList<>();
+		/** A lava-submerged processor tests template states' shapes: dynamic shapes stay in Java. */
+		boolean testsShapes;
 	}
 
 	/**
@@ -71,34 +92,38 @@ final class NativeTemplates {
 	 */
 	static boolean place(StructureTemplate template, StructureTemplate.Palette palette, List<StructureTemplate.StructureBlockInfo> blocks,
 						 ServerLevelAccessor level, BlockPos origin, BlockPos pivot, StructurePlaceSettings settings, RandomSource random, int flags) {
+		PLACED.remove();
 		var region = NativeDecoration.activeRegion(level);
 		// A settings random is supported when it is the placement random itself (fossils):
 		// block rot then draws from that stream in processing order.
 		boolean shared = settings.nativeHasRandom();
-		if (region == null || shared && !settings.nativeRandomIs(random)) return false;
-		// Processors read at every template position before the bounding box applies, and
-		// Java's generation region serves chunks beyond the bound 3x3: those stay in Java.
-		var extent = template.getBoundingBox(settings, origin);
-		if (!region.covers(extent.minX() >> 4, extent.minZ() >> 4, extent.maxX() >> 4, extent.maxZ() >> 4)) return false;
+		if (region == null) return false;
+		if (shared && !settings.nativeRandomIs(random)) return decline(level, "settings random");
+		// Writes stay inside the settings box (or the whole extent without one), which must lie in
+		// the bound 3x3; processors' reads beyond it go to Java's generation region.
+		var writes = settings.getBoundingBox() != null ? settings.getBoundingBox() : template.getBoundingBox(settings, origin);
+		if (!region.covers(writes.minX() >> 4, writes.minZ() >> 4, writes.maxX() >> 4, writes.maxZ() >> 4)) return decline(level, "extent");
+		if (!(level instanceof net.minecraft.world.level.WorldGenLevel worldGen)) return decline(level, "level");
 		// Loot seeds draw nextLong from the placement random: a WorldgenRandom over a Xoroshiro source
 		// (a bare Xoroshiro source derives nextLong and nextInt differently).
 		XoroshiroRandomSource source = random instanceof WorldgenRandom worldgen && worldgen.nativeSource() instanceof XoroshiroRandomSource x ? x : null;
-		if (source == null) return false;
+		if (source == null) return decline(level, "random");
 		List<Object> key = List.of(template, palette, List.copyOf(settings.getProcessors()));
 		Object entry = CACHE.computeIfAbsent(key, k -> compile(blocks, settings.getProcessors()));
-		if (!(entry instanceof Compiled compiled)) return false;
+		if (!(entry instanceof Compiled compiled)) return decline(level, ((Unsupported)entry).reason());
 		var generator = source.nativeGenerator();
 		var box = settings.getBoundingBox();
 		long[] args = {origin.getX(), origin.getY(), origin.getZ(), pivot.getX(), pivot.getY(), pivot.getZ(), settings.getMirror().ordinal(),
 			settings.getRotation().ordinal(), box == null ? 0 : 1, box == null ? 0 : box.minX(), box == null ? 0 : box.minY(), box == null ? 0 : box.minZ(),
 			box == null ? 0 : box.maxX(), box == null ? 0 : box.maxY(), box == null ? 0 : box.maxZ(), flags, settings.shouldApplyWaterlogging() ? 1 : 0,
-			shared ? 1 : 0, 0, generator.nativeSeedLo(), generator.nativeSeedHi(), settings.getRotationPivot().getX(), settings.getRotationPivot().getY(),
+			shared ? 1 : 0, level.getLevel().getSeed(), generator.nativeSeedLo(), generator.nativeSeedHi(), settings.getRotationPivot().getX(), settings.getRotationPivot().getY(),
 			settings.getRotationPivot().getZ()};
 		try (ProblemReporter.ScopedCollector collector = new ProblemReporter.ScopedCollector(LOGGER)) {
-			long[] positions = NativeDecoration.placeTemplate(region, compiled.template, compiled.processors, args,
+			long[] positions = NativeDecoration.placeTemplate(region, worldGen, compiled.template, compiled.processors, args,
 				(pos, loads, at) -> loadBlockEntity(compiled, level, collector, pos, loads, at));
-			if (positions == null) return false;
+			if (positions == null) return decline(level, "write path");
 			generator.nativeSetState(args[19], args[20]);
+			PLACED.set(new Object[]{template, origin.immutable(), compiled.template});
 			if (!settings.getKnownShape() && positions.length > 0) updateShapes(level, flags, positions);
 			if (!settings.isIgnoreEntities()) {
 				template.placeEntities(level, origin, settings.getMirror(), settings.getRotation(), settings.getRotationPivot(), box,
@@ -106,6 +131,11 @@ final class NativeTemplates {
 			}
 		}
 		return true;
+	}
+
+	private static boolean decline(ServerLevelAccessor level, String reason) {
+		NativeDecoration.javaTemplate(level, reason);
+		return false;
 	}
 
 	/** The tail of {@code placeInWorld} for templates without a known shape. */
@@ -158,11 +188,26 @@ final class NativeTemplates {
 
 	@Nullable
 	private static Object compile(List<StructureTemplate.StructureBlockInfo> blocks, List<StructureProcessor> processors) {
+		long setupStart = System.nanoTime();
+		try {
+			return compileTimed(blocks, processors);
+		} finally {
+			net.minecraft.world.level.levelgen.NativeDecoration.setupTime("templates", setupStart);
+		}
+	}
+
+	@Nullable
+	private static Object compileTimed(List<StructureTemplate.StructureBlockInfo> blocks, List<StructureProcessor> processors) {
 		try {
 			var compiled = new Compiled();
-			List<Integer> processorWords = new ArrayList<>();
 			var states = new LinkedHashMap<BlockState, Integer>();
-			if (!encodeProcessors(processors, processorWords, compiled, states)) return UNSUPPORTED;
+			// A processor list encodes (and scans the state registry) once, shared by every template it processes.
+			Encoded encoded = PROCESSORS.computeIfAbsent(List.copyOf(processors), NativeTemplates::encode);
+			if (encoded.failure() != null) return new Unsupported(encoded.failure());
+			compiled.lootTables.addAll(encoded.lootTables());
+			compiled.statics.addAll(encoded.statics());
+			compiled.testsShapes = encoded.testsShapes();
+			for (BlockState output : encoded.outputs()) states.put(output, 0);
 			List<Integer> words = new ArrayList<>();
 			words.add(blocks.size());
 			for (var info : blocks) {
@@ -176,12 +221,12 @@ final class NativeTemplates {
 				states.put(info.state(), 0);
 				if (info.state().is(Blocks.JIGSAW)) {
 					// JigsawReplacementProcessor's final_state, parsed as Java parses it.
-					if (info.nbt() == null) return UNSUPPORTED;
+					if (info.nbt() == null) return new Unsupported("jigsaw without NBT");
 					BlockState replacement;
 					try {
 						replacement = BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK, info.nbt().getStringOr("final_state", "minecraft:air"), true).blockState();
 					} catch (Exception unparsable) {
-						return UNSUPPORTED;
+						return new Unsupported("unparsable jigsaw final state");
 					}
 					if (replacement.is(Blocks.STRUCTURE_VOID)) {
 						words.add(-1);
@@ -193,6 +238,40 @@ final class NativeTemplates {
 					words.add(-2);
 				}
 			}
+			if (compiled.testsShapes) {
+				for (BlockState state : states.keySet()) {
+					if (state.getBlock().hasDynamicShape()) return new Unsupported("dynamic shape under lava submersion");
+				}
+			}
+			// TemplateStructurePiece.postProcess's tail: DATA markers (an unreadable mode keeps
+			// Java's loops) and every jigsaw's final state, in palette order.
+			List<Integer> tail = new ArrayList<>();
+			List<Integer> jigsaws = new ArrayList<>();
+			int markers = 0;
+			for (var info : blocks) {
+				if (info.state().is(Blocks.STRUCTURE_BLOCK) && info.nbt() != null) {
+					var mode = info.nbt().read("mode", net.minecraft.world.level.block.state.properties.StructureMode.LEGACY_CODEC);
+					if (mode.isEmpty()) {
+						markers = -1;
+						break;
+					}
+					if (mode.get() == net.minecraft.world.level.block.state.properties.StructureMode.DATA) {
+						markers++;
+						int[] text = info.nbt().getStringOr("metadata", "").codePoints().toArray();
+						tail.addAll(List.of(info.pos().getX(), info.pos().getY(), info.pos().getZ(), text.length));
+						for (int c : text) tail.add(c);
+					}
+				} else if (info.state().is(Blocks.JIGSAW) && info.nbt() != null) {
+					BlockState finalState;
+					try {
+						finalState = BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK, info.nbt().getStringOr("final_state", "minecraft:air"), true).blockState();
+					} catch (Exception unparsable) {
+						return new Unsupported("unparsable jigsaw final state");
+					}
+					jigsaws.addAll(List.of(info.pos().getX(), info.pos().getY(), info.pos().getZ(), stateId(finalState)));
+					states.put(finalState, 0);
+				}
+			}
 			// Facts for the closure of states under transforms and waterlogging.
 			List<BlockState> pending = new ArrayList<>(states.keySet());
 			for (int i = 0; i < pending.size(); i++) {
@@ -201,7 +280,7 @@ final class NativeTemplates {
 				for (Mirror mirror : Mirror.values()) {
 					for (Rotation rotation : Rotation.values()) next.add(state.mirror(mirror).rotate(rotation));
 				}
-				if (state.hasProperty(BlockStateProperties.WATERLOGGED)) next.add(state.setValue(BlockStateProperties.WATERLOGGED, true));
+				if (state.hasProperty(BlockStateProperties.WATERLOGGED)) next.add(liquidTarget(state));
 				for (BlockState s : next) {
 					if (states.putIfAbsent(s, 0) == null) pending.add(s);
 				}
@@ -209,26 +288,40 @@ final class NativeTemplates {
 			words.add(states.size());
 			for (BlockState state : states.keySet()) {
 				int flags = facts(state);
-				if (flags < 0) return UNSUPPORTED;
+				if (flags < 0) return new Unsupported("liquid container " + BuiltInRegistries.BLOCK.getKey(state.getBlock()));
 				words.add(stateId(state));
 				words.add(flags);
-				words.add(stateId(state.hasProperty(BlockStateProperties.WATERLOGGED) ? state.setValue(BlockStateProperties.WATERLOGGED, true) : state));
+				words.add(stateId(state.hasProperty(BlockStateProperties.WATERLOGGED) ? liquidTarget(state) : state));
 				for (Mirror mirror : Mirror.values()) {
 					for (Rotation rotation : Rotation.values()) words.add(stateId(state.mirror(mirror).rotate(rotation)));
 				}
 			}
 			words.add(stateId(Blocks.BARRIER.defaultBlockState()));
 			words.add(BuiltInRegistries.FLUID.getId(Fluids.WATER));
+			words.add(markers);
+			if (markers >= 0) {
+				words.addAll(tail);
+				words.add(jigsaws.size() / 4);
+				words.addAll(jigsaws);
+			}
 			compiled.template = NativeDecoration.createTemplateObject(false, toArray(words), compiled);
-			compiled.processors = NativeDecoration.createTemplateObject(true, toArray(processorWords), compiled);
-			return compiled.template.address() == 0 || compiled.processors.address() == 0 ? UNSUPPORTED : compiled;
-		} catch (ReflectiveOperationException | ClassCastException failure) {
-			return UNSUPPORTED;
+			compiled.processors = encoded.segment();
+			return compiled.template.address() == 0 || compiled.processors.address() == 0 ? new Unsupported("native rejected the words") : compiled;
+		} catch (ClassCastException failure) {
+			return new Unsupported("custom state or unreadable processor");
 		}
 	}
 
+	// Pure per state (and per class below): shared by every template that holds the state.
+	private static final java.util.concurrent.ConcurrentHashMap<BlockState, Integer> FACTS = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final java.util.concurrent.ConcurrentHashMap<Class<?>, java.util.Optional<Class<?>>> LIQUID_OWNERS = new java.util.concurrent.ConcurrentHashMap<>();
+
 	/** {@code template.rs}'s state flags, or -1 for a liquid container Rust cannot place into. */
 	private static int facts(BlockState state) {
+		return FACTS.computeIfAbsent(state, NativeTemplates::computeFacts);
+	}
+
+	private static int computeFacts(BlockState state) {
 		int flags = 0;
 		Block block = state.getBlock();
 		if (state.hasBlockEntity() && block instanceof EntityBlock entityBlock) {
@@ -243,9 +336,21 @@ final class NativeTemplates {
 		if (fluid.getType() == Fluids.WATER) flags |= 8;
 		if (fluid.isEmpty()) flags |= 16;
 		if (block instanceof LiquidBlockContainer) {
-			if (block instanceof SimpleWaterloggedBlock && state.hasProperty(BlockStateProperties.WATERLOGGED) && !overridesPlaceLiquid(block.getClass())) {
+			Class<?> owner = placeLiquidOwner(block.getClass());
+			boolean waterloggable = block instanceof SimpleWaterloggedBlock && state.hasProperty(BlockStateProperties.WATERLOGGED);
+			if (waterloggable && owner == net.minecraft.world.level.block.SlabBlock.class
+				&& state.getValue(net.minecraft.world.level.block.SlabBlock.TYPE) == net.minecraft.world.level.block.state.properties.SlabType.DOUBLE) {
+				// A double slab's placeLiquid does nothing.
+				flags |= 128;
+			} else if (waterloggable && (owner == null || owner == net.minecraft.world.level.block.SlabBlock.class
+				|| owner == net.minecraft.world.level.block.DriedGhastBlock.class || owner == net.minecraft.world.level.block.CampfireBlock.class
+				|| owner == net.minecraft.world.level.block.CandleBlock.class)) {
+				// SimpleWaterloggedBlock.placeLiquid's write (the overrides' sounds, particles and
+				// game events do nothing in a generation region): liquidTarget with flags 3, or 11
+				// for a lit candle's extinguish.
 				flags |= 32;
 				if (state.getValue(BlockStateProperties.WATERLOGGED)) flags |= 64;
+				if (owner == net.minecraft.world.level.block.CandleBlock.class && state.getValue(net.minecraft.world.level.block.CandleBlock.LIT)) flags |= 512;
 			} else if (block instanceof net.minecraft.world.level.block.KelpBlock || block instanceof net.minecraft.world.level.block.KelpPlantBlock
 				|| block instanceof net.minecraft.world.level.block.SeagrassBlock || block instanceof net.minecraft.world.level.block.TallSeagrassBlock) {
 				// Their placeLiquid returns false and changes nothing.
@@ -256,15 +361,31 @@ final class NativeTemplates {
 		return flags;
 	}
 
-	private static boolean overridesPlaceLiquid(Class<?> type) {
+	/** The class declaring {@code placeLiquid} above {@link SimpleWaterloggedBlock}'s default, or null. */
+	@Nullable
+	private static Class<?> placeLiquidOwner(Class<?> type) {
+		return LIQUID_OWNERS.computeIfAbsent(type, t -> java.util.Optional.ofNullable(findPlaceLiquidOwner(t))).orElse(null);
+	}
+
+	@Nullable
+	private static Class<?> findPlaceLiquidOwner(Class<?> type) {
 		for (Class<?> at = type; at != null && at != Object.class; at = at.getSuperclass()) {
 			try {
 				at.getDeclaredMethod("placeLiquid", net.minecraft.world.level.LevelAccessor.class, BlockPos.class, BlockState.class, net.minecraft.world.level.material.FluidState.class);
-				return true;
+				return at;
 			} catch (NoSuchMethodException ignored) {
 			}
 		}
-		return false;
+		return null;
+	}
+
+	/** The state {@code placeLiquid} writes for a waterloggable state: waterlogged, and unlit for campfires and candles. */
+	private static BlockState liquidTarget(BlockState state) {
+		BlockState target = state.setValue(BlockStateProperties.WATERLOGGED, true);
+		Class<?> owner = placeLiquidOwner(state.getBlock().getClass());
+		if (owner == net.minecraft.world.level.block.CampfireBlock.class) target = target.setValue(net.minecraft.world.level.block.CampfireBlock.LIT, false);
+		if (owner == net.minecraft.world.level.block.CandleBlock.class) target = target.setValue(net.minecraft.world.level.block.CandleBlock.LIT, false);
+		return target;
 	}
 
 	private static Object field(Object owner, Class<?> type, String name) throws ReflectiveOperationException {
@@ -292,70 +413,194 @@ final class NativeTemplates {
 		for (int word : set) words.add(word);
 	}
 
+	/** A processor list's words as a native object, the tables they index and the states they write; or why it is unsupported. */
+	private record Encoded(@Nullable String failure, MemorySegment segment, List<ResourceKey<LootTable>> lootTables, List<CompoundTag> statics,
+						   List<BlockState> outputs, boolean testsShapes) {
+	}
+
+	/** By processor list (processors compare by identity). */
+	private static final Map<List<StructureProcessor>, Encoded> PROCESSORS = new ConcurrentHashMap<>();
+
+	private static Encoded encode(List<StructureProcessor> processors) {
+		var scratch = new Compiled();
+		var outputs = new LinkedHashMap<BlockState, Integer>();
+		List<Integer> words = new ArrayList<>();
+		String failure;
+		try {
+			failure = encodeProcessors(processors, words, scratch, outputs);
+		} catch (ReflectiveOperationException | ClassCastException error) {
+			failure = "unreadable processor";
+		}
+		if (failure != null) return new Encoded(failure, MemorySegment.NULL, List.of(), List.of(), List.of(), false);
+		// The native object lives as long as the cache key (the entry's own list).
+		MemorySegment segment = NativeDecoration.createTemplateObject(true, toArray(words), processors);
+		if (segment.address() == 0) return new Encoded("native rejected the processors", MemorySegment.NULL, List.of(), List.of(), List.of(), false);
+		return new Encoded(null, segment, List.copyOf(scratch.lootTables), List.copyOf(scratch.statics), List.copyOf(outputs.keySet()), scratch.testsShapes);
+	}
+
 	/** {@code template.rs}'s processor words; false declines the list. */
-	private static boolean encodeProcessors(List<StructureProcessor> processors, List<Integer> words, Compiled compiled, Map<BlockState, Integer> outputs)
+	@Nullable
+	private static String encodeProcessors(List<StructureProcessor> processors, List<Integer> words, Compiled compiled, Map<BlockState, Integer> outputs)
 		throws ReflectiveOperationException {
 		List<Integer> body = new ArrayList<>();
 		int count = 0;
-		boolean ruleSeen = false;
+		boolean[] ruleSeen = {false};
 		for (StructureProcessor processor : processors) {
-			Class<?> type = processor.getClass();
-			if (type == NopProcessor.class) continue;
+			if (processor.getClass() == NopProcessor.class) continue;
 			count++;
-			if (type == BlockIgnoreProcessor.class) {
-				@SuppressWarnings("unchecked")
-				var ignored = (List<Block>)field(processor, type, "toIgnore");
-				body.add(1);
-				set(body, s -> ignored.contains(s.getBlock()));
-			} else if (type == JigsawReplacementProcessor.class) {
-				// Jigsaw replacement reads the template's own NBT: rules must not edit it first.
-				if (ruleSeen) return false;
-				body.add(2);
-			} else if (type == RuleProcessor.class) {
-				ruleSeen = true;
-				@SuppressWarnings("unchecked")
-				var rules = (List<ProcessorRule>)field(processor, type, "rules");
-				body.addAll(List.of(3, rules.size()));
-				for (ProcessorRule rule : rules) {
-					if (!ruleTest((RuleTest)field(rule, ProcessorRule.class, "inputPredicate"), body)
-						|| !ruleTest((RuleTest)field(rule, ProcessorRule.class, "locPredicate"), body)
-						|| !posTest((PosRuleTest)field(rule, ProcessorRule.class, "posPredicate"), body)) return false;
-					BlockState output = (BlockState)field(rule, ProcessorRule.class, "outputState");
-					body.add(stateId(output));
-					outputs.put(output, 0);
-					var modifier = (RuleBlockEntityModifier)field(rule, ProcessorRule.class, "blockEntityModifier");
-					if (modifier.getClass() == Passthrough.class) {
-						body.addAll(List.of(0, 0));
-					} else if (modifier.getClass() == AppendLoot.class) {
-						@SuppressWarnings("unchecked")
-						var table = (ResourceKey<LootTable>)field(modifier, AppendLoot.class, "lootTable");
-						body.addAll(List.of(1, compiled.lootTables.size()));
-						compiled.lootTables.add(table);
-					} else if (modifier.getClass() == AppendStatic.class) {
-						body.addAll(List.of(2, compiled.statics.size()));
-						compiled.statics.add((CompoundTag)field(modifier, AppendStatic.class, "tag"));
-					} else if (modifier.getClass() == Clear.class) {
-						body.addAll(List.of(3, 0));
-					} else return false;
-				}
-			} else if (type == BlockRotProcessor.class) {
-				@SuppressWarnings("unchecked")
-				var rottable = (java.util.Optional<HolderSet<Block>>)field(processor, type, "rottableBlocks");
-				body.addAll(List.of(4, Float.floatToRawIntBits((float)field(processor, type, "integrity")), rottable.isPresent() ? 1 : 0));
-				if (rottable.isPresent()) set(body, s -> s.is(rottable.get()));
-			} else if (type == GravityProcessor.class) {
-				var heightmap = (net.minecraft.world.level.levelgen.Heightmap.Types)field(processor, type, "heightmap");
-				body.addAll(List.of(5, heightmap.ordinal(), (int)field(processor, type, "offset")));
-			} else if (type == ProtectedBlockProcessor.class) {
-				TagKey<Block> tag = ((ProtectedBlockProcessor)processor).cannotReplace;
-				body.add(6);
-				set(body, s -> !s.is(tag));
-			} else return false;
+			if (!encodeProcessor(processor, body, compiled, outputs, ruleSeen, 0)) return "processor " + processor.getClass().getSimpleName();
 		}
 		words.add(count);
 		words.addAll(body);
+		return null;
+	}
+
+	/** One processor's words (a capped processor's delegate at depth 1); false declines. */
+	private static boolean encodeProcessor(StructureProcessor processor, List<Integer> body, Compiled compiled, Map<BlockState, Integer> outputs,
+		boolean[] ruleSeen, int depth) throws ReflectiveOperationException {
+		Class<?> type = processor.getClass();
+		if (type == BlockIgnoreProcessor.class) {
+			@SuppressWarnings("unchecked")
+			var ignored = (List<Block>)field(processor, type, "toIgnore");
+			body.add(1);
+			set(body, s -> ignored.contains(s.getBlock()));
+		} else if (type == JigsawReplacementProcessor.class) {
+			// Jigsaw replacement reads the template's own NBT: rules must not edit it first.
+			if (ruleSeen[0]) return false;
+			body.add(2);
+		} else if (type == RuleProcessor.class) {
+			ruleSeen[0] = true;
+			@SuppressWarnings("unchecked")
+			var rules = (List<ProcessorRule>)field(processor, type, "rules");
+			body.addAll(List.of(3, rules.size()));
+			for (ProcessorRule rule : rules) {
+				if (!ruleTest((RuleTest)field(rule, ProcessorRule.class, "inputPredicate"), body)
+					|| !ruleTest((RuleTest)field(rule, ProcessorRule.class, "locPredicate"), body)
+					|| !posTest((PosRuleTest)field(rule, ProcessorRule.class, "posPredicate"), body)) return false;
+				BlockState output = (BlockState)field(rule, ProcessorRule.class, "outputState");
+				body.add(stateId(output));
+				outputs.put(output, 0);
+				var modifier = (RuleBlockEntityModifier)field(rule, ProcessorRule.class, "blockEntityModifier");
+				if (modifier.getClass() == Passthrough.class) {
+					body.addAll(List.of(0, 0));
+				} else if (modifier.getClass() == AppendLoot.class) {
+					@SuppressWarnings("unchecked")
+					var table = (ResourceKey<LootTable>)field(modifier, AppendLoot.class, "lootTable");
+					body.addAll(List.of(1, compiled.lootTables.size()));
+					compiled.lootTables.add(table);
+				} else if (modifier.getClass() == AppendStatic.class) {
+					body.addAll(List.of(2, compiled.statics.size()));
+					compiled.statics.add((CompoundTag)field(modifier, AppendStatic.class, "tag"));
+				} else if (modifier.getClass() == Clear.class) {
+					body.addAll(List.of(3, 0));
+				} else return false;
+			}
+		} else if (type == BlockRotProcessor.class) {
+			@SuppressWarnings("unchecked")
+			var rottable = (java.util.Optional<HolderSet<Block>>)field(processor, type, "rottableBlocks");
+			body.addAll(List.of(4, Float.floatToRawIntBits((float)field(processor, type, "integrity")), rottable.isPresent() ? 1 : 0));
+			if (rottable.isPresent()) set(body, s -> s.is(rottable.get()));
+		} else if (type == GravityProcessor.class) {
+			var heightmap = (net.minecraft.world.level.levelgen.Heightmap.Types)field(processor, type, "heightmap");
+			body.addAll(List.of(5, heightmap.ordinal(), (int)field(processor, type, "offset")));
+		} else if (type == ProtectedBlockProcessor.class) {
+			TagKey<Block> tag = ((ProtectedBlockProcessor)processor).cannotReplace;
+			body.add(6);
+			set(body, s -> !s.is(tag));
+		} else if (type == BlackstoneReplaceProcessor.class) {
+			int[] map = BLACKSTONE.get();
+			body.add(7);
+			body.add(map.length / 2);
+			for (int i = 0; i < map.length; i += 2) {
+				body.add(map[i]);
+				body.add(map[i + 1]);
+				outputs.put(Block.BLOCK_STATE_REGISTRY.byId(map[i + 1]), 0);
+			}
+		} else if (type == LavaSubmergedBlockProcessor.class) {
+			compiled.testsShapes = true;
+			body.add(8);
+			set(body, s -> s.is(Blocks.LAVA));
+			set(body, s -> !s.getBlock().hasDynamicShape()
+				&& !Block.isShapeFullBlock(s.getShape(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO)));
+			body.add(stateId(Blocks.LAVA.defaultBlockState()));
+			outputs.put(Blocks.LAVA.defaultBlockState(), 0);
+		} else if (type == BlockAgeProcessor.class) {
+			body.addAll(List.of(9, Float.floatToRawIntBits((float)field(processor, type, "mossiness"))));
+			int[] table = BLOCK_AGE.get();
+			body.add(table.length / 3);
+			for (int i = 0; i < table.length; i += 3) {
+				body.addAll(List.of(table[i], table[i + 1], table[i + 2]));
+				if (table[i + 2] >= 0) outputs.put(Block.BLOCK_STATE_REGISTRY.byId(table[i + 2]), 0);
+			}
+			List<BlockState> fixed = new ArrayList<>(List.of(Blocks.CRACKED_STONE_BRICKS.defaultBlockState(), Blocks.MOSSY_STONE_BRICKS.defaultBlockState(),
+				Blocks.STONE_SLAB.defaultBlockState(), Blocks.STONE_BRICK_SLAB.defaultBlockState(), Blocks.MOSSY_STONE_BRICK_SLAB.defaultBlockState(),
+				Blocks.CRYING_OBSIDIAN.defaultBlockState()));
+			for (Block stairs : List.of(Blocks.STONE_BRICK_STAIRS, Blocks.MOSSY_STONE_BRICK_STAIRS)) {
+				// BlockAgeProcessor.getRandomFacingStairs: Plane.HORIZONTAL's facing order, then Half.values().
+				for (Direction facing : new Direction[]{Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST}) {
+					for (Half half : Half.values()) {
+						fixed.add(stairs.defaultBlockState().setValue(StairBlock.FACING, facing).setValue(StairBlock.HALF, half));
+					}
+				}
+			}
+			for (BlockState state : fixed) {
+				body.add(stateId(state));
+				outputs.put(state, 0);
+			}
+		} else if (type == CappedProcessor.class && depth == 0) {
+			var limit = (net.minecraft.util.valueproviders.IntProvider)field(processor, type, "limit");
+			if (limit.getClass() == net.minecraft.util.valueproviders.ConstantInt.class) {
+				body.addAll(List.of(10, 0, limit.getMaxValue(), 0));
+			} else if (limit.getClass() == net.minecraft.util.valueproviders.UniformInt.class) {
+				body.addAll(List.of(10, 1, limit.getMinValue(), limit.getMaxValue()));
+			} else return false;
+			var delegate = (StructureProcessor)field(processor, type, "delegate");
+			if (delegate.getClass() == NopProcessor.class || !encodeProcessor(delegate, body, compiled, outputs, new boolean[]{true}, depth + 1)) return false;
+		} else return false;
 		return true;
 	}
+
+	/** {@code BlackstoneReplaceProcessor}'s replacement per state, as (state, replacement) pairs. */
+	private static final com.google.common.base.Supplier<int[]> BLACKSTONE = com.google.common.base.Suppliers.memoize(() -> {
+		List<Integer> pairs = new ArrayList<>();
+		for (BlockState state : Block.BLOCK_STATE_REGISTRY) {
+			var info = new StructureTemplate.StructureBlockInfo(BlockPos.ZERO, state, null);
+			BlockState replaced = BlackstoneReplaceProcessor.INSTANCE.processBlock(null, BlockPos.ZERO, BlockPos.ZERO, info, info, null).state();
+			if (replaced != state) {
+				pairs.add(Block.BLOCK_STATE_REGISTRY.getId(state));
+				pairs.add(Block.BLOCK_STATE_REGISTRY.getId(replaced));
+			}
+		}
+		return toArray(pairs);
+	});
+
+	/**
+	 * {@code BlockAgeProcessor}'s categories per state, as (state, category, mossy counterpart or -1):
+	 * 1 stone bricks, stone or chiseled stone bricks; 2 stairs; 3 slabs; 4 walls; 5 obsidian.
+	 */
+	private static final com.google.common.base.Supplier<int[]> BLOCK_AGE = com.google.common.base.Suppliers.memoize(() -> {
+		List<Integer> table = new ArrayList<>();
+		for (BlockState state : Block.BLOCK_STATE_REGISTRY) {
+			int category;
+			BlockState mapped = null;
+			if (state.is(Blocks.STONE_BRICKS) || state.is(Blocks.STONE) || state.is(Blocks.CHISELED_STONE_BRICKS)) {
+				category = 1;
+			} else if (state.is(net.minecraft.tags.BlockTags.STAIRS)) {
+				category = 2;
+				mapped = Blocks.MOSSY_STONE_BRICK_STAIRS.withPropertiesOf(state);
+			} else if (state.is(net.minecraft.tags.BlockTags.SLABS)) {
+				category = 3;
+				mapped = Blocks.MOSSY_STONE_BRICK_SLAB.withPropertiesOf(state);
+			} else if (state.is(net.minecraft.tags.BlockTags.WALLS)) {
+				category = 4;
+				mapped = Blocks.MOSSY_STONE_BRICK_WALL.withPropertiesOf(state);
+			} else if (state.is(Blocks.OBSIDIAN)) {
+				category = 5;
+			} else continue;
+			table.addAll(List.of(Block.BLOCK_STATE_REGISTRY.getId(state), category, mapped == null ? -1 : Block.BLOCK_STATE_REGISTRY.getId(mapped)));
+		}
+		return toArray(table);
+	});
 
 	private static boolean ruleTest(RuleTest test, List<Integer> words) throws ReflectiveOperationException {
 		Class<?> type = test.getClass();

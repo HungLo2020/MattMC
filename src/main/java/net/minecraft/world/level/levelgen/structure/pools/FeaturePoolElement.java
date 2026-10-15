@@ -92,6 +92,12 @@ public class FeaturePoolElement extends StructurePoolElement {
 		LiquidSettings liquidSettings,
 		boolean bl
 	) {
+		var region = net.minecraft.world.level.levelgen.NativeDecoration.activeRegion(worldGenLevel);
+		if (region != null && randomSource instanceof net.minecraft.world.level.levelgen.WorldgenRandom worldgen) {
+			Boolean placed = net.minecraft.world.level.levelgen.NativeDecoration.placeWithRandom(chunkGenerator.nativeDecorationPrograms, region,
+				chunkGenerator, worldGenLevel, worldgen, this.feature.value(), blockPos);
+			if (placed != null) return placed;
+		}
 		return this.feature.value().place(worldGenLevel, chunkGenerator, randomSource, blockPos);
 	}
 

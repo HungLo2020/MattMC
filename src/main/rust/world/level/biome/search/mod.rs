@@ -89,6 +89,16 @@ impl<'a> Sampler<'a> {
     }
 }
 
+/// `biomeSource.getNoiseBiome(qx, qy, qz, sampler)`: one climate sample and
+/// search from the sampler's previous leaf (which it updates).
+pub(crate) fn leaf_at(sampler: &mut Sampler, qx: i32, qy: i32, qz: i32) -> Result<i32, Error> {
+    let y = [block(qy)];
+    with_frame(sampler.program, |frame| {
+        sampler.targets(frame, block(qx), block(qz), &y)?;
+        sampler.search(0)
+    })
+}
+
 /// The quart grid of `findBiomeHorizontal(i, j, k, l, m, ..., false, ...)`:
 /// centre `(qx, qz)`, quart `y`, radius and step in quarts. (The
 /// perimeter-only variant has no production caller and stays Java.)

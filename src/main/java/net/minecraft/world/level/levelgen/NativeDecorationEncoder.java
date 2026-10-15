@@ -95,7 +95,7 @@ import org.jetbrains.annotations.Nullable;
  * Java's path. Configuration fields that their classes keep private are read
  * reflectively here, once per program, for those exact classes.
  */
-final class NativeDecorationEncoder {
+public final class NativeDecorationEncoder {
 	private final ChunkGenerator generator;
 	private final List<Integer> words = new ArrayList<>();
 	private final List<int[]> sets = new ArrayList<>();
@@ -242,6 +242,14 @@ final class NativeDecorationEncoder {
 			for (int word : m) this.words.add(word);
 			return this.predicate((BlockPredicate)field(modifier, modifier.getClass(), "targetCondition"))
 				&& this.predicate((BlockPredicate)field(modifier, modifier.getClass(), "allowedSearchCondition"));
+		} else if (modifier.getClass() == net.minecraft.world.level.levelgen.placement.FixedPlacement.class) {
+			@SuppressWarnings("unchecked")
+			var positions = (List<net.minecraft.core.BlockPos>)field(modifier, modifier.getClass(), "positions");
+			m[0] = 21;
+			m[1] = positions.size();
+			for (int word : m) this.words.add(word);
+			for (var pos : positions) this.words.addAll(List.of(pos.getX(), pos.getY(), pos.getZ()));
+			return true;
 		} else if (modifier.getClass() == net.minecraft.world.level.levelgen.placement.RandomOffsetPlacement.class) {
 			m[0] = 16;
 			for (int word : m) this.words.add(word);
@@ -773,6 +781,27 @@ final class NativeDecorationEncoder {
 				this.words.add(stateId((kind == 45 ? Blocks.TWISTING_VINES_PLANT : Blocks.WEEPING_VINES_PLANT).defaultBlockState()));
 			}
 			case 46 -> this.words.add(stateId(Blocks.BASALT.defaultBlockState()));
+			case 50 -> {
+				return this.spikes((net.minecraft.world.level.levelgen.feature.configurations.SpikeConfiguration)config);
+			}
+			case 51 -> {
+				var gateway = (net.minecraft.world.level.levelgen.feature.configurations.EndGatewayConfiguration)config;
+				for (Block block : List.of(Blocks.END_GATEWAY, Blocks.AIR, Blocks.BEDROCK)) this.words.add(stateId(block.defaultBlockState()));
+				var exit = gateway.getExit();
+				this.words.add(exit.isPresent() ? 1 : 0);
+				if (exit.isPresent()) {
+					var target = exit.get();
+					boolean exact = gateway.isExitExact();
+					this.words.add(this.javaStep((level, random, pos) -> {
+						if (level.getBlockEntity(pos) instanceof net.minecraft.world.level.block.entity.TheEndGatewayBlockEntity entity) entity.setExitPosition(target, exact);
+					}));
+				}
+			}
+			case 52 -> {
+				this.words.addAll(List.of(stateId(Blocks.OBSIDIAN.defaultBlockState()), stateId(Blocks.AIR.defaultBlockState())));
+				this.words.add(this.set(List.of("block", Blocks.OBSIDIAN), st -> st.is(Blocks.OBSIDIAN)));
+				this.words.add(this.set(List.of("block", Blocks.AIR), st -> st.is(Blocks.AIR)));
+			}
 			case 49 -> {
 				this.words.add(this.set(List.of("block", Blocks.SAND), st -> st.is(Blocks.SAND)));
 				for (Block block : List.of(Blocks.SAND, Blocks.SANDSTONE_SLAB, Blocks.SANDSTONE, Blocks.WATER, Blocks.SUSPICIOUS_SAND)) {
@@ -1036,10 +1065,53 @@ final class NativeDecorationEncoder {
 		if (feature == Feature.WATERLOGGED_VEGETATION_PATCH && feature.getClass() == net.minecraft.world.level.levelgen.feature.WaterloggedVegetationPatchFeature.class
 			&& c == net.minecraft.world.level.levelgen.feature.configurations.VegetationPatchConfiguration.class) return 48;
 		if (feature == Feature.DESERT_WELL && feature.getClass() == net.minecraft.world.level.levelgen.feature.DesertWellFeature.class) return 49;
+		if (feature == Feature.END_SPIKE && feature.getClass() == net.minecraft.world.level.levelgen.feature.SpikeFeature.class
+			&& c == net.minecraft.world.level.levelgen.feature.configurations.SpikeConfiguration.class) return 50;
+		if (feature == Feature.END_GATEWAY && feature.getClass() == net.minecraft.world.level.levelgen.feature.EndGatewayFeature.class
+			&& c == net.minecraft.world.level.levelgen.feature.configurations.EndGatewayConfiguration.class) return 51;
+		if (feature == Feature.END_PLATFORM && feature.getClass() == net.minecraft.world.level.levelgen.feature.EndPlatformFeature.class) return 52;
 		if (feature == Feature.END_ISLAND && feature.getClass() == net.minecraft.world.level.levelgen.feature.EndIslandFeature.class) return 40;
 		if (feature == Feature.MULTIFACE_GROWTH && feature.getClass() == net.minecraft.world.level.levelgen.feature.MultifaceGrowthFeature.class
 			&& c == net.minecraft.world.level.levelgen.feature.configurations.MultifaceGrowthConfiguration.class) return 20;
 		return 0;
+	}
+
+	/** {@code end.rs}: End spikes, resolved for this level's seed when the configuration lists none. */
+	private boolean spikes(net.minecraft.world.level.levelgen.feature.configurations.SpikeConfiguration config) {
+		var spikes = config.getSpikes();
+		if (spikes.isEmpty()) {
+			// SpikeFeature.getSpikesForLevel without a level: the same seed derivation.
+			long key = net.minecraft.util.RandomSource.create(this.seed).nextLong() & 65535L;
+			spikes = net.minecraft.world.level.levelgen.feature.SpikeFeature.spikesForKey(key);
+		}
+		this.words.add(spikes.size());
+		for (var spike : spikes) {
+			this.words.addAll(List.of(spike.getCenterX(), spike.getCenterZ(), spike.getRadius(), spike.getHeight(), spike.isGuarded() ? 1 : 0));
+		}
+		this.words.addAll(List.of(stateId(Blocks.OBSIDIAN.defaultBlockState()), stateId(Blocks.AIR.defaultBlockState())));
+		for (int bits = 0; bits < 16; bits++) {
+			this.words.add(stateId(Blocks.IRON_BARS.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.IronBarsBlock.NORTH, (bits & 1) != 0)
+				.setValue(net.minecraft.world.level.block.IronBarsBlock.SOUTH, (bits & 2) != 0)
+				.setValue(net.minecraft.world.level.block.IronBarsBlock.WEST, (bits & 4) != 0)
+				.setValue(net.minecraft.world.level.block.IronBarsBlock.EAST, (bits & 8) != 0)));
+		}
+		var beam = config.getCrystalBeamTarget();
+		boolean invulnerable = config.isCrystalInvulnerable();
+		this.words.add(this.javaStep((level, random, pos) -> {
+			// SpikeFeature.placeSpike's crystal: pos is the crystal's block, above the spike.
+			var crystal = net.minecraft.world.entity.EntityType.END_CRYSTAL.create(level.getLevel(), net.minecraft.world.entity.EntitySpawnReason.STRUCTURE);
+			if (crystal != null) {
+				crystal.setBeamTarget(beam);
+				crystal.setInvulnerable(invulnerable);
+				crystal.snapTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, random.nextFloat() * 360.0F, 0.0F);
+				level.addFreshEntity(crystal);
+				var at = crystal.blockPosition();
+				level.setBlock(at.below(), Blocks.BEDROCK.defaultBlockState(), 3);
+				level.setBlock(at, net.minecraft.world.level.block.FireBlock.getState(level, at), 3);
+			}
+		}));
+		return true;
 	}
 
 	/** {@code patch.rs}: a vegetation patch, then its nested placement. */

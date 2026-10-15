@@ -75,6 +75,84 @@ public class ChunkGeneratorStructureState {
 		return this.possibleStructureSets;
 	}
 
+	private static final java.lang.invoke.MethodHandle PLACEMENTS_CREATE = net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_structure_placements_create", java.lang.foreign.FunctionDescriptor.of(java.lang.foreign.ValueLayout.ADDRESS, java.lang.foreign.ValueLayout.JAVA_LONG,
+			java.lang.foreign.ValueLayout.ADDRESS, java.lang.foreign.ValueLayout.JAVA_INT));
+	private static final java.lang.invoke.MethodHandle PLACEMENTS_RELEASE = net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_structure_placements_release", java.lang.foreign.FunctionDescriptor.ofVoid(java.lang.foreign.ValueLayout.ADDRESS));
+	private static final java.lang.invoke.MethodHandle PLACEMENTS_QUERY = net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust",
+		"mattmc_structure_placements_query", java.lang.foreign.FunctionDescriptor.of(java.lang.foreign.ValueLayout.JAVA_INT, java.lang.foreign.ValueLayout.ADDRESS,
+			java.lang.foreign.ValueLayout.JAVA_INT, java.lang.foreign.ValueLayout.JAVA_INT, java.lang.foreign.ValueLayout.ADDRESS, java.lang.foreign.ValueLayout.JAVA_INT),
+		java.lang.foreign.Linker.Option.critical(true));
+	private static final boolean NATIVE_PLACEMENTS = !Boolean.getBoolean("mattmc.worldgen.javaStructurePlacement");
+	private static final java.lang.ref.Cleaner CLEANER = java.lang.ref.Cleaner.create();
+	/** The native placement table over {@link #possibleStructureSets} (then sets only exclusion zones name), or a failed marker. */
+	private volatile Object nativePlacements;
+
+	/**
+	 * Per possible structure set, whether chunk (x, z) is one of its structure chunks: 1 yes,
+	 * 0 no, 2 Java must ask {@code isStructureChunk}. Null keeps Java's checks for every set.
+	 */
+	@org.jetbrains.annotations.Nullable
+	public byte[] nativeStructureChunks(int x, int z) {
+		Object table = this.nativePlacements;
+		if (table == null) table = this.createNativePlacements();
+		if (!(table instanceof java.lang.foreign.MemorySegment handle)) return null;
+		byte[] out = new byte[this.possibleStructureSets.size() + 64];
+		try {
+			int count = (int)PLACEMENTS_QUERY.invokeExact(handle, x, z, java.lang.foreign.MemorySegment.ofArray(out), out.length);
+			return count < this.possibleStructureSets.size() ? null : out;
+		} catch (Throwable failure) {
+			throw new IllegalStateException("Native structure placement failed", failure);
+		}
+	}
+
+	private synchronized Object createNativePlacements() {
+		if (this.nativePlacements != null) return this.nativePlacements;
+		Object result = Boolean.FALSE;
+		if (NATIVE_PLACEMENTS) {
+			// Rings exist before any chunk asks: Java's first check joins them too.
+			this.ensureStructuresGenerated();
+			List<Holder<StructureSet>> sets = new ArrayList<>(this.possibleStructureSets);
+			java.util.Map<StructureSet, Integer> index = new java.util.IdentityHashMap<>();
+			for (int i = 0; i < sets.size(); i++) index.putIfAbsent(sets.get(i).value(), i);
+			for (int i = 0; i < sets.size(); i++) {
+				var zone = sets.get(i).value().placement().nativeExclusionSet();
+				if (zone != null && !index.containsKey(zone.value())) {
+					index.put(zone.value(), sets.size());
+					sets.add(zone);
+				}
+			}
+			List<Integer> words = new ArrayList<>();
+			words.add(sets.size());
+			for (var set : sets) {
+				var placement = set.value().placement();
+				var zone = placement.nativeExclusionSet();
+				List<ChunkPos> rings = placement instanceof ConcentricRingsStructurePlacement ringed ? this.getRingPositionsFor(ringed) : null;
+				placement.nativePlacementWords(words, zone == null ? -1 : index.get(zone.value()), rings);
+			}
+			int[] array = words.stream().mapToInt(Integer::intValue).toArray();
+			try (var arena = java.lang.foreign.Arena.ofConfined()) {
+				var handle = (java.lang.foreign.MemorySegment)PLACEMENTS_CREATE.invokeExact(this.levelSeed,
+					arena.allocateFrom(java.lang.foreign.ValueLayout.JAVA_INT, array), array.length);
+				if (handle.address() != 0) {
+					long address = handle.address();
+					CLEANER.register(this, () -> {
+						try {
+							PLACEMENTS_RELEASE.invokeExact(java.lang.foreign.MemorySegment.ofAddress(address));
+						} catch (Throwable ignored) {
+						}
+					});
+					result = handle;
+				}
+			} catch (Throwable failure) {
+				throw new IllegalStateException("Cannot create native structure placements", failure);
+			}
+		}
+		this.nativePlacements = result;
+		return result;
+	}
+
 	private void generatePositions() {
 		Set<Holder<Biome>> set = this.biomeSource.possibleBiomes();
 		this.possibleStructureSets().forEach(holder -> {

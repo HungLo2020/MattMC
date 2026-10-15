@@ -62,13 +62,17 @@ import org.slf4j.Logger;
 public final class NativeDecoration {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final int PLACED = 1, NOT_PLACED = 0, UNAVAILABLE_CHUNK = -2, BROKEN_BINDING = -3, JAVA_ROUTE = -4, PANIC = -5, CALLBACK_FAILED = -6;
-	private static final int OP_UPDATE_SHAPE_AT_EDGE = 1, OP_BEEHIVE_PRESENT = 2, OP_STORE_BEES = 3, OP_PLACE_JAVA = 4, OP_TEST_PREDICATE = 5, OP_STRUCTURES = 6, OP_PLACE_FEATURE = 7, OP_JAVA_STEP = 8, OP_MATH_LOG = 9, OP_FAR_STATE = 10, OP_FAR_HEIGHT = 11, OP_FAR_BIOME = 12, OP_MATH_POW = 13, OP_MATH_SIN = 14, OP_MATH_COS = 15, OP_BLOCK_LIGHT = 16;
+	private static final int OP_UPDATE_SHAPE_AT_EDGE = 1, OP_BEEHIVE_PRESENT = 2, OP_STORE_BEES = 3, OP_PLACE_JAVA = 4, OP_TEST_PREDICATE = 5, OP_STRUCTURES = 6, OP_PLACE_FEATURE = 7, OP_JAVA_STEP = 8, OP_MATH_LOG = 9, OP_FAR_STATE = 10, OP_FAR_HEIGHT = 11, OP_FAR_BIOME = 12, OP_MATH_POW = 13, OP_MATH_SIN = 14, OP_MATH_COS = 15, OP_BLOCK_LIGHT = 16, OP_STURDY = 17, OP_CENTER_SUPPORT = 18, OP_BIOME_TAG = 19, OP_COLLISION_FACE = 20, OP_TOUCH = 21;
 	private static final MethodHandle CREATE = handle("program_create", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 	private static final MethodHandle RELEASE = handle("program_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
 	private static final MethodHandle PLAN_CREATE = handle("plan_create", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
 		ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 	private static final MethodHandle PLAN_RELEASE = handle("plan_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
 	private static final MethodHandle DECORATE = handle("decorate", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+		ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
+		ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+		ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+	private static final MethodHandle DECORATE_GATHERING = handle("decorate_gathering", FunctionDescriptor.of(ValueLayout.JAVA_INT,
 		ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
 		ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
 		ValueLayout.ADDRESS, ValueLayout.ADDRESS));
@@ -88,6 +92,9 @@ public final class NativeDecoration {
 		ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
 		ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
 		ValueLayout.ADDRESS));
+	private static final MethodHandle PLACE_WITH_RANDOM = handle("place_with_random", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+		ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 	private static final MethodHandle KIND = handle("program_kind", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
 	private static final MethodHandle SET_BLOCK = handle("program_set_block", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
 	/** The placement running on this thread, for Rust's sync upcalls. */
@@ -189,6 +196,9 @@ public final class NativeDecoration {
 		MISMATCHED = new java.util.concurrent.atomic.LongAdder();
 	/** Native placements by outermost feature kind (1 ore, 2 replace blobs, 3 glowstone, 4 spring, 5–7 selectors, 8 tree). */
 	private static final java.util.concurrent.atomic.LongAdder[] NATIVE_BY_KIND = adders(64);
+	private static final java.util.concurrent.atomic.LongAdder PIECES = new java.util.concurrent.atomic.LongAdder();
+	/** Step loops whose biome set Java gathered. */
+	private static final java.util.concurrent.atomic.LongAdder JAVA_BIOME_SETS = new java.util.concurrent.atomic.LongAdder();
 	/** Replayed events by kind (decoration/write.rs numbering). */
 	static final java.util.concurrent.atomic.LongAdder[] EVENTS_BY_KIND = adders(9);
 
@@ -242,13 +252,25 @@ public final class NativeDecoration {
 		return out.toString();
 	}
 
+	// One-time setup costs by phase, so timing runs can tell warm-up from steady state.
+	private static final java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.LongAdder> SETUP_NANOS = new java.util.concurrent.ConcurrentHashMap<>();
+
+	public static void setupTime(String phase, long start) {
+		SETUP_NANOS.computeIfAbsent(phase, k -> new java.util.concurrent.atomic.LongAdder()).add(System.nanoTime() - start);
+	}
+
 	public static String statistics() {
 		return "enabled=" + ENABLED + " regions=" + REGIONS.sum() + " declinedRegions=" + DECLINED_REGIONS.sum()
 			+ " nativePlacements=" + NATIVE.sum() + " javaPlacementsInBoundRegions=" + JAVA.sum()
  			+ " declinedOwners=" + REFRESH_DECLINED[1].sum() + " declinedBiomes=" + REFRESH_DECLINED[2].sum() + " declinedHeightmaps=" + REFRESH_DECLINED[3].sum()
 			+ " nativeByKind=" + sums(NATIVE_BY_KIND) + " eventsByKind=" + sums(EVENTS_BY_KIND)
 			+ (VERIFY ? " verified=" + VERIFIED.sum() + " mismatched=" + MISMATCHED.sum() : "")
-			+ " templates=" + TEMPLATES.sum() + " sequenced=" + SEQUENCED.sum() + " sequenceDeclined=" + SEQUENCE_DECLINED.sum() + " sequenceResumed=" + SEQUENCE_RESUMED.sum()
+			+ " templates=" + TEMPLATES.sum() + " javaTemplates=" + new java.util.TreeMap<>(JAVA_TEMPLATES).toString().replace(' ', '_') + " pieces=" + PIECES.sum()
+			+ " javaPieces=" + new java.util.TreeMap<>(JAVA_PIECES).toString().replace(' ', '_') + " " + NativeCarvers.statistics() + " javaBiomeSets=" + JAVA_BIOME_SETS.sum() + " columnHeights=" + NativeColumns.HEIGHTS.get()
+			+ " " + NativeJigsaw.statistics() + " structureStubs=" + NativeStructureStubs.PLANNED.get() + " sequenced=" + SEQUENCED.sum() + " sequenceDeclined=" + SEQUENCE_DECLINED.sum() + " sequenceResumed=" + SEQUENCE_RESUMED.sum()
+			+ " txOverlaps=" + net.minecraft.world.level.chunk.DecorationTransaction.OVERLAPS.sum() + " txConflicts=" + net.minecraft.world.level.chunk.DecorationTransaction.CONFLICTS.sum()
+			+ " upcalls=" + upcallSummary() + " setupMs=" + new java.util.TreeMap<>(SETUP_NANOS).entrySet().stream().map(e -> e.getKey() + "=" + e.getValue().sum() / 1_000_000)
+				.collect(java.util.stream.Collectors.joining(",", "{", "}"))
 			+ (PROFILE ? " profile=" + profileSummary() : "");
 	}
 
@@ -280,6 +302,17 @@ public final class NativeDecoration {
 		if (factsInstalled) return true;
 		synchronized (NativeDecoration.class) {
 			if (factsInstalled) return true;
+			long setupStart = System.nanoTime();
+			try {
+				return installFactsLocked();
+			} finally {
+				setupTime("facts", setupStart);
+			}
+		}
+	}
+
+	private static boolean installFactsLocked() {
+		{
 			int count = Block.BLOCK_STATE_REGISTRY.size();
 			try (var arena = Arena.ofConfined()) {
 				var words = arena.allocate(count * 4L, 4);
@@ -304,6 +337,8 @@ public final class NativeDecoration {
 			} catch (Throwable failure) {
 				throw new IllegalStateException("Native decoration facts install failed", failure);
 			}
+			// The structure tables' one-time export, before the first structure piece needs it.
+			if (factsInstalled) net.minecraft.world.level.levelgen.structure.NativeStructurePieces.prepare();
 			return factsInstalled;
 		}
 	}
@@ -347,10 +382,28 @@ public final class NativeDecoration {
 	private static final MethodHandle PROCESSORS_CREATE = templateHandle("template_processors_create", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 	private static final MethodHandle PROCESSORS_RELEASE = templateHandle("template_processors_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
 	private static final MethodHandle TEMPLATE_PLACE = templateHandle("template_place", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
-		ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+		ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 	private static final MethodHandle TEMPLATE_RESULTS = templateHandle("template_results", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 	private static final ThreadLocal<Object[]> TEMPLATE_LOADS = new ThreadLocal<>();
 	private static final java.util.concurrent.atomic.LongAdder TEMPLATES = new java.util.concurrent.atomic.LongAdder();
+	/** Templates Java placed inside a bound region, and structure pieces Java post-processed, by class. */
+	private static final java.util.Map<String, java.util.concurrent.atomic.LongAdder> JAVA_TEMPLATES = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final java.util.Map<String, java.util.concurrent.atomic.LongAdder> JAVA_PIECES = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** Counts a template {@code placeInWorld} that Java placed while a region was bound, by reason. */
+	public static void javaTemplate(net.minecraft.world.level.ServerLevelAccessor level, String reason) {
+		if (activeRegion(level) != null) JAVA_TEMPLATES.computeIfAbsent(reason, k -> new java.util.concurrent.atomic.LongAdder()).increment();
+	}
+
+	/** Counts a structure piece whose {@code postProcess} Java ran while a region was bound. */
+	public static void javaPiece(net.minecraft.world.level.WorldGenLevel level, Object piece) {
+		javaWork(level, piece.getClass().getSimpleName());
+	}
+
+	/** Counts Java-written structure work while a region was bound, by name. */
+	public static void javaWork(net.minecraft.world.level.ServerLevelAccessor level, String name) {
+		if (activeRegion(level) != null) JAVA_PIECES.computeIfAbsent(name, k -> new java.util.concurrent.atomic.LongAdder()).increment();
+	}
 
 	private static MethodHandle templateHandle(String name, FunctionDescriptor descriptor) {
 		return NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_" + name, descriptor);
@@ -388,19 +441,32 @@ public final class NativeDecoration {
 	 * Returns the placed positions as x, y, z triples, or null when Java must place it (nothing written).
 	 */
 	@Nullable
-	public static long[] placeTemplate(NativeDecorationRegion region, MemorySegment template, MemorySegment processors, long[] args, BlockEntityLoads loads) {
+	public static long[] placeTemplate(NativeDecorationRegion region, WorldGenLevel level, MemorySegment template, MemorySegment processors, long[] args,
+									   BlockEntityLoads loads) {
 		if (!ENABLED || region.refresh(true, true) != NativeDecorationRegion.REFRESHED) return null;
+		// Pure reads beyond the bound 3x3 (processors test every template position) come back here.
+		var call = new Call(region, level, level.getLevel().getChunkSource().getGenerator(), null, List.of(), List.of());
+		var previous = CURRENT.get();
+		CURRENT.set(call);
 		int status;
 		try (var arena = Arena.ofConfined()) {
 			var words = arena.allocate(args.length * 8L, 8);
 			MemorySegment.copy(args, 0, words, ValueLayout.JAVA_LONG, 0, args.length);
 			status = (int)TEMPLATE_PLACE.invokeExact(template, processors, region.words(), (int)(region.words().byteSize() / 8), region.out(),
-				(int)(region.out().byteSize() / 8), words);
+				(int)(region.out().byteSize() / 8), words, UPCALL);
 			MemorySegment.copy(words, ValueLayout.JAVA_LONG, 0, args, 0, args.length);
 		} catch (RuntimeException | Error failure) {
 			throw failure;
 		} catch (Throwable failure) {
 			throw new IllegalStateException("Native template placement failed", failure);
+		} finally {
+			CURRENT.set(previous);
+		}
+		if (status == CALLBACK_FAILED) {
+			var failure = call.failure;
+			if (failure instanceof RuntimeException runtime) throw runtime;
+			if (failure instanceof Error error) throw error;
+			throw new IllegalStateException("Native template read failed", failure);
 		}
 		switch (status) {
 			case PLACED -> {
@@ -428,6 +494,84 @@ public final class NativeDecoration {
 		}
 	}
 
+	/**
+	 * One structure piece's native placement over the bound region, with {@code steps}
+	 * as the Java steps Rust may call. Returns PLACED or JAVA_ROUTE (nothing written);
+	 * {@code words} and {@code args} (random state in 11 to 14) are updated in place.
+	 */
+	/** {@link #placePiece} for a structure's {@code afterPlace}: its random is in args 10 to 13. */
+	public static int placeAfter(NativeDecorationRegion region, WorldGenLevel level, WorldgenRandom random, List<NativeDecorationEncoder.JavaStep> steps,
+								 MethodHandle handle, long[] words, long[] args) {
+		return place(region, level, random, steps, handle, null, words, args, 12);
+	}
+
+	/** {@link #placePiece} for a template piece's tail after {@code template}: its random is in args 14 to 17. */
+	public static int placeTail(NativeDecorationRegion region, WorldGenLevel level, WorldgenRandom random, List<NativeDecorationEncoder.JavaStep> steps,
+								MethodHandle handle, MemorySegment template, long[] words, long[] args) {
+		return place(region, level, random, steps, handle, template, words, args, 16);
+	}
+
+	public static int placePiece(NativeDecorationRegion region, WorldGenLevel level, WorldgenRandom random, List<NativeDecorationEncoder.JavaStep> steps,
+								 MethodHandle handle, long[] pieceWords, long[] args) {
+		return place(region, level, random, steps, handle, null, pieceWords, args, 13);
+	}
+
+	private static int place(NativeDecorationRegion region, WorldGenLevel level, WorldgenRandom random, List<NativeDecorationEncoder.JavaStep> steps,
+							 MethodHandle handle, @Nullable MemorySegment template, long[] pieceWords, long[] args, int gaussianAt) {
+		if (!ENABLED || region.refresh(true, true) != NativeDecorationRegion.REFRESHED) return JAVA_ROUTE;
+		var call = new Call(region, level, level.getLevel().getChunkSource().getGenerator(), random, List.of(), List.of());
+		call.javaSteps = steps;
+		var previous = CURRENT.get();
+		CURRENT.set(call);
+		int status;
+		try (var arena = Arena.ofConfined()) {
+			var words = arena.allocate(pieceWords.length * 8L, 8);
+			MemorySegment.copy(pieceWords, 0, words, ValueLayout.JAVA_LONG, 0, pieceWords.length);
+			var argWords = arena.allocate(args.length * 8L, 8);
+			MemorySegment.copy(args, 0, argWords, ValueLayout.JAVA_LONG, 0, args.length);
+			putGaussian(argWords, gaussianAt, random.nativeGaussian());
+			status = template == null
+				? (int)handle.invokeExact(region.words(), (int)(region.words().byteSize() / 8), region.out(), (int)(region.out().byteSize() / 8),
+					words, pieceWords.length, argWords, UPCALL)
+				: (int)handle.invokeExact(template, region.words(), (int)(region.words().byteSize() / 8), region.out(), (int)(region.out().byteSize() / 8),
+					words, pieceWords.length, argWords, UPCALL);
+			if (status == PLACED || status == UNAVAILABLE_CHUNK) {
+				takeGaussian(argWords, gaussianAt, random.nativeGaussian());
+				MemorySegment.copy(words, ValueLayout.JAVA_LONG, 0, pieceWords, 0, pieceWords.length);
+				MemorySegment.copy(argWords, ValueLayout.JAVA_LONG, 0, args, 0, args.length);
+			}
+		} catch (RuntimeException | Error failure) {
+			throw failure;
+		} catch (Throwable failure) {
+			throw new IllegalStateException("Native structure piece placement failed", failure);
+		} finally {
+			CURRENT.set(previous);
+		}
+		switch (status) {
+			case PLACED -> {
+				region.afterPlacement();
+				replayEvents(region);
+				PIECES.increment();
+				return PLACED;
+			}
+			case JAVA_ROUTE -> {
+				return JAVA_ROUTE;
+			}
+			case UNAVAILABLE_CHUNK -> {
+				region.afterPlacement();
+				replayEvents(region);
+				throw region.unavailableChunk();
+			}
+			case CALLBACK_FAILED -> {
+				var failure = call.failure;
+				if (failure instanceof RuntimeException runtime) throw runtime;
+				if (failure instanceof Error error) throw error;
+				throw new IllegalStateException("Native structure piece upcall failed", failure);
+			}
+			default -> throw new IllegalStateException("Native structure piece placement returned " + status);
+		}
+	}
+
 	private static long[] templateResults(int which) throws IllegalStateException {
 		try {
 			int length = (int)TEMPLATE_RESULTS.invokeExact(which, MemorySegment.NULL, 0);
@@ -449,6 +593,76 @@ public final class NativeDecoration {
 		Object[] loads = TEMPLATE_LOADS.get();
 		if (loads == null) throw new IllegalStateException("Template block entity outside a template placement");
 		((BlockEntityLoads)loads[1]).load(pos, (long[])loads[0], (int)at);
+	}
+
+	/**
+	 * {@code PlacedFeature.place(level, generator, random, origin)} natively with the
+	 * caller's random ({@code FeaturePoolElement}): whether any position placed it, or
+	 * null when Java must place it (nothing was drawn or written).
+	 */
+	@Nullable
+	public static Boolean placeWithRandom(Programs programs, NativeDecorationRegion region, ChunkGenerator generator, WorldGenLevel level,
+										  WorldgenRandom random, PlacedFeature feature, BlockPos origin) {
+		if (!ENABLED || !(random.nativeSource() instanceof XoroshiroRandomSource source)) return null;
+		var program = programs.program(feature, generator, region);
+		if (program == null || JAVA_KINDS.contains(program.kind)) {
+			javaWork(level, "FeaturePoolElement_unencoded_" + feature.feature().unwrapKey().map(k -> k.location().toString()).orElse(feature.feature().value().feature().toString()));
+			return null;
+		}
+		if (region.refresh(true, program.setBlock) != NativeDecorationRegion.REFRESHED) {
+			javaWork(level, "FeaturePoolElement_refresh");
+			return null;
+		}
+		var call = new Call(region, level, generator, random, program.javaFeatures, program.javaPredicates);
+		call.javaSteps = program.javaSteps;
+		var previous = CURRENT.get();
+		CURRENT.set(call);
+		var generatorState = source.nativeGenerator();
+		int result;
+		try (var arena = Arena.ofConfined()) {
+			var state = arena.allocate(32, 8);
+			state.setAtIndex(ValueLayout.JAVA_LONG, 0, generatorState.nativeSeedLo());
+			state.setAtIndex(ValueLayout.JAVA_LONG, 1, generatorState.nativeSeedHi());
+			putGaussian(state, 2, random.nativeGaussian());
+			result = (int)PLACE_WITH_RANDOM.invokeExact(program.pointer, region.words(), (int)(region.words().byteSize() / 8),
+				region.out(), (int)(region.out().byteSize() / 8), origin.getX(), origin.getY(), origin.getZ(), UPCALL, state);
+			if (result == PLACED || result == NOT_PLACED || result == UNAVAILABLE_CHUNK) {
+				generatorState.nativeSetState(state.getAtIndex(ValueLayout.JAVA_LONG, 0), state.getAtIndex(ValueLayout.JAVA_LONG, 1));
+				takeGaussian(state, 2, random.nativeGaussian());
+			}
+		} catch (RuntimeException | Error failure) {
+			throw failure;
+		} catch (Throwable failure) {
+			throw new IllegalStateException("Native decoration failed", failure);
+		} finally {
+			CURRENT.set(previous);
+			java.lang.ref.Reference.reachabilityFence(program);
+		}
+		switch (result) {
+			case PLACED, NOT_PLACED -> {
+				region.afterPlacement();
+				replayEvents(region);
+				NATIVE.increment();
+				NATIVE_BY_KIND[Math.min(program.kind, NATIVE_BY_KIND.length - 1)].increment();
+				return result == PLACED;
+			}
+			case JAVA_ROUTE -> {
+				javaWork(level, "FeaturePoolElement_route");
+				return null;
+			}
+			case CALLBACK_FAILED -> {
+				var failure = call.failure;
+				if (failure instanceof RuntimeException runtime) throw runtime;
+				if (failure instanceof Error error) throw error;
+				throw new IllegalStateException("Native decoration upcall failed for " + feature, failure);
+			}
+			case UNAVAILABLE_CHUNK -> {
+				region.afterPlacement();
+				replayEvents(region);
+				throw region.unavailableChunk();
+			}
+			default -> throw new IllegalStateException("Native decoration returned " + result);
+		}
 	}
 
 	/**
@@ -550,23 +764,20 @@ public final class NativeDecoration {
 	 * continues after that feature.
 	 */
 	public static long decorate(Programs programs, NativeDecorationRegion region, ChunkGenerator generator, WorldGenLevel level, WorldgenRandom random,
-								long seed, java.util.Collection<Holder<net.minecraft.world.level.biome.Biome>> biomes, long structures, BlockPos origin,
-								List<net.minecraft.world.level.biome.FeatureSorter.StepFeatureData> steps, int stepCount, Sequence sequence) {
+								long seed, java.util.function.Supplier<? extends java.util.Collection<Holder<net.minecraft.world.level.biome.Biome>>> biomes,
+								long structures, BlockPos origin, List<net.minecraft.world.level.biome.FeatureSorter.StepFeatureData> steps, int stepCount,
+								Sequence sequence) {
 		if (!ENABLED || VERIFY || PROFILE || JAVA_SEQUENCE || stepCount > 64) return DECORATION_DECLINED;
 		Plan plan = programs.plan(generator, region, steps, stepCount);
-		int[] biomeIds = new int[biomes.size()];
-		int present = 0;
-		for (var biome : biomes) {
-			Integer id = plan == null ? null : plan.biomeIds.get(biome);
-			if (id == null) break;
-			biomeIds[present++] = id;
-		}
-		int refresh = plan == null || present != biomeIds.length ? -1 : region.refresh(true, true);
+		int refresh = plan == null ? -1 : region.refresh(true, true);
 		if (refresh != NativeDecorationRegion.REFRESHED) {
 			SEQUENCE_DECLINED.increment();
-			if (DEBUG) LOGGER.info("Native decoration: step loop declined (plan {}, biomes {}/{}, refresh {})", plan != null, present, biomeIds.length, refresh);
+			if (DEBUG) LOGGER.info("Native decoration: step loop declined (plan {}, refresh {})", plan != null, refresh);
 			return DECORATION_DECLINED;
 		}
+		// Rust gathers the 3x3's biome set from the bound sections; Java only when it cannot.
+		int[] table = plan.valueTable(region.biomeValues(), generator.getBiomeSource().possibleBiomes());
+		int[] biomeIds = null;
 		var call = new Call(region, level, generator, random, List.of(), List.of());
 		call.plan = plan;
 		call.sequence = sequence;
@@ -575,13 +786,32 @@ public final class NativeDecoration {
 		int status;
 		long[] info;
 		try (var arena = Arena.ofConfined()) {
-			var ids = arena.allocate(Math.max(1, biomeIds.length) * 4L, 4);
-			MemorySegment.copy(biomeIds, 0, ids, ValueLayout.JAVA_INT, 0, biomeIds.length);
-			int count = biomeIds.length;
 			var infoSegment = arena.allocate((8 + NATIVE_BY_KIND.length) * 8L, 8);
 			putGaussian(infoSegment, 6, random.nativeGaussian());
-			status = (int)DECORATE.invokeExact(plan.pointer, region.words(), (int)(region.words().byteSize() / 8), region.out(),
-				(int)(region.out().byteSize() / 8), seed, ids, count, structures, origin.getX(), origin.getY(), origin.getZ(), UPCALL, infoSegment);
+			var tableSegment = arena.allocateFrom(ValueLayout.JAVA_INT, table.length == 0 ? new int[1] : table);
+			status = (int)DECORATE_GATHERING.invokeExact(plan.pointer, region.words(), (int)(region.words().byteSize() / 8), region.out(),
+				(int)(region.out().byteSize() / 8), seed, tableSegment, table.length, structures, origin.getX(), origin.getY(), origin.getZ(), UPCALL, infoSegment);
+			if (status == JAVA_ROUTE) {
+				// A biome value the table cannot map: Java's gathered set, as before.
+				JAVA_BIOME_SETS.increment();
+				var gathered = biomes.get();
+				biomeIds = new int[gathered.size()];
+				int present = 0;
+				for (var biome : gathered) {
+					Integer id = plan.biomeIds.get(biome);
+					if (id == null) break;
+					biomeIds[present++] = id;
+				}
+				if (present != biomeIds.length) {
+					SEQUENCE_DECLINED.increment();
+					return DECORATION_DECLINED;
+				}
+				var ids = arena.allocate(Math.max(1, biomeIds.length) * 4L, 4);
+				MemorySegment.copy(biomeIds, 0, ids, ValueLayout.JAVA_INT, 0, biomeIds.length);
+				putGaussian(infoSegment, 6, random.nativeGaussian());
+				status = (int)DECORATE.invokeExact(plan.pointer, region.words(), (int)(region.words().byteSize() / 8), region.out(),
+					(int)(region.out().byteSize() / 8), seed, ids, biomeIds.length, structures, origin.getX(), origin.getY(), origin.getZ(), UPCALL, infoSegment);
+			}
 			info = infoSegment.toArray(ValueLayout.JAVA_LONG);
 			takeGaussian(infoSegment, 6, random.nativeGaussian());
 		} catch (RuntimeException | Error failure) {
@@ -643,6 +873,22 @@ public final class NativeDecoration {
 		final long seed;
 		final List<net.minecraft.world.level.biome.FeatureSorter.StepFeatureData> steps;
 
+		/** By region biome value: the plan's biome ID, -2 outside {@code possibleBiomes()}, -1 unplanned; with the values it was built for. */
+		private volatile Object[] valueTable;
+
+		int[] valueTable(List<Holder<net.minecraft.world.level.biome.Biome>> values, java.util.Set<Holder<net.minecraft.world.level.biome.Biome>> possible) {
+			Object[] cached = this.valueTable;
+			if (cached != null && cached[0] == values && (int)cached[1] == values.size() && cached[2] == possible) return (int[])cached[3];
+			int[] table = new int[values.size()];
+			for (int value = 0; value < table.length; value++) {
+				var biome = values.get(value);
+				Integer id = this.biomeIds.get(biome);
+				table[value] = !possible.contains(biome) ? -2 : id == null ? -1 : id;
+			}
+			this.valueTable = new Object[]{values, table.length, possible, table};
+			return table;
+		}
+
 		Plan(MemorySegment pointer, Program[] programs, java.util.Map<Holder<net.minecraft.world.level.biome.Biome>, Integer> biomeIds, long tagGeneration,
 			 Object biomes, int minGenY, int genDepth, long seed, int stepCount, List<net.minecraft.world.level.biome.FeatureSorter.StepFeatureData> steps) {
 			this.pointer = pointer;
@@ -683,7 +929,24 @@ public final class NativeDecoration {
 	 * Rust's mid-placement step: apply everything Rust holds, run the Java
 	 * operation, then refresh the binding words Rust reads afterwards.
 	 */
+	private static final java.util.concurrent.atomic.LongAdder[] UPCALL_COUNTS = new java.util.concurrent.atomic.LongAdder[64];
+	static {
+		for (int i = 0; i < 64; i++) {
+			UPCALL_COUNTS[i] = new java.util.concurrent.atomic.LongAdder();
+		}
+	}
+
+	private static String upcallSummary() {
+		StringBuilder out = new StringBuilder("{");
+		for (int i = 0; i < 64; i++) {
+			long n = UPCALL_COUNTS[i].sum();
+			if (n != 0) out.append(out.length() > 1 ? "," : "").append(i).append('=').append(n);
+		}
+		return out.append('}').toString();
+	}
+
 	private static int upcall(int op, MemorySegment args, int count) {
+		UPCALL_COUNTS[op & 63].increment();
 		if (op == OP_MATH_LOG || op == OP_MATH_POW || op == OP_MATH_SIN || op == OP_MATH_COS) {
 			// Pure: HotSpot's Math intrinsics, which Rust's libm need not match bit for bit.
 			var words = args.reinterpret(count * 8L);
@@ -699,13 +962,34 @@ public final class NativeDecoration {
 		}
 		Call call = CURRENT.get();
 		if (call == null) return -1;
-		if (op == OP_FAR_STATE || op == OP_FAR_HEIGHT || op == OP_FAR_BIOME || op == OP_BLOCK_LIGHT) {
+		if (op == OP_TOUCH) {
+			// The FEATURES transaction's first-touch capture, before Rust's first write to the chunk.
+			try {
+				call.region.touchForTransaction((int)args.reinterpret(count * 8L).getAtIndex(ValueLayout.JAVA_LONG, 0));
+				return 0;
+			} catch (Throwable failure) {
+				if (call.failure == null) call.failure = failure;
+				return -1;
+			}
+		}
+		if (op == OP_FAR_STATE || op == OP_FAR_HEIGHT || op == OP_FAR_BIOME || op == OP_BLOCK_LIGHT || op == OP_STURDY || op == OP_CENTER_SUPPORT || op == OP_BIOME_TAG || op == OP_COLLISION_FACE) {
 			// Pure reads outside the bound 3x3, answered by the WorldGenRegion as Java's own reads are.
 			try {
 				var words = args.reinterpret(count * 8L);
 				long[] a = words.toArray(ValueLayout.JAVA_LONG);
 				long value = switch (op) {
 					case OP_FAR_STATE -> Block.BLOCK_STATE_REGISTRY.getId(call.level.getBlockState(new BlockPos((int)a[0], (int)a[1], (int)a[2])));
+					case OP_STURDY -> {
+						var pos = new BlockPos((int)a[0], (int)a[1], (int)a[2]);
+						yield call.level.getBlockState(pos).isFaceSturdy(call.level, pos, net.minecraft.core.Direction.values()[(int)a[3]]) ? 1 : 0;
+					}
+					case OP_COLLISION_FACE -> {
+						var pos = new BlockPos((int)a[0], (int)a[1], (int)a[2]);
+						yield Block.isFaceFull(call.level.getBlockState(pos).getCollisionShape(call.level, pos), net.minecraft.core.Direction.values()[(int)a[3]]) ? 1 : 0;
+					}
+					case OP_CENTER_SUPPORT -> Block.canSupportCenter(call.level, new BlockPos((int)a[0], (int)a[1], (int)a[2]), net.minecraft.core.Direction.values()[(int)a[3]]) ? 1 : 0;
+					case OP_BIOME_TAG -> call.level.getBiome(new BlockPos((int)a[0], (int)a[1], (int)a[2]))
+						.is(net.minecraft.world.level.levelgen.structure.NativeStructurePieces.BIOME_TAGS.get((int)a[3])) ? 1 : 0;
 					case OP_BLOCK_LIGHT -> call.level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, new BlockPos((int)a[0], (int)a[1], (int)a[2]));
 					case OP_FAR_HEIGHT -> call.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.values()[(int)a[0]], (int)a[1], (int)a[2]);
 					default -> {
@@ -944,7 +1228,21 @@ public final class NativeDecoration {
 					&& current.genDepth == genDepth && current.steps == steps && current.stepCount == stepCount && current.seed == region.seed()) {
 				return current;
 			}
+			long setupStart = System.nanoTime();
+			try {
+				return this.rebuild(generator, region, steps, stepCount, tags, minGenY, genDepth);
+			} finally {
+				setupTime("plans@" + generator.getBiomeSource().getClass().getSimpleName(), setupStart);
+			}
+		}
+
+		@Nullable
+		private Plan rebuild(ChunkGenerator generator, NativeDecorationRegion region, List<net.minecraft.world.level.biome.FeatureSorter.StepFeatureData> steps,
+				int stepCount, long tags, int minGenY, int genDepth) {
+			Plan current;
+			long waitStart = System.nanoTime();
 			synchronized (this) {
+				setupTime("planWait", waitStart);
 				current = this.plan;
 				if (current != null && current.tagGeneration == tags && current.biomes == region.biomeValues() && current.minGenY == minGenY
 						&& current.genDepth == genDepth && current.steps == steps && current.stepCount == stepCount && current.seed == region.seed()) {
@@ -1016,7 +1314,10 @@ public final class NativeDecoration {
 					&& program.minGenY == minGenY && program.genDepth == genDepth && program.seed == seed) {
 				return program;
 			}
+			long encodeStart = System.nanoTime();
 			int[] words = NativeDecorationEncoder.encode(feature, generator, region.biomeValues(), seed);
+			setupTime("encode@" + generator.getBiomeSource().getClass().getSimpleName(), encodeStart);
+			long createStart = System.nanoTime();
 			Object compiled = UNSUPPORTED;
 			if (DEBUG && words == null) LOGGER.info("Native decoration: Java encoder declined {}: {}", feature, NativeDecorationEncoder.lastDecline());
 			if (words != null) {
@@ -1030,6 +1331,7 @@ public final class NativeDecoration {
 					throw new IllegalStateException("Native decoration program creation failed", failure);
 				}
 			}
+			setupTime("create", createStart);
 			synchronized (this) {
 				var next = new IdentityHashMap<>(this.entries);
 				next.put(feature, compiled);

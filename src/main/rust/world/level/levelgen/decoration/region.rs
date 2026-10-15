@@ -122,6 +122,19 @@ pub(crate) const OP_MATH_COS: i32 = 15;
 /// `WorldGenRegion.getBrightness(LightLayer.BLOCK, [x, y, z])` to word 0; pure:
 /// Java's own setBlock only queues light work, so pending events never change it.
 pub(crate) const OP_BLOCK_LIGHT: i32 = 16;
+/// `getBlockState(pos).isFaceSturdy(level, pos, direction)` for `[x, y, z, direction ordinal]`; pure.
+pub(crate) const OP_STURDY: i32 = 17;
+/// `Block.canSupportCenter(level, pos, direction)` for `[x, y, z, direction ordinal]`; pure.
+pub(crate) const OP_CENTER_SUPPORT: i32 = 18;
+/// `getBiome(pos).is(tag)` for `[x, y, z, tag index]`; pure.
+pub(crate) const OP_BIOME_TAG: i32 = 19;
+/// `Block.isFaceFull(getBlockState(pos).getCollisionShape(level, pos), direction)` for
+/// `[x, y, z, direction ordinal]`; pure.
+pub(crate) const OP_COLLISION_FACE: i32 = 20;
+/// The FEATURES transaction's first-touch capture for `[chunk index]`: Java
+/// snapshots that chunk (and arms its native sections) before Rust's first
+/// write to it. Pure: it reads Java state only.
+pub(crate) const OP_TOUCH: i32 = 21;
 pub(crate) const OP_FAR_HEIGHT: i32 = 11;
 pub(crate) const OP_FAR_BIOME: i32 = 12;
 
@@ -204,6 +217,8 @@ pub(crate) struct Region<'a> {
     /// A failure raised where no `Result` reaches (an int provider's `Math.log`
     /// upcall); the next region access returns it.
     deferred: std::cell::Cell<Option<Failure>>,
+    /// Chunks Java has captured for the step's transaction during this call.
+    touched: std::cell::Cell<u16>,
     /// Lock-free reads of each section's current generation, renewed after
     /// palette growth replaces it (as Java's views are).
     leases: std::cell::RefCell<Vec<Option<live::WorldLease>>>,
@@ -275,6 +290,7 @@ impl<'a> Region<'a> {
             callback: None,
             slot: -1,
             deferred: std::cell::Cell::new(None),
+            touched: std::cell::Cell::new(0),
             leases: std::cell::RefCell::new((0..CHUNKS * sections).map(|_| None).collect()),
             words,
             out,
@@ -465,6 +481,16 @@ impl<'a> Region<'a> {
     }
 
     /// A Java call that touches no world state (`Math.log`): nothing is synced either way.
+    /// Java's first-touch capture of `chunk`, once per call, before its first write.
+    fn touch(&self, chunk: usize) -> Result<()> {
+        let bit = 1u16 << chunk;
+        if self.touched.get() & bit == 0 {
+            self.pure_call(OP_TOUCH, &mut [chunk as i64])?;
+            self.touched.set(self.touched.get() | bit);
+        }
+        Ok(())
+    }
+
     pub(crate) fn pure_call(&self, op: i32, args: &mut [i64]) -> Result<i32> {
         let callback = self.callback.ok_or(Failure::Unbound)?;
         // SAFETY: Java reads and writes only `args` for pure operations.
@@ -599,6 +625,7 @@ impl<'a> Region<'a> {
     pub(crate) fn set_section_state(&mut self, x: i32, y: i32, z: i32, state: u32) -> Result<u32> {
         injected_failure()?;
         let chunk = self.chunk(x >> 4, z >> 4)?;
+        self.touch(chunk)?;
         let section = self.section_index(y).ok_or(Failure::Unbound)?;
         let words = self.section_words(chunk, section);
         // SAFETY: Java keeps each bound section's owners alive for the call.
@@ -725,6 +752,32 @@ impl<'a> Region<'a> {
             }
         }
         Ok(heights)
+    }
+
+    /// The distinct biome values stored in the bound 3x3's sections (the set
+    /// `applyBiomeDecoration` gathers), ascending.
+    pub(crate) fn present_biomes(&self) -> Result<Vec<u32>> {
+        let mut seen: Vec<u32> = Vec::new();
+        for chunk in 0..CHUNKS {
+            for section in 0..self.sections {
+                let pointer = self.section_words(chunk, section)[2] as *const biomes::Owner;
+                // SAFETY: Java keeps each bound section's owner alive for the call.
+                let owner = unsafe { pointer.as_ref() }.ok_or(Failure::Unbound)?;
+                let mut last = u32::MAX;
+                let valid = owner.for_each_present(|value| {
+                    if value != last {
+                        last = value;
+                        if let Err(at) = seen.binary_search(&value) {
+                            seen.insert(at, value);
+                        }
+                    }
+                });
+                if !valid {
+                    return Err(Failure::Unbound);
+                }
+            }
+        }
+        Ok(seen)
     }
 
     /// `WorldGenRegion.getBiome`: fiddled zoom, then `ChunkAccess.getNoiseBiome`'s clamp.

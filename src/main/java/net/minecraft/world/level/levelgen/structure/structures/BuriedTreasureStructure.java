@@ -16,6 +16,27 @@ public class BuriedTreasureStructure extends Structure {
 	}
 
 	@Override
+	public int[] nativeStub() {
+		return new int[]{2, 1, 0};
+	}
+
+	@Override
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext,
+		net.minecraft.core.BlockPos stub, net.minecraft.world.level.block.Rotation rotation) {
+		generatePieces(structurePiecesBuilder, generationContext);
+	}
+
+	/** {@code small_plan.rs}'s params: {@code [family 3]}. */
+	public int[] nativePlanParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager) {
+		return new int[]{3};
+	}
+
+	/** Rebuilds {@code small_plan.rs}'s pieces ({@link BuriedTreasurePieces#addNativePieces}). */
+	public void nativePlanPieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager, int[] words) {
+		BuriedTreasurePieces.addNativePieces(builder, manager, words);
+	}
+
+	@Override
 	public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext) {
 		return onTopOfChunkCenter(
 			generationContext, Heightmap.Types.OCEAN_FLOOR_WG, structurePiecesBuilder -> generatePieces(structurePiecesBuilder, generationContext)

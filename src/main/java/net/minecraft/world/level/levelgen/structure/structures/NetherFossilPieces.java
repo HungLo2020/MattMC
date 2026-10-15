@@ -72,6 +72,11 @@ public class NetherFossilPieces {
 		}
 
 		@Override
+		protected long[] nativeTailWords() {
+			return this.nativeTailWords(0);
+		}
+
+		@Override
 		protected void handleDataMarker(String string, BlockPos blockPos, ServerLevelAccessor serverLevelAccessor, RandomSource randomSource, BoundingBox boundingBox) {
 		}
 

@@ -27,22 +27,29 @@ entities run in Java after the call, as `placeInWorld` orders them.
 
 | Piece | Supported |
 | --- | --- |
-| Processors | block ignore, jigsaw replacement (before any rule), rule, block rot, gravity, protected blocks, nop |
+| Processors | block ignore, jigsaw replacement (before any rule), rule, block rot, gravity, protected blocks, block age, blackstone replace, lava submerged block, capped (constant or uniform limit, one delegate), nop |
 | Rule tests | always true, block, tag, block state, random block, random block state |
 | Position tests | always true, linear, axis-aligned linear |
 | Block-entity modifiers | passthrough, append loot, append static, clear |
-| Liquid containers | simple waterloggable blocks with the default `placeLiquid`; kelp, kelp plant, seagrass and tall seagrass (theirs do nothing) |
+| Liquid containers | simple waterloggable blocks with the default `placeLiquid`, slabs (a double slab's does nothing), dried ghasts, campfires and candles (waterlogged and unlit; a lit candle writes with flags 11); kelp, kelp plant, seagrass and tall seagrass (theirs do nothing) |
 
-Java's path keeps a template when it has capped, block-age, blackstone-replace
-or lava-submerged processors, another liquid container, a jigsaw block without
-NBT or with an unparsable `final_state`, a settings random other than the
-placement random, a placement random that is not a `WorldgenRandom` over
-Xoroshiro (a bare Xoroshiro source derives `nextLong` and `nextInt`
-differently), or an extent outside the bound 3×3 chunks. When the settings
-random is the placement random (fossils), block rot draws from it in
-processing order, before the write loop's loot seeds. Processors
-read at every template position before the bounding box applies, and Java's
-generation region serves chunks beyond that 3×3.
+Java's path keeps a template when it has another processor or liquid
+container, a jigsaw block without NBT or with an unparsable `final_state`, a
+lava-submerged processor with a dynamic-shape state, a settings random other
+than the placement random, a placement random that is not a `WorldgenRandom`
+over Xoroshiro (a bare Xoroshiro source derives `nextLong` and `nextInt`
+differently), or writes outside the bound 3×3 chunks (the settings box, or the
+whole extent without one). When the settings random is the placement random
+(fossils), block rot and block age draw from it in processing order, before the
+write loop's loot seeds. Processors read at every template position before the
+bounding box applies: reads beyond the bound 3×3 go to Java's generation
+region through the pure-read upcall, and a rule reads the world only when one
+of its location tests needs it. Capped processors run in `finalizeProcessing`
+with `RandomSource.create(seed).forkPositional().at(origin)` and
+`Util.toShuffledList`'s order.
+
+`javaTemplates={reason=count}` in the decoration statistics counts templates
+Java placed inside a bound region, by decline reason.
 
 Compiled templates are cached by (template, palette, processor list identity).
 Worker threads share templates (one builds a start's jigsaws while another

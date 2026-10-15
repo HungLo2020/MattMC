@@ -20,15 +20,27 @@ import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSeriali
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 
-public class DesertPyramidPiece extends ScatteredFeaturePiece {
+public class DesertPyramidPiece extends ScatteredFeaturePiece implements net.minecraft.world.level.levelgen.structure.NativeStructurePieces.Native {
 	public static final int WIDTH = 21;
 	public static final int DEPTH = 21;
 	private final boolean[] hasPlacedChest = new boolean[4];
 	private final List<BlockPos> potentialSuspiciousSandWorldPositions = new ArrayList();
 	private BlockPos randomCollapsedRoofPos = BlockPos.ZERO;
+	/** Native placement placed the cellar: its suspicious-sand candidates (a fixed set) apply, as Java's list would hold them. */
+	private boolean nativeCellar;
 
 	public DesertPyramidPiece(RandomSource randomSource, int i, int j) {
 		super(StructurePieceType.DESERT_PYRAMID_PIECE, i, 64, j, 21, 15, 21, getRandomHorizontalDirection(randomSource));
+	}
+
+	/** A piece Rust planned ({@code structure/small_plan.rs}): no draws. */
+	public DesertPyramidPiece(BoundingBox boundingBox, Direction direction) {
+		super(StructurePieceType.DESERT_PYRAMID_PIECE, boundingBox, direction, 21, 15, 21);
+	}
+
+	/** Rebuilds {@code small_plan.rs}'s piece (kind 3, fields {@code [width, height, depth, heightPosition]}). */
+	public static void addNativePieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager, int[] words) {
+		builder.addPiece(ScatteredFeaturePiece.nativePiece(words, 3, 21, 15, 21, DesertPyramidPiece::new));
 	}
 
 	public DesertPyramidPiece(CompoundTag compoundTag) {
@@ -46,6 +58,29 @@ public class DesertPyramidPiece extends ScatteredFeaturePiece {
 		compoundTag.putBoolean("hasPlacedChest1", this.hasPlacedChest[1]);
 		compoundTag.putBoolean("hasPlacedChest2", this.hasPlacedChest[2]);
 		compoundTag.putBoolean("hasPlacedChest3", this.hasPlacedChest[3]);
+	}
+
+	@Override
+	public long[] nativeWords() {
+		long[] words = this.nativeScatteredWords(3, 8);
+		for (int i = 0; i < 4; i++) words[13 + i] = this.hasPlacedChest[i] ? 1 : 0;
+		words[17] = this.nativeCellar ? 1 : 0;
+		words[18] = this.randomCollapsedRoofPos.getX();
+		words[19] = this.randomCollapsedRoofPos.getY();
+		words[20] = this.randomCollapsedRoofPos.getZ();
+		return words;
+	}
+
+	@Override
+	public void nativeUpdate(long[] words) {
+		this.nativeScatteredUpdate(words);
+		for (int i = 0; i < 4; i++) this.hasPlacedChest[i] = words[13 + i] != 0;
+		this.nativeCellar = words[17] != 0;
+		this.randomCollapsedRoofPos = new BlockPos((int)words[18], (int)words[19], (int)words[20]);
+	}
+
+	public boolean nativeCellarPlaced() {
+		return this.nativeCellar;
 	}
 
 	@Override

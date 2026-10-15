@@ -39,6 +39,11 @@ public class SpikeFeature extends Feature<SpikeConfiguration> {
 		super(codec);
 	}
 
+	/** The spikes for a seed-derived key, as {@link #getSpikesForLevel} resolves them. */
+	public static List<SpikeFeature.EndSpike> spikesForKey(long key) {
+		return SPIKE_CACHE.getUnchecked(key);
+	}
+
 	public static List<SpikeFeature.EndSpike> getSpikesForLevel(WorldGenLevel worldGenLevel) {
 		RandomSource randomSource = RandomSource.create(worldGenLevel.getSeed());
 		long l = randomSource.nextLong() & 65535L;

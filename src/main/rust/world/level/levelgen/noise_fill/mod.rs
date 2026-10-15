@@ -4,6 +4,7 @@
 //! order: interpolation, the aquifer or disabled-aquifer substance, the ore
 //! vein rule, the default block, section palette writes, both world-generation
 //! heightmaps and fluid post-processing marks. Java installs the results.
+pub(crate) mod column;
 mod ffi;
 pub(crate) mod section;
 pub(crate) mod traversal;

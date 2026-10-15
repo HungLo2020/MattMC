@@ -139,6 +139,11 @@ public class LevelChunkSection {
 	}
 	java.lang.foreign.MemorySegment nativeGenerationCounters() { return this.counters.owner(); }
 
+	/** {@link DecorationTransaction}: puts back counts captured with {@link #packedSectionCounts}. */
+	void restorePackedCounts(long packed) {
+		this.counters.set((short)packed, (short)(packed >>> 16), (short)(packed >>> 32));
+	}
+
 	/** Coherent signed-short CPU snapshot: nonempty, ticking blocks, fluids in 16-bit lanes. */
 	public long packedSectionCounts() { return this.counters.packed(); }
 

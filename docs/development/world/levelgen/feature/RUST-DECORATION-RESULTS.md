@@ -137,3 +137,37 @@ The End feature step is level with Frozen (runs 98–106 ms against 95–107 ms)
 the remaining Java time there is End-city placement. Across dimensions most
 Java-route time left is structure orchestration (trial chambers, mineshaft
 legacy pieces, End cities), measured with `decorationProfile`.
+
+## Slice 4: structure starts and feature-step overheads
+
+Uncommitted working-tree results, 2026-10-14, on master `f3815385` plus the
+local world-generation changes; author-reported measurements.
+
+Rust now plans every vanilla structure start
+([structure pieces guide](../structure/RUST-STRUCTURE-PIECES.md)). The
+feature step keeps per-chunk bind captures across regions, calls structure
+steps only for structures the chunk references, and caches template state
+facts.
+
+- **Pre-change Current** (suite `s7`): standard, 17-biome, Nether/End biome
+  and resume runs identical. In the structure regions the only differences are
+  End-city shulker yaw and one taiga-village start whose jigsaw piece boxes
+  differ in `maxY` only. That box difference reproduces with Java's jigsaw
+  planner (`javaJigsaw=true`), and the start matches once boxes are removed.
+  Every per-structure run (monument, mansion, temples, swamp hut, igloo,
+  buried treasure, shipwrecks, ocean ruins, mineshafts, fortress, stronghold,
+  ruined portals, fossils) matched.
+- **Timing** (`col-4-timing`, Current/Frozen, two launches × three rounds):
+
+| Dimension | Feature step | FULL wall time |
+| --- | --- | --- |
+| Overworld | 1,521 / 2,301 ms | 5.53 / 13.19 s |
+| Primordial Caves | 1,625 / 3,809 ms | 7.02 / 13.68 s |
+| Nether | 568 / 810 ms | 3.20 / 7.91 s |
+| End | 101 / 98 ms | 0.85 / 1.77 s |
+
+An End-only launch (no other dimension warmed first) measured End features at
+243 / 191 ms. With the rollback snapshot disabled for measurement
+(`decorationTransaction=false`), they were 216 / 189 ms. The rest of the gap
+is one-time native template compilation in the first End-city round
+(`setupMs=` reports it). Later rounds are at or below Frozen.

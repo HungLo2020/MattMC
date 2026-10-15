@@ -22,9 +22,11 @@ struct StateFacts {
     transforms: [u32; 12],
     /// Bit 0 block entity, 1 randomizable container, 2 fluid is a source, 3 fluid is
     /// still water, 4 fluid empty, 5 simple waterloggable, 6 waterlogged, 7 other
-    /// liquid container whose `placeLiquid` does nothing, 8 jigsaw.
+    /// liquid container whose `placeLiquid` does nothing, 8 jigsaw, 9 `placeLiquid`
+    /// writes with flags 11 (a lit candle's extinguish) rather than 3.
     flags: u32,
-    /// The state with `WATERLOGGED` true (simple waterloggable states).
+    /// What `placeLiquid` writes: the state with `WATERLOGGED` true (and unlit for
+    /// campfires and candles).
     waterlogged: u32,
 }
 
@@ -35,12 +37,23 @@ const STILL_WATER: u32 = 8;
 const SIMPLE_WATERLOGGED: u32 = 32;
 const WATERLOGGED: u32 = 64;
 const NO_OP_CONTAINER: u32 = 128;
+const LIQUID_FLAGS_11: u32 = 512;
 
 pub(crate) struct Template {
     blocks: Vec<Block>,
     facts: std::collections::HashMap<u32, StateFacts>,
     barrier: u32,
     water_fluid: u32,
+    /// `TemplateStructurePiece.postProcess`'s tail: DATA-mode structure blocks
+    /// (template position, metadata) and jigsaw blocks (template position,
+    /// parsed `final_state`), in palette order; None when a structure block's
+    /// mode is unreadable (Java's path).
+    tail: Option<Tail>,
+}
+
+pub(crate) struct Tail {
+    pub(crate) markers: Vec<([i32; 3], String)>,
+    pub(crate) jigsaws: Vec<([i32; 3], u32)>,
 }
 
 /// A rule's block-entity modifier: `Passthrough`, `AppendLoot`, `AppendStatic` or `Clear`.
@@ -96,6 +109,39 @@ enum Processor {
     Gravity(u32, i32),
     /// `ProtectedBlockProcessor`: states it may replace.
     Protected(Vec<u32>),
+    /// `BlackstoneReplaceProcessor`: each replaced state's replacement.
+    Replace(std::collections::HashMap<u32, u32>),
+    /// `LavaSubmergedBlockProcessor`: lava block states, states whose shape is not
+    /// a full block, and lava's default state.
+    LavaSubmerged { lava: Vec<u32>, not_full: Vec<u32>, lava_state: u32 },
+    BlockAge(Box<BlockAge>),
+    /// `CappedProcessor`: its limit and the delegate it applies in `finalizeProcessing`.
+    Capped { limit: IntProvider, delegate: Box<Processor> },
+}
+
+/// `ConstantInt` or `UniformInt`.
+#[derive(Clone, Copy, Debug)]
+enum IntProvider {
+    Constant(i32),
+    Uniform(i32, i32),
+}
+
+/// `BlockAgeProcessor`'s tables. Categories: 1 full stone block, 2 stairs, 3 slab,
+/// 4 wall, 5 obsidian; stairs, slabs and walls carry their mossy counterpart
+/// with the state's properties.
+#[derive(Clone, Debug)]
+struct BlockAge {
+    mossiness: f32,
+    table: std::collections::HashMap<u32, (u8, u32)>,
+    cracked: u32,
+    mossy: u32,
+    stone_slab: u32,
+    stone_brick_slab: u32,
+    mossy_slab: u32,
+    crying: u32,
+    /// `STONE_BRICK_STAIRS` by facing (north, east, south, west) × half (top, bottom).
+    stairs: [u32; 8],
+    mossy_stairs: [u32; 8],
 }
 
 pub(crate) struct Processors {
@@ -143,13 +189,31 @@ impl Template {
         }
         let barrier = reader.state()?;
         let water_fluid = reader.state()?;
+        let tail = match reader.next()? {
+            -1 => None,
+            markers => {
+                let mut tail = Tail { markers: Vec::with_capacity(markers.max(0) as usize), jigsaws: Vec::new() };
+                for _ in 0..markers {
+                    let pos = [reader.next()?, reader.next()?, reader.next()?];
+                    let length = reader.count(1 << 12)?;
+                    let text: String = reader.take(length)?.iter().map(|&c| char::from_u32(c as u32)).collect::<Option<String>>()?;
+                    tail.markers.push((pos, text));
+                }
+                let jigsaws = reader.count(1 << 20)?;
+                for _ in 0..jigsaws {
+                    tail.jigsaws.push(([reader.next()?, reader.next()?, reader.next()?], reader.state()?));
+                }
+                Some(tail)
+            }
+        };
         if reader.at != words.len() {
             return None;
         }
         // Every state the loop can write or test needs its facts.
         let complete = blocks.iter().all(|b| facts.contains_key(&b.state) && b.jigsaw.flatten().is_none_or(|s| facts.contains_key(&s)))
             && facts.values().all(|f| f.transforms.iter().all(|t| facts.contains_key(t)) && (f.flags & SIMPLE_WATERLOGGED == 0 || facts.contains_key(&f.waterlogged)));
-        complete.then_some(Self { blocks, facts, barrier, water_fluid })
+        let tail_states = tail.as_ref().is_none_or(|t| t.jigsaws.iter().all(|(_, s)| facts.contains_key(s)));
+        (complete && tail_states).then_some(Self { blocks, facts, barrier, water_fluid, tail })
     }
 
     /// Every state the template can write, for counter-policy admission.
@@ -163,72 +227,156 @@ impl Processors {
         let mut reader = Reader::new(words);
         let count = reader.count(64)?;
         let mut list = Vec::with_capacity(count);
-        let test = |reader: &mut Reader| -> Option<Test> {
-            Some(match reader.next()? {
-                0 => Test::Always,
-                1 => Test::In(read_set(reader)?),
-                2 => {
-                    let probability = reader.float()?;
-                    Test::RandomIn(read_set(reader)?, probability)
-                }
-                _ => return None,
-            })
-        };
         for _ in 0..count {
-            list.push(match reader.next()? {
-                1 => Processor::Ignore(read_set(&mut reader)?),
-                2 => Processor::Jigsaw,
-                3 => {
-                    let rules = reader.count(256)?;
-                    let mut out = Vec::with_capacity(rules);
-                    for _ in 0..rules {
-                        let input = test(&mut reader)?;
-                        let location = test(&mut reader)?;
-                        let pos = match reader.next()? {
-                            0 => PosTest::Always,
-                            kind @ (1 | 2) => {
-                                let axis = reader.next()?;
-                                PosTest::Linear {
-                                    axis: if kind == 1 { Some(usize::try_from(axis).ok().filter(|&a| a < 3)?) } else { None },
-                                    min_chance: reader.float()?,
-                                    max_chance: reader.float()?,
-                                    min_dist: reader.next()?,
-                                    max_dist: reader.next()?,
-                                }
-                            }
-                            _ => return None,
-                        };
-                        let output = reader.state()?;
-                        let modifier = match (reader.next()?, reader.next()?) {
-                            (0, _) => Modifier::Passthrough,
-                            (1, table) => Modifier::AppendLoot(table),
-                            (2, tag) => Modifier::AppendStatic(tag),
-                            (3, _) => Modifier::Clear,
-                            _ => return None,
-                        };
-                        out.push(Rule { input, location, pos, output, modifier });
-                    }
-                    Processor::Rule(out)
-                }
-                4 => {
-                    let integrity = reader.float()?;
-                    Processor::Rot(if reader.flag()? { Some(read_set(&mut reader)?) } else { None }, integrity)
-                }
-                5 => Processor::Gravity(reader.state().filter(|&h| h < 6)?, reader.next()?),
-                6 => Processor::Protected(read_set(&mut reader)?),
-                _ => return None,
-            });
+            list.push(read_processor(&mut reader, 0)?);
         }
         (reader.at == words.len()).then_some(Self { list })
     }
 
-    /// Output states rules can write.
+    /// Output states processors can write.
     pub(crate) fn states(&self) -> impl Iterator<Item = u32> + '_ {
-        self.list.iter().flat_map(|p| match p {
-            Processor::Rule(rules) => rules.iter().map(|r| r.output).collect::<Vec<_>>(),
-            _ => Vec::new(),
-        })
+        self.list.iter().flat_map(outputs)
     }
+}
+
+fn outputs(processor: &Processor) -> Vec<u32> {
+    match processor {
+        Processor::Rule(rules) => rules.iter().map(|r| r.output).collect(),
+        Processor::Replace(map) => map.values().copied().collect(),
+        Processor::LavaSubmerged { lava_state, .. } => vec![*lava_state],
+        Processor::BlockAge(age) => {
+            let mut out: Vec<u32> = age.table.values().filter(|&&(_, mapped)| mapped != u32::MAX).map(|&(_, m)| m).collect();
+            out.extend([age.cracked, age.mossy, age.stone_slab, age.stone_brick_slab, age.mossy_slab, age.crying]);
+            out.extend(age.stairs);
+            out.extend(age.mossy_stairs);
+            out
+        }
+        Processor::Capped { delegate, .. } => outputs(delegate),
+        _ => Vec::new(),
+    }
+}
+
+fn read_test(reader: &mut Reader) -> Option<Test> {
+    Some(match reader.next()? {
+        0 => Test::Always,
+        1 => Test::In(read_set(reader)?),
+        2 => {
+            let probability = reader.float()?;
+            Test::RandomIn(read_set(reader)?, probability)
+        }
+        _ => return None,
+    })
+}
+
+/// One processor's words; `depth` bounds capped nesting.
+fn read_processor(reader: &mut Reader, depth: u32) -> Option<Processor> {
+    let test = read_test;
+    Some(match reader.next()? {
+        1 => Processor::Ignore(read_set(reader)?),
+        2 => Processor::Jigsaw,
+        3 => {
+            let rules = reader.count(256)?;
+            let mut out = Vec::with_capacity(rules);
+            for _ in 0..rules {
+                let input = test(reader)?;
+                let location = test(reader)?;
+                let pos = match reader.next()? {
+                    0 => PosTest::Always,
+                    kind @ (1 | 2) => {
+                        let axis = reader.next()?;
+                        PosTest::Linear {
+                            axis: if kind == 1 { Some(usize::try_from(axis).ok().filter(|&a| a < 3)?) } else { None },
+                            min_chance: reader.float()?,
+                            max_chance: reader.float()?,
+                            min_dist: reader.next()?,
+                            max_dist: reader.next()?,
+                        }
+                    }
+                    _ => return None,
+                };
+                let output = reader.state()?;
+                let modifier = match (reader.next()?, reader.next()?) {
+                    (0, _) => Modifier::Passthrough,
+                    (1, table) => Modifier::AppendLoot(table),
+                    (2, tag) => Modifier::AppendStatic(tag),
+                    (3, _) => Modifier::Clear,
+                    _ => return None,
+                };
+                out.push(Rule { input, location, pos, output, modifier });
+            }
+            Processor::Rule(out)
+        }
+        4 => {
+            let integrity = reader.float()?;
+            Processor::Rot(if reader.flag()? { Some(read_set(reader)?) } else { None }, integrity)
+        }
+        5 => Processor::Gravity(reader.state().filter(|&h| h < 6)?, reader.next()?),
+        6 => Processor::Protected(read_set(reader)?),
+        7 => {
+            let pairs = reader.count(1 << 20)?;
+            let mut map = std::collections::HashMap::with_capacity(pairs);
+            for _ in 0..pairs {
+                map.insert(reader.state()?, reader.state()?);
+            }
+            Processor::Replace(map)
+        }
+        8 => Processor::LavaSubmerged { lava: read_set(reader)?, not_full: read_set(reader)?, lava_state: reader.state()? },
+        9 => {
+            let mossiness = reader.float()?;
+            let entries = reader.count(1 << 20)?;
+            let mut table = std::collections::HashMap::with_capacity(entries);
+            for _ in 0..entries {
+                let state = reader.state()?;
+                let category = u8::try_from(reader.next()?).ok().filter(|c| (1..=5).contains(c))?;
+                let mapped = match reader.next()? {
+                    -1 => u32::MAX,
+                    m => u32::try_from(m).ok()?,
+                };
+                table.insert(state, (category, mapped));
+            }
+            let mut fixed = [0u32; 22];
+            for f in fixed.iter_mut() {
+                *f = reader.state()?;
+            }
+            let mut stairs = [0; 8];
+            let mut mossy_stairs = [0; 8];
+            stairs.copy_from_slice(&fixed[6..14]);
+            mossy_stairs.copy_from_slice(&fixed[14..22]);
+            Processor::BlockAge(Box::new(BlockAge {
+                mossiness,
+                table,
+                cracked: fixed[0],
+                mossy: fixed[1],
+                stone_slab: fixed[2],
+                stone_brick_slab: fixed[3],
+                mossy_slab: fixed[4],
+                crying: fixed[5],
+                stairs,
+                mossy_stairs,
+            }))
+        }
+        10 if depth == 0 => {
+            let limit = match (reader.next()?, reader.next()?, reader.next()?) {
+                (0, value, _) => IntProvider::Constant(value),
+                (1, min, max) if min <= max => IntProvider::Uniform(min, max),
+                _ => return None,
+            };
+            Processor::Capped { limit, delegate: Box::new(read_processor(reader, depth + 1)?) }
+        }
+        _ => return None,
+    })
+}
+
+impl Template {
+    pub(crate) fn tail(&self) -> Option<&Tail> {
+        self.tail.as_ref()
+    }
+}
+
+/// A template position placed at `origin` (`calculateRelativePosition(settings, pos).offset(origin)`).
+pub(crate) fn placed_position(pos: [i32; 3], origin: [i32; 3], mirror: usize, rotation: usize, pivot: [i32; 3]) -> [i32; 3] {
+    let relative = transform(pos, mirror, rotation, pivot);
+    [relative[0] + origin[0], relative[1] + origin[1], relative[2] + origin[2]]
 }
 
 /// `Mth.getSeed(x, y, z)`.
@@ -238,7 +386,7 @@ fn position_seed(pos: [i32; 3]) -> i64 {
 
 /// `StructureTemplate.transform(pos, mirror, rotation, pivot)`: mirror 0 none,
 /// 1 left-right, 2 front-back; rotation 0 none, 1 clockwise 90, 2 180, 3 counterclockwise 90.
-fn transform(pos: [i32; 3], mirror: usize, rotation: usize, pivot: [i32; 3]) -> [i32; 3] {
+pub(crate) fn transform(pos: [i32; 3], mirror: usize, rotation: usize, pivot: [i32; 3]) -> [i32; 3] {
     let [mut i, j, mut k] = pos;
     match mirror {
         1 => k = -k,
@@ -291,6 +439,8 @@ pub(crate) struct Call {
     pub(crate) random: super::random::WorldgenRandom,
     /// The settings random is the placement random: block rot draws from it.
     pub(crate) shared_random: bool,
+    /// The level seed (`CappedProcessor`'s random).
+    pub(crate) seed: i64,
 }
 
 /// What Java finishes: every placed position (shape updates) and block-entity loads.
@@ -402,7 +552,7 @@ impl Template {
     /// `SimpleWaterloggedBlock.placeLiquid`; the other admitted containers do nothing.
     fn place_liquid(&self, region: &mut Region, pos: [i32; 3], facts: &StateFacts, fluid: u32) -> Result<()> {
         if facts.flags & SIMPLE_WATERLOGGED != 0 && facts.flags & WATERLOGGED == 0 && fluid & STILL_WATER != 0 {
-            region.set_block(pos[0], pos[1], pos[2], facts.waterlogged, 3)?;
+            region.set_block(pos[0], pos[1], pos[2], facts.waterlogged, if facts.flags & LIQUID_FLAGS_11 != 0 { 11 } else { 3 })?;
             region.schedule_tick(true, pos[0], pos[1], pos[2], self.water_fluid, 5);
         }
         Ok(())
@@ -411,6 +561,8 @@ impl Template {
     /// `StructureTemplate.processBlockInfos`.
     fn process(&self, processors: &Processors, region: &mut Region, call: &mut Call) -> Result<Vec<Info>> {
         let mut out = Vec::with_capacity(self.blocks.len());
+        // The template block behind each kept info, for `finalizeProcessing`.
+        let mut originals = Vec::with_capacity(self.blocks.len());
         for block in &self.blocks {
             let relative = transform(block.pos, call.mirror, call.rotation, call.rotation_pivot);
             let pos = [relative[0] + call.origin[0], relative[1] + call.origin[1], relative[2] + call.origin[2]];
@@ -423,9 +575,57 @@ impl Template {
             }
             if let Some(info) = info {
                 out.push(info);
+                originals.push(block);
+            }
+        }
+        for processor in &processors.list {
+            if let Processor::Capped { limit, delegate } = processor {
+                self.capped(*limit, delegate, region, call, &originals, &mut out)?;
             }
         }
         Ok(out)
+    }
+
+    /// `CappedProcessor.finalizeProcessing`: the delegate applied to shuffled
+    /// entries until `limit` of them changed.
+    fn capped(&self, limit: IntProvider, delegate: &Processor, region: &mut Region, call: &mut Call, originals: &[&Block], out: &mut [Info]) -> Result<()> {
+        let max = match limit {
+            IntProvider::Constant(v) => v,
+            IntProvider::Uniform(_, max) => max,
+        };
+        if max == 0 || out.is_empty() {
+            return Ok(());
+        }
+        let factory = Legacy::new(call.seed).next_long();
+        let mut random = Legacy::new(position_seed(call.origin) ^ factory);
+        let sampled = match limit {
+            IntProvider::Constant(v) => v,
+            IntProvider::Uniform(min, max) => random.next_int_bound(max - min + 1) + min,
+        };
+        let i = sampled.min(out.len() as i32);
+        if i < 1 {
+            return Ok(());
+        }
+        // `Util.toShuffledList(IntStream.range(0, n), random)`.
+        let mut order: Vec<usize> = (0..out.len()).collect();
+        for j in (2..=order.len()).rev() {
+            let k = random.next_int_bound(j as i32) as usize;
+            order.swap(j - 1, k);
+        }
+        let mut changed = 0;
+        for k in order {
+            if changed >= i {
+                break;
+            }
+            let current = out[k].clone();
+            if let Some(result) = self.process_one(delegate, region, call, originals[k], current.clone())? {
+                if result != current {
+                    changed += 1;
+                    out[k] = result;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn process_one(&self, processor: &Processor, region: &mut Region, call: &mut Call, block: &Block, info: Info) -> Result<Option<Info>> {
@@ -448,10 +648,21 @@ impl Template {
             }
             Processor::Rule(rules) => {
                 let mut random = Legacy::new(position_seed(info.pos));
-                let location = region.level_block_state(info.pos[0], info.pos[1], info.pos[2])?;
+                // Java reads the world state first; the read is pure, so only tests that use it read.
+                let mut location = None;
                 for rule in rules {
+                    let location_matches = |random: &mut Legacy, location: &mut Option<u32>| -> Result<bool> {
+                        if matches!(rule.location, Test::Always) {
+                            return Ok(true);
+                        }
+                        let state = match *location {
+                            Some(state) => state,
+                            None => *location.insert(region.level_block_state(info.pos[0], info.pos[1], info.pos[2])?),
+                        };
+                        Ok(test(&rule.location, state, random))
+                    };
                     if test(&rule.input, info.state, &mut random)
-                        && test(&rule.location, location, &mut random)
+                        && location_matches(&mut random, &mut location)?
                         && pos_test(&rule.pos, block.pos, info.pos, call.pivot, &mut random)
                     {
                         let nbt = match rule.modifier {
@@ -494,7 +705,83 @@ impl Template {
                 let there = region.level_block_state(info.pos[0], info.pos[1], info.pos[2])?;
                 bit(replaceable, there).then_some(info)
             }
+            Processor::Replace(map) => match map.get(&info.state) {
+                Some(&state) => Some(Info { state, ..info }),
+                None => Some(info),
+            },
+            Processor::LavaSubmerged { lava, not_full, lava_state } => {
+                let there = region.level_block_state(info.pos[0], info.pos[1], info.pos[2])?;
+                if bit(lava, there) && bit(not_full, info.state) {
+                    Some(Info { state: *lava_state, ..info })
+                } else {
+                    Some(info)
+                }
+            }
+            Processor::BlockAge(age) => {
+                let mut draw = if call.shared_random { Draw::Shared(&mut call.random) } else { Draw::Fresh(Legacy::new(position_seed(info.pos))) };
+                match age.replace(info.state, &mut draw) {
+                    Some(state) => Some(Info { state, ..info }),
+                    None => Some(info),
+                }
+            }
+            // Capped processors act in `finalizeProcessing` only.
+            Processor::Capped { .. } => Some(info),
         })
+    }
+}
+
+/// `settings.getRandom(pos)`: the placement random, or a fresh positional legacy source.
+enum Draw<'a> {
+    Shared(&'a mut super::random::WorldgenRandom),
+    Fresh(Legacy),
+}
+
+impl Draw<'_> {
+    fn next_float(&mut self) -> f32 {
+        match self {
+            Draw::Shared(random) => random.next_float(),
+            Draw::Fresh(random) => random.next_float(),
+        }
+    }
+    fn next_int(&mut self, bound: i32) -> i32 {
+        match self {
+            Draw::Shared(random) => random.next_int(bound),
+            Draw::Fresh(random) => random.next_int_bound(bound),
+        }
+    }
+}
+
+impl BlockAge {
+    /// `BlockAgeProcessor.processBlock`'s replacement, drawing as Java does.
+    fn replace(&self, state: u32, r: &mut Draw) -> Option<u32> {
+        let &(category, mapped) = self.table.get(&state)?;
+        // `getRandomFacingStairs`: a horizontal facing, then a half.
+        let stairs = |r: &mut Draw, table: &[u32; 8]| {
+            let facing = r.next_int(4) as usize;
+            table[facing * 2 + r.next_int(2) as usize]
+        };
+        let pick = |r: &mut Draw, normal: [u32; 2], mossy: [u32; 2]| {
+            let set = if r.next_float() < self.mossiness { mossy } else { normal };
+            set[r.next_int(2) as usize]
+        };
+        match category {
+            1 => {
+                if r.next_float() >= 0.5 {
+                    return None;
+                }
+                let normal = [self.cracked, stairs(r, &self.stairs)];
+                let mossy = [self.mossy, stairs(r, &self.mossy_stairs)];
+                Some(pick(r, normal, mossy))
+            }
+            2 => {
+                if r.next_float() >= 0.5 {
+                    return None;
+                }
+                Some(pick(r, [self.stone_slab, self.stone_brick_slab], [mapped, self.mossy_slab]))
+            }
+            3 | 4 => (r.next_float() < self.mossiness).then_some(mapped),
+            _ => (r.next_float() < 0.15).then_some(self.crying),
+        }
     }
 }
 

@@ -19,6 +19,28 @@ public class IglooStructure extends Structure {
 	}
 
 	@Override
+	public int[] nativeStub() {
+		return new int[]{2, 0, 0};
+	}
+
+	@Override
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext,
+		net.minecraft.core.BlockPos stub, net.minecraft.world.level.block.Rotation rotation) {
+		this.generatePieces(structurePiecesBuilder, generationContext);
+	}
+
+	/** {@code small_plan.rs}'s params ({@link IglooPieces#nativePlanParams}), or null for Java's path. */
+	@org.jetbrains.annotations.Nullable
+	public int[] nativePlanParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager) {
+		return IglooPieces.nativePlanParams(manager);
+	}
+
+	/** Rebuilds {@code small_plan.rs}'s pieces ({@link IglooPieces#addNativePieces}). */
+	public void nativePlanPieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager, int[] words) {
+		IglooPieces.addNativePieces(builder, manager, words);
+	}
+
+	@Override
 	public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext) {
 		return onTopOfChunkCenter(
 			generationContext, Heightmap.Types.WORLD_SURFACE_WG, structurePiecesBuilder -> this.generatePieces(structurePiecesBuilder, generationContext)

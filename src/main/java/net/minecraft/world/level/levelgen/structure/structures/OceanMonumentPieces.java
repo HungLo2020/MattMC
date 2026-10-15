@@ -29,6 +29,84 @@ public class OceanMonumentPieces {
 	private OceanMonumentPieces() {
 	}
 
+	/** What the Rust plan ({@code structure/monument_plan.rs}) needs: nothing. */
+	public static int[] nativePlanParams() {
+		return new int[0];
+	}
+
+	/**
+	 * Rebuilds the planned building ({@code structure/monument_plan.rs}) with no
+	 * random draws: one kind-50 piece whose fields carry the room graph (per room
+	 * index, opening bits, claimed, isSource, scanIndex, six connection slots),
+	 * the source and core slots, then each child (kind as
+	 * {@code MonumentBuilding.nativeKind}, depth, box, orientation, room slot,
+	 * main design).
+	 */
+	public static void addNativePieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder structurePiecesBuilder, int[] words) {
+		int i = 0;
+		while (i < words.length) {
+			int kind = words[i];
+			int depth = words[i + 1];
+			BoundingBox box = new BoundingBox(words[i + 2], words[i + 3], words[i + 4], words[i + 5], words[i + 6], words[i + 7]);
+			Direction direction = words[i + 8] == -1 ? null : Direction.from2DDataValue(words[i + 8]);
+			int fieldCount = words[i + 9];
+			int at = i + 10;
+			i = at + fieldCount;
+			if (kind != 50) {
+				throw new IllegalStateException("Unknown native ocean monument piece kind " + kind);
+			}
+			int roomCount = words[at++];
+			RoomDefinition[] rooms = new RoomDefinition[roomCount];
+			for (int r = 0; r < roomCount; r++) {
+				rooms[r] = new RoomDefinition(words[at + r * 11]);
+			}
+			for (int r = 0; r < roomCount; r++) {
+				RoomDefinition room = rooms[r];
+				int open = words[at + 1];
+				room.claimed = words[at + 2] != 0;
+				room.isSource = words[at + 3] != 0;
+				room.scanIndex = words[at + 4];
+				for (int d = 0; d < 6; d++) {
+					room.hasOpening[d] = (open & 1 << d) != 0;
+					int slot = words[at + 5 + d];
+					room.connections[d] = slot < 0 ? null : rooms[slot];
+				}
+				at += 11;
+			}
+			RoomDefinition source = rooms[words[at++]];
+			RoomDefinition core = rooms[words[at++]];
+			int childCount = words[at++];
+			List<OceanMonumentPiece> children = new java.util.ArrayList<>(childCount);
+			for (int c = 0; c < childCount; c++) {
+				int childKind = words[at];
+				int childDepth = words[at + 1];
+				BoundingBox childBox = new BoundingBox(words[at + 2], words[at + 3], words[at + 4], words[at + 5], words[at + 6], words[at + 7]);
+				Direction childDirection = words[at + 8] == -1 ? null : Direction.from2DDataValue(words[at + 8]);
+				RoomDefinition room = words[at + 9] < 0 ? null : rooms[words[at + 9]];
+				int mainDesign = words[at + 10];
+				at += 11;
+				if (childDepth != 1) {
+					throw new IllegalStateException("Unexpected native ocean monument child depth " + childDepth);
+				}
+				children.add(switch (childKind) {
+					case 0 -> new OceanMonumentEntryRoom(childDirection, room, childBox);
+					case 1 -> new OceanMonumentCoreRoom(childDirection, room, childBox);
+					case 2 -> new OceanMonumentDoubleXRoom(childDirection, room, childBox);
+					case 3 -> new OceanMonumentDoubleXYRoom(childDirection, room, childBox);
+					case 4 -> new OceanMonumentDoubleYRoom(childDirection, room, childBox);
+					case 5 -> new OceanMonumentDoubleYZRoom(childDirection, room, childBox);
+					case 6 -> new OceanMonumentDoubleZRoom(childDirection, room, childBox);
+					case 7 -> new OceanMonumentSimpleRoom(childDirection, room, childBox, mainDesign);
+					case 8 -> new OceanMonumentSimpleTopRoom(childDirection, room, childBox);
+					case 9 -> new OceanMonumentWingRoom(childDirection, childBox, mainDesign);
+					case 10 -> new OceanMonumentPenthouse(childDirection, childBox);
+					default -> throw new IllegalStateException("Unknown native ocean monument child kind " + childKind);
+				});
+			}
+			structurePiecesBuilder.addPiece(new MonumentBuilding(direction, box, depth, source, core, children));
+		}
+	}
+
 	static class FitDoubleXRoom implements OceanMonumentPieces.MonumentRoomFitter {
 		@Override
 		public boolean fits(OceanMonumentPieces.RoomDefinition roomDefinition) {
@@ -154,7 +232,7 @@ public class OceanMonumentPieces {
 		}
 	}
 
-	public static class MonumentBuilding extends OceanMonumentPieces.OceanMonumentPiece {
+	public static class MonumentBuilding extends OceanMonumentPieces.OceanMonumentPiece implements net.minecraft.world.level.levelgen.structure.NativeStructurePieces.Native {
 		private static final int WIDTH = 58;
 		private static final int HEIGHT = 22;
 		private static final int DEPTH = 58;
@@ -206,8 +284,94 @@ public class OceanMonumentPieces {
 			this.childPieces.add(new OceanMonumentPieces.OceanMonumentPenthouse(direction, boundingBox3));
 		}
 
+		/** The planned building ({@link OceanMonumentPieces#addNativePieces}): its rooms and children, no draws. */
+		MonumentBuilding(
+			Direction direction,
+			BoundingBox boundingBox,
+			int genDepth,
+			OceanMonumentPieces.RoomDefinition sourceRoom,
+			OceanMonumentPieces.RoomDefinition coreRoom,
+			List<OceanMonumentPieces.OceanMonumentPiece> childPieces
+		) {
+			super(StructurePieceType.OCEAN_MONUMENT_BUILDING, direction, genDepth, boundingBox);
+			this.setOrientation(direction);
+			this.sourceRoom = sourceRoom;
+			this.coreRoom = coreRoom;
+			this.childPieces.addAll(childPieces);
+		}
+
 		public MonumentBuilding(CompoundTag compoundTag) {
 			super(StructurePieceType.OCEAN_MONUMENT_BUILDING, compoundTag);
+		}
+
+		/**
+		 * {@link net.minecraft.world.level.levelgen.structure.NativeStructurePieces}: the header, the room graph its children reach (per room its
+		 * index, opening bits and six connection slots), then each child's kind, box,
+		 * orientation, room slot and main design.
+		 */
+		@Override
+		public long[] nativeWords() {
+			java.util.Map<OceanMonumentPieces.RoomDefinition, Integer> slots = new java.util.IdentityHashMap<>();
+			List<OceanMonumentPieces.RoomDefinition> rooms = new java.util.ArrayList<>();
+			for (OceanMonumentPieces.OceanMonumentPiece child : this.childPieces) {
+				if (child.roomDefinition != null && !slots.containsKey(child.roomDefinition)) {
+					slots.put(child.roomDefinition, rooms.size());
+					rooms.add(child.roomDefinition);
+				}
+			}
+			for (int i = 0; i < rooms.size(); i++) {
+				for (OceanMonumentPieces.RoomDefinition next : rooms.get(i).connections) {
+					if (next != null && !slots.containsKey(next)) {
+						slots.put(next, rooms.size());
+						rooms.add(next);
+					}
+				}
+			}
+			long[] words = net.minecraft.world.level.levelgen.structure.NativeStructurePieces.header(this, 50, 2 + rooms.size() * 8 + this.childPieces.size() * 10);
+			int at = 9;
+			words[at++] = rooms.size();
+			for (OceanMonumentPieces.RoomDefinition room : rooms) {
+				long open = 0;
+				for (int d = 0; d < 6; d++) {
+					if (room.hasOpening[d]) open |= 1L << d;
+				}
+				words[at++] = room.index;
+				words[at++] = open;
+				for (OceanMonumentPieces.RoomDefinition next : room.connections) words[at++] = next == null ? -1 : slots.get(next);
+			}
+			words[at++] = this.childPieces.size();
+			for (OceanMonumentPieces.OceanMonumentPiece child : this.childPieces) {
+				int kind = nativeKind(child);
+				if (kind < 0) return null;
+				long[] header = net.minecraft.world.level.levelgen.structure.NativeStructurePieces.header(child, kind, 0);
+				System.arraycopy(header, 0, words, at, 8);
+				words[at + 8] = child.roomDefinition == null ? -1 : slots.get(child.roomDefinition);
+				words[at + 9] = child instanceof OceanMonumentPieces.OceanMonumentSimpleRoom simple ? simple.mainDesign
+					: child instanceof OceanMonumentPieces.OceanMonumentWingRoom wing ? wing.mainDesign : 0;
+				at += 10;
+			}
+			return words;
+		}
+
+		private static int nativeKind(OceanMonumentPieces.OceanMonumentPiece child) {
+			return switch (child) {
+				case OceanMonumentPieces.OceanMonumentEntryRoom ignored -> 0;
+				case OceanMonumentPieces.OceanMonumentCoreRoom ignored -> 1;
+				case OceanMonumentPieces.OceanMonumentDoubleXRoom ignored -> 2;
+				case OceanMonumentPieces.OceanMonumentDoubleXYRoom ignored -> 3;
+				case OceanMonumentPieces.OceanMonumentDoubleYRoom ignored -> 4;
+				case OceanMonumentPieces.OceanMonumentDoubleYZRoom ignored -> 5;
+				case OceanMonumentPieces.OceanMonumentDoubleZRoom ignored -> 6;
+				case OceanMonumentPieces.OceanMonumentSimpleRoom ignored -> 7;
+				case OceanMonumentPieces.OceanMonumentSimpleTopRoom ignored -> 8;
+				case OceanMonumentPieces.OceanMonumentWingRoom ignored -> 9;
+				case OceanMonumentPieces.OceanMonumentPenthouse ignored -> 10;
+				default -> -1;
+			};
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
 		}
 
 		private List<OceanMonumentPieces.RoomDefinition> generateRoomGraph(RandomSource randomSource) {
@@ -712,6 +876,11 @@ public class OceanMonumentPieces {
 			super(StructurePieceType.OCEAN_MONUMENT_CORE_ROOM, 1, direction, roomDefinition, 2, 2, 2);
 		}
 
+		/** A planned room ({@link OceanMonumentPieces#addNativePieces}). */
+		OceanMonumentCoreRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, BoundingBox boundingBox) {
+			super(StructurePieceType.OCEAN_MONUMENT_CORE_ROOM, 1, direction, roomDefinition, boundingBox);
+		}
+
 		public OceanMonumentCoreRoom(CompoundTag compoundTag) {
 			super(StructurePieceType.OCEAN_MONUMENT_CORE_ROOM, compoundTag);
 		}
@@ -798,6 +967,11 @@ public class OceanMonumentPieces {
 			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_X_ROOM, 1, direction, roomDefinition, 2, 1, 1);
 		}
 
+		/** A planned room ({@link OceanMonumentPieces#addNativePieces}). */
+		OceanMonumentDoubleXRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, BoundingBox boundingBox) {
+			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_X_ROOM, 1, direction, roomDefinition, boundingBox);
+		}
+
 		public OceanMonumentDoubleXRoom(CompoundTag compoundTag) {
 			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_X_ROOM, compoundTag);
 		}
@@ -873,6 +1047,11 @@ public class OceanMonumentPieces {
 	public static class OceanMonumentDoubleXYRoom extends OceanMonumentPieces.OceanMonumentPiece {
 		public OceanMonumentDoubleXYRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition) {
 			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_XY_ROOM, 1, direction, roomDefinition, 2, 2, 1);
+		}
+
+		/** A planned room ({@link OceanMonumentPieces#addNativePieces}). */
+		OceanMonumentDoubleXYRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, BoundingBox boundingBox) {
+			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_XY_ROOM, 1, direction, roomDefinition, boundingBox);
 		}
 
 		public OceanMonumentDoubleXYRoom(CompoundTag compoundTag) {
@@ -996,6 +1175,11 @@ public class OceanMonumentPieces {
 			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_Y_ROOM, 1, direction, roomDefinition, 1, 2, 1);
 		}
 
+		/** A planned room ({@link OceanMonumentPieces#addNativePieces}). */
+		OceanMonumentDoubleYRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, BoundingBox boundingBox) {
+			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_Y_ROOM, 1, direction, roomDefinition, boundingBox);
+		}
+
 		public OceanMonumentDoubleYRoom(CompoundTag compoundTag) {
 			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_Y_ROOM, compoundTag);
 		}
@@ -1082,6 +1266,11 @@ public class OceanMonumentPieces {
 	public static class OceanMonumentDoubleYZRoom extends OceanMonumentPieces.OceanMonumentPiece {
 		public OceanMonumentDoubleYZRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition) {
 			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_YZ_ROOM, 1, direction, roomDefinition, 1, 2, 2);
+		}
+
+		/** A planned room ({@link OceanMonumentPieces#addNativePieces}). */
+		OceanMonumentDoubleYZRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, BoundingBox boundingBox) {
+			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_YZ_ROOM, 1, direction, roomDefinition, boundingBox);
 		}
 
 		public OceanMonumentDoubleYZRoom(CompoundTag compoundTag) {
@@ -1203,6 +1392,11 @@ public class OceanMonumentPieces {
 			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_Z_ROOM, 1, direction, roomDefinition, 1, 1, 2);
 		}
 
+		/** A planned room ({@link OceanMonumentPieces#addNativePieces}). */
+		OceanMonumentDoubleZRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, BoundingBox boundingBox) {
+			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_Z_ROOM, 1, direction, roomDefinition, boundingBox);
+		}
+
 		public OceanMonumentDoubleZRoom(CompoundTag compoundTag) {
 			super(StructurePieceType.OCEAN_MONUMENT_DOUBLE_Z_ROOM, compoundTag);
 		}
@@ -1297,6 +1491,11 @@ public class OceanMonumentPieces {
 	public static class OceanMonumentEntryRoom extends OceanMonumentPieces.OceanMonumentPiece {
 		public OceanMonumentEntryRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition) {
 			super(StructurePieceType.OCEAN_MONUMENT_ENTRY_ROOM, 1, direction, roomDefinition, 1, 1, 1);
+		}
+
+		/** A planned room ({@link OceanMonumentPieces#addNativePieces}). */
+		OceanMonumentEntryRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, BoundingBox boundingBox) {
+			super(StructurePieceType.OCEAN_MONUMENT_ENTRY_ROOM, 1, direction, roomDefinition, boundingBox);
 		}
 
 		public OceanMonumentEntryRoom(CompoundTag compoundTag) {
@@ -1447,6 +1646,15 @@ public class OceanMonumentPieces {
 			this.roomDefinition = roomDefinition;
 		}
 
+		/** A planned room with its final box ({@link OceanMonumentPieces#addNativePieces}). */
+		protected OceanMonumentPiece(
+			StructurePieceType structurePieceType, int i, Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, BoundingBox boundingBox
+		) {
+			super(structurePieceType, i, boundingBox);
+			this.setOrientation(direction);
+			this.roomDefinition = roomDefinition;
+		}
+
 		private static BoundingBox makeBoundingBox(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, int i, int j, int k) {
 			int l = roomDefinition.index;
 			int m = l % 5;
@@ -1551,6 +1759,12 @@ public class OceanMonumentPieces {
 		public OceanMonumentSimpleRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, RandomSource randomSource) {
 			super(StructurePieceType.OCEAN_MONUMENT_SIMPLE_ROOM, 1, direction, roomDefinition, 1, 1, 1);
 			this.mainDesign = randomSource.nextInt(3);
+		}
+
+		/** A planned room ({@link OceanMonumentPieces#addNativePieces}). */
+		OceanMonumentSimpleRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, BoundingBox boundingBox, int mainDesign) {
+			super(StructurePieceType.OCEAN_MONUMENT_SIMPLE_ROOM, 1, direction, roomDefinition, boundingBox);
+			this.mainDesign = mainDesign;
 		}
 
 		public OceanMonumentSimpleRoom(CompoundTag compoundTag) {
@@ -1725,6 +1939,11 @@ public class OceanMonumentPieces {
 	public static class OceanMonumentSimpleTopRoom extends OceanMonumentPieces.OceanMonumentPiece {
 		public OceanMonumentSimpleTopRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition) {
 			super(StructurePieceType.OCEAN_MONUMENT_SIMPLE_TOP_ROOM, 1, direction, roomDefinition, 1, 1, 1);
+		}
+
+		/** A planned room ({@link OceanMonumentPieces#addNativePieces}). */
+		OceanMonumentSimpleTopRoom(Direction direction, OceanMonumentPieces.RoomDefinition roomDefinition, BoundingBox boundingBox) {
+			super(StructurePieceType.OCEAN_MONUMENT_SIMPLE_TOP_ROOM, 1, direction, roomDefinition, boundingBox);
 		}
 
 		public OceanMonumentSimpleTopRoom(CompoundTag compoundTag) {

@@ -29,6 +29,7 @@ public final class NativeDecorationRegion implements AutoCloseable {
 	/** {@code ChunkStatus.FINAL_HEIGHTMAPS} in enum order: what proto-chunk writes update from CARVERS on. */
 	private static final Heightmap.Types[] FINAL = {Heightmap.Types.WORLD_SURFACE, Heightmap.Types.OCEAN_FLOOR,
 		Heightmap.Types.MOTION_BLOCKING, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES};
+	private static final java.util.Set<Heightmap.Types> FINAL_SET = java.util.EnumSet.copyOf(java.util.List.of(FINAL));
 	private static final int EVENT_POI = 1, EVENT_BLOCK_ENTITY_DUMMY = 2, EVENT_BLOCK_ENTITY_REMOVE = 3, EVENT_POST_PROCESS = 4,
 		EVENT_LIGHT_SECTION = 5, EVENT_LIGHT_CHECK = 6, EVENT_FLUID_TICK = 7, EVENT_BLOCK_TICK = 8;
 	private static final int OUT_DETAIL_X = 0, OUT_DETAIL_Z = 1, OUT_FAR_COUNT = 2, OUT_FAR_LOG = 3, FAR_LOG_ENTRIES = 16;
@@ -80,6 +81,10 @@ public final class NativeDecorationRegion implements AutoCloseable {
 	 * keeps Java's path.
 	 */
 	@Nullable
+	/** One chunk's captured section owners and their words. */
+	private record Captured(LevelChunkSection[] sections, NativeLiveBlockSection[] blocks, MemorySegment[] counters, NativeLiveBiomeSection<?>[] biomes,
+							NativeLiveBiomeSection.Binding<?> binding, long[] words) {}
+
 	public static NativeDecorationRegion bind(WorldGenLevel level, ChunkAccess center, WorldGenerationContext context, boolean lazyPriming) {
 		if (level.getClass() != WorldGenRegion.class || center.getClass() != ProtoChunk.class || center.isUpgrading()) return null;
 		var region = (WorldGenRegion)level;
@@ -89,7 +94,8 @@ public final class NativeDecorationRegion implements AutoCloseable {
 		var pos = center.getPos();
 		ProtoChunk[] chunks = new ProtoChunk[CHUNKS];
 		for (int index = 0; index < CHUNKS; index++) {
-			ChunkAccess chunk = region.getChunk(pos.x + index % 3 - 1, pos.z + index / 3 - 1);
+			// Binding only reads: each chunk joins the FEATURES transaction at its first write.
+			ChunkAccess chunk = region.nativeChunkUntracked(pos.x + index % 3 - 1, pos.z + index / 3 - 1);
 			if (chunk.getClass() != ProtoChunk.class || chunk.getSectionsCount() != sectionCount || chunk.getMinY() != center.getMinY()) return null;
 			chunks[index] = (ProtoChunk)chunk;
 		}
@@ -119,8 +125,21 @@ public final class NativeDecorationRegion implements AutoCloseable {
 		for (int index = 0; index < CHUNKS; index++) {
 			var chunk = chunks[index];
 			this.chunks[index] = chunk;
-			var chunkSections = chunk.getSections();
+			var chunkSections = chunk.getSectionsForRead();
 			if (chunkSections.length != this.sectionCount) return false;
+			long base = HEADER + (long)index * this.sectionCount * SECTION_WORDS;
+			// A previous region's capture of this chunk, while its section identities hold;
+			// refresh re-checks every owner before native work reads them.
+			if (chunk.nativeDecorationCapture instanceof Captured cached && cached.binding == this.biomeBinding
+					&& java.util.Arrays.equals(cached.sections, chunkSections)) {
+				this.sections[index] = cached.sections;
+				this.blocks[index] = cached.blocks;
+				this.counters[index] = cached.counters;
+				this.biomes[index] = cached.biomes;
+				MemorySegment.copy(cached.words, 0, this.words, ValueLayout.JAVA_LONG, base * 8L, cached.words.length);
+				continue;
+			}
+			long[] captured = new long[this.sectionCount * SECTION_WORDS];
 			this.sections[index] = chunkSections.clone();
 			this.blocks[index] = new NativeLiveBlockSection[this.sectionCount];
 			this.counters[index] = new MemorySegment[this.sectionCount];
@@ -136,11 +155,12 @@ public final class NativeDecorationRegion implements AutoCloseable {
 				this.blocks[index][s] = live;
 				this.counters[index][s] = section.nativeGenerationCounters();
 				this.biomes[index][s] = biome;
-				long at = HEADER + ((long)index * this.sectionCount + s) * SECTION_WORDS;
-				this.words.setAtIndex(ValueLayout.JAVA_LONG, at, live.stageOwner().address());
-				this.words.setAtIndex(ValueLayout.JAVA_LONG, at + 1, this.counters[index][s].address());
-				this.words.setAtIndex(ValueLayout.JAVA_LONG, at + 2, biome.owner.address());
+				captured[s * SECTION_WORDS] = live.stageOwner().address();
+				captured[s * SECTION_WORDS + 1] = this.counters[index][s].address();
+				captured[s * SECTION_WORDS + 2] = biome.owner.address();
 			}
+			MemorySegment.copy(captured, 0, this.words, ValueLayout.JAVA_LONG, base * 8L, captured.length);
+			chunk.nativeDecorationCapture = new Captured(this.sections[index], this.blocks[index], this.counters[index], this.biomes[index], this.biomeBinding, captured);
 		}
 		this.words.setAtIndex(ValueLayout.JAVA_LONG, 0, VERSION);
 		this.words.setAtIndex(ValueLayout.JAVA_LONG, 1, pos.x);
@@ -160,7 +180,7 @@ public final class NativeDecorationRegion implements AutoCloseable {
 		for (int index = 0; index < CHUNKS; index++) {
 			var chunk = chunks[index];
 			var status = chunk.getPersistedStatus();
-			if (!status.isOrAfter(net.minecraft.world.level.chunk.status.ChunkStatus.CARVERS) || !status.heightmapsAfter().equals(java.util.EnumSet.copyOf(java.util.List.of(FINAL)))
+			if (!status.isOrAfter(net.minecraft.world.level.chunk.status.ChunkStatus.CARVERS) || !status.heightmapsAfter().equals(FINAL_SET)
 					|| status.getChunkType() != net.minecraft.world.level.chunk.status.ChunkType.PROTOCHUNK) {
 				this.writeReady = false;
 			}
@@ -207,11 +227,17 @@ public final class NativeDecorationRegion implements AutoCloseable {
 		long present = 0;
 		for (int index = 0; index < CHUNKS; index++) {
 			var chunk = this.chunks[index];
-			var chunkSections = chunk.getSections();
+			var chunkSections = chunk.getSectionsForRead();
 			for (int s = 0; s < this.sectionCount; s++) {
 				var section = chunkSections[s];
-				if (section != this.sections[index][s] || section.nativeGenerationInput() != this.blocks[index][s]) return REFRESH_BLOCKS;
-				if (!(section.getBiomes() instanceof PalettedContainer<?> container) || container.nativeLiveBiomes() != this.biomes[index][s]) return REFRESH_BIOMES;
+				if (section != this.sections[index][s] || section.nativeGenerationInput() != this.blocks[index][s]) {
+					chunk.nativeDecorationCapture = null;
+					return REFRESH_BLOCKS;
+				}
+				if (!(section.getBiomes() instanceof PalettedContainer<?> container) || container.nativeLiveBiomes() != this.biomes[index][s]) {
+					chunk.nativeDecorationCapture = null;
+					return REFRESH_BIOMES;
+				}
 			}
 			for (int type = 0; type < HEIGHTMAPS.length; type++) {
 				if (!chunk.hasPrimedHeightmap(HEIGHTMAPS[type])) {
@@ -273,6 +299,19 @@ public final class NativeDecorationRegion implements AutoCloseable {
 
 	/** {@code installPrimed} false only in verification, which compares them with Java's own priming. */
 	public void afterPlacement(boolean installPrimed) {
+		if (installPrimed) {
+			// Installing heightmaps or sky sources writes the chunk: it joins the transaction first.
+			long finalBits = this.out.getAtIndex(ValueLayout.JAVA_LONG, this.outFinal() + 1);
+			long skyBits = this.out.getAtIndex(ValueLayout.JAVA_LONG, this.outSky() + 1);
+			long primedBits = this.out.getAtIndex(ValueLayout.JAVA_LONG, OUT_RESIZED + (long)CHUNKS * this.sectionCount);
+			for (int index = 0; index < CHUNKS; index++) {
+				long finalMask = ((1L << FINAL.length) - 1) << (index * FINAL.length);
+				long primedMask = ((1L << HEIGHTMAPS.length) - 1) << (index * HEIGHTMAPS.length);
+				if ((finalBits & finalMask) != 0 || (skyBits >>> index & 1) != 0 || (primedBits & primedMask) != 0) {
+					DecorationTransaction.touchCurrent(this.chunks[index]);
+				}
+			}
+		}
 		for (int index = 0; index < CHUNKS; index++) {
 			for (int s = 0; s < this.sectionCount; s++) {
 				if (this.out.getAtIndex(ValueLayout.JAVA_LONG, OUT_RESIZED + (long)index * this.sectionCount + s) != 0) {
@@ -492,6 +531,12 @@ public final class NativeDecorationRegion implements AutoCloseable {
 		return ((pos.getZ() >> 4) - center.z + 1) * 3 + (pos.getX() >> 4) - center.x + 1;
 	}
 
+	/** {@code OP_TOUCH}: chunk {@code index} of the bound 3x3 joins the step's transaction. */
+	public void touchForTransaction(int index) {
+		if (index < 0 || index >= CHUNKS) throw new IllegalArgumentException("Native touch outside the bound region: " + index);
+		DecorationTransaction.touchCurrent(this.chunks[index]);
+	}
+
 	/** Verification only: a block position for a flat state index. */
 	public BlockPos positionForVerification(int section, int i) {
 		var pos = this.chunks[section / this.sectionCount].getPos();
@@ -524,8 +569,15 @@ public final class NativeDecorationRegion implements AutoCloseable {
 				}
 				case EVENT_BLOCK_ENTITY_REMOVE -> chunk.removeBlockEntity(pos);
 				case EVENT_POST_PROCESS -> chunk.markPosForPostprocessing(pos);
-				case EVENT_LIGHT_SECTION -> ((ProtoChunk)chunk).nativeLightEngine().updateSectionStatus(pos, argument != 0);
-				case EVENT_LIGHT_CHECK -> ((ProtoChunk)chunk).nativeLightEngine().checkBlock(pos);
+				case EVENT_LIGHT_SECTION -> {
+					var engine = ((ProtoChunk)chunk).nativeLightEngine();
+					boolean empty = argument != 0;
+					if (!DecorationTransaction.defer(() -> engine.updateSectionStatus(pos, empty))) engine.updateSectionStatus(pos, empty);
+				}
+				case EVENT_LIGHT_CHECK -> {
+					var engine = ((ProtoChunk)chunk).nativeLightEngine();
+					if (!DecorationTransaction.defer(() -> engine.checkBlock(pos))) engine.checkBlock(pos);
+				}
 				case EVENT_FLUID_TICK -> this.region.scheduleTick(pos, net.minecraft.core.registries.BuiltInRegistries.FLUID.byId((int)(argument >>> 32)), (int)argument);
 				case EVENT_BLOCK_TICK -> this.region.scheduleTick(pos, net.minecraft.core.registries.BuiltInRegistries.BLOCK.byId((int)(argument >>> 32)), (int)argument);
 				case 9 -> net.minecraft.world.level.levelgen.NativeDecoration.templateBlockEntity(pos, argument);

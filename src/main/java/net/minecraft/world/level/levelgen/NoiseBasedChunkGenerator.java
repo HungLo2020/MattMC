@@ -111,8 +111,19 @@ public final class NoiseBasedChunkGenerator extends ChunkGenerator {
 		return this.settings.is(resourceKey);
 	}
 
+	NoiseGeneratorSettings nativeSettings() {
+		return this.settings.value();
+	}
+
+	Aquifer.FluidPicker nativeFluidPicker() {
+		return this.globalFluidPicker.get();
+	}
+
 	@Override
 	public int getBaseHeight(int i, int j, Heightmap.Types types, LevelHeightAccessor levelHeightAccessor, RandomState randomState) {
+		// Rust evaluates the column over its chunk's native noise when it can.
+		int nativeHeight = NativeColumns.baseHeight(this, i, j, types, levelHeightAccessor, randomState);
+		if (nativeHeight != NativeColumns.UNHANDLED) return nativeHeight;
 		return this.iterateNoiseColumn(levelHeightAccessor, randomState, i, j, null, types.isOpaque()).orElse(levelHeightAccessor.getMinY());
 	}
 
@@ -296,18 +307,9 @@ public final class NoiseBasedChunkGenerator extends ChunkGenerator {
 		);
 		CarvingMask carvingMask = ((ProtoChunk)chunkAccess).getOrCreateCarvingMask();
 		if (NativeCarvers.eligible(chunkAccess, noiseChunk, carvingContext)) {
-			// Rust runs the carver loop; Java supplies each neighbour's carver biome's carvers.
-			ChunkPos chunkPos = chunkAccess.getPos();
-			List<NativeCarvers.Neighbour> neighbours = new ArrayList<>(289);
-			for (int j = -8; j <= 8; j++) {
-				for (int k = -8; k <= 8; k++) {
-					ChunkPos chunkPos2 = new ChunkPos(chunkPos.x + j, chunkPos.z + k);
-					List<ConfiguredWorldCarver<?>> carvers = new ArrayList<>();
-					for (Holder<ConfiguredWorldCarver<?>> holder : this.carverBiome(chunks, randomState, chunkPos2).getCarvers()) carvers.add(holder.value());
-					neighbours.add(new NativeCarvers.Neighbour(chunkPos2.x, chunkPos2.z, carvers));
-				}
-			}
-			if (NativeCarvers.run(carvingContext, chunkAccess, aquifer, l, neighbours, biomeManager2::getBiome)) return;
+			// Rust selects each neighbour's carvers (sampling carver biomes not yet cached) and carves.
+			var selection = NativeCarvers.select(this, this.biomeSource, randomState, chunks, chunkAccess.getPos());
+			if (selection != null && NativeCarvers.run(carvingContext, chunkAccess, aquifer, l, selection, biomeManager2::getBiome)) return;
 		}
 		this.carveAll(chunks, l, randomState, chunkAccess, worldgenRandom, carvingContext, biomeManager2, aquifer, carvingMask);
 	}

@@ -142,6 +142,28 @@ struct State {
     /// Generations replaced since Java last loaded a view. Java's previous
     /// view may still be read, so `view` hands these to Java to pin with it.
     retired: Vec<Arc<Generation>>,
+    /// A generation step's transaction: armed, then the section as it was
+    /// before the step's first write, so a failed step publishes nothing.
+    tx: Tx,
+}
+
+/// A generation step's transaction state, owned by one transaction id.
+#[derive(Default)]
+enum Tx {
+    #[default]
+    Off,
+    Armed(u64),
+    Saved(u64, Box<Saved>),
+}
+
+/// A section's palette, packed words and ID map at a transaction's first write.
+struct Saved {
+    bits: usize,
+    requested: usize,
+    global: bool,
+    entries: Vec<u32>,
+    words: Vec<u64>,
+    ids: StateIds,
 }
 pub struct Owner {
     authoritative: AtomicBool,
@@ -358,7 +380,7 @@ impl Owner {
         Some(Self {
             authoritative: AtomicBool::new(true),
             generation_epoch: AtomicU64::new(0),
-            state: Mutex::new(State { generation, ids, retired: Vec::new() }),
+            state: Mutex::new(State { generation, ids, retired: Vec::new(), tx: Tx::Off }),
             limit,
             global_bits,
         })
@@ -376,6 +398,7 @@ impl Owner {
                     generation: g.clone(),
                     ids: guard.ids.clone(),
                     retired: Vec::new(),
+                    tx: Tx::Off,
                 }),
                 limit: self.limit,
                 global_bits: self.global_bits,
@@ -398,6 +421,7 @@ impl Owner {
                 )),
                 ids: guard.ids.clone(),
                 retired: Vec::new(),
+                tx: Tx::Off,
             }),
             limit: self.limit,
             global_bits: self.global_bits,
@@ -459,6 +483,17 @@ impl Owner {
         self.write_locked(&mut s, index, value)
     }
     fn write_locked(&self, s: &mut State, index: usize, value: u32) -> Option<(u32, bool)> {
+        if let Tx::Armed(id) = s.tx {
+            let g = &s.generation;
+            s.tx = Tx::Saved(id, Box::new(Saved {
+                bits: g.bits,
+                requested: g.requested,
+                global: g.global,
+                entries: (0..g.count.load(Ordering::Acquire) as usize).map(|i| g.palette[i].load(Ordering::Acquire)).collect(),
+                words: g.words.iter().map(|w| w.load(Ordering::Acquire)).collect(),
+                ids: s.ids.clone(),
+            }));
+        }
         let old = s.generation.state(index);
         if s.generation.global {
             s.generation.set(index, value);
@@ -610,6 +645,59 @@ impl Owner {
         s.generation.changed();
         true
     }
+    /// Arms transaction `id`: the next write saves the section first. Err when
+    /// another open transaction owns the section (never shared or discarded).
+    pub(crate) fn tx_begin(&self, id: u64) -> Result<(), ()> {
+        let mut s = self.state.lock().unwrap();
+        match s.tx {
+            Tx::Off => {
+                s.tx = Tx::Armed(id);
+                Ok(())
+            }
+            Tx::Armed(owner) | Tx::Saved(owner, _) if owner == id => Ok(()),
+            _ => Err(()),
+        }
+    }
+
+    /// Ends transaction `id`. A rollback restores the saved section as a new
+    /// generation (Java's views must reload); Ok(whether it changed). Err when
+    /// the section is not this transaction's.
+    pub(crate) fn tx_end(&self, id: u64, rollback: bool) -> Result<bool, ()> {
+        self.tx_end_changes(id, rollback, None)
+    }
+
+    /// [`Self::tx_end`], also reporting a rollback's changed entries as
+    /// `(index, state before the rollback)` in index order.
+    pub(crate) fn tx_end_changes(&self, id: u64, rollback: bool, changes: Option<&mut Vec<(u32, u32)>>) -> Result<bool, ()> {
+        let mut s = self.state.lock().unwrap();
+        match s.tx {
+            Tx::Armed(owner) | Tx::Saved(owner, _) if owner == id => {}
+            _ => return Err(()),
+        }
+        let Tx::Saved(_, saved) = std::mem::take(&mut s.tx) else {
+            return Ok(false);
+        };
+        if !rollback {
+            return Ok(false);
+        }
+        let saved = *saved;
+        let next = Arc::new(Generation::new(saved.bits, saved.requested, saved.global, &saved.entries, &saved.words));
+        if let Some(changes) = changes {
+            for index in 0..ENTRIES {
+                let before = s.generation.state(index);
+                if before != next.state(index) {
+                    changes.push((index as u32, before));
+                }
+            }
+        }
+        next.changed();
+        let previous = std::mem::replace(&mut s.generation, next);
+        self.generation_epoch.fetch_update(Ordering::Release, Ordering::Relaxed, |v| Some(v.saturating_add(1))).unwrap();
+        s.retired.push(previous);
+        s.ids = saved.ids;
+        Ok(true)
+    }
+
     pub(crate) fn capture(&self) -> Box<[u16; ENTRIES]> {
         let s = self.state.lock().unwrap();
         if s.generation.bits == 0 {

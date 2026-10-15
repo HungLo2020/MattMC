@@ -44,6 +44,64 @@ public class WoodlandMansionPieces {
 		mansionPiecePlacer.createMansion(blockPos, rotation, list, mansionGrid);
 	}
 
+	/** Template names the native planner can emit, indexed by its template field (same table as mansion_plan.rs NAMES). */
+	public static final String[] NATIVE_TEMPLATES = {
+		"entrance", "wall_flat", "wall_window", "wall_corner", "roof", "roof_front", "small_wall", "small_wall_corner", "roof_corner",
+		"roof_inner_corner", "corridor_floor", "carpet_north", "carpet_east", "carpet_south_1", "carpet_south_2", "carpet_west_1",
+		"carpet_west_2", "indoors_wall_1", "indoors_wall_2", "indoors_door_1", "indoors_door_2",
+		"1x1_a1", "1x1_a2", "1x1_a3", "1x1_a4", "1x1_a5", "1x1_as1", "1x1_as2", "1x1_as3", "1x1_as4",
+		"1x2_a1", "1x2_a2", "1x2_a3", "1x2_a4", "1x2_a5", "1x2_a6", "1x2_a7", "1x2_a8", "1x2_a9",
+		"1x2_b1", "1x2_b2", "1x2_b3", "1x2_b4", "1x2_b5", "1x2_s1", "1x2_s2", "2x2_a1", "2x2_a2", "2x2_a3", "2x2_a4", "2x2_s1",
+		"1x1_b1", "1x1_b2", "1x1_b3", "1x1_b4", "1x1_b5", "1x2_c_stairs", "1x2_c1", "1x2_c2", "1x2_c3", "1x2_c4",
+		"1x2_d_stairs", "1x2_d1", "1x2_d2", "1x2_d3", "1x2_d4", "1x2_d5", "1x2_se1", "2x2_b1", "2x2_b2", "2x2_b3", "2x2_b4", "2x2_b5"
+	};
+
+	/** Native piece kind of a {@link WoodlandMansionPiece} in mansion_plan.rs words. */
+	public static final int NATIVE_KIND = 80;
+
+	/** mansion_plan.rs params: {@code [NATIVE_TEMPLATES.length, then each template's size x, y, z]} (the sizes only give the boxes). */
+	public static int[] nativePlanParams(StructureTemplateManager structureTemplateManager) {
+		int[] params = new int[1 + NATIVE_TEMPLATES.length * 3];
+		params[0] = NATIVE_TEMPLATES.length;
+		for (int i = 0; i < NATIVE_TEMPLATES.length; i++) {
+			net.minecraft.core.Vec3i size = structureTemplateManager.getOrCreate(WoodlandMansionPiece.makeLocation(NATIVE_TEMPLATES[i])).getSize();
+			params[1 + i * 3] = size.getX();
+			params[2 + i * 3] = size.getY();
+			params[3 + i * 3] = size.getZ();
+		}
+		return params;
+	}
+
+	/**
+	 * Rebuilds the planned pieces (mansion_plan.rs words: kind, depth, box[6], orientation, field count,
+	 * then template, rotation, mirror, tx, ty, tz) in order with the normal constructor; no random draws.
+	 */
+	public static void addNativePieces(
+		net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder structurePiecesBuilder,
+		StructureTemplateManager structureTemplateManager,
+		int[] words
+	) {
+		Rotation[] rotations = Rotation.values();
+		Mirror[] mirrors = Mirror.values();
+		int i = 0;
+		while (i < words.length) {
+			if (words[i] != NATIVE_KIND || words[i + 9] != 6) {
+				throw new IllegalStateException("Unexpected native mansion piece kind " + words[i]);
+			}
+			int f = i + 10;
+			structurePiecesBuilder.addPiece(
+				new WoodlandMansionPiece(
+					structureTemplateManager,
+					NATIVE_TEMPLATES[words[f]],
+					new BlockPos(words[f + 3], words[f + 4], words[f + 5]),
+					rotations[words[f + 1]],
+					mirrors[words[f + 2]]
+				)
+			);
+			i = f + 6;
+		}
+	}
+
 	static class FirstFloorRoomCollection extends WoodlandMansionPieces.FloorRoomCollection {
 		@Override
 		public String get1x1(RandomSource randomSource) {
@@ -1210,6 +1268,11 @@ public class WoodlandMansionPieces {
 			super.addAdditionalSaveData(structurePieceSerializationContext, compoundTag);
 			compoundTag.store("Rot", Rotation.LEGACY_CODEC, this.placeSettings.getRotation());
 			compoundTag.store("Mi", Mirror.LEGACY_CODEC, this.placeSettings.getMirror());
+		}
+
+		@Override
+		protected long[] nativeTailWords() {
+			return this.nativeTailWords(5);
 		}
 
 		@Override

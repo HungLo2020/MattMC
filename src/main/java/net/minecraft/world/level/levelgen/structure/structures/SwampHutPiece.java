@@ -22,7 +22,7 @@ import net.minecraft.world.level.levelgen.structure.ScatteredFeaturePiece;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
 
-public class SwampHutPiece extends ScatteredFeaturePiece {
+public class SwampHutPiece extends ScatteredFeaturePiece implements net.minecraft.world.level.levelgen.structure.NativeStructurePieces.Native {
 	private boolean spawnedWitch;
 	private boolean spawnedCat;
 
@@ -30,10 +30,35 @@ public class SwampHutPiece extends ScatteredFeaturePiece {
 		super(StructurePieceType.SWAMPLAND_HUT, i, 64, j, 7, 7, 9, getRandomHorizontalDirection(randomSource));
 	}
 
+	/** A piece Rust planned ({@code structure/small_plan.rs}): no draws. */
+	public SwampHutPiece(BoundingBox boundingBox, Direction direction) {
+		super(StructurePieceType.SWAMPLAND_HUT, boundingBox, direction, 7, 7, 9);
+	}
+
+	/** Rebuilds {@code small_plan.rs}'s piece (kind 1, fields {@code [width, height, depth, heightPosition]}). */
+	public static void addNativePieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager, int[] words) {
+		builder.addPiece(ScatteredFeaturePiece.nativePiece(words, 1, 7, 7, 9, SwampHutPiece::new));
+	}
+
 	public SwampHutPiece(CompoundTag compoundTag) {
 		super(StructurePieceType.SWAMPLAND_HUT, compoundTag);
 		this.spawnedWitch = compoundTag.getBooleanOr("Witch", false);
 		this.spawnedCat = compoundTag.getBooleanOr("Cat", false);
+	}
+
+	@Override
+	public long[] nativeWords() {
+		long[] words = this.nativeScatteredWords(1, 2);
+		words[13] = this.spawnedWitch ? 1 : 0;
+		words[14] = this.spawnedCat ? 1 : 0;
+		return words;
+	}
+
+	@Override
+	public void nativeUpdate(long[] words) {
+		this.nativeScatteredUpdate(words);
+		this.spawnedWitch = words[13] != 0;
+		this.spawnedCat = words[14] != 0;
 	}
 
 	@Override

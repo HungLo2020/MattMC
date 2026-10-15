@@ -243,3 +243,59 @@ pub unsafe extern "C" fn mattmc_live_section_recount(
     };
     i32::from(owner.recount(counts, policies))
 }
+
+/// Rolls back transaction `id` over `count` owners like `mattmc_live_section_tx`
+/// op 2, also writing each restored entry that changed as `[owner index << 12 |
+/// block index, state before the rollback]` pairs to `changes` (up to
+/// `capacity` pairs; `total` receives the full count). Returns the owners
+/// restored, -1 for invalid input, -2 for another transaction's owner.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_live_section_tx_rollback(owners: *const *const Owner, count: i32, id: i64, changes: *mut i32, capacity: i32,
+    total: *mut i32) -> i32 {
+    if owners.is_null() || changes.is_null() || total.is_null() || !(0..=1 << 16).contains(&count) || capacity < 0 || id <= 0 {
+        return -1;
+    }
+    let out = std::slice::from_raw_parts_mut(changes, capacity as usize * 2);
+    let (mut restored, mut conflict, mut written) = (0, false, 0usize);
+    let mut found = Vec::new();
+    for (o, &owner) in std::slice::from_raw_parts(owners, count as usize).iter().enumerate() {
+        let Some(owner) = owner.as_ref() else { continue };
+        found.clear();
+        match owner.tx_end_changes(id as u64, true, Some(&mut found)) {
+            Ok(changed) => restored += changed as i32,
+            Err(()) => conflict = true,
+        }
+        for &(index, before) in &found {
+            if written < capacity as usize {
+                out[written * 2] = ((o as i32) << 12) | index as i32;
+                out[written * 2 + 1] = before as i32;
+            }
+            written += 1;
+        }
+    }
+    *total = written.min(i32::MAX as usize) as i32;
+    if conflict { -2 } else { restored }
+}
+
+/// Transaction `id`'s operation over `count` owners: `op` 0 arms each, 1
+/// commits (drops saved sections), 2 rolls back. Returns the owners restored,
+/// -1 for invalid input, -2 when an owner belongs to another transaction (every
+/// owner of this one is still processed; another's state is never touched).
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_live_section_tx(owners: *const *const Owner, count: i32, op: i32, id: i64) -> i32 {
+    if owners.is_null() || !(0..=1 << 16).contains(&count) || !(0..=2).contains(&op) || id <= 0 {
+        return -1;
+    }
+    let (mut restored, mut conflict) = (0, false);
+    for &owner in std::slice::from_raw_parts(owners, count as usize) {
+        let Some(owner) = owner.as_ref() else { continue };
+        match op {
+            0 => conflict |= owner.tx_begin(id as u64).is_err(),
+            _ => match owner.tx_end(id as u64, op == 2) {
+                Ok(changed) => restored += changed as i32,
+                Err(()) => conflict = true,
+            },
+        }
+    }
+    if conflict { -2 } else { restored }
+}

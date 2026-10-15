@@ -126,6 +126,12 @@ pub(crate) enum Vegetation {
     BasaltPillar(Box<super::nether::BasaltPillar>),
     /// `DesertWellFeature` (`rooms.rs`).
     DesertWell(Box<super::rooms::DesertWell>),
+    /// `SpikeFeature` (`end.rs`).
+    Spikes(Box<super::end::Spikes>),
+    /// `EndGatewayFeature` (`end.rs`).
+    Gateway(Box<super::end::Gateway>),
+    /// `EndPlatformFeature` (`end.rs`).
+    Platform(Box<super::end::Platform>),
     /// `EndIslandFeature` (`end.rs`).
     EndIsland(Box<super::end::EndIsland>),
 }
@@ -298,6 +304,9 @@ impl Vegetation {
             44 | 45 => Vegetation::NetherVines(Box::new(super::plants::NetherVines::read(kind == 45, reader)?)),
             46 => Vegetation::BasaltPillar(Box::new(super::nether::BasaltPillar::read(reader)?)),
             49 => Vegetation::DesertWell(Box::new(super::rooms::DesertWell::read(reader)?)),
+            50 => Vegetation::Spikes(Box::new(super::end::Spikes::read(reader)?)),
+            51 => Vegetation::Gateway(Box::new(super::end::Gateway::read(reader)?)),
+            52 => Vegetation::Platform(Box::new(super::end::Platform::read(reader)?)),
             40 => Vegetation::EndIsland(Box::new(super::end::EndIsland::read(reader)?)),
             19 => Vegetation::UnderwaterMagma {
                 floor_search_range: reader.next()?,
@@ -344,6 +353,9 @@ impl Vegetation {
             Vegetation::NetherVines(vines) => vines.kind(),
             Vegetation::BasaltPillar(_) => 46,
             Vegetation::DesertWell(_) => 49,
+            Vegetation::Spikes(_) => 50,
+            Vegetation::Gateway(_) => 51,
+            Vegetation::Platform(_) => 52,
         }
     }
 }
@@ -534,6 +546,9 @@ pub(crate) fn place(placement: &mut Placement, feature: &Vegetation, origin: [i3
         Vegetation::NetherVines(vines) => vines.place(placement, origin),
         Vegetation::BasaltPillar(pillar) => pillar.place(placement, origin),
         Vegetation::DesertWell(well) => well.place(placement, origin),
+        Vegetation::Spikes(spikes) => spikes.place(placement, origin),
+        Vegetation::Gateway(gateway) => gateway.place(placement, origin),
+        Vegetation::Platform(platform) => platform.place(placement, origin),
         Vegetation::UnderwaterMagma { floor_search_range, radius, probability, water, magma } => {
             let Some(floor) = magma_floor(placement, origin, *floor_search_range, *water)? else {
                 return Ok(false);

@@ -28,6 +28,32 @@ public class NetherFossilStructure extends Structure {
 	}
 
 	@Override
+	public int[] nativeStub() {
+		return new int[]{6, 0, 0};
+	}
+
+	@Override
+	public int[] nativeStubParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager structureTemplateManager,
+		net.minecraft.world.level.chunk.ChunkGenerator chunkGenerator, net.minecraft.world.level.LevelHeightAccessor levelHeightAccessor) {
+		// Uniform heights only; Rust draws them (an empty range keeps Java's warning).
+		if (!(this.height instanceof net.minecraft.world.level.levelgen.heightproviders.UniformHeight uniform)) return null;
+		WorldGenerationContext context = new WorldGenerationContext(chunkGenerator, levelHeightAccessor);
+		int min = uniform.minInclusive().resolveY(context), max = uniform.maxInclusive().resolveY(context);
+		return min > max ? null : new int[]{min, max};
+	}
+
+	@Override
+	public void nativeStubPieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder structurePiecesBuilder,
+		Structure.GenerationContext generationContext, BlockPos stub, net.minecraft.world.level.block.Rotation rotation) {
+		// Replay findGenerationPoint's draws (Rust found the position), then the pieces'.
+		WorldgenRandom worldgenRandom = generationContext.random();
+		worldgenRandom.nextInt(16);
+		worldgenRandom.nextInt(16);
+		this.height.sample(worldgenRandom, new WorldGenerationContext(generationContext.chunkGenerator(), generationContext.heightAccessor()));
+		NetherFossilPieces.addPieces(generationContext.structureTemplateManager(), structurePiecesBuilder, worldgenRandom, stub);
+	}
+
+	@Override
 	public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext) {
 		WorldgenRandom worldgenRandom = generationContext.random();
 		int i = generationContext.chunkPos().getMinBlockX() + worldgenRandom.nextInt(16);

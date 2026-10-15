@@ -98,6 +98,11 @@ public class StructureTemplatePool {
 		return this.rawTemplates;
 	}
 
+	/** The weighted list expanded (each element repeated by its weight), as {@code getRandomTemplate} draws from it. */
+	public List<StructurePoolElement> nativeTemplates() {
+		return this.templates;
+	}
+
 	public Holder<StructureTemplatePool> getFallback() {
 		return this.fallback;
 	}

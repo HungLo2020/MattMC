@@ -104,7 +104,7 @@ spawn-protection=0
                f'-Daudit.output={run}', f'-Daudit.serial={str(not args.timing).lower()}', f'-Daudit.hash={str(not args.timing).lower()}',
                f'-Daudit.radius={args.radius}', f'-Daudit.rounds={args.rounds}', f'-Daudit.warmups={args.warmups}',
                f'-Daudit.dimensions={args.dimensions}', f'-Daudit.resume={str(args.resume).lower()}',
-               f'-Daudit.biomes={args.biomes}', f'-Daudit.structures={args.structures}', f'-javaagent:{jar}']
+               f'-Daudit.biomes={args.biomes}', f'-Daudit.structures={args.structures}', f'-Daudit.centers={args.centers}', f'-javaagent:{jar}']
     if side.startswith('current') or side == 'reference':
         command += ['--enable-native-access=ALL-UNNAMED', f'-Dmattmc.rust.natives.dir={native_dir(side, args)}']
     if side == 'current-java':
@@ -213,6 +213,7 @@ def main():
     parser.add_argument('--resume', action='store_true', help='carve each region, save and unload it, then finish it to FULL from disk')
     parser.add_argument('--pairs', type=int, default=1, help='alternating Frozen/Current launches')
     parser.add_argument('--workers', type=int, default=4)
+    parser.add_argument('--centers', default='', help='extra regions at dimension:chunkX:chunkZ, comma separated (e.g. the End origin)')
     parser.add_argument('--cpus', default='2-7')
     parser.add_argument('--timeout', type=int, default=3600)
     parser.add_argument('--skip-build', action='store_true')

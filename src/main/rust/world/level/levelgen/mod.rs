@@ -13,5 +13,6 @@ pub(crate) mod noise_fill;
 pub(crate) mod proto_chunk;
 pub(crate) mod random;
 pub(crate) mod router;
+pub(crate) mod structure;
 pub(crate) mod surface;
 pub(crate) mod synth;

@@ -12,10 +12,16 @@ then runs every generation step in one call per chunk:
    [`levelgen/decoration/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/decoration),
    or Java's `placeWithBiomeCheck` through an upcall (`Sequence.feature`).
 
-Java still gathers the present biome set (from section palettes) and owns
-structure placement and every feature without a program. When the loop
-declines before running, Java's own loop runs, offering each placed feature
-to `NativeDecoration.place` one at a time.
+Rust also gathers the present biome set: the distinct values stored in the
+bound 3×3's native biome owners, mapped through a per-plan table to plan biome
+IDs (values outside `possibleBiomes()` drop out). When a value is not in the
+plan, Java gathers the set from section palettes as before
+(`javaBiomeSets=` counts those loops). Java owns the structure-step dispatch
+(each start's pieces then place natively, see
+[native structure pieces](../structure/RUST-STRUCTURE-PIECES.md)) and every
+feature without a program. When the loop declines before running, Java's own
+loop runs, offering each placed feature to `NativeDecoration.place` one at a
+time.
 
 ## What runs in Rust
 
@@ -118,6 +124,17 @@ and each lit chunk's light engine and sky sources) and a plan for the region
 context. Programs and the plan are cached per generator, keyed by the tag
 generation, biome binding and `minGenY`/`genDepth`.
 
+Binding is per-chunk work over every section, so two shortcuts keep sparse
+chunks (the End's islands) cheap:
+
+- Each `ProtoChunk` keeps its last capture (section, block, counter and biome
+  owners and their words) while its section array is unchanged; the next
+  region reuses it, and `refresh` re-checks every owner before native work.
+  A failed check drops the capture so the next bind recaptures.
+- A structure step calls back only when the chunk references one of the
+  step's structures: `startsForStructure` finds nothing otherwise, and each
+  feature reseeds the random the step would have set.
+
 Unprimed WG heightmaps (chunks restored from disk at CARVERS) are primed by
 Rust at the first read, exactly as `ChunkAccess.getHeight` primes them,
 unless a custom `BlockState` subclass is registered.
@@ -134,7 +151,11 @@ unless a custom `BlockState` subclass is registered.
 
 `NativeDecoration.statistics()` (the audit's `native_decoration`) reports
 bound regions, native/Java placements, sequenced and declined loops, native
-placements by kind and replayed events by kind.
+placements by kind, replayed events by kind, native templates and pieces with
+Java's remaining structure work (`javaTemplates=`, `javaPieces=`), carver
+counters and `javaBiomeSets=`, upcalls by operation (`upcalls={op=count}`)
+and one-time setup times by phase (`setupMs=`: facts, piece tables, plan and
+program encoding per biome source, template compiles).
 
 ## Verify
 

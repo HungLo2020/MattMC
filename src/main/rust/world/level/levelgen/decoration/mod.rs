@@ -3,6 +3,7 @@
 //! reads and writes in Java's order. Java keeps the step/feature loop, the
 //! choice of route per placed feature, structures and every other feature.
 mod ffi;
+pub(crate) use ffi::{publish_events, BROKEN_BINDING, CALLBACK_FAILED, INVALID, JAVA_ROUTE, PANIC, PLACED, UNAVAILABLE_CHUNK};
 pub(crate) mod ore;
 pub(crate) mod placement;
 pub(crate) mod program;

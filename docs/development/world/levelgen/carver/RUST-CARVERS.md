@@ -6,14 +6,22 @@ On eligible chunks the carving itself now runs in Rust, in one call per chunk.
 
 ## How it is split
 
-Java still gives each chunk within 8 its carvers: `carveChunk` reads every
-neighbour's carver biome (`ChunkAccess.carverBiome`, cached per chunk) and
-passes the configured carvers in applyCarvers' order.
 [`NativeCarvers`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/levelgen/NativeCarvers.java)
-resolves each carver's anchors for the chunk and encodes its providers, then
+keeps per-generator tables: the distinct carver settings of the biome source's
+biomes, the union of their carvers (encoded once per chunk), and for a plain
+multi-noise source each climate-tree leaf's settings. Per chunk Java passes
+each neighbour's cached carver settings (`ChunkAccess.cachedCarverBiome`), or
+-1 when the neighbour has not cached one yet;
 [`carver/stage/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/carver/stage)
-runs the rest in one call:
+then runs the rest in one call:
 
+- carver selection: an uncached neighbour's carver biome is sampled at
+  `(QuartPos.fromBlock(minBlockX), 0, QuartPos.fromBlock(minBlockZ))` with the
+  RandomState sampler's climate program and searched from the thread's previous
+  leaf, interleaved with carving in applyCarvers' order (as Java's lazy
+  `carverBiome` does). A fixed biome source fills every neighbour in Java;
+  other biome sources keep Java's loop. Rust's choices fill the neighbours'
+  caches and its previous leaf becomes the thread's afterwards;
 - applyCarvers' loop: `setLargeFeatureSeed(seed + index, x, z)` on a Legacy
   random, `isStartChunk`, then `CaveWorldCarver.carve` (and the Nether
   carver's bound, thickness and Y scale) or `CanyonWorldCarver.carve`, with
@@ -37,7 +45,10 @@ over:
 The only call back into Java is `CarvingContext.topMaterial`, for dirt below a
 carved grass or mycelium block. It is an FFM upcall that first copies the
 storage's current heightmaps into the Java chunk, because the rule may test
-steep. The storage, the mask words, the aquifer's caches and its schedule flag
+steep, and carries the climate search's previous leaf in and out (the rule's
+biome conditions search the climate tree too). It evaluates the [native surface
+program](../RUST-SURFACE.md), with Java answering the same requests it answers
+for the SURFACE stage. The storage, the mask words, the aquifer's caches and its schedule flag
 install once at the end. Canonical sections use the
 [native handoff](../RUST-STAGE-HANDOFF.md), preserving isolated inputs and
 modified-only installation without Java palette/word reconstruction.
@@ -51,7 +62,9 @@ The chunk keeps Java's carvers when any of these fail:
   `SurfaceSystem`, and a surface rule whose conditions read the chunk only
   through heightmaps (`NativeSurface.readsOnlyHeightmaps`: built-in rules and
   conditions);
-- every configured carver in range passes `NativeCarvers.supports`: a
+- the biome source is a plain multi-noise source whose sampler compiles to a
+  native climate program, or a fixed source (other sources keep Java's loop);
+- every carver of the biome source's biomes passes `NativeCarvers.supports`: a
   built-in carver class with its own configuration class, `UniformHeight`
   Y, constant, uniform or trapezoid floats, no debug settings; and its height
   range resolves non-empty (Java logs an empty one);
@@ -60,7 +73,11 @@ The chunk keeps Java's carvers when any of these fail:
 - the storage accepts the chunk ([`NativeProtoChunk`](../RUST-SURFACE-STORAGE.md#shared-chunk-storage)).
 
 Java's loop reseeds its random per carver, so a fallback draws what Rust would
-have. A top-material exception aborts the stage and is rethrown.
+have. A top-material exception aborts the stage and is rethrown; a failed
+carver-biome sample (`-5`) throws.
+
+The decoration statistics line reports `carvedChunks=`, `carverBiomesSampled=`
+(neighbours Rust sampled) and `carverTopCalls=`.
 `-Dmattmc.worldgen.javaCarvers=true` keeps Java's carvers for comparisons.
 
 ## Preserve these contracts

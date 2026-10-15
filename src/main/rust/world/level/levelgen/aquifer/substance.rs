@@ -75,6 +75,11 @@ impl Substance<'_> {
     /// `computeSubstance` at (x, y, z) with density 0: the state (-1 for null)
     /// and `shouldScheduleFluidUpdate` after the call.
     pub(crate) fn compute(&mut self, x: i32, y: i32, z: i32) -> Result<(i32, bool), i32> {
+        self.compute_with_density(x, y, z, 0.0)
+    }
+
+    /// `computeSubstance(context, density)` for a density at or below zero.
+    pub(crate) fn compute_with_density(&mut self, x: i32, y: i32, z: i32, density: f64) -> Result<(i32, bool), i32> {
         let (_, state) = self.picked(y);
         if y > self.skip_y {
             return Ok((state, false));
@@ -95,7 +100,7 @@ impl Substance<'_> {
         f[10] = y;
         f[11] = -1;
         f[14] = self.policy[7];
-        let mut values = [0.0, f64::NAN];
+        let mut values = [density, f64::NAN];
         loop {
             match decision::step(&mut f, &mut values, self.cache, false) {
                 0 => return Ok((f[12], f[13] != 0)),

@@ -124,6 +124,10 @@ public class ProtoChunk extends ChunkAccess {
 		}
 	}
 
+	/** {@link NativeDecorationRegion}'s last capture of this chunk's sections, reused while its identities hold. */
+	@Nullable
+	Object nativeDecorationCapture;
+
 	/** Native decoration replays light notifications through the chunk's own engine. */
 	@Nullable
 	public LevelLightEngine nativeLightEngine() {
@@ -152,12 +156,17 @@ public class ProtoChunk extends ChunkAccess {
 				if (this.status.isOrAfter(ChunkStatus.INITIALIZE_LIGHT)) {
 					boolean bl2 = levelChunkSection.hasOnlyAir();
 					if (bl2 != bl) {
-						this.lightEngine.updateSectionStatus(blockPos, bl2);
+						// Inside a FEATURES transaction the light task waits for its commit.
+						BlockPos sectionPos = blockPos.immutable();
+						var engine = this.lightEngine;
+						if (!DecorationTransaction.defer(() -> engine.updateSectionStatus(sectionPos, bl2))) engine.updateSectionStatus(sectionPos, bl2);
 					}
 
 					if (LightEngine.hasDifferentLightProperties(blockState2, blockState)) {
 						this.skyLightSources.update(this, n, k, p);
-						this.lightEngine.checkBlock(blockPos);
+						BlockPos checkPos = blockPos.immutable();
+						var engine = this.lightEngine;
+						if (!DecorationTransaction.defer(() -> engine.checkBlock(checkPos))) engine.checkBlock(checkPos);
 					}
 				}
 
@@ -235,6 +244,15 @@ public class ProtoChunk extends ChunkAccess {
 
 	public List<CompoundTag> getEntities() {
 		return this.entities;
+	}
+
+	/** {@link DecorationTransaction}: the tick containers themselves. */
+	net.minecraft.world.ticks.ProtoChunkTicks<Block> protoBlockTicks() {
+		return this.blockTicks;
+	}
+
+	net.minecraft.world.ticks.ProtoChunkTicks<Fluid> protoFluidTicks() {
+		return this.fluidTicks;
 	}
 
 	@Override

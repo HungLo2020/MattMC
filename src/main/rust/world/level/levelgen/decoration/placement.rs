@@ -74,6 +74,13 @@ impl<'p, 'r, 'a> Placement<'p, 'r, 'a> {
         (result, self.scratch, self.random.gaussian)
     }
 
+    /// `run`, handing back the whole random (a caller-owned stream).
+    pub(crate) fn run_keeping_random(mut self, origin: [i32; 3]) -> (Result<bool>, Scratch, WorldgenRandom) {
+        let program = self.program;
+        let result = self.place_placed(&program.placed, origin).and_then(|placed| self.region.check_deferred().map(|_| placed));
+        (result, self.scratch, self.random)
+    }
+
     /// `PlacedFeature.place`/`placeWithBiomeCheck`.
     pub(crate) fn place_placed(&mut self, placed: &'p Placed, origin: [i32; 3]) -> Result<bool> {
         let mut any = false;
@@ -129,6 +136,14 @@ impl<'p, 'r, 'a> Placement<'p, 'r, 'a> {
                 let k = self.random.next_int(j.wrapping_sub(i).wrapping_sub(inner).wrapping_add(1));
                 let y = self.random.next_int(k.wrapping_add(inner)).wrapping_add(i);
                 self.walk(placed, next, [pos[0], y, pos[2]], any)?;
+            }
+            Modifier::Fixed(ref positions) => {
+                let (cx, cz) = (pos[0] >> 4, pos[2] >> 4);
+                for &at in positions {
+                    if at[0] >> 4 == cx && at[2] >> 4 == cz {
+                        self.walk(placed, next, at, any)?;
+                    }
+                }
             }
             Modifier::HeightVeryBiasedToBottom(min, max, inner) => {
                 let (i, j) = (self.resolve(min), self.resolve(max));

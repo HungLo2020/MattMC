@@ -97,10 +97,12 @@ pub unsafe extern "C" fn mattmc_template_processors_release(processors: *mut sup
 
 /// `StructureTemplate.placeInWorld`'s processing and write loop (`template.rs`).
 /// `args`: `[origin xyz, pivot xyz, mirror, rotation, has bounds, bounds 6, flags,
-/// waterlogging, 0, 0, seedLo, seedHi, rotation pivot xyz]`; the random state is written back.
+/// waterlogging, shared settings random, level seed, seedLo, seedHi, rotation pivot xyz]`; the random
+/// state is written back.
 ///
 /// # Safety
-/// As `mattmc_decoration_place`; `args` is valid for 24 longs.
+/// As `mattmc_decoration_place`; `args` is valid for 24 longs. `callback`
+/// answers reads beyond the bound chunks.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_template_place(
     template: *const super::template::Template,
@@ -110,6 +112,7 @@ pub unsafe extern "C" fn mattmc_template_place(
     out: *mut i64,
     out_length: i32,
     args: *mut i64,
+    callback: Option<super::region::Callback>,
 ) -> i32 {
     let (Some(template), Some(processors), false, false, false) = (template.as_ref(), processors.as_ref(), region.is_null(), out.is_null(), args.is_null()) else {
         return INVALID;
@@ -124,6 +127,9 @@ pub unsafe extern "C" fn mattmc_template_place(
         let Some(mut region) = Region::bind(words, out) else {
             return INVALID;
         };
+        // Processors read beyond the bound 3x3 through Java's region.
+        region.callback = callback;
+        region.slot = -1;
         if !(region.write_path_ready() && super::facts::installed().is_some_and(|f| !f.any_unknown())) {
             return JAVA_ROUTE;
         }
@@ -140,6 +146,7 @@ pub unsafe extern "C" fn mattmc_template_place(
             flags: a(15),
             waterlogging: args[16] != 0,
             shared_random: args[17] != 0,
+            seed: args[18],
             random,
         };
         let result = template.place(processors, &mut region, &mut call);
@@ -319,6 +326,144 @@ pub unsafe extern "C" fn mattmc_decoration_place(
             Ok(PlaceOutcome::Placed(true)) => PLACED,
             Ok(PlaceOutcome::Placed(false)) => NOT_PLACED,
             Ok(PlaceOutcome::JavaRoute) => JAVA_ROUTE,
+            Err(failure) => failure_status(&mut region, failure),
+        }
+    }));
+    result.unwrap_or(PANIC)
+}
+
+/// `PlacedFeature.place(level, generator, random, origin)` with the caller's
+/// random (`FeaturePoolElement`): no reseeding and no biome check, so a program
+/// with a `BiomeFilter` (which throws there in Java) takes Java's path.
+/// `random`: `[lo, hi, gaussian have, gaussian bits]`, updated in place.
+///
+/// # Safety
+/// As `mattmc_decoration_place`; `random` is valid for 4 longs.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_decoration_place_with_random(
+    program: *const Program,
+    region: *const i64,
+    region_length: i32,
+    out: *mut i64,
+    out_length: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+    callback: Option<super::region::Callback>,
+    random: *mut i64,
+) -> i32 {
+    let (Some(program), false, false, false) = (program.as_ref(), region.is_null(), out.is_null(), random.is_null()) else {
+        return INVALID;
+    };
+    let state = std::slice::from_raw_parts_mut(random, 4);
+    if region_length < 0 || out_length < 0 {
+        return INVALID;
+    }
+    if program.placed.modifiers.iter().any(|m| matches!(m, super::program::Modifier::Biome)) {
+        return JAVA_ROUTE;
+    }
+    let words = super::region::Shared::new(region as *mut i64, region_length as usize);
+    let out = super::region::Shared::new(out, out_length as usize);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let Some(mut region) = Region::bind(words, out) else {
+            return INVALID;
+        };
+        region.callback = callback;
+        if !heights_resolve(program, region.min_gen_y, region.gen_depth)
+            || program.placed.feature.uses_set_block() && !(region.write_path_ready() && super::facts::installed().is_some_and(|f| !f.any_unknown()))
+        {
+            return JAVA_ROUTE;
+        }
+        let mut random = WorldgenRandom::new(0);
+        random.set_state(state[0], state[1]);
+        random.gaussian = super::random::gaussian_from(state[2], state[3]);
+        let scratch = SCRATCH.with(|s| std::mem::take(&mut *s.borrow_mut()));
+        let (result, scratch, random) = Placement::new(program, &mut region, random, scratch).run_keeping_random([x, y, z]);
+        SCRATCH.with(|s| *s.borrow_mut() = scratch);
+        let (lo, hi) = random.state();
+        state[0] = lo;
+        state[1] = hi;
+        state[2..4].copy_from_slice(&super::random::gaussian_words(random.gaussian));
+        EVENTS.with(|e| *e.borrow_mut() = std::mem::take(&mut region.events));
+        match result {
+            Ok(true) => PLACED,
+            Ok(false) => NOT_PLACED,
+            Err(failure) => failure_status(&mut region, failure),
+        }
+    }));
+    result.unwrap_or(PANIC)
+}
+
+/// `mattmc_decoration_decorate` gathering the biome set itself: the distinct
+/// biomes stored in the bound 3x3's sections, each mapped through `table`
+/// (indexed by biome value: its plan biome ID, -2 when `possibleBiomes()`
+/// excludes it). A value outside the table or mapped to -1 returns
+/// `JAVA_ROUTE` before anything runs (Java gathers the set itself).
+///
+/// # Safety
+/// As `mattmc_decoration_decorate`; `table` is valid for `table_length` ints.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_decoration_decorate_gathering(
+    plan: *const super::sequence::Plan,
+    region: *const i64,
+    region_length: i32,
+    out: *mut i64,
+    out_length: i32,
+    decoration_seed: i64,
+    table: *const i32,
+    table_length: i32,
+    structures: i64,
+    x: i32,
+    y: i32,
+    z: i32,
+    callback: Option<super::region::Callback>,
+    info: *mut i64,
+) -> i32 {
+    let (Some(plan), false, false, false, false) = (plan.as_ref(), region.is_null(), out.is_null(), info.is_null(), table.is_null()) else {
+        return INVALID;
+    };
+    if region_length < 0 || out_length < 0 || table_length < 0 {
+        return INVALID;
+    }
+    let table = std::slice::from_raw_parts(table, table_length as usize);
+    let info = std::slice::from_raw_parts_mut(info, INFO_HEAD + INFO_KINDS);
+    let words = super::region::Shared::new(region as *mut i64, region_length as usize);
+    let out = super::region::Shared::new(out, out_length as usize);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let Some(mut region) = Region::bind(words, out) else {
+            return INVALID;
+        };
+        // The biome set, before anything runs: Java gathers it when a value is unmapped.
+        let Ok(present) = region.present_biomes() else { return JAVA_ROUTE };
+        let mut biomes = Vec::with_capacity(present.len());
+        for value in present {
+            match table.get(value as usize).copied() {
+                Some(-2) => {}
+                Some(id) if id >= 0 => biomes.push(id as u32),
+                _ => return JAVA_ROUTE,
+            }
+        }
+        region.callback = callback;
+        let mut counts = [0i64; 3];
+        let mut current = [0i32; 2];
+        let (head, kinds) = info.split_at_mut(INFO_HEAD);
+        kinds.fill(0);
+        let mut gaussian = super::random::gaussian_from(head[6], head[7]);
+        let result = super::sequence::decorate(plan, &mut region, decoration_seed, &biomes, structures as u64, [x, y, z], &mut counts, &mut current, kinds, &mut gaussian);
+        let info = head;
+        info[6..8].copy_from_slice(&super::random::gaussian_words(gaussian));
+        EVENTS.with(|e| *e.borrow_mut() = std::mem::take(&mut region.events));
+        info[2] = counts[0];
+        info[3] = counts[1];
+        info[4] = current[0] as i64;
+        info[5] = current[1] as i64;
+        match result {
+            Ok(None) => DECORATED,
+            Ok(Some(resume)) => {
+                info[0] = resume.step as i64;
+                info[1] = resume.index as i64;
+                RESUME
+            }
             Err(failure) => failure_status(&mut region, failure),
         }
     }));

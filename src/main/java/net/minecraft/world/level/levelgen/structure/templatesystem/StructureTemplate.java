@@ -193,6 +193,11 @@ public class StructureTemplate {
 		return this.filterBlocks(blockPos, structurePlaceSettings, block, true);
 	}
 
+	/** Each palette, for native jigsaw planning. */
+	public List<StructureTemplate.Palette> nativePalettes() {
+		return this.palettes;
+	}
+
 	public List<StructureTemplate.JigsawBlockInfo> getJigsaws(BlockPos blockPos, Rotation rotation) {
 		if (this.palettes.isEmpty()) {
 			return new ArrayList();

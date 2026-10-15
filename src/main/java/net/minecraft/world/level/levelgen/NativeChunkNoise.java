@@ -237,6 +237,15 @@ final class NativeChunkNoise {
         return NativeNoiseRouter.instance(handle, this, chunk.cellCountXZ + 1, chunk.cellCountY + 1);
     }
 
+    /** The slice template and FlatCache input program, for native column sources that outlive no chunk noise. */
+    long templateHandle() {
+        return this.template;
+    }
+
+    long flatsHandle() {
+        return this.flats;
+    }
+
     /** Verification only: keeps the states referenced while instances run. */
     NativeNoiseState[] states() {
         return this.states;

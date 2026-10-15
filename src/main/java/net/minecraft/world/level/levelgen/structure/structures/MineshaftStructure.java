@@ -36,6 +36,42 @@ public class MineshaftStructure extends Structure {
 	}
 
 	@Override
+	public int[] nativeStub() {
+		return new int[]{7, 0, 0};
+	}
+
+	@Override
+	public int[] nativeStubParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager structureTemplateManager,
+		ChunkGenerator chunkGenerator, net.minecraft.world.level.LevelHeightAccessor levelHeightAccessor) {
+		return new int[]{this.type == MineshaftStructure.Type.MESA ? 1 : 0, chunkGenerator.getMinY()};
+	}
+
+	@Override
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext, BlockPos stub,
+		net.minecraft.world.level.block.Rotation rotation, long[] extra, int[] pieces) {
+		// Rust planned and moved every piece: [kind, depth, box, direction, fields, entrances, entrance boxes].
+		for (int i = 0; i < pieces.length; ) {
+			int kind = pieces[i], depth = pieces[i + 1];
+			var box = new net.minecraft.world.level.levelgen.structure.BoundingBox(pieces[i + 2], pieces[i + 3], pieces[i + 4], pieces[i + 5], pieces[i + 6], pieces[i + 7]);
+			net.minecraft.core.Direction direction = pieces[i + 8] < 0 ? null : net.minecraft.core.Direction.from2DDataValue(pieces[i + 8]);
+			int entrances = pieces[i + 12];
+			java.util.List<net.minecraft.world.level.levelgen.structure.BoundingBox> boxes = new java.util.ArrayList<>(entrances);
+			for (int e = 0; e < entrances; e++) {
+				int at = i + 13 + e * 6;
+				boxes.add(new net.minecraft.world.level.levelgen.structure.BoundingBox(pieces[at], pieces[at + 1], pieces[at + 2], pieces[at + 3], pieces[at + 4], pieces[at + 5]));
+			}
+			structurePiecesBuilder.addPiece(switch (kind) {
+				case 0 -> new MineshaftPieces.MineShaftCorridor(depth, box, direction, this.type, pieces[i + 9] != 0, pieces[i + 10] != 0, pieces[i + 11]);
+				case 1 -> new MineshaftPieces.MineShaftCrossing(depth, box, direction, this.type);
+				case 2 -> new MineshaftPieces.MineShaftRoom(depth, box, this.type, boxes);
+				case 3 -> new MineshaftPieces.MineShaftStairs(depth, box, direction, this.type);
+				default -> throw new IllegalStateException("Unknown native mineshaft piece " + kind);
+			});
+			i += 13 + entrances * 6;
+		}
+	}
+
+	@Override
 	public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext) {
 		generationContext.random().nextDouble();
 		ChunkPos chunkPos = generationContext.chunkPos();

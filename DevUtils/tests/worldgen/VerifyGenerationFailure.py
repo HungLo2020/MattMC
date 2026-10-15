@@ -8,7 +8,9 @@ saves while halting. A second launch on the same world reads every persisted
 chunk status around the region without generating anything.
 
 Accepts when, on both routes, the failure surfaces as the "Feature placement"
-crash for one decorating chunk, and that chunk is persisted below FEATURES.
+crash for one decorating chunk, that chunk is persisted below FEATURES, and every
+chunk the failed step could write is, after its rollback, identical in saved
+form to what it held just before the step.
 
   python3 DevUtils/tests/worldgen/VerifyGenerationFailure.py --output build/generation-failure/<label>
 """
@@ -85,6 +87,10 @@ def main():
     parser.add_argument('--cpus', default='2-7')
     parser.add_argument('--timeout', type=int, default=900)
     parser.add_argument('--skip-build', action='store_true')
+    parser.add_argument('--no-rollback', action='store_true',
+                        help='control: leave failed writes in place; the rollback check must then report changed chunks')
+    parser.add_argument('--no-transaction', action='store_true',
+                        help='control: no FEATURES transaction at all (no capture, ownership locks or deferred effects), as before it existed')
     args = parser.parse_args()
     out = args.output.resolve()
     if not out.is_relative_to(full.ROOT / 'build'):
@@ -99,19 +105,26 @@ def main():
     for route, spec, startup, extra in routes:
         failed = run_server(f'{route}-fail', classpath, jar, out, args, env, {
             'mattmc.worldgen.decorationTest': startup, 'audit.injectFailure': spec, 'audit.chunkTimeoutSeconds': 30,
-            'audit.regionTimeoutSeconds': 60, 'audit.injectAtChunk': args.at_chunk, **extra})
+            'audit.regionTimeoutSeconds': 60, 'audit.injectAtChunk': args.at_chunk,
+            **({'mattmc.worldgen.decorationRollback': 'false'} if args.no_rollback else {}),
+            **({'mattmc.worldgen.decorationTransaction': 'false'} if args.no_transaction else {}), **extra})
         report = failure_report(failed / 'server.log')
         inspected = run_server(f'{route}-inspect', classpath, jar, out, args, env, {'audit.inspect': 'true'}, world=failed / 'server')
         statuses = json.loads((inspected / 'statuses.json').read_text())['minecraft:overworld']
         memory = json.loads((failed / 'statuses-memory.json').read_text()) if (failed / 'statuses-memory.json').exists() else {}
         saved = (failed / 'saved.txt').exists()
+        rollback = json.loads((failed / 'rollback.json').read_text()) if (failed / 'rollback.json').exists() else {}
+        # A rollback stage that reported a failure fails the route, whatever was saved.
+        rollback_failed = (failed / 'rollback-failed.txt').exists()
+        restored = bool(rollback) and all(v == 'identical' for v in rollback.values()) and not rollback_failed
         chunk = report['chunk']
         published = statuses.get(chunk) in FEATURES_OR_LATER or memory.get(chunk) in FEATURES_OR_LATER if chunk else None
         counts = lambda values: {s: list(values).count(s) for s in sorted(set(values))}
         results[route] = {**report, 'saved_after_failure': saved, 'failed_chunk_memory': memory.get(chunk) if chunk else None,
                           'failed_chunk_persisted': statuses.get(chunk) if chunk else None,
                           'memory_counts': counts(memory.values()), 'persisted_counts': counts(statuses.values()),
-                          'accepted': bool(report['feature_placement'] and chunk and saved and chunk in statuses and not published)}
+                          'rolled_back_chunks': rollback, 'rollback_identical': restored, 'rollback_stage_failed': rollback_failed,
+                          'accepted': bool(report['feature_placement'] and chunk and saved and chunk in statuses and not published and restored)}
         print(route, json.dumps(results[route]), flush=True)
     (out / 'failure.json').write_text(json.dumps(results, indent=2))
     accepted = all(r['accepted'] for r in results.values())

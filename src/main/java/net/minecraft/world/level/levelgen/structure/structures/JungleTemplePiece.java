@@ -27,7 +27,7 @@ import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSeriali
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 
-public class JungleTemplePiece extends ScatteredFeaturePiece {
+public class JungleTemplePiece extends ScatteredFeaturePiece implements net.minecraft.world.level.levelgen.structure.NativeStructurePieces.Native {
 	public static final int WIDTH = 12;
 	public static final int DEPTH = 15;
 	private boolean placedMainChest;
@@ -38,6 +38,16 @@ public class JungleTemplePiece extends ScatteredFeaturePiece {
 
 	public JungleTemplePiece(RandomSource randomSource, int i, int j) {
 		super(StructurePieceType.JUNGLE_PYRAMID_PIECE, i, 64, j, 12, 10, 15, getRandomHorizontalDirection(randomSource));
+	}
+
+	/** A piece Rust planned ({@code structure/small_plan.rs}): no draws. */
+	public JungleTemplePiece(BoundingBox boundingBox, Direction direction) {
+		super(StructurePieceType.JUNGLE_PYRAMID_PIECE, boundingBox, direction, 12, 10, 15);
+	}
+
+	/** Rebuilds {@code small_plan.rs}'s piece (kind 4, fields {@code [width, height, depth, heightPosition]}). */
+	public static void addNativePieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager, int[] words) {
+		builder.addPiece(ScatteredFeaturePiece.nativePiece(words, 4, 12, 10, 15, JungleTemplePiece::new));
 	}
 
 	public JungleTemplePiece(CompoundTag compoundTag) {
@@ -55,6 +65,25 @@ public class JungleTemplePiece extends ScatteredFeaturePiece {
 		compoundTag.putBoolean("placedHiddenChest", this.placedHiddenChest);
 		compoundTag.putBoolean("placedTrap1", this.placedTrap1);
 		compoundTag.putBoolean("placedTrap2", this.placedTrap2);
+	}
+
+	@Override
+	public long[] nativeWords() {
+		long[] words = this.nativeScatteredWords(4, 4);
+		words[13] = this.placedMainChest ? 1 : 0;
+		words[14] = this.placedHiddenChest ? 1 : 0;
+		words[15] = this.placedTrap1 ? 1 : 0;
+		words[16] = this.placedTrap2 ? 1 : 0;
+		return words;
+	}
+
+	@Override
+	public void nativeUpdate(long[] words) {
+		this.nativeScatteredUpdate(words);
+		this.placedMainChest = words[13] != 0;
+		this.placedHiddenChest = words[14] != 0;
+		this.placedTrap1 = words[15] != 0;
+		this.placedTrap2 = words[16] != 0;
 	}
 
 	@Override

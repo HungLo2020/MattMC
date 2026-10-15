@@ -143,6 +143,64 @@ public class OceanRuinPieces {
 		return Util.getRandom(BIG_WARM_RUINS, randomSource);
 	}
 
+	/** {@code small_plan.rs}'s template lists: warm {@code [small 8, big 4]}, cold {@code [brick, cracked, mossy, big brick, big cracked, big mossy]}. */
+	private static ResourceLocation[] nativeTemplates(OceanRuinStructure.Type type) {
+		ResourceLocation[][] lists = type == OceanRuinStructure.Type.COLD
+			? new ResourceLocation[][]{RUINS_BRICK, RUINS_CRACKED, RUINS_MOSSY, BIG_RUINS_BRICK, BIG_RUINS_CRACKED, BIG_RUINS_MOSSY}
+			: new ResourceLocation[][]{WARM_RUINS, BIG_WARM_RUINS};
+		return java.util.Arrays.stream(lists).flatMap(java.util.Arrays::stream).toArray(ResourceLocation[]::new);
+	}
+
+	/**
+	 * {@code small_plan.rs}'s params: {@code [family 6, cold, Float.floatToIntBits(largeProbability),
+	 * Float.floatToIntBits(clusterProbability), template count, sizes (x, y, z) in nativeTemplates' order]}.
+	 */
+	public static int[] nativePlanParams(StructureTemplateManager structureTemplateManager, OceanRuinStructure oceanRuinStructure) {
+		ResourceLocation[] templates = nativeTemplates(oceanRuinStructure.biomeTemp);
+		int[] params = new int[5 + 3 * templates.length];
+		params[0] = 6;
+		params[1] = oceanRuinStructure.biomeTemp == OceanRuinStructure.Type.COLD ? 1 : 0;
+		params[2] = Float.floatToIntBits(oceanRuinStructure.largeProbability);
+		params[3] = Float.floatToIntBits(oceanRuinStructure.clusterProbability);
+		params[4] = templates.length;
+		for (int i = 0; i < templates.length; i++) {
+			net.minecraft.core.Vec3i size = structureTemplateManager.getOrCreate(templates[i]).getSize();
+			params[5 + 3 * i] = size.getX();
+			params[6 + 3 * i] = size.getY();
+			params[7 + 3 * i] = size.getZ();
+		}
+		return params;
+	}
+
+	/**
+	 * Rebuilds {@code small_plan.rs}'s pieces, no draws. Each: {@code [62, 0, box (6), 2 (north), 9, template index
+	 * (nativeTemplates), rotation ordinal, mirror 0, template x, y, z, Float.floatToIntBits(integrity), cold, isLarge]}.
+	 */
+	public static void addNativePieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, StructureTemplateManager structureTemplateManager, int[] words) {
+		int at = 0;
+		while (at < words.length) {
+			if (at + 16 + 3 > words.length || words[at] != 62 || words[at + 1] != 0 || words[at + 8] != 2 || words[at + 9] != 6 + 3
+				|| words[at + 12] != 0) {
+				throw new IllegalArgumentException("Bad native ocean ruin words at " + at);
+			}
+			BoundingBox box = new BoundingBox(words[at + 2], words[at + 3], words[at + 4], words[at + 5], words[at + 6], words[at + 7]);
+			int template = words[at + 10];
+			Rotation rotation = Rotation.values()[words[at + 11]];
+			BlockPos position = new BlockPos(words[at + 13], words[at + 14], words[at + 15]);
+			int f = at + 16;
+			at = f + 3;
+			float integrity = Float.intBitsToFloat(words[f]);
+			OceanRuinStructure.Type type = words[f + 1] != 0 ? OceanRuinStructure.Type.COLD : OceanRuinStructure.Type.WARM;
+			OceanRuinPieces.OceanRuinPiece piece = new OceanRuinPieces.OceanRuinPiece(
+				structureTemplateManager, nativeTemplates(type)[template], position, rotation, integrity, type, words[f + 2] != 0
+			);
+			if (!piece.getBoundingBox().equals(box)) {
+				throw new IllegalStateException("Native ocean ruin box " + box + " differs from " + piece.getBoundingBox());
+			}
+			builder.addPiece(piece);
+		}
+	}
+
 	public static void addPieces(
 		StructureTemplateManager structureTemplateManager,
 		BlockPos blockPos,
@@ -292,6 +350,13 @@ public class OceanRuinPieces {
 			compoundTag.putFloat("Integrity", this.integrity);
 			compoundTag.store("BiomeType", OceanRuinStructure.Type.LEGACY_CODEC, this.biomeType);
 			compoundTag.putBoolean("IsLarge", this.isLarge);
+		}
+
+		@Override
+		protected long[] nativeTailWords() {
+			long[] words = this.nativeTailWords(4);
+			words[1] = this.isLarge ? 1 : 0;
+			return words;
 		}
 
 		@Override

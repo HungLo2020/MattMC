@@ -120,8 +120,37 @@ crash/chunk, a save marker, a persisted entry for that chunk, and no FEATURES-or
 status in the inspected memory or persisted entry. It does **not** assert that
 the two reported chunk identities match. An absent memory entry can pass when
 the persisted status is below FEATURES; inspect `failure.json` for both details.
+The gate also requires every chunk the failed step could write to be
+identical in saved form to its state just before that step (`rollback.json`,
+written by the audit's transaction hook). `--no-rollback` is the control: it
+leaves failed writes in place, as Frozen does, and must report changed chunks.
 This bounded injection does not establish rollback for arbitrary callbacks,
 later publication failures, process crashes or concurrent world activity.
+
+### The FEATURES transaction
+
+[`DecorationTransaction`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/DecorationTransaction.java)
+wraps each FEATURES step:
+
+- **Ownership:** before reading or writing, the step takes every writable
+  chunk's ownership lock in a global chunk order, holding them through commit
+  or rollback. Steps whose 3×3 regions overlap run one after the other. The
+  lock-held path never waits on executor work (WorldGenRegion hands out
+  present chunks only; POI and light effects are queued).
+- **Lazy capture:** the centre chunk is captured at begin. A neighbour is
+  captured (Java state plus arming its native sections) at its first touch:
+  `WorldGenRegion` handing it out, Rust's `OP_TOUCH` before its first native
+  write, or Java installing native heightmaps or sky sources into it.
+  `-Dmattmc.worldgen.decorationEagerCapture=true` captures all nine at begin.
+- **Identity:** each transaction has an id; a native section belongs to at
+  most one, and begin/commit/rollback reject another transaction's sections.
+- **Deferred effects:** POI updates and light tasks queued during the step run
+  in order after commit and are dropped on rollback.
+
+`DecorationTransactionTest` drives overlapping steps with controlled
+interleaving (wait, either side failing, cancellation while waiting, retry,
+deferred effects). The audit reports `txOverlaps=` and `txConflicts=`
+(invariant violations, expected 0).
 
 ## Known differences (2026-10-14)
 

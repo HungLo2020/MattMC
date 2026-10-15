@@ -83,6 +83,10 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	protected final Map<BlockPos, BlockEntity> blockEntities = new Object2ObjectOpenHashMap<>();
 	protected final LevelHeightAccessor levelHeightAccessor;
 	protected final LevelChunkSection[] sections;
+	/** {@link DecorationTransaction}'s chunk ownership: a global acquisition order and the lock it orders. */
+	private static final java.util.concurrent.atomic.AtomicLong NATIVE_TX_ORDER = new java.util.concurrent.atomic.AtomicLong();
+	final long nativeTxOrder = NATIVE_TX_ORDER.incrementAndGet();
+	final java.util.concurrent.locks.ReentrantLock nativeTxLock = new java.util.concurrent.locks.ReentrantLock();
 
 	public ChunkAccess(
 		ChunkPos chunkPos,
@@ -484,6 +488,12 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	}
 
 	@Deprecated
+	/** {@link #carverBiome}'s cached settings, or null before the first call. */
+	@Nullable
+	public BiomeGenerationSettings cachedCarverBiome() {
+		return this.carverBiomeSettings;
+	}
+
 	public BiomeGenerationSettings carverBiome(Supplier<BiomeGenerationSettings> supplier) {
 		if (this.carverBiomeSettings == null) {
 			this.carverBiomeSettings = (BiomeGenerationSettings)supplier.get();

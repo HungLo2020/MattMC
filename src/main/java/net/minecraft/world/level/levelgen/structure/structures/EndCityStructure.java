@@ -19,6 +19,24 @@ public class EndCityStructure extends Structure {
 	}
 
 	@Override
+	public int[] nativeStub() {
+		return new int[]{4, 1, 0};
+	}
+
+	@Override
+	public int[] nativeStubParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager structureTemplateManager,
+		net.minecraft.world.level.chunk.ChunkGenerator chunkGenerator, net.minecraft.world.level.LevelHeightAccessor levelHeightAccessor) {
+		return EndCityPieces.nativePlanParams(structureTemplateManager);
+	}
+
+	@Override
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext,
+		net.minecraft.core.BlockPos stub, net.minecraft.world.level.block.Rotation rotation, long[] extra, int[] pieces) {
+		// Rust drew the rotation and planned the towers (structure/end_city_plan.rs).
+		EndCityPieces.addNativePieces(structurePiecesBuilder, generationContext.structureTemplateManager(), pieces);
+	}
+
+	@Override
 	public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext) {
 		Rotation rotation = Rotation.getRandom(generationContext.random());
 		BlockPos blockPos = this.getLowestYIn5by5BoxOffset7Blocks(generationContext, rotation);

@@ -70,6 +70,56 @@ public class ShipwreckPieces {
 		"map_chest", BuiltInLootTables.SHIPWRECK_MAP, "treasure_chest", BuiltInLootTables.SHIPWRECK_TREASURE, "supply_chest", BuiltInLootTables.SHIPWRECK_SUPPLY
 	);
 
+	/**
+	 * {@code small_plan.rs}'s params: {@code [family 5, isBeached, template count, sizes (x, y, z) in the beached or
+	 * ocean list's order]}, or null when a template is too big for the world-gen region (Java then moves it by heights).
+	 */
+	@org.jetbrains.annotations.Nullable
+	public static int[] nativePlanParams(StructureTemplateManager structureTemplateManager, boolean bl) {
+		ResourceLocation[] templates = bl ? STRUCTURE_LOCATION_BEACHED : STRUCTURE_LOCATION_OCEAN;
+		int[] params = new int[3 + 3 * templates.length];
+		params[0] = 5;
+		params[1] = bl ? 1 : 0;
+		params[2] = templates.length;
+		for (int i = 0; i < templates.length; i++) {
+			Vec3i size = structureTemplateManager.getOrCreate(templates[i]).getSize();
+			if (size.getX() > 32 || size.getY() > 32) {
+				return null;
+			}
+			params[3 + 3 * i] = size.getX();
+			params[4 + 3 * i] = size.getY();
+			params[5 + 3 * i] = size.getZ();
+		}
+		return params;
+	}
+
+	/**
+	 * Rebuilds {@code small_plan.rs}'s piece, no draws: {@code [61, 0, box (6), 2 (north), 7, template index (in the
+	 * beached or ocean list), rotation ordinal, mirror 0, template x, y, z, isBeached]}.
+	 */
+	public static void addNativePieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, StructureTemplateManager structureTemplateManager, int[] words) {
+		int at = 0;
+		while (at < words.length) {
+			if (at + 16 + 1 > words.length || words[at] != 61 || words[at + 1] != 0 || words[at + 8] != 2 || words[at + 9] != 6 + 1
+				|| words[at + 12] != 0) {
+				throw new IllegalArgumentException("Bad native shipwreck words at " + at);
+			}
+			BoundingBox box = new BoundingBox(words[at + 2], words[at + 3], words[at + 4], words[at + 5], words[at + 6], words[at + 7]);
+			int template = words[at + 10];
+			Rotation rotation = Rotation.values()[words[at + 11]];
+			BlockPos position = new BlockPos(words[at + 13], words[at + 14], words[at + 15]);
+			int f = at + 16;
+			at = f + 1;
+			boolean bl = words[f] != 0;
+			ResourceLocation[] templates = bl ? STRUCTURE_LOCATION_BEACHED : STRUCTURE_LOCATION_OCEAN;
+			ShipwreckPieces.ShipwreckPiece piece = new ShipwreckPieces.ShipwreckPiece(structureTemplateManager, templates[template], position, rotation, bl);
+			if (!piece.getBoundingBox().equals(box)) {
+				throw new IllegalStateException("Native shipwreck box " + box + " differs from " + piece.getBoundingBox());
+			}
+			builder.addPiece(piece);
+		}
+	}
+
 	public static ShipwreckPieces.ShipwreckPiece addRandomPiece(
 		StructureTemplateManager structureTemplateManager,
 		BlockPos blockPos,
@@ -115,6 +165,11 @@ public class ShipwreckPieces {
 				.setMirror(Mirror.NONE)
 				.setRotationPivot(ShipwreckPieces.PIVOT)
 				.addProcessor(BlockIgnoreProcessor.STRUCTURE_AND_AIR);
+		}
+
+		@Override
+		protected long[] nativeTailWords() {
+			return this.nativeTailWords(2);
 		}
 
 		@Override
