@@ -44,14 +44,18 @@ public final class NativeDensityProgram {
     }
     private Snapshot state() {
         Snapshot s=snapshot;
-        if (s!=null) {
-            boolean fresh=true;
-            for(int i=0;i<noises.length;i++) if(noises[i].nativeState()!=s.noises[i]) {fresh=false;break;}
-            if(fresh) return s;
-        }
-        return rebuild();
+        return fresh(s) ? s : rebuild();
+    }
+    private boolean fresh(Snapshot s) {
+        if(s==null) return false;
+        for(int i=0;i<noises.length;i++) if(noises[i].nativeState()!=s.noises[i]) return false;
+        return true;
     }
     private synchronized Snapshot rebuild() {
+        // Threads that raced to a stale snapshot share the first rebuild: a fill
+        // may already have bound the current memory, which no rebuild replaces.
+        Snapshot fresh=snapshot;
+        if(fresh(fresh)) return fresh;
         NativeNoiseState[] current=new NativeNoiseState[noises.length];
         long size=16L+64L*nodes.length; int octaves=0;
         long[] offsets=new long[noises.length];
@@ -78,7 +82,9 @@ public final class NativeDensityProgram {
         catch(Throwable t){throw failure(t);}
         Snapshot s=new Snapshot(data.asReadOnly(),current);snapshot=s;return s;
     }
-    /** The validated program memory; it stays valid while it is reachable. */
+    /** The validated program memory; it stays valid while it is reachable. A
+     * caller that keeps only its address across downcalls must keep this
+     * segment reachable until that native use ends. */
     MemorySegment memory() { return state().state; }
     public double sample(double x,double y,double z) {
         Snapshot s=state();

@@ -132,6 +132,18 @@ fill; see the [separate router contract](RUST-NOISE-ROUTER.md#eligibility).
   `LevelChunkSection.installGenerated`; counters and palette history are unchanged.
 - The native traversal visits cells in the same order as Java's (X, then Z,
   then Y down) and requests materials for exactly the cells Java's loop would.
+- Rust keeps only the address of the cell program BIND receives, and later
+  downcalls don't pass it. The fill therefore holds that exact
+  `NativeDensityProgram.memory()` segment, and so its `Arena.ofAuto()`
+  arena, until `RELEASE`. `NativeDensityProgram.rebuild` re-checks freshness
+  under its lock, so threads racing to a shared program build it once. Without
+  both, a replaced snapshot was freed under a running traversal: a SIGSEGV in
+  `density_cell_array` during parallel fills.
+  [`NativeProgramLifetimeTest`](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/minecraft/world/level/levelgen/NativeProgramLifetimeTest.java)
+  replaces the snapshot mid-traversal and checks, through a weak reference to
+  the arena scope, that the arena stays reachable until the fill releases it.
+  Any new native user that stores a program address must keep the segment
+  the same way.
 
 ## Verify and measure
 

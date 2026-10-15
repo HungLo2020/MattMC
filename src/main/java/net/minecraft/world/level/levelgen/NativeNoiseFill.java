@@ -96,6 +96,9 @@ final class NativeNoiseFill {
 
     // Verification only: Java fills and uploads every slice, as for a slice the router declines.
     static volatile boolean uploadSlices;
+    // Verification only: runs after the first cell column of each Rust traversal.
+    @Nullable
+    static volatile Runnable traversalHook;
 
     private static int id(BlockState state) {
         return Block.BLOCK_STATE_REGISTRY.getId(state);
@@ -113,6 +116,10 @@ final class NativeNoiseFill {
     private final long[] longs = new long[2];
     private final double[] doubles = new double[4];
     private final double[] corners = new double[24];
+    // The program memory BIND gave Rust: Rust keeps only its address, so the
+    // fill keeps this exact segment (and its arena) reachable until RELEASE.
+    @Nullable
+    private MemorySegment boundProgram;
     // Ore veins are configured (from the chunk's interpolators or its template).
     private boolean ore;
 
@@ -335,6 +342,10 @@ final class NativeNoiseFill {
             } finally {
                 try { RELEASE.invokeExact(handle); }
                 catch (Throwable error) { throw new IllegalStateException("Cannot release native noise fill", error); }
+                finally {
+                    Reference.reachabilityFence(this.boundProgram);
+                    this.boundProgram = null;
+                }
             }
         }
     }
@@ -373,6 +384,7 @@ final class NativeNoiseFill {
         for (int index = 11; index < ints.length; index++) if (ints[index] < 0) return null;
         if (ints[6] != 0 && (ints[7] < 0 || ints[8] < 0 || ints[9] < 0)) return null;
         MemorySegment program = cells.program().memory();
+        this.boundProgram = program;
         int status = (int)BIND.invokeExact(handle, router.handle(), program, program.byteSize(), MemorySegment.ofArray(ints), ints.length);
         return status == 0 ? cells : null;
     }
@@ -404,6 +416,7 @@ final class NativeNoiseFill {
         ints[10] = inputs.length;
         System.arraycopy(inputs, 0, ints, 11, inputs.length);
         MemorySegment program = cells.memory();
+        this.boundProgram = program;
         int status = (int)BIND.invokeExact(handle, router.handle(), program, program.byteSize(), MemorySegment.ofArray(ints), ints.length);
         Reference.reachabilityFence(template);
         if (status != 0) throw new IllegalStateException("Native chunk noise binding rejected: " + status);
@@ -465,6 +478,8 @@ final class NativeNoiseFill {
                     given = materials;
                 }
                 this.chunk.skipNativeCells(cells * cellCountY);
+                Runnable hook = traversalHook;
+                if (hook != null && cellX == 0) hook.run();
             }
             this.chunk.stopInterpolation();
             if (aquiferBinding != null) {
