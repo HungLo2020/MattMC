@@ -12,7 +12,6 @@ import net.minecraft.core.RegistryCodecs;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.util.valueproviders.IntProvider;
 import net.minecraft.world.damagesource.DamageEffects;
 import net.minecraft.world.damagesource.DamageScaling;
@@ -64,7 +63,11 @@ public final class NativeDataProjections {
 	private static final com.mojang.serialization.Codec<HolderSet<net.minecraft.world.level.biome.Biome>> BIOMES = RegistryCodecs.homogeneousList(Registries.BIOME);
 
 	private static Component text(NativeData.Context context, Object slot) {
-		return context.slot(slot, ComponentSerialization.CODEC);
+		return net.minecraft.network.chat.NativeText.project(slot, context);
+	}
+
+	private static Object textOut(net.minecraft.network.chat.Component text, NativeData.Builder b) {
+		return net.minecraft.network.chat.NativeText.unproject(text, b);
 	}
 
 	public static PaintingVariant painting(Object value, NativeData.Context context) {
@@ -73,8 +76,8 @@ public final class NativeDataProjections {
 			(Integer)f[0],
 			(Integer)f[1],
 			NativeData.location(f[2]),
-			context.optionalSlot(f[3], ComponentSerialization.CODEC),
-			context.optionalSlot(f[4], ComponentSerialization.CODEC)
+			Optional.ofNullable(f[3]).map(t -> text(context, t)),
+			Optional.ofNullable(f[4]).map(t -> text(context, t))
 		);
 	}
 
@@ -96,7 +99,7 @@ public final class NativeDataProjections {
 
 	public static JukeboxSong jukeboxSong(Object value, NativeData.Context context) {
 		Object[] f = NativeData.record(value);
-		return new JukeboxSong(context.sound(f[0]), text(context, f[1]), (Float)f[2], (Integer)f[3]);
+		return new JukeboxSong(context.slot(f[0], net.minecraft.sounds.SoundEvent.CODEC), text(context, f[1]), (Float)f[2], (Integer)f[3]);
 	}
 
 	public static TrimPattern trimPattern(Object value, NativeData.Context context) {
@@ -120,7 +123,7 @@ public final class NativeDataProjections {
 
 	public static Instrument instrument(Object value, NativeData.Context context) {
 		Object[] f = NativeData.record(value);
-		return new Instrument(context.sound(f[0]), (Float)f[1], (Float)f[2], text(context, f[3]));
+		return new Instrument(context.slot(f[0], net.minecraft.sounds.SoundEvent.CODEC), (Float)f[1], (Float)f[2], text(context, f[3]));
 	}
 
 	private static Enchantment.Cost cost(Object value) {
@@ -136,8 +139,8 @@ public final class NativeDataProjections {
 			slots.add(NativeData.named(EquipmentSlotGroup.class, slot));
 		}
 		Enchantment.EnchantmentDefinition definition = new Enchantment.EnchantmentDefinition(
-			context.holderSet(d[0], Registries.ITEM, ITEMS),
-			context.optionalHolderSet(d[1], Registries.ITEM, ITEMS),
+			context.slot(d[0], ITEMS),
+			context.optionalSlot(d[1], ITEMS),
 			(Integer)d[2],
 			(Integer)d[3],
 			cost(d[4]),
@@ -148,7 +151,7 @@ public final class NativeDataProjections {
 		return new Enchantment(
 			text(context, f[0]),
 			definition,
-			context.holderSetOrDefault(f[2], Registries.ENCHANTMENT, ENCHANTMENTS, HolderSet.direct()),
+			context.slotOrDefault(f[2], ENCHANTMENTS, HolderSet.direct()),
 			net.minecraft.world.item.enchantment.NativeEnchantmentEffects.effects(f[3], context)
 		);
 	}
@@ -157,8 +160,8 @@ public final class NativeDataProjections {
 		NativeData.Variant variant = (NativeData.Variant)value;
 		Object[] f = variant.fields();
 		return switch (variant.index()) {
-			case 0 -> new EnchantmentsByCost(context.holderSet(f[0], Registries.ENCHANTMENT, ENCHANTMENTS), IntProvider.project(f[1]));
-			case 1 -> new EnchantmentsByCostWithDifficulty(context.holderSet(f[0], Registries.ENCHANTMENT, ENCHANTMENTS), (Integer)f[1], (Integer)f[2]);
+			case 0 -> new EnchantmentsByCost(context.slot(f[0], ENCHANTMENTS), IntProvider.project(f[1]));
+			case 1 -> new EnchantmentsByCostWithDifficulty(context.slot(f[0], ENCHANTMENTS), (Integer)f[1], (Integer)f[2]);
 			default -> new SingleEnchantment(context.slot(f[0], Enchantment.CODEC), IntProvider.project(f[1]));
 		};
 	}
@@ -176,9 +179,9 @@ public final class NativeDataProjections {
 	private static SpawnCondition condition(NativeData.Variant variant, NativeData.Context context) {
 		Object[] f = variant.fields();
 		return switch (variant.index()) {
-			case 0 -> new StructureCheck(context.holderSet(f[0], Registries.STRUCTURE, STRUCTURES));
+			case 0 -> new StructureCheck(context.slot(f[0], STRUCTURES));
 			case 1 -> new MoonBrightnessCheck(bounds(f[0]));
-			default -> new BiomeCheck(context.holderSet(f[0], Registries.BIOME, BIOMES));
+			default -> new BiomeCheck(context.slot(f[0], BIOMES));
 		};
 	}
 
@@ -222,7 +225,7 @@ public final class NativeDataProjections {
 
 	public static WolfSoundVariant wolfSound(Object value, NativeData.Context context) {
 		Object[] f = NativeData.record(value);
-		return new WolfSoundVariant(context.sound(f[0]), context.sound(f[1]), context.sound(f[2]), context.sound(f[3]), context.sound(f[4]), context.sound(f[5]));
+		return new WolfSoundVariant(context.slot(f[0], net.minecraft.sounds.SoundEvent.CODEC), context.slot(f[1], net.minecraft.sounds.SoundEvent.CODEC), context.slot(f[2], net.minecraft.sounds.SoundEvent.CODEC), context.slot(f[3], net.minecraft.sounds.SoundEvent.CODEC), context.slot(f[4], net.minecraft.sounds.SoundEvent.CODEC), context.slot(f[5], net.minecraft.sounds.SoundEvent.CODEC));
 	}
 
 	public static PigVariant pig(Object value, NativeData.Context context) {
@@ -250,7 +253,7 @@ public final class NativeDataProjections {
 	// Unprojections: each object back to its decoded value, in schema field order.
 
 	public static Object paintingOut(PaintingVariant v, NativeData.Builder b) {
-		return new Object[]{v.width(), v.height(), v.assetId().toString(), b.optionalSlot(v.title(), ComponentSerialization.CODEC), b.optionalSlot(v.author(), ComponentSerialization.CODEC)};
+		return new Object[]{v.width(), v.height(), v.assetId().toString(), v.title().map(t -> textOut(t, b)).orElse(null), v.author().map(t -> textOut(t, b)).orElse(null)};
 	}
 
 	public static Object damageTypeOut(DamageType v, NativeData.Builder b) {
@@ -262,21 +265,21 @@ public final class NativeDataProjections {
 	}
 
 	public static Object jukeboxSongOut(JukeboxSong v, NativeData.Builder b) {
-		return new Object[]{b.sound(v.soundEvent()), b.slot(v.description(), ComponentSerialization.CODEC), v.lengthInSeconds(), v.comparatorOutput()};
+		return new Object[]{b.slot(v.soundEvent(), net.minecraft.sounds.SoundEvent.CODEC), textOut(v.description(), b), v.lengthInSeconds(), v.comparatorOutput()};
 	}
 
 	public static Object trimPatternOut(TrimPattern v, NativeData.Builder b) {
-		return new Object[]{v.assetId().toString(), b.slot(v.description(), ComponentSerialization.CODEC), v.decal()};
+		return new Object[]{v.assetId().toString(), textOut(v.description(), b), v.decal()};
 	}
 
 	public static Object trimMaterialOut(TrimMaterial v, NativeData.Builder b) {
 		Map<String, Object> overrides = new LinkedHashMap<>();
 		v.assets().overrides().forEach((key, info) -> overrides.put(key.location().toString(), info.suffix()));
-		return new Object[]{new Object[]{v.assets().base().suffix(), overrides}, b.slot(v.description(), ComponentSerialization.CODEC)};
+		return new Object[]{new Object[]{v.assets().base().suffix(), overrides}, textOut(v.description(), b)};
 	}
 
 	public static Object instrumentOut(Instrument v, NativeData.Builder b) {
-		return new Object[]{b.sound(v.soundEvent()), v.useDuration(), v.range(), b.slot(v.description(), ComponentSerialization.CODEC)};
+		return new Object[]{b.slot(v.soundEvent(), net.minecraft.sounds.SoundEvent.CODEC), v.useDuration(), v.range(), textOut(v.description(), b)};
 	}
 
 	private static Object costOut(Enchantment.Cost cost) {
@@ -298,7 +301,7 @@ public final class NativeDataProjections {
 			slots
 		};
 		return new Object[]{
-			b.slot(v.description(), ComponentSerialization.CODEC),
+			textOut(v.description(), b),
 			definition,
 			b.slotWithDefault(v.exclusiveSet(), ENCHANTMENTS, HolderSet.direct()),
 			net.minecraft.world.item.enchantment.NativeEnchantmentEffects.effectsOut(v.effects(), b)
@@ -347,7 +350,7 @@ public final class NativeDataProjections {
 	}
 
 	public static Object wolfSoundOut(WolfSoundVariant v, NativeData.Builder b) {
-		return new Object[]{b.sound(v.ambientSound()), b.sound(v.deathSound()), b.sound(v.growlSound()), b.sound(v.hurtSound()), b.sound(v.pantSound()), b.sound(v.whineSound())};
+		return new Object[]{b.slot(v.ambientSound(), net.minecraft.sounds.SoundEvent.CODEC), b.slot(v.deathSound(), net.minecraft.sounds.SoundEvent.CODEC), b.slot(v.growlSound(), net.minecraft.sounds.SoundEvent.CODEC), b.slot(v.hurtSound(), net.minecraft.sounds.SoundEvent.CODEC), b.slot(v.pantSound(), net.minecraft.sounds.SoundEvent.CODEC), b.slot(v.whineSound(), net.minecraft.sounds.SoundEvent.CODEC)};
 	}
 
 	private static <T extends net.minecraft.util.StringRepresentable> Object modelOut(ModelAndTexture<T> model, SpawnPrioritySelectors selectors, NativeData.Builder b) {

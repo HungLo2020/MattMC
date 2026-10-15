@@ -37,9 +37,21 @@ pub static REGISTRIES: &[Registry] = &[
 ];
 
 const NON_NEGATIVE: S = S::IntRange(0, i32::MAX);
-/// `RegistryCodecs.homogeneousList`: a tag, one ID or a list.
-const HOLDERS: S = S::HolderSet { force_list: false };
 const POSITIVE: S = S::IntRange(1, i32::MAX);
+
+// Values Java's codecs decode while Rust decodes, at their field's position
+// (`NativeValues.JavaCodec` ordinals), so lookups and their errors compose
+// in DFU's order.
+pub const ENCHANTMENT_HOLDER: u16 = 18;
+pub const ITEMS: u16 = 19;
+pub const ENCHANTMENTS: u16 = 20;
+pub const STRUCTURES: u16 = 21;
+pub const BIOMES: u16 = 22;
+pub const CARVERS: u16 = 23;
+pub const FEATURES: u16 = 24;
+const SOUND: S = S::Java(super::enchant::SOUND_EVENT);
+/// `ComponentSerialization.CODEC`, which is the native text schema itself.
+const DESCRIPTION: &S = &super::text::COMPONENT;
 
 // Biome (`Biome.DIRECT_CODEC` / `NETWORK_CODEC`).
 
@@ -56,14 +68,14 @@ static CLIMATE: S = S::Record(&[
 ]);
 static PARTICLE: S = S::Record(&[f("options", &super::values::PARTICLE, Required), f("probability", &S::Float, Required)]);
 static MOOD: S = S::Record(&[
-    f("sound", &S::Sound, Required),
+    f("sound", &SOUND, Required),
     f("tick_delay", &S::Int, Required),
     f("block_search_extent", &S::Int, Required),
     f("offset", &S::Double, Required),
 ]);
-static ADDITIONS: S = S::Record(&[f("sound", &S::Sound, Required), f("tick_chance", &S::Double, Required)]);
+static ADDITIONS: S = S::Record(&[f("sound", &SOUND, Required), f("tick_chance", &S::Double, Required)]);
 static MUSIC_DATA: S = S::Record(&[
-    f("sound", &S::Sound, Required),
+    f("sound", &SOUND, Required),
     f("min_delay", &S::Int, Required),
     f("max_delay", &S::Int, Required),
     f("replace_current_music", &S::Bool, Required),
@@ -79,7 +91,7 @@ static EFFECTS: S = S::Record(&[
     f("grass_color", &S::Int, Optional),
     f("grass_color_modifier", &S::Enum(GRASS_COLOR_MODIFIERS), Default(Dv::Name("none"))),
     f("particle", &PARTICLE, Optional),
-    f("ambient_sound", &S::Sound, Optional),
+    f("ambient_sound", &SOUND, Optional),
     f("mood_sound", &MOOD, Optional),
     f("additions_sound", &ADDITIONS, Optional),
     f("music", &S::List(&MUSIC), Optional),
@@ -107,8 +119,8 @@ static BIOME: S = S::Record(&[
     f("climate", &CLIMATE, Inline),
     f("effects", &EFFECTS, Required),
     f("generation", &S::Record(&[
-        f("carvers", &S::HolderSet { force_list: false }, Required),
-        f("features", &S::HolderSetList, Required),
+        f("carvers", &S::Java(CARVERS), Required),
+        f("features", &S::Java(FEATURES), Required),
     ]), Inline),
     f("mobs", &S::Record(&[
         f("creature_spawn_probability", &S::FloatRange(0.0, 0.999_999_9), Default(Dv::Float(0.1))),
@@ -124,8 +136,8 @@ static PAINTING: S = S::Record(&[
     f("width", &S::IntRange(1, 16), Required),
     f("height", &S::IntRange(1, 16), Required),
     f("asset_id", &S::Location, Required),
-    f("title", &S::Delegate, Optional),
-    f("author", &S::Delegate, Optional),
+    f("title", DESCRIPTION, Optional),
+    f("author", DESCRIPTION, Optional),
 ]);
 static DAMAGE_TYPE: S = S::Record(&[
     f("message_id", &S::Str, Required),
@@ -136,14 +148,14 @@ static DAMAGE_TYPE: S = S::Record(&[
 ]);
 static BANNER_PATTERN: S = S::Record(&[f("asset_id", &S::Location, Required), f("translation_key", &S::Str, Required)]);
 static JUKEBOX_SONG: S = S::Record(&[
-    f("sound_event", &S::Sound, Required),
-    f("description", &S::Delegate, Required),
+    f("sound_event", &SOUND, Required),
+    f("description", DESCRIPTION, Required),
     f("length_in_seconds", &S::PositiveFloat, Required),
     f("comparator_output", &S::IntRange(0, 15), Required),
 ]);
 static TRIM_PATTERN: S = S::Record(&[
     f("asset_id", &S::Location, Required),
-    f("description", &S::Delegate, Required),
+    f("description", DESCRIPTION, Required),
     f("decal", &S::Bool, OrElse(Dv::Bool(false))),
 ]);
 static TRIM_MATERIAL: S = S::Record(&[
@@ -151,21 +163,21 @@ static TRIM_MATERIAL: S = S::Record(&[
         f("asset_name", &S::ResourcePath, Required),
         f("override_armor_assets", &S::Map(&S::Location, &S::ResourcePath), Default(Dv::EmptyMap)),
     ]), Inline),
-    f("description", &S::Delegate, Required),
+    f("description", DESCRIPTION, Required),
 ]);
 static INSTRUMENT: S = S::Record(&[
-    f("sound_event", &S::Sound, Required),
+    f("sound_event", &SOUND, Required),
     f("use_duration", &S::PositiveFloat, Required),
     f("range", &S::PositiveFloat, Required),
-    f("description", &S::Delegate, Required),
+    f("description", DESCRIPTION, Required),
 ]);
 pub const SLOT_GROUPS: &[&str] = &["any", "mainhand", "offhand", "hand", "feet", "legs", "chest", "head", "armor", "body", "saddle"];
 static COST: S = S::Record(&[f("base", &S::Int, Required), f("per_level_above_first", &S::Int, Required)]);
 static ENCHANTMENT: S = S::Record(&[
-    f("description", &S::Delegate, Required),
+    f("description", DESCRIPTION, Required),
     f("definition", &S::Record(&[
-        f("supported_items", &HOLDERS, Required),
-        f("primary_items", &HOLDERS, Optional),
+        f("supported_items", &S::Java(ITEMS), Required),
+        f("primary_items", &S::Java(ITEMS), Optional),
         f("weight", &S::IntRange(1, 1024), Required),
         f("max_level", &S::IntRange(1, 255), Required),
         f("min_cost", &COST, Required),
@@ -173,25 +185,25 @@ static ENCHANTMENT: S = S::Record(&[
         f("anvil_cost", &NON_NEGATIVE, Required),
         f("slots", &S::List(&S::Enum(SLOT_GROUPS)), Required),
     ]), Inline),
-    f("exclusive_set", &HOLDERS, JavaDefault),
+    f("exclusive_set", &S::Java(ENCHANTMENTS), JavaDefault),
     f("effects", &super::enchant::EFFECTS, Default(Dv::EmptyMap)),
 ]);
 static ENCHANTMENT_PROVIDER: S = S::Dispatch("enchantment_provider_type", &[
-    case("by_cost", &[f("enchantments", &HOLDERS, Required), f("cost", &INT_PROVIDER, Required)]),
+    case("by_cost", &[f("enchantments", &S::Java(ENCHANTMENTS), Required), f("cost", &INT_PROVIDER, Required)]),
     case("by_cost_with_difficulty", &[
-        f("enchantments", &HOLDERS, Required),
+        f("enchantments", &S::Java(ENCHANTMENTS), Required),
         f("min_cost", &S::IntRange(1, 10000), Required),
         f("max_cost_span", &S::IntRange(0, 10000), Required),
     ]),
-    case("single", &[f("enchantment", &S::Delegate, Required), f("level", &INT_PROVIDER, Required)]),
+    case("single", &[f("enchantment", &S::Java(ENCHANTMENT_HOLDER), Required), f("level", &INT_PROVIDER, Required)]),
 ]);
 
 // Entity variants.
 
 static SPAWN_CONDITION: S = S::Dispatch("spawn_condition_type", &[
-    case("structure", &[f("structures", &HOLDERS, Required)]),
+    case("structure", &[f("structures", &S::Java(STRUCTURES), Required)]),
     case("moon_brightness", &[f("range", &S::DoubleBounds, Required)]),
-    case("biome", &[f("biomes", &HOLDERS, Required)]),
+    case("biome", &[f("biomes", &S::Java(BIOMES), Required)]),
 ]);
 static SPAWN_CONDITIONS: S = S::List(&S::Record(&[f("condition", &SPAWN_CONDITION, Optional), f("priority", &S::Int, Required)]));
 static ASSET_VARIANT: S = S::Record(&[f("asset_id", &S::Location, Required), f("spawn_conditions", &SPAWN_CONDITIONS, Required)]);
@@ -200,12 +212,12 @@ static WOLF_ASSETS: S = S::Record(&[f("wild", &S::Location, Required), f("tame",
 static WOLF_VARIANT: S = S::Record(&[f("assets", &WOLF_ASSETS, Required), f("spawn_conditions", &SPAWN_CONDITIONS, Required)]);
 static WOLF_VARIANT_NETWORK: S = S::Record(&[f("assets", &WOLF_ASSETS, Required)]);
 static WOLF_SOUND_VARIANT: S = S::Record(&[
-    f("ambient_sound", &S::Sound, Required),
-    f("death_sound", &S::Sound, Required),
-    f("growl_sound", &S::Sound, Required),
-    f("hurt_sound", &S::Sound, Required),
-    f("pant_sound", &S::Sound, Required),
-    f("whine_sound", &S::Sound, Required),
+    f("ambient_sound", &SOUND, Required),
+    f("death_sound", &SOUND, Required),
+    f("growl_sound", &SOUND, Required),
+    f("hurt_sound", &SOUND, Required),
+    f("pant_sound", &SOUND, Required),
+    f("whine_sound", &SOUND, Required),
 ]);
 
 macro_rules! model_variant {

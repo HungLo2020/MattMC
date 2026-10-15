@@ -31,8 +31,8 @@ public final class NativeBiomes {
 	private NativeBiomes() {
 	}
 
-	private static final com.mojang.serialization.Codec<HolderSet<ConfiguredWorldCarver<?>>> CARVERS = ConfiguredWorldCarver.LIST_CODEC.promotePartial(Util.prefix("Carver: ", LOGGER::error));
-	private static final com.mojang.serialization.Codec<List<HolderSet<PlacedFeature>>> FEATURES = PlacedFeature.LIST_OF_LISTS_CODEC.promotePartial(Util.prefix("Features: ", LOGGER::error));
+	public static final com.mojang.serialization.Codec<HolderSet<ConfiguredWorldCarver<?>>> CARVERS = ConfiguredWorldCarver.LIST_CODEC.promotePartial(Util.prefix("Carver: ", LOGGER::error));
+	public static final com.mojang.serialization.Codec<List<HolderSet<PlacedFeature>>> FEATURES = PlacedFeature.LIST_OF_LISTS_CODEC.promotePartial(Util.prefix("Features: ", LOGGER::error));
 
 	static Biome project(Object value, NativeData.Context context) {
 		Object[] biome = NativeData.record(value);
@@ -45,8 +45,8 @@ public final class NativeBiomes {
 		MobSpawnSettings mobs = MobSpawnSettings.EMPTY;
 		if (biome.length > 2) {
 			Object[] gen = NativeData.record(biome[2]);
-			HolderSet<ConfiguredWorldCarver<?>> carvers = context.holderSet(gen[0], Registries.CONFIGURED_CARVER, CARVERS);
-			List<HolderSet<PlacedFeature>> features = context.holderSetList(gen[1], Registries.PLACED_FEATURE, FEATURES);
+			HolderSet<ConfiguredWorldCarver<?>> carvers = context.slot(gen[0], CARVERS);
+			List<HolderSet<PlacedFeature>> features = context.slot(gen[1], FEATURES);
 			generation = new BiomeGenerationSettings(carvers, features);
 			mobs = mobs(NativeData.record(biome[3]));
 		}
@@ -60,18 +60,18 @@ public final class NativeBiomes {
 		});
 		Optional<AmbientMoodSettings> mood = Optional.ofNullable(e[10]).map(m -> {
 			Object[] fields = NativeData.record(m);
-			return new AmbientMoodSettings(context.sound(fields[0]), (Integer)fields[1], (Integer)fields[2], (Double)fields[3]);
+			return new AmbientMoodSettings(context.slot(fields[0], net.minecraft.sounds.SoundEvent.CODEC), (Integer)fields[1], (Integer)fields[2], (Double)fields[3]);
 		});
 		Optional<AmbientAdditionsSettings> additions = Optional.ofNullable(e[11]).map(a -> {
 			Object[] fields = NativeData.record(a);
-			return new AmbientAdditionsSettings(context.sound(fields[0]), (Double)fields[1]);
+			return new AmbientAdditionsSettings(context.slot(fields[0], net.minecraft.sounds.SoundEvent.CODEC), (Double)fields[1]);
 		});
 		Optional<WeightedList<Music>> music = Optional.ofNullable(e[12]).map(list -> {
 			List<Weighted<Music>> entries = new ArrayList<>();
 			for (Object entry : NativeData.list(list)) {
 				Object[] weighted = NativeData.record(entry);
 				Object[] data = NativeData.record(weighted[0]);
-				entries.add(new Weighted<>(new Music(context.sound(data[0]), (Integer)data[1], (Integer)data[2], (Boolean)data[3]), (Integer)weighted[1]));
+				entries.add(new Weighted<>(new Music(context.slot(data[0], net.minecraft.sounds.SoundEvent.CODEC), (Integer)data[1], (Integer)data[2], (Boolean)data[3]), (Integer)weighted[1]));
 			}
 			return WeightedList.of(entries);
 		});
@@ -85,7 +85,7 @@ public final class NativeBiomes {
 			Optional.ofNullable((Integer)e[6]),
 			NativeData.named(BiomeSpecialEffects.GrassColorModifier.class, e[7]),
 			particle,
-			Optional.ofNullable(e[9]).map(context::sound),
+			Optional.ofNullable(e[9]).map(s -> context.slot(s, net.minecraft.sounds.SoundEvent.CODEC)),
 			mood,
 			additions,
 			music,
@@ -125,14 +125,14 @@ public final class NativeBiomes {
 			e.getGrassColorOverride().orElse(null),
 			e.getGrassColorModifier().getSerializedName(),
 			e.getAmbientParticleSettings().map(p -> new Object[]{ParticleTypes.unproject(p.getOptions(), b), p.probability()}).orElse(null),
-			e.getAmbientLoopSoundEvent().map(b::sound).orElse(null),
-			e.getAmbientMoodSettings().map(m -> new Object[]{b.sound(m.getSoundEvent()), m.getTickDelay(), m.getBlockSearchExtent(), m.getSoundPositionOffset()}).orElse(null),
-			e.getAmbientAdditionsSettings().map(a -> new Object[]{b.sound(a.getSoundEvent()), a.getTickChance()}).orElse(null),
+			e.getAmbientLoopSoundEvent().map(s -> b.slot(s, net.minecraft.sounds.SoundEvent.CODEC)).orElse(null),
+			e.getAmbientMoodSettings().map(m -> new Object[]{b.slot(m.getSoundEvent(), net.minecraft.sounds.SoundEvent.CODEC), m.getTickDelay(), m.getBlockSearchExtent(), m.getSoundPositionOffset()}).orElse(null),
+			e.getAmbientAdditionsSettings().map(a -> new Object[]{b.slot(a.getSoundEvent(), net.minecraft.sounds.SoundEvent.CODEC), a.getTickChance()}).orElse(null),
 			e.getBackgroundMusic().map(list -> {
 				List<Object> entries = new ArrayList<>();
 				for (Weighted<Music> w : list.unwrap()) {
 					Music m = w.value();
-					entries.add(new Object[]{new Object[]{b.sound(m.event()), m.minDelay(), m.maxDelay(), m.replaceCurrentMusic()}, w.weight()});
+					entries.add(new Object[]{new Object[]{b.slot(m.event(), net.minecraft.sounds.SoundEvent.CODEC), m.minDelay(), m.maxDelay(), m.replaceCurrentMusic()}, w.weight()});
 				}
 				return (Object)entries;
 			}).orElse(null),

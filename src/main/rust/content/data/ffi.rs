@@ -9,14 +9,12 @@
 //!
 //! Decoded values (`D`): 0 absent, 1 false, 2 true, 3 int, 4 float,
 //! 5 double, 6 string, 7 list, 8 map, 9 record, 10 variant (u16 case, u32
-//! count, fields), 11 slot (u32), 12 sound reference (string), 13 inline
-//! sound (string, u8 has range, f32 range), 14 holder set slot (u32, u8
-//! parsed, then u32 sets, each 0 tag string or 1 u32 IDs and strings),
-//! 15 a number as its source held it (a tree number node).
+//! count, fields), 11 slot (u32), 15 a number as its source held it (a
+//! tree number node).
 //!
 //! Encoded values (`O`): 1 false, 2 true, 3 int, 4 float, 5 double,
 //! 6 string, 7 list, 8 map, 11 slot (u32), 14 slot omitted when Java's
-//! value equals its default (u32), 15 registered sound (string), 16 int
+//! value equals its default (u32), 16 int
 //! list (u32 count, ints), 17 a number of its Java type (tree number
 //! node), 18 a delegated map codec's entries merged into the map (u32).
 
@@ -29,7 +27,8 @@ use super::schema::{D, O, R};
 use super::value::{Mode, Node, Num, Value};
 use super::Definition;
 
-type Entry = Result<Arc<Definition>, String>;
+/// A stored decode: its definition, or the error and any partial definition.
+type Entry = Result<Arc<Definition>, (String, Option<Arc<Definition>>)>;
 
 fn store() -> &'static Mutex<HashMap<u64, Entry>> {
     static STORE: OnceLock<Mutex<HashMap<u64, Entry>>> = OnceLock::new();
@@ -45,7 +44,10 @@ fn keep(entry: Entry) -> i64 {
 
 /// The stored definition behind a live Java object, for native readers.
 pub fn get(handle: u64) -> Option<Arc<Definition>> {
-    store().lock().unwrap().get(&handle).and_then(|e| e.as_ref().ok().cloned())
+    store().lock().unwrap().get(&handle).and_then(|e| match e {
+        Ok(def) | Err((_, Some(def))) => Some(def.clone()),
+        Err((_, None)) => None,
+    })
 }
 
 struct In<'a> {
@@ -107,18 +109,10 @@ impl In<'_> {
                 D::Variant(case, (0..n).map(|_| self.decoded()).collect::<R<_>>()?)
             }
             11 => D::Slot(self.u32()?),
-            14 => D::Holders(self.u32()?, None),
             15 => match self.node()?.value {
                 Value::Number(n) => D::Num(n),
                 _ => return Err("decoded number is not a number".into()),
             },
-            12 => D::SoundRef(self.string()?),
-            13 => {
-                let id = self.string()?;
-                let has = self.u8()? != 0;
-                let range = f32::from_bits(self.u32()?);
-                D::SoundDirect(id, has.then_some(range))
-            }
             tag => return Err(format!("unknown decoded tag {tag}")),
         })
     }
@@ -159,6 +153,13 @@ impl In<'_> {
 
 #[derive(Default)]
 struct Out(Vec<u8>);
+
+/// Appends `node` in the input tree format to `bytes`, for a Java codec Rust calls back.
+pub(crate) fn write_tree(node: &Node, bytes: Vec<u8>) -> Vec<u8> {
+    let mut o = Out(bytes);
+    o.node(node);
+    o.0
+}
 
 thread_local! {
     /// A reusable output buffer; taken while in use, so a nested call (Java
@@ -306,43 +307,9 @@ impl Out {
                 self.u8(11);
                 self.u32(*i);
             }
-            D::SoundRef(s) => {
-                self.u8(12);
-                self.string(s);
-            }
-            D::SoundDirect(s, range) => {
-                self.u8(13);
-                self.string(s);
-                self.u8(u8::from(range.is_some()));
-                self.u32(range.unwrap_or(0.0).to_bits());
-            }
             D::Num(n) => {
                 self.u8(15);
                 self.node(&Node::new(Value::Number(n.clone())));
-            }
-            D::Holders(slot, refs) => {
-                self.u8(14);
-                self.u32(*slot);
-                match refs {
-                    None => self.u8(0),
-                    Some(sets) => {
-                        self.u8(1);
-                        self.u32(sets.len() as u32);
-                        for set in sets {
-                            match set {
-                                super::schema::Refs::Tag(tag) => {
-                                    self.u8(0);
-                                    self.string(tag);
-                                }
-                                super::schema::Refs::Ids(ids) => {
-                                    self.u8(1);
-                                    self.u32(ids.len() as u32);
-                                    ids.iter().for_each(|i| self.string(i));
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -391,10 +358,6 @@ impl Out {
                 self.u8(14);
                 self.u32(*i);
             }
-            O::SoundRef(s) => {
-                self.u8(15);
-                self.string(s);
-            }
             O::Num(n) => {
                 self.u8(17);
                 self.node(&Node::new(Value::Number(n.clone())));
@@ -408,19 +371,25 @@ impl Out {
 }
 
 /// Status 1, the decoded value, its slots (present flag, Java node index or
-/// u32::MAX, input tree) and logs; or status 0 and the error.
+/// u32::MAX, input tree) and logs; or status 0, the error and u8 partial,
+/// then a partial definition as for status 1.
 fn payload(entry: &Entry) -> Vec<u8> {
     let mut o = Out::default();
-    match entry {
-        Err(error) => {
+    let def = match entry {
+        Err((error, partial)) => {
             o.u8(0);
             o.string(error);
+            o.u8(u8::from(partial.is_some()));
+            partial.as_ref()
         }
         Ok(def) => {
             o.u8(1);
-            o.decoded(&def.value);
-            o.slots(&def.slots, &def.logs);
+            Some(def)
         }
+    };
+    if let Some(def) = def {
+        o.decoded(&def.value);
+        o.slots(&def.slots, &def.logs);
     }
     o.0
 }
@@ -457,17 +426,19 @@ unsafe fn copy_out(table: &[u8], out: *mut u8, capacity: i64) -> i64 {
 /// A data call's handle when it met a block state the block registry could
 /// not be installed for (`schema::BLOCKS_MISSING`); nothing is stored.
 const BLOCKS_MISSING_HANDLE: i64 = -2;
+/// A file call's handle when its bytes are not JSON Rust parses; nothing is stored.
+const JSON_INVALID_HANDLE: i64 = -1;
 /// A data call's handle when a Java codec it called back threw: `-3 - id`,
 /// Java's id for that `Throwable`, which Java rethrows.
 const JAVA_THROWN_HANDLE: i64 = -3;
 
-fn guarded(f: impl FnOnce() -> R<Definition>) -> i64 {
-    let (entry, thrown) = super::schema::thrown_scope(|| catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|_| Err("data decode panicked".into())));
+fn guarded(f: impl FnOnce() -> Result<Definition, super::Failed>) -> i64 {
+    let (entry, thrown) = super::schema::thrown_scope(|| catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|_| Err("data decode panicked".to_owned().into())));
     let entry = match thrown {
         Some((super::schema::BLOCKS_MISSING, _, _)) => return BLOCKS_MISSING_HANDLE,
         Some((super::schema::JAVA_THROWN, _, id)) => return JAVA_THROWN_HANDLE - i64::from(id),
-        Some((_, message, _)) => Err(message),
-        None => entry,
+        Some((_, message, _)) => Err((message, None)),
+        None => entry.map_err(|f| (f.msg, f.partial.map(Arc::new))),
     };
     keep(entry.map(Arc::new))
 }
@@ -476,7 +447,9 @@ fn guarded(f: impl FnOnce() -> R<Definition>) -> i64 {
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_data_decode_file(registry: i32, network: i32, bytes: *const u8, len: i64) -> i64 {
     let input = slice(bytes, len);
-    guarded(|| super::decode_file(registry as usize, network != 0, input))
+    // Java parses text that isn't JSON itself, for the loader's own exception.
+    let Ok(node) = crate::content::json::parse_into::<Node>(input) else { return JSON_INVALID_HANDLE };
+    guarded(|| super::decode_partial(registry as usize, network != 0, &node, Mode::Json, true))
 }
 
 /// Decodes a value tree from Java (`mode` 0 JsonOps, 1 NbtOps) into the store; returns its handle.
@@ -485,7 +458,7 @@ pub unsafe extern "C" fn mattmc_data_decode_tree(registry: i32, network: i32, mo
     let input = slice(bytes, len);
     guarded(|| {
         let node = In { bytes: input, pos: 0, next_index: 0 }.node()?;
-        super::decode(registry as usize, network != 0, &node, if mode == 1 { Mode::Nbt } else { Mode::Json }, registry_ops != 0)
+        super::decode_partial(registry as usize, network != 0, &node, if mode == 1 { Mode::Nbt } else { Mode::Json }, registry_ops != 0)
     })
 }
 
@@ -496,7 +469,7 @@ pub unsafe extern "C" fn mattmc_data_define(registry: i32, slots: i32, bytes: *c
     let input = slice(bytes, len);
     guarded(|| {
         let value = In { bytes: input, pos: 0, next_index: 0 }.decoded()?;
-        super::define(registry as usize, value, slots.max(0) as usize)
+        Ok(super::define(registry as usize, value, slots.max(0) as usize)?)
     })
 }
 

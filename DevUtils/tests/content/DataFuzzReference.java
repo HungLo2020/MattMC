@@ -30,8 +30,9 @@ import net.minecraft.server.packs.resources.Resource;
  * JSON text) go through the registry loader's file path, the direct codec over
  * a parsed JSON tree, and the network codec (direct when not synchronized)
  * over NBT. Each row is the outcome: "ERR", or a hash of the decoded element's
- * direct and network encodings. Tree and NBT errors keep their message and
- * their partial value's encodings. Arguments: the output file.
+ * direct and network encodings. File errors keep the loader's exception;
+ * tree and NBT errors keep their message and their partial value's
+ * encodings. Arguments: the output file.
  */
 public final class DataFuzzReference {
     private DataFuzzReference() {}
@@ -120,7 +121,9 @@ public final class DataFuzzReference {
             return outcome(registry.getValue(key));
         } catch (Throwable e) {
             if (DEBUG && debugged++ < 3) e.printStackTrace();
-            return "ERR";
+            // The loader's diagnostic: the exception the per-file path throws.
+            Throwable cause = e instanceof java.lang.reflect.InvocationTargetException t ? t.getCause() : e;
+            return ("ERR " + cause.getClass().getName() + ": " + cause.getMessage()).replace("\n", "\\n");
         }
     }
 

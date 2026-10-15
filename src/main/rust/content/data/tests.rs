@@ -30,7 +30,7 @@ fn node(o: &O) -> Node {
         O::Int(v) => Value::Number(Num::Int(*v)),
         O::Float(v) => Value::Number(Num::Float(*v)),
         O::Double(v) => Value::Number(Num::Double(*v)),
-        O::Str(s) | O::SoundRef(s) => Value::String(s.to_string()),
+        O::Str(s) => Value::String(s.to_string()),
         O::List(items) => Value::List(items.iter().map(node).collect::<Vec<_>>().into()),
         O::Map(entries) => Value::Map(entries.iter().map(|(k, v)| (k.to_string(), node(v))).collect::<Vec<_>>().into()),
         O::IntList(v) => Value::List(v.iter().map(|i| Node::new(Value::Number(Num::Int(*i)))).collect::<Vec<_>>().into()),
@@ -46,7 +46,7 @@ fn every_shipped_definition_decodes_and_round_trips() {
         let files = files(registry.name);
         assert!(!files.is_empty(), "{}", registry.name);
         for (name, bytes) in files {
-            let def = decode_file(index, false, &bytes).unwrap_or_else(|e| panic!("{}/{name}: {e}", registry.name));
+            let def = decode_file(index, false, &bytes).unwrap_or_else(|e| panic!("{}/{name}: {}", registry.name, e.msg));
             assert!(def.logs.is_empty(), "{}/{name}", registry.name);
             for network in [false, true] {
                 let encoded = encode(&def, network).unwrap();
@@ -462,7 +462,7 @@ fn vanilla_enchantment_effects_decode_natively_and_round_trip() {
     assert_eq!(files.len(), 43);
     let (mut components, mut slots) = (0, 0);
     for (name, bytes) in &files {
-        let def = decode_file(index, false, bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let def = decode_file(index, false, bytes).unwrap_or_else(|e| panic!("{name}: {}", e.msg));
         let D::Record(fields) = &def.value else { panic!("{name}: not a record") };
         let D::Map(effects) = fields.last().unwrap() else { panic!("{name}: effects not native: {:?}", fields.last()) };
         components += effects.len();

@@ -59,7 +59,17 @@ public final class NativeValues {
 		MOB_EFFECTS,
 		BLOCKS,
 		ENTITY_TYPES,
-		SOUND_EVENT;
+		SOUND_EVENT,
+		/** Data definition fields (`content/data/registries.rs`). */
+		ENCHANTMENT_HOLDER,
+		ITEMS,
+		ENCHANTMENTS,
+		STRUCTURES,
+		BIOMES,
+		CARVERS,
+		FEATURES;
+
+		static final JavaCodec[] VALUES = values();
 
 		public Codec<?> codec() {
 			return switch (this) {
@@ -81,6 +91,13 @@ public final class NativeValues {
 				case BLOCKS -> Conditions.BLOCKS;
 				case ENTITY_TYPES -> Conditions.ENTITY_TYPES;
 				case SOUND_EVENT -> net.minecraft.sounds.SoundEvent.CODEC;
+				case ENCHANTMENT_HOLDER -> net.minecraft.world.item.enchantment.Enchantment.CODEC;
+				case ITEMS -> Conditions.ITEMS;
+				case ENCHANTMENTS -> Conditions.ENCHANTMENTS;
+				case STRUCTURES -> Conditions.STRUCTURES;
+				case BIOMES -> Conditions.BIOMES;
+				case CARVERS -> net.minecraft.world.level.biome.NativeBiomes.CARVERS;
+				case FEATURES -> net.minecraft.world.level.biome.NativeBiomes.FEATURES;
 			};
 		}
 
@@ -100,6 +117,10 @@ public final class NativeValues {
 			static final Codec<?> MOB_EFFECTS = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.MOB_EFFECT);
 			static final Codec<?> BLOCKS = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.BLOCK);
 			static final Codec<?> ENTITY_TYPES = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.ENTITY_TYPE);
+			static final Codec<?> ITEMS = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.ITEM);
+			static final Codec<?> ENCHANTMENTS = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.ENCHANTMENT);
+			static final Codec<?> STRUCTURES = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.STRUCTURE);
+			static final Codec<?> BIOMES = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.BIOME);
 		}
 	}
 
@@ -173,12 +194,6 @@ public final class NativeValues {
 			}
 			return bytes.length;
 		}
-	}
-
-	private static String text(MemorySegment text, long length) {
-		byte[] bytes = new byte[(int)length];
-		text.reinterpret(length).asByteBuffer().get(bytes);
-		return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
 	}
 
 	/** A data definition call's handle, the values Java's codecs decoded for its slots, and what a callback threw. */
@@ -257,17 +272,19 @@ public final class NativeValues {
 			answer.write(2);
 		} else {
 			try {
+				// A node Rust parsed itself (a data pack file) arrives as an input
+				// tree, after a component codec's type name.
+				java.nio.ByteBuffer named = name.reinterpret(nameLength).asByteBuffer().order(java.nio.ByteOrder.LITTLE_ENDIAN);
 				Codec codec;
 				if (kind == 0) {
-					codec = JavaCodec.values()[id].codec();
+					codec = JavaCodec.VALUES[id].codec();
 				} else {
-					byte[] bytes = new byte[(int)nameLength];
-					name.reinterpret(nameLength).asByteBuffer().get(bytes);
+					byte[] bytes = new byte[node >= 0 ? (int)nameLength : named.getInt()];
+					named.get(bytes);
 					String type = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
 					codec = net.minecraft.core.registries.BuiltInRegistries.DATA_COMPONENT_TYPE.getValue(ResourceLocation.parse(type)).codecOrThrow();
 				}
-				// A node Rust parsed itself (a data pack file) arrives as its JSON text.
-				Object input = node >= 0 ? frame.nodes.get(node) : com.google.gson.JsonParser.parseString(text(name, nameLength));
+				Object input = node >= 0 ? frame.nodes.get(node) : NativeData.tree(named);
 				DataResult<Pair<Object, Object>> result = ((Codec)testDelegates.apply(codec)).decode(frame.ops, input);
 				Optional<Pair<Object, Object>> value = result.resultOrPartial();
 				while (frame.resolved.size() <= slot) {

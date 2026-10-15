@@ -138,16 +138,6 @@ public final class NativeData {
 			this.defaults.add(fallback);
 			return new Slot(this.values.size() - 1);
 		}
-
-		/** A sound: its registry ID when registered, else its inline event. */
-		public Object sound(Holder<SoundEvent> holder) {
-			Optional<ResourceKey<SoundEvent>> key = holder.unwrapKey();
-			if (key.isPresent()) {
-				return new SoundRef(key.get().location().toString());
-			}
-			SoundEvent event = holder.value();
-			return new SoundDirect(event.location().toString(), event.fixedRange().orElse(null));
-		}
 	}
 
 	/** Decoded values: records as {@code Object[]}, absent as null. */
@@ -159,20 +149,6 @@ public final class NativeData {
 
 	/** A number kept as its source's Java type ({@code ExtraCodecs.JAVA} values). */
 	public record JavaNumber(Number value) {
-	}
-
-	public record SoundRef(String id) {
-	}
-
-	public record SoundDirect(String id, @Nullable Float range) {
-	}
-
-	/** A delegated holder set (or list of them) with its references as Rust parsed them, or null refs. */
-	public record Holders(int slot, @Nullable List<Refs> refs) {
-	}
-
-	/** One holder set's references: a tag, or element IDs. */
-	public record Refs(@Nullable String tag, List<String> ids) {
 	}
 
 	/** One registry's codec: Rust decodes and encodes, the projector builds Java objects. */
@@ -230,6 +206,13 @@ public final class NativeData {
 				throw new IllegalStateException("Rust data decode failed", e);
 			}
 			long handle = call.handle();
+			if (handle == JSON_INVALID_HANDLE) {
+				// Not JSON Rust parses: the loader's own parser reports it (or, if it
+				// accepts the text, its tree decodes as the loader decoded it).
+				JsonElement json = net.minecraft.util.StrictJsonParser.parse(
+					new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.ByteArrayInputStream(bytes), java.nio.charset.StandardCharsets.UTF_8)));
+				return this.parse(ops, json);
+			}
 			this.checkBlocks(handle, "Decoding");
 			if (call.thrown() != null) {
 				// A Java codec Rust called back threw: the decode throws that same exception.
@@ -241,12 +224,17 @@ public final class NativeData {
 		private DataResult<E> project(long handle, @Nullable Source<?> source, @Nullable RegistryOps<JsonElement> jsonOps, List<Object> resolved) {
 			E value;
 			Context context;
+			String error = null;
 			try {
 				ByteBuffer in = ByteBuffer.wrap(table(PAYLOAD, handle, 0)).order(ByteOrder.LITTLE_ENDIAN);
 				if (in.get() == 0) {
-					String error = string(in);
-					release(handle);
-					return DataResult.error(() -> error);
+					error = string(in);
+					if (in.get() == 0) {
+						release(handle);
+						String message = error;
+						return DataResult.error(() -> message);
+					}
+					// The partial definition DFU keeps, projected like a decoded one.
 				}
 				Object decoded = decoded(in);
 				context = new Context(source, jsonOps, in);
@@ -264,6 +252,10 @@ public final class NativeData {
 			}
 			ELEMENTS.put(value, new Element(handle, this.network, context.values, context.codecs, context.defaults));
 			CLEANER.register(value, () -> release(handle));
+			if (error != null) {
+				String message = error;
+				return DataResult.error(() -> message, value);
+			}
 			return DataResult.success(value);
 		}
 
@@ -279,7 +271,14 @@ public final class NativeData {
 				}
 				element = defined.getOrThrow();
 			}
-			ByteBuffer in = ByteBuffer.wrap(table(ENCODE, element.handle, this.network ? 1 : 0)).order(ByteOrder.LITTLE_ENDIAN);
+			ByteBuffer in;
+			try {
+				in = ByteBuffer.wrap(table(ENCODE, element.handle, this.network ? 1 : 0)).order(ByteOrder.LITTLE_ENDIAN);
+			} finally {
+				// The handle lives while its owner does (the Cleaner releases it): keep both through the native read.
+				java.lang.ref.Reference.reachabilityFence(value);
+				java.lang.ref.Reference.reachabilityFence(element);
+			}
 			byte status = in.get();
 			if (status == 2) {
 				throw blocksMissing("Encoding " + (this.kind == Kind.BIOME ? "biomes" : this.kind.toString()));
@@ -485,100 +484,6 @@ public final class NativeData {
 			}
 			return this.trees[i];
 		}
-
-		/** The registry context delegated values decode in, if it has one. */
-		@Nullable
-		private RegistryOps<?> registryOps() {
-			if (this.source != null) {
-				return this.source.ops() instanceof RegistryOps<?> ops ? ops : null;
-			}
-			return this.jsonOps;
-		}
-
-		/**
-		 * A delegated holder set. When Rust parsed it as a tag or IDs and the
-		 * context resolves every one, it is built as {@code HolderSetCodec}
-		 * would; otherwise {@code codec} decodes the original value.
-		 */
-		public <T> HolderSet<T> holderSet(Object value, ResourceKey<? extends Registry<T>> registry, Codec<HolderSet<T>> codec) {
-			Holders holders = (Holders)value;
-			HolderSet<T> fast = holders.refs() == null ? null : this.resolve(registry, holders.refs().getFirst());
-			HolderSet<T> result = fast != null ? fast : this.parse(holders.slot(), codec);
-			this.values[holders.slot()] = result;
-			this.codecs[holders.slot()] = codec;
-			return result;
-		}
-
-		public <T> Optional<HolderSet<T>> optionalHolderSet(@Nullable Object value, ResourceKey<? extends Registry<T>> registry, Codec<HolderSet<T>> codec) {
-			return value == null ? Optional.empty() : Optional.of(this.holderSet(value, registry, codec));
-		}
-
-		/** A delegated holder set whose absent default Java holds; encoding omits it when equal. */
-		public <T> HolderSet<T> holderSetOrDefault(Object value, ResourceKey<? extends Registry<T>> registry, Codec<HolderSet<T>> codec, HolderSet<T> fallback) {
-			int slot = ((Holders)value).slot();
-			HolderSet<T> result = this.present[slot] ? this.holderSet(value, registry, codec) : fallback;
-			this.values[slot] = result;
-			this.codecs[slot] = codec;
-			this.defaults[slot] = fallback;
-			return result;
-		}
-
-		/** A delegated list of holder sets, resolved directly when all of them resolve. */
-		public <T> List<HolderSet<T>> holderSetList(Object value, ResourceKey<? extends Registry<T>> registry, Codec<List<HolderSet<T>>> codec) {
-			Holders holders = (Holders)value;
-			List<HolderSet<T>> result = null;
-			if (holders.refs() != null) {
-				List<HolderSet<T>> sets = new ArrayList<>(holders.refs().size());
-				for (Refs refs : holders.refs()) {
-					HolderSet<T> set = this.resolve(registry, refs);
-					if (set == null) {
-						sets = null;
-						break;
-					}
-					sets.add(set);
-				}
-				result = sets == null ? null : List.copyOf(sets);
-			}
-			if (result == null) {
-				result = this.parse(holders.slot(), codec);
-			}
-			this.values[holders.slot()] = result;
-			this.codecs[holders.slot()] = codec;
-			return result;
-		}
-
-		@Nullable
-		private <T> HolderSet<T> resolve(ResourceKey<? extends Registry<T>> registry, Refs refs) {
-			RegistryOps<?> ops = this.registryOps();
-			Optional<net.minecraft.core.HolderGetter<T>> getter = ops == null ? Optional.empty() : ops.getter(registry);
-			if (getter.isEmpty()) {
-				return null;
-			}
-			if (refs.tag() != null) {
-				return getter.get().get(net.minecraft.tags.TagKey.create(registry, ResourceLocation.parse(refs.tag()))).orElse(null);
-			}
-			List<Holder<T>> elements = new ArrayList<>(refs.ids().size());
-			for (String id : refs.ids()) {
-				Optional<? extends Holder<T>> holder = getter.get().get(ResourceKey.create(registry, ResourceLocation.parse(id)));
-				if (holder.isEmpty()) {
-					return null;
-				}
-				elements.add(holder.get());
-			}
-			return HolderSet.direct(elements);
-		}
-
-		/** A sound: a registered reference, or an inline event. */
-		public Holder<SoundEvent> sound(Object value) {
-			if (value instanceof SoundDirect direct) {
-				ResourceLocation id = ResourceLocation.parse(direct.id());
-				return Holder.direct(direct.range() == null ? SoundEvent.createVariableRangeEvent(id) : SoundEvent.createFixedRangeEvent(id, direct.range()));
-			}
-			ResourceKey<SoundEvent> key = ResourceKey.create(Registries.SOUND_EVENT, ResourceLocation.parse(((SoundRef)value).id()));
-			RegistryOps<?> ops = this.jsonOps;
-			Optional<? extends Holder<SoundEvent>> holder = ops == null ? Optional.empty() : ops.getter(Registries.SOUND_EVENT).flatMap(getter -> getter.get(key));
-			return holder.orElseThrow(() -> new Failure("Failed to get element " + key));
-		}
 	}
 
 	private static final ClassValue<Map<String, Object>> NAMES = new ClassValue<>() {
@@ -621,6 +526,21 @@ public final class NativeData {
 	}
 
 	/** Stored native definitions; each live projection holds one. */
+	/** The native handle behind a projected object, or 0 (tests). */
+	static long handleOf(Object value) {
+		Element element = ELEMENTS.get(value);
+		return element == null ? 0 : element.handle();
+	}
+
+	/** Whether a native handle is still stored (tests). */
+	static boolean stored(long handle) {
+		try {
+			return (long)PAYLOAD.invokeExact(handle, MemorySegment.NULL, 0L) >= 0;
+		} catch (Throwable e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
 	public static long liveCount() {
 		try {
 			return (long)LIVE_COUNT.invokeExact();
@@ -1106,7 +1026,7 @@ public final class NativeData {
 	}
 
 	/** A Rust input tree as Gson would have parsed it (numbers keep their text). */
-	private static JsonElement tree(ByteBuffer in) {
+	static JsonElement tree(ByteBuffer in) {
 		return switch (in.get()) {
 			case 0 -> JsonNull.INSTANCE;
 			case 1 -> new JsonPrimitive(false);
@@ -1196,16 +1116,6 @@ public final class NativeData {
 				out.write(15);
 				writeNumber(out, number.value());
 			}
-			case SoundRef sound -> {
-				out.write(12);
-				out.string(sound.id());
-			}
-			case SoundDirect sound -> {
-				out.write(13);
-				out.string(sound.id());
-				out.write(sound.range() != null ? 1 : 0);
-				out.u32(Float.floatToRawIntBits(sound.range() != null ? sound.range() : 0.0F));
-			}
 			default -> throw new IllegalArgumentException("Cannot describe " + value);
 		}
 	}
@@ -1252,32 +1162,6 @@ public final class NativeData {
 			}
 			case 11 -> new Slot(in.getInt());
 			case 15 -> new JavaNumber(readNumber(in));
-			case 12 -> new SoundRef(string(in));
-			case 13 -> {
-				String id = string(in);
-				boolean hasRange = in.get() != 0;
-				float range = in.getFloat();
-				yield new SoundDirect(id, hasRange ? range : null);
-			}
-			case 14 -> {
-				int slot = in.getInt();
-				List<Refs> refs = null;
-				if (in.get() != 0) {
-					refs = new ArrayList<>();
-					for (int i = in.getInt(); i > 0; i--) {
-						if (in.get() == 0) {
-							refs.add(new Refs(string(in), List.of()));
-						} else {
-							List<String> ids = new ArrayList<>();
-							for (int j = in.getInt(); j > 0; j--) {
-								ids.add(string(in));
-							}
-							refs.add(new Refs(null, ids));
-						}
-					}
-				}
-				yield new Holders(slot, refs);
-			}
 			default -> throw new IllegalStateException("Unknown native decoded tag");
 		};
 	}
@@ -1467,15 +1351,6 @@ public final class NativeData {
 				}
 				yield ops.createIntList(java.util.stream.IntStream.of(ints));
 			}
-			case 15 -> {
-				String id = string(in);
-				if (ops instanceof RegistryOps<?>) {
-					yield ops.createString(id);
-				}
-				// RegistryFileCodec writes registered sounds inline outside registry contexts.
-				SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getValue(ResourceLocation.parse(id));
-				yield SoundEvent.DIRECT_CODEC.encodeStart(ops, sound).getOrThrow(Context.Failure::new);
-			}
 			default -> throw new IllegalStateException("Unknown native encoded tag " + tag);
 		};
 	}
@@ -1572,6 +1447,8 @@ public final class NativeData {
 
 	/** A data call's handle when it met a block state the registry couldn't be installed for. */
 	static final long BLOCKS_MISSING_HANDLE = -2;
+	/** A file call's handle when its bytes are not JSON Rust parses. */
+	static final long JSON_INVALID_HANDLE = -1;
 	/** A data call's handles when a Java codec it called back threw: {@code -3 - id}. */
 	static final long JAVA_THROWN_HANDLE = -3;
 

@@ -3,9 +3,8 @@
 //! A schema decodes an input [`Node`] into a canonical [`D`] value, and
 //! encodes a [`D`] back into an output tree in the field order and with the
 //! default omission Java's `RecordCodecBuilder` codecs use. Values that
-//! belong to registries Java still owns are [`S::Delegate`] slots: decoding
-//! keeps their input node for Java to resolve, encoding leaves a slot for
-//! Java to fill.
+//! belong to registries Java still owns are [`S::Java`] leaves: Java's codec
+//! decodes them while Rust decodes, encoding leaves a slot for Java to fill.
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -56,8 +55,6 @@ pub enum S {
     /// A `"type"`-keyed dispatch over a built-in type registry (named by its
     /// path, for errors), by case path in `minecraft`.
     Dispatch(&'static str, &'static [Case]),
-    /// `SoundEvent.CODEC`: a registered sound's ID, or an inline `{sound_id, range}`.
-    Sound,
     /// `BuiltInRegistries.ENTITY_TYPE.byNameCodec()`, against the Rust entity catalog.
     EntityType,
     /// `MinMaxBounds.Doubles.CODEC`: a number, or `{min, max}` with no swapped bounds.
@@ -98,21 +95,6 @@ pub enum S {
     /// A codec Java still owns (`NativeValues.JavaCodec`, by ordinal), run
     /// by Java while Rust decodes so its errors and partials compose.
     Java(u16),
-    /// Resolved and encoded by a Java codec of another registry.
-    Delegate,
-    /// A delegated `HolderSet` (`HolderSetCodec`): a `#tag`, or IDs (a list,
-    /// or one ID unless `force_list`). Simple forms are parsed for Java to
-    /// look up directly; anything else Java decodes with the codec.
-    HolderSet { force_list: bool },
-    /// A delegated list of `HolderSet`s that are always lists (placed feature steps).
-    HolderSetList,
-}
-
-/// A holder set's references as parsed: a tag, or element IDs.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Refs {
-    Tag(String),
-    Ids(Vec<String>),
 }
 
 /// One dispatch case: its type name (path in `minecraft`), fields and,
@@ -252,23 +234,32 @@ fn java_answer(kind: i32, id: i32, name: &str, node: &Node, slot: u32) -> JavaAn
         return JavaAnswer::Err { msg, partial: false };
     }
     let Some(call) = JAVA_DECODE.get() else { return JavaAnswer::Lazy };
-    // A node Java holds is named by its index; one Rust parsed (a data pack
-    // file) is sent as its JSON text, numbers verbatim, for a Java codec.
-    let shown;
-    let (index, name) = match node.index {
-        Some(index) => (index as i32, name),
-        None if kind == JAVA_CODEC => {
-            shown = node.show(super::value::Mode::Json);
-            (-1, shown.as_str())
+    // A node Java holds is named by its index. One Rust parsed (a data pack
+    // file) is sent as an input tree (numbers as their text), after the
+    // component type's name (u32 length and UTF-8) for a component codec.
+    let tree;
+    let (index, name): (i32, &[u8]) = match node.index {
+        Some(index) => (index as i32, name.as_bytes()),
+        None => {
+            let mut bytes = Vec::with_capacity(64);
+            if kind != JAVA_CODEC {
+                bytes.extend_from_slice(&(name.len() as u32).to_le_bytes());
+                bytes.extend_from_slice(name.as_bytes());
+            }
+            tree = super::ffi::write_tree(node, bytes);
+            (-1, &tree)
         }
-        None => return JavaAnswer::Lazy,
     };
-    let mut buffer = vec![0u8; 256];
+    // Most answers fit on the stack; a larger one is retried into the heap.
+    let mut small = [0u8; 256];
+    let mut large = Vec::new();
+    let mut buffer: &mut [u8] = &mut small;
     loop {
         // SAFETY: the callback reads `name` and writes at most `capacity` bytes.
         let n = unsafe { call(kind, id, name.as_ptr(), name.len() as i64, index, slot as i32, buffer.as_mut_ptr(), buffer.len() as i64) } as usize;
         if n > buffer.len() {
-            buffer.resize(n, 0);
+            large.resize(n, 0);
+            buffer = &mut large;
             continue;
         }
         let text = |from: usize| -> (String, usize) {
@@ -402,10 +393,6 @@ pub enum D {
     Variant(u16, Vec<D>),
     /// A delegated value: index into the decoded element's slots.
     Slot(u32),
-    /// A delegated holder set (or list of them) and its parsed references, if simple.
-    Holders(u32, Option<Vec<Refs>>),
-    SoundRef(String),
-    SoundDirect(String, Option<f32>),
     /// A number kept as its source held it (`ExtraCodecs.JAVA`'s values).
     Num(Num),
 }
@@ -419,14 +406,12 @@ impl PartialEq for D {
             (D::Absent, D::Absent) => true,
             (D::Bool(a), D::Bool(b)) => a == b,
             (D::Int(a), D::Int(b)) => a == b,
-            (D::Str(a), D::Str(b)) | (D::SoundRef(a), D::SoundRef(b)) => a == b,
+            (D::Str(a), D::Str(b)) => a == b,
             (D::List(a), D::List(b)) | (D::Record(a), D::Record(b)) => a == b,
             (D::Map(a), D::Map(b)) => a == b,
             (D::Variant(t, a), D::Variant(u, b)) => t == u && a == b,
             (D::Slot(a), D::Slot(b)) => a == b,
             // Parsed references derive from the slot's own input.
-            (D::Holders(a, _), D::Holders(b, _)) => a == b,
-            (D::SoundDirect(a, r), D::SoundDirect(b, s)) => a == b && r.map(f32::to_bits) == s.map(f32::to_bits),
             (D::Num(a), D::Num(b)) => a == b,
             _ => false,
         }
@@ -829,18 +814,6 @@ pub fn decode(s: &S, node: &Node, cx: &mut Cx) -> DR {
                 .ok_or_else(|| format!("Unknown registry key in ResourceKey[minecraft:root / minecraft:{registry}]: {location}"))?;
             return case_result(index, &cases[index], node, cx);
         }
-        S::Sound => {
-            let reference = if cx.registry_ops { string(node, mode).ok().and_then(|s| Location::parse(s).ok()) } else { None };
-            match reference {
-                Some(location) => D::SoundRef(location.to_string()),
-                None => {
-                    map_members(node, mode)?;
-                    let id = location(node.get("sound_id").ok_or_else(|| format!("No key sound_id in {}", map_like(node, mode)))?, mode)?;
-                    let range = node.get("range").and_then(|n| number(n, mode).ok()).map(Num::float_value);
-                    D::SoundDirect(id, range)
-                }
-            }
-        }
         S::EntityType => {
             let location = Location::parse(string(node, mode)?)?;
             if &*location.namespace != "minecraft" || !entity_names().contains(&*location.path) {
@@ -851,11 +824,16 @@ pub fn decode(s: &S, node: &Node, cx: &mut Cx) -> DR {
         S::DoubleBounds => {
             let (min, max) = match &node.value {
                 Value::Map(_) => {
+                    // The record side: invalid optional fields leave their
+                    // partial absent, so `Codec.either` returns that side's
+                    // error with the partial (errors joined last field first).
                     let opt = |key| node.get(key).map(|n| number(n, mode).map(Num::double_value)).transpose();
                     match (opt("min"), opt("max")) {
                         (Ok(min), Ok(max)) => (min, max),
-                        (Err(first), _) | (_, Err(first)) => {
-                            return Err(format!("Failed to parse either. First: {first}; Second: {}", not_msg("number", node, mode)).into())
+                        (min, max) => {
+                            let msg = [&max, &min].iter().filter_map(|r| r.as_ref().err()).cloned().collect::<Vec<_>>().join("; ");
+                            let field = |r: &R<Option<f64>>| r.as_ref().ok().copied().flatten().map_or(D::Absent, D::Double);
+                            return Err(Fail { msg, partial: Some(D::Record(vec![field(&min), field(&max)])) });
                         }
                     }
                 }
@@ -942,20 +920,6 @@ pub fn decode(s: &S, node: &Node, cx: &mut Cx) -> DR {
             let block = registry.by_name(&location.to_string())
                 .ok_or_else(|| format!("Unknown registry key in ResourceKey[minecraft:root / minecraft:block]: {location}"))?;
             D::Int(i32::from(registry.block(block).default_state().0))
-        }
-        S::Delegate => cx.slot(Some(node.clone())),
-        S::HolderSet { force_list } => {
-            let refs = refs(node, *force_list).map(|r| vec![r]);
-            let D::Slot(i) = cx.slot(Some(node.clone())) else { unreachable!() };
-            D::Holders(i, refs)
-        }
-        S::HolderSetList => {
-            let refs = match &node.value {
-                Value::List(items) => items.iter().map(|n| refs(n, true)).collect::<Option<Vec<_>>>(),
-                _ => None,
-            };
-            let D::Slot(i) = cx.slot(Some(node.clone())) else { unreachable!() };
-            D::Holders(i, refs)
         }
     })
 }
@@ -1112,24 +1076,6 @@ fn map(key: &S, value: &S, node: &Node, cx: &mut Cx) -> DR {
     Err(Fail { msg: format!("{msg} missed input: {}", missed.show(mode)), partial: Some(D::Map(out)) })
 }
 
-/// `HolderSetCodec`'s simple forms: `#tag`, or element IDs (a list, or one
-/// ID unless `force_list`). None leaves the codec to decide.
-fn refs(node: &Node, force_list: bool) -> Option<Refs> {
-    let id = |n: &Node| match &n.value {
-        Value::String(s) if !s.starts_with('#') => Location::parse(s).ok().map(|l| l.to_string()),
-        _ => None,
-    };
-    match &node.value {
-        Value::String(s) => match s.strip_prefix('#') {
-            Some(tag) => Location::parse(tag).ok().map(|l| Refs::Tag(l.to_string())),
-            None if !force_list => id(node).map(|i| Refs::Ids(vec![i])),
-            None => None,
-        },
-        Value::List(items) => items.iter().map(id).collect::<Option<Vec<_>>>().map(Refs::Ids),
-        _ => None,
-    }
-}
-
 /// A record's fields read from a map (a `MapCodec`'s decode).
 pub fn decode_fields(fields: &[F], map: &Node, cx: &mut Cx) -> DR {
     record(fields, map, cx)
@@ -1155,10 +1101,10 @@ fn record(fields: &[F], map: &Node, cx: &mut Cx) -> DR {
             (P::LenientDefault(d), None) => Ok(d.to_d()),
             (P::LenientDefault(d), Some(n)) => Ok(decode(field.schema, n, cx).unwrap_or(d.to_d())),
             (P::Default(d) | P::DefaultAlways(d) | P::OrElse(d), None) => Ok(d.to_d()),
-            (P::JavaDefault, None) => Ok(java_default(field.schema, cx)),
+            (P::JavaDefault, None) => Ok(cx.slot(None)),
             // As `Optional` above: an invalid value leaves Java's default as the partial.
             (P::JavaDefault, Some(n)) => match decode(field.schema, n, cx) {
-                Err(Fail { msg, partial: None }) => Err(Fail { msg, partial: Some(java_default(field.schema, cx)) }),
+                Err(Fail { msg, partial: None }) => Err(Fail { msg, partial: Some(cx.slot(None)) }),
                 result => result,
             },
             (P::Lenient, Some(n)) => Ok(decode(field.schema, n, cx).unwrap_or(D::Absent)),
@@ -1177,14 +1123,6 @@ fn record(fields: &[F], map: &Node, cx: &mut Cx) -> DR {
         });
     }
     parts.all(D::Record)
-}
-
-/// A `JavaDefault` field's default: an empty slot Java fills with it.
-fn java_default(schema: &S, cx: &mut Cx) -> D {
-    match (cx.slot(None), schema) {
-        (D::Slot(i), S::HolderSet { .. } | S::HolderSetList) => D::Holders(i, None),
-        (slot, _) => slot,
-    }
 }
 
 fn entity_names() -> &'static std::collections::HashSet<&'static str> {
@@ -1208,8 +1146,6 @@ pub enum O<'a> {
     Slot(u32),
     /// A delegated `JavaDefault` field: Java omits the entry when it equals the default.
     SlotUnlessDefault(u32),
-    /// A registered sound: its ID for `RegistryOps`, else its inline form (`RegistryFileCodec`).
-    SoundRef(Cow<'a, str>),
     /// A number created as its Java type (`JavaOps.convertTo`).
     Num(Num),
     /// A delegated `MapCodec`'s entries, merged into the enclosing map.
@@ -1275,14 +1211,6 @@ pub fn encode<'a>(target: &S, stored: &S, d: &'a D) -> R<O<'a>> {
         },
         (_, D::Double(v)) => O::Double(*v),
         (_, D::Str(v)) => O::Str(Cow::Borrowed(v)),
-        (_, D::SoundRef(v)) => O::SoundRef(Cow::Borrowed(v)),
-        (_, D::SoundDirect(id, range)) => {
-            let mut entries = vec![(Cow::Borrowed("sound_id"), O::Str(Cow::Borrowed(id)))];
-            if let Some(r) = range {
-                entries.push((Cow::Borrowed("range"), O::Float(*r)));
-            }
-            O::Map(entries)
-        }
         (S::List(item) | S::PartialList(item, _) | S::SizedList(item, _, _), D::List(items)) => {
             let stored_item = match stored { S::List(i) | S::PartialList(i, _) | S::SizedList(i, _, _) => *i, _ => *item };
             O::List(items.iter().map(|d| encode(item, stored_item, d)).collect::<R<_>>()?)
@@ -1299,7 +1227,7 @@ pub fn encode<'a>(target: &S, stored: &S, d: &'a D) -> R<O<'a>> {
             entries.push((Cow::Borrowed("type"), O::Str(Cow::Owned(format!("minecraft:{name}")))));
             O::Map(entries)
         }
-        (_, D::Slot(i)) | (_, D::Holders(i, _)) => O::Slot(*i),
+        (_, D::Slot(i)) => O::Slot(*i),
         (_, other) => return Err(format!("cannot encode {other:?}")),
     })
 }
@@ -1452,7 +1380,7 @@ fn record_entries<'a>(target: &[F], stored: &[F], values: &'a [D], out: &mut Vec
             P::Optional | P::Lenient if *value == D::Absent => {}
             P::Default(d) if *value == d.to_d() => {}
             P::JavaDefault => {
-                let (D::Slot(i) | D::Holders(i, _)) = value else { return Err(format!("{} is not a slot", field.name)) };
+                let D::Slot(i) = value else { return Err(format!("{} is not a slot", field.name)) };
                 out.push((Cow::Borrowed(field.name), O::SlotUnlessDefault(*i)));
             }
             _ => out.push((Cow::Borrowed(field.name), encode(field.schema, stored_field.schema, value)?)),
@@ -1470,7 +1398,7 @@ pub fn to_node(o: &O) -> Node {
         O::Int(v) => Value::Number(Num::Int(*v)),
         O::Float(v) => Value::Number(Num::Float(*v)),
         O::Double(v) => Value::Number(Num::Double(*v)),
-        O::Str(s) | O::SoundRef(s) => Value::String(s.to_string()),
+        O::Str(s) => Value::String(s.to_string()),
         O::List(items) => Value::List(items.iter().map(to_node).collect::<Vec<_>>().into()),
         O::Map(entries) => Value::Map(entries.iter().filter(|(_, v)| !matches!(v, O::SlotUnlessDefault(_) | O::SlotMerge(_))).map(|(k, v)| (k.to_string(), to_node(v))).collect::<Vec<_>>().into()),
         O::Slot(_) | O::SlotUnlessDefault(_) | O::SlotMerge(_) => Value::String("<delegated>".into()),

@@ -103,4 +103,127 @@ class NativeDataTest {
             assertEquals(registries.lookupOrThrow(NativeData.registry(kind)).listElementIds().count(), lookup.lookupOrThrow(NativeData.registry(kind)).listElementIds().count(), kind.toString());
         }
     }
+
+    static com.mojang.serialization.DataResult<Object> parse(NativeData.Kind kind, String json) {
+        return codecs(kind)[0].parse(registries.createSerializationContext(JsonOps.INSTANCE), com.google.gson.JsonParser.parseString(json));
+    }
+
+    // Java's codecs run while Rust decodes, once each, in field order, and
+    // their errors compose with Rust's as DFU's do; a thrown exception stops
+    // the decode, with no later callback and no handle left behind.
+    @Test void delegatedFieldsDecodeInPlaceAndCompose() {
+        var ops = registries.createSerializationContext(JsonOps.INSTANCE);
+        var sound = net.minecraft.sounds.SoundEvent.CODEC;
+        String song = "{\"sound_event\":\"minecraft:nope\",\"description\":5,\"length_in_seconds\":-1,\"comparator_output\":3}";
+        var calls = new java.util.ArrayList<Codec<?>>();
+        long live = NativeData.liveCount();
+        NativeValuesTest.withDelegates(codec -> NativeValuesTest.watched(codec, () -> { calls.add(codec); return null; }), () -> {
+            String message = parse(NativeData.Kind.JUKEBOX_SONG, song).error().orElseThrow().message();
+            for (String part : List.of(
+                sound.parse(ops, new com.google.gson.JsonPrimitive("minecraft:nope")).error().orElseThrow().message(),
+                net.minecraft.network.chat.ComponentSerialization.CODEC.parse(ops, new com.google.gson.JsonPrimitive(5)).error().orElseThrow().message(),
+                "Value must be positive: -1.0")) {
+                assertTrue(message.contains(part), message + " lacks " + part);
+            }
+        });
+        // The sound is Java's; the description is the native text schema itself.
+        assertEquals(List.of(sound), calls);
+        assertEquals(live, NativeData.liveCount());
+
+        // An invalid optional field leaves a partial, projected and encodable.
+        var painting = parse(NativeData.Kind.PAINTING_VARIANT, "{\"width\":2,\"height\":3,\"asset_id\":\"minecraft:a\",\"title\":5}");
+        var partial = assertInstanceOf(net.minecraft.world.entity.decoration.PaintingVariant.class, painting.resultOrPartial().orElseThrow());
+        assertEquals(2, partial.width());
+        assertTrue(partial.title().isEmpty());
+        assertTrue(codecs(NativeData.Kind.PAINTING_VARIANT)[0].encodeStart(ops, partial).isSuccess());
+
+        // Every field's codec runs once, in order, even after an error, and an
+        // answer larger than Rust's buffer is retried, not decoded again.
+        String wolf = "{\"ambient_sound\":\"minecraft:a\",\"death_sound\":\"minecraft:b\",\"growl_sound\":\"minecraft:c\","
+            + "\"hurt_sound\":\"minecraft:d\",\"pant_sound\":\"minecraft:e\",\"whine_sound\":\"minecraft:f\"}";
+        var inputs = new java.util.ArrayList<String>();
+        String longMessage = "x".repeat(4000);
+        NativeValuesTest.withDelegates(codec -> new Codec<Object>() {
+            @Override public <T> com.mojang.serialization.DataResult<com.mojang.datafixers.util.Pair<Object, T>> decode(com.mojang.serialization.DynamicOps<T> o, T input) {
+                inputs.add(String.valueOf(input));
+                return inputs.size() == 1 ? com.mojang.serialization.DataResult.error(() -> longMessage) : codec.decode(o, input);
+            }
+            @Override public <T> com.mojang.serialization.DataResult<T> encode(Object input, com.mojang.serialization.DynamicOps<T> o, T prefix) {
+                return codec.encode(input, o, prefix);
+            }
+        }, () -> assertTrue(parse(NativeData.Kind.WOLF_SOUND_VARIANT, wolf).error().orElseThrow().message().contains(longMessage)));
+        assertEquals(List.of("\"minecraft:a\"", "\"minecraft:b\"", "\"minecraft:c\"", "\"minecraft:d\"", "\"minecraft:e\"", "\"minecraft:f\""), inputs);
+
+        // A thrown exception leaves the decode unchanged and stops later callbacks.
+        calls.clear();
+        Throwable thrown = new IllegalStateException("sound");
+        long before = NativeData.liveCount();
+        NativeValuesTest.withDelegates(codec -> NativeValuesTest.watched(codec, () -> {
+            calls.add(codec);
+            if (calls.size() == 2) throw NativeValuesTest.sneaky(thrown);
+            return null;
+        }), () -> assertSame(thrown, assertThrows(Throwable.class, () -> parse(NativeData.Kind.WOLF_SOUND_VARIANT, wolf))));
+        assertEquals(2, calls.size());
+        assertEquals(before, NativeData.liveCount());
+    }
+
+    // A partial keeps its native definition while it is reachable, encodes
+    // after collections, and releases it once its last owner is gone.
+    @Test void retainedPartialsKeepTheirDefinitionUntilCollected() throws InterruptedException {
+        var ops = registries.createSerializationContext(JsonOps.INSTANCE);
+        Object partial = parse(NativeData.Kind.PAINTING_VARIANT, "{\"width\":2,\"height\":3,\"asset_id\":\"minecraft:a\",\"title\":5}")
+            .resultOrPartial().orElseThrow();
+        long handle = NativeData.handleOf(partial);
+        assertNotEquals(0, handle);
+        String encoded = codecs(NativeData.Kind.PAINTING_VARIANT)[0].encodeStart(ops, partial).getOrThrow().toString();
+        for (int i = 0; i < 5; i++) {
+            System.gc();
+            Thread.sleep(20);
+        }
+        assertTrue(NativeData.stored(handle));
+        assertEquals(encoded, codecs(NativeData.Kind.PAINTING_VARIANT)[0].encodeStart(ops, partial).getOrThrow().toString());
+        java.lang.ref.Reference.reachabilityFence(partial);
+        partial = null;
+        for (int i = 0; i < 200 && NativeData.stored(handle); i++) {
+            System.gc();
+            Thread.sleep(20);
+        }
+        assertFalse(NativeData.stored(handle));
+    }
+
+    // Inline text is the text codec itself: nested Java-owned item components
+    // inside it run once each, in order, on the file and tree paths alike,
+    // and their errors compose with the definition's own.
+    @Test void inlineTextComposesWithDataFieldsAndNestedComponents() {
+        var ops = registries.createSerializationContext(JsonOps.INSTANCE);
+        @SuppressWarnings("unchecked")
+        var codec = (NativeData.DataCodec<Object>)(Object)codecs(NativeData.Kind.PAINTING_VARIANT)[0];
+        Codec<?> food = net.minecraft.core.component.DataComponents.FOOD.codecOrThrow();
+        Codec<?> tool = net.minecraft.core.component.DataComponents.TOOL.codecOrThrow();
+        String title = "{\"text\":\"a\",\"hover_event\":{\"action\":\"show_item\",\"id\":\"minecraft:stone\",\"components\":"
+            + "{\"minecraft:food\":{\"nutrition\":\"x\",\"saturation\":1},\"minecraft:tool\":{\"rules\":5}}}}";
+        String file = "{\"width\":99,\"height\":3,\"asset_id\":\"minecraft:a\",\"title\":" + title + "}";
+        String textError = net.minecraft.network.chat.ComponentSerialization.CODEC.parse(ops, com.google.gson.JsonParser.parseString(title))
+            .error().orElseThrow().message();
+        var calls = new java.util.ArrayList<Object>();
+        String[] messages = new String[2];
+        NativeValuesTest.withDelegates(c -> NativeValuesTest.watched(c, () -> { calls.add(c); return null; }), () -> {
+            messages[0] = codec.decodeFile(ops, file.getBytes(java.nio.charset.StandardCharsets.UTF_8)).error().orElseThrow().message();
+            messages[1] = codec.parse(ops, com.google.gson.JsonParser.parseString(file)).error().orElseThrow().message();
+        });
+        assertEquals(messages[1], messages[0]);
+        assertTrue(messages[0].contains(textError), messages[0]);
+        assertTrue(messages[0].contains("99"), messages[0]);
+        assertEquals(List.of(food, tool, food, tool), calls);
+
+        // A nested answer larger than Rust's buffer is retried, not decoded again.
+        calls.clear();
+        String longMessage = "y".repeat(5000);
+        NativeValuesTest.withDelegates(c -> c != food ? c : NativeValuesTest.watched(c, () -> {
+            calls.add(c);
+            return com.mojang.serialization.DataResult.error(() -> longMessage);
+        }), () -> assertTrue(codec.decodeFile(ops, file.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+            .error().orElseThrow().message().contains(longMessage)));
+        assertEquals(List.of(food), calls);
+    }
 }

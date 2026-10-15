@@ -23,7 +23,9 @@ nautilus variants.
   drop bad entries with a logged error.
 - **Files:** `RegistryDataLoader` hands files to Rust as bytes.
   [`content/json.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/json.rs)
-  parses them as Gson's strict mode does, keeping each number's text.
+  parses them as Gson's strict mode does, keeping each number's text. Text
+  Rust can't parse goes back to the loader's own `StrictJsonParser`, so a
+  malformed file fails with Gson's exception.
 - **Other inputs** (network NBT, inline definitions): Java walks the
   `DynamicOps` value into a tree for Rust, numbered so that delegated parts
   resolve from the original nodes.
@@ -31,21 +33,24 @@ nautilus variants.
   `RecordCodecBuilder` produces. Records of five or more members are regrouped
   (`GROUP_ORDER`, measured from DFU 8.0.16). Defaults are omitted as DFU omits
   them, and `"type"` is written last.
-- **Delegated values:** values belonging to registries Java still owns are
-  resolved and encoded by those registries' codecs. These are text components
-  and holders. Int providers, particle options and enchantment effect
-  components are [native value types](NATIVE-VALUES.md), decoded inline.
-  Sounds are parsed by Rust and looked up by ID.
-- **Java-owned leaves** inside a native value (for example an enchantment
-  effect's requirements) are decoded by Rust calling their Java codec while
-  it decodes. A file Rust parsed itself sends the leaf's JSON text, and the
-  loader's ops decode it, so errors, partials and exceptions are the same.
-- **Holder sets** (carvers, features, item and enchantment sets, spawn-condition
-  biomes and structures) are parsed by Rust as `HolderSetCodec` reads them: a
-  `#tag`, one ID, or a list of IDs. Java looks each one up in the decode
-  context. If any form is unusual or any lookup misses, the original value
-  decodes through the Java codec instead, so partial results and logs stay
-  exact.
+- **Java-owned fields:** sounds, the single-enchantment
+  holder, and holder sets are decoded by their original Java codecs:
+  - holder sets: items, enchantments, structures, biomes, and biome carvers
+    and features, the last two with their `promotePartial` logging;
+  - each field is `S::Java` in
+    [`registries.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/data/registries.rs),
+    by `NativeValues.JavaCodec` ordinal.
+
+  Rust calls the codec while it decodes, at the field's position, once, on
+  the calling thread. A file Rust parsed itself sends the field's binary
+  input tree, preserving number text, which the loader's ops decode. Errors
+  and partials compose with Rust's in DFU's order, and an exception the codec
+  throws leaves the decode unchanged.
+  Projections read the decoded values. The same codecs encode them.
+- **Text, int providers, particle options and enchantment effect components** are
+  [native value types](NATIVE-VALUES.md), decoded inline.
+- **Errors:** a failed decode keeps DFU's partial definition, stored and
+  projected like a decoded one, and released with its Java object.
 
 [`NativeData`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/resources/NativeData.java)
 owns the FFI and the generic codec. Each projection keeps its stored
@@ -72,10 +77,13 @@ resource keys remain.
 1. Add the schema to `registries.rs` and its `Registry` entry. The order must
    match `NativeData.Kind`.
 2. Write a projector and an unprojector that read and build fields in schema order.
+   A field Java still owns is `S::Java` with a new `NativeValues.JavaCodec`
+   entry for its original codec; the projector reads it with `context.slot`
+   and the unprojector writes it with `builder.slot`, both with that codec.
 3. Point the class's `DIRECT_CODEC` and `NETWORK_CODEC` at `NativeData.codec`,
    and its data generator bootstrap at `NativeData.bootstrap`.
 4. Run the checks below, including the fuzz observer, which compares accept,
-   reject and encoding outcomes with Frozen.
+   reject and encoding outcomes, error messages and partials with Frozen.
 
 ## Performance
 
@@ -111,6 +119,21 @@ not proof of an untouched cold biome-codec path.
     - 512 ms against Frozen's 476 ms (+7.6%);
     - 504 ms against `186614ce`'s 519 ms.
     Matched runs of the same code differed by about 5%.
+- **After Java-owned fields decode in place (2026-10-15, release,
+  matched Frozen; load/biome measurements at `37776ed0`, wolf follow-up at `a8af4006`):**
+  - `worldgen_load` 525.5 against Frozen's 488.5 ms (+7.6%), level with `e35d2450`.
+  - Biome decode per round 7.86 against Frozen's 7.04 ms (+11.7%).
+  - `RegistryTiming` total +5–8%. Text is inline, so text-only registries
+    (trim, jukebox, instrument) are faster than Frozen.
+  - **Owner-approved exception: `wolf_sound_variant`.** Seven files per round,
+    median 0.052 ms on Frozen against 0.091 ms (+75%, 9 pairs). Current
+    ranged 0.067–0.158 ms.
+    - About half was there before (`e35d2450`: 0.068 ms). That's the data
+      path's fixed per-file cost: the native call, payload read, projection
+      and Cleaner.
+    - The rest is six sound callbacks per file, about 0.4 µs each over
+      `RegistryFileCodec`'s own lookup.
+    - The exception covers only this workload. It isn't a general waiver.
 - **Gameplay** (small DH fixture, moving camera, four alternating runs per side
   against pre-change Current): average FPS 82.3 against 81.2, median frame
   8.59 ms against 8.46 ms, and p99 59.8 ms against 68.5 ms. Swap reached
@@ -129,24 +152,11 @@ regression.
 
 ## Known differences
 
-- Registry decode errors differ from DFU's text and stop at the first error,
-  without a partial value. The recorded corpus matches the observer's
-  normalized outcomes; parse and encode failures can both become `ERR`, so
-  this is not a universal acceptance/error-equivalence guarantee. Value types
-  follow DFU's messages exactly ([native value types](NATIVE-VALUES.md)).
-- Measured with `DataFuzzReference` recording messages and partials for the
-  tree and NBT paths (2026-10-15, at `599dd6c1`), 11,244 of 37,418 rows
-  differ from Frozen. There are two causes, both older than the enchantment
-  effect move:
-  - The data path never returns a partial.
-  - Errors from Rust's decode and from Java's later resolution (holder-set
-    lookups, delegated slots) aren't joined, so only one of them is reported.
-  The enchantment effect move changed which message survives in about 7,500
-  of those rows: the effect error now shows and the holder lookup error
-  doesn't. On the file path that live loading uses, the same rows are
-  rejected; that row records only `ERR`, so its diagnostics aren't compared.
-- A rejected file stops at its first error. The load error report can then
-  list fewer missing references than Frozen's, but the load fails either way.
+- Before 2026-10-15 (until `e35d2450`), data-path errors differed from
+  Frozen: they had no partial, joined only one decode phase's message, and
+  malformed files threw a different exception. `DataFuzzReference` measured
+  11,244 differing rows. Those causes are fixed. The corpus is measured to
+  match, not proven equivalent for every input.
 - `VanillaRegistries.createLookup()` (IDE-only command validation and data
   generation) fails on biomes because their files name placed features that
   the Java worldgen generator lacks. Frozen failed there too, on custom biome

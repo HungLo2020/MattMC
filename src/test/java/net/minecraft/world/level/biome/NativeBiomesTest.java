@@ -81,7 +81,8 @@ class NativeBiomesTest {
         Biome extended = codec.decodeFile(json, direct.toString().getBytes(StandardCharsets.UTF_8)).getOrThrow();
         direct.remove("custom_field");
         assertEquals(direct, Biome.DIRECT_CODEC.encodeStart(json, extended).getOrThrow());
-        assertTrue(codec.decodeFile(json, "{\"temperature\": 0.5,}".getBytes(StandardCharsets.UTF_8)).isError());
+        // Malformed text fails as the loader's own parser fails (Gson's exception).
+        assertThrows(com.google.gson.JsonSyntaxException.class, () -> codec.decodeFile(json, "{\"temperature\": 0.5,}".getBytes(StandardCharsets.UTF_8)));
         direct.addProperty("has_precipitation", 1);
         assertTrue(codec.decodeFile(json, direct.toString().getBytes(StandardCharsets.UTF_8)).isError());
     }
