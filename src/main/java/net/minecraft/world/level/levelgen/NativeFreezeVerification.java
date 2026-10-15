@@ -43,7 +43,6 @@ final class NativeFreezeVerification {
 
 	private final List<Biome> biomes = new ArrayList<>();
 	private final List<long[]> before;
-	private final long callsBefore;
 	private List<long[]> nativeState;
 	private long nativeCalls;
 
@@ -52,7 +51,6 @@ final class NativeFreezeVerification {
 		for (var holder : values) if (seen.put(holder.value(), Boolean.TRUE) == null) this.biomes.add(holder.value());
 		if (SEED) this.seed(level, origin);
 		this.before = this.capture();
-		this.callsBefore = NativeDecoration.WARM_CALLS.sum();
 	}
 
 	static NativeFreezeVerification begin(List<Holder<Biome>> values, WorldGenLevel level, BlockPos origin) {
@@ -107,10 +105,14 @@ final class NativeFreezeVerification {
 		}
 	}
 
-	/** After the native placement: keep its result and restore the history Java's replay starts from. */
-	void afterNative() {
+	/**
+	 * After the native placement: keep its result and restore the history Java's
+	 * replay starts from. {@code calls} is this placement's own OP_WARM count (per
+	 * call, not a delta of the global aggregate, which other threads also advance).
+	 */
+	void afterNative(long calls) {
 		this.nativeState = this.capture();
-		this.nativeCalls = NativeDecoration.WARM_CALLS.sum() - this.callsBefore;
+		this.nativeCalls = calls;
 		this.restore(this.before);
 	}
 

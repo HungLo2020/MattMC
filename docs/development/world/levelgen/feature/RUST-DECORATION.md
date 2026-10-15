@@ -69,7 +69,9 @@ precipitation. Java's cache sees the same sequence as Java's feature would make.
 This is retained Java cache ownership, not a native temperature. With
 `-Dmattmc.worldgen.verifyDecoration=true` each native freeze placement checks
 that the caches (entries and FIFO order) and call counts equal Java's replay
-from the same history (`freezeHistoryVerified=`/`freezeHistoryMismatched=`);
+from the same history (`freezeHistoryVerified=`/`freezeHistoryMismatched=`).
+The native count is the placement's own (`Call.warmCalls`), not a delta of the
+global `freezeWarmCalls=` aggregate, which other worker threads also advance;
 `-Dmattmc.worldgen.verifyFreezeSeed=true` additionally seeds conflicting
 sea-level entries and fills each cache to its eviction boundary (not a parity
 run). [Java cache scope][temperature-cache] · [Calculation, lookup and sea-level callers][temperature-lookup] ·

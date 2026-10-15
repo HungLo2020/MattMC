@@ -121,6 +121,9 @@ public final class NativeDecoration {
 		final List<net.minecraft.world.level.levelgen.feature.ConfiguredFeature<?, ?>> javaFeatures;
 		final List<NativeDecorationEncoder.JavaPredicate> javaPredicates;
 		List<NativeDecorationEncoder.JavaStep> javaSteps = List.of();
+		/** OP_WARM calls made for this placement: CURRENT is per thread and restored
+		 * after nested placements, so each placement counts only its own. */
+		long warmCalls;
 		/** Set for the native step loop: its plan's programs by slot, and Java's steps. */
 		@Nullable
 		Plan plan;
@@ -722,7 +725,7 @@ public final class NativeDecoration {
 					boolean nativeHas = gaussian.nativeHas();
 					double nativeValue = gaussian.nativeValue();
 					gaussian.nativeSet(gaussianBefore, gaussianValueBefore);
-					if (freeze != null) freeze.afterNative();
+					if (freeze != null) freeze.afterNative(call.warmCalls);
 					verify(region, before, maps, level, generator, random, feature, origin, levelRandom, freeze);
 					if (gaussian.nativeHas() != nativeHas || nativeHas && Double.doubleToRawLongBits(gaussian.nativeValue()) != Double.doubleToRawLongBits(nativeValue)) {
 						MISMATCHED.increment();
@@ -1003,6 +1006,7 @@ public final class NativeDecoration {
 					// call does, so Rust makes it exactly where Java's feature would.
 					case OP_WARM -> {
 						WARM_CALLS.increment();
+						call.warmCalls++;
 						yield call.region.biomeValues().get((int)a[3]).value().warmEnoughToRain(new BlockPos((int)a[0], (int)a[1], (int)a[2]),
 							call.level.getSeaLevel()) ? 1 : 0;
 					}
