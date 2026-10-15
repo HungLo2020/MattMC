@@ -1,7 +1,8 @@
 //! Schemas of the data-driven entity, item and biome registries, field for
 //! field as Java's codecs declare them (order, presence and defaults).
 
-use super::schema::{f, D, Dv, P, R, S};
+use super::schema::{case, f, D, Dv, P, R, S};
+use super::values::INT_PROVIDER;
 
 use P::{Default, Inline, JavaDefault, Optional, OrElse, Required};
 
@@ -53,7 +54,7 @@ static CLIMATE: S = S::Record(&[
     f("temperature_modifier", &S::Enum(TEMPERATURE_MODIFIERS), Default(Dv::Name("none"))),
     f("downfall", &S::Float, Required),
 ]);
-static PARTICLE: S = S::Record(&[f("options", &S::Delegate, Required), f("probability", &S::Float, Required)]);
+static PARTICLE: S = S::Record(&[f("options", &super::values::PARTICLE, Required), f("probability", &S::Float, Required)]);
 static MOOD: S = S::Record(&[
     f("sound", &S::Sound, Required),
     f("tick_delay", &S::Int, Required),
@@ -175,22 +176,22 @@ static ENCHANTMENT: S = S::Record(&[
     f("exclusive_set", &HOLDERS, JavaDefault),
     f("effects", &S::Delegate, JavaDefault),
 ]);
-static ENCHANTMENT_PROVIDER: S = S::Dispatch(&[
-    ("by_cost", &[f("enchantments", &HOLDERS, Required), f("cost", &S::Delegate, Required)]),
-    ("by_cost_with_difficulty", &[
+static ENCHANTMENT_PROVIDER: S = S::Dispatch("enchantment_provider_type", &[
+    case("by_cost", &[f("enchantments", &HOLDERS, Required), f("cost", &INT_PROVIDER, Required)]),
+    case("by_cost_with_difficulty", &[
         f("enchantments", &HOLDERS, Required),
         f("min_cost", &S::IntRange(1, 10000), Required),
         f("max_cost_span", &S::IntRange(0, 10000), Required),
     ]),
-    ("single", &[f("enchantment", &S::Delegate, Required), f("level", &S::Delegate, Required)]),
+    case("single", &[f("enchantment", &S::Delegate, Required), f("level", &INT_PROVIDER, Required)]),
 ]);
 
 // Entity variants.
 
-static SPAWN_CONDITION: S = S::Dispatch(&[
-    ("structure", &[f("structures", &HOLDERS, Required)]),
-    ("moon_brightness", &[f("range", &S::DoubleBounds, Required)]),
-    ("biome", &[f("biomes", &HOLDERS, Required)]),
+static SPAWN_CONDITION: S = S::Dispatch("spawn_condition_type", &[
+    case("structure", &[f("structures", &HOLDERS, Required)]),
+    case("moon_brightness", &[f("range", &S::DoubleBounds, Required)]),
+    case("biome", &[f("biomes", &HOLDERS, Required)]),
 ]);
 static SPAWN_CONDITIONS: S = S::List(&S::Record(&[f("condition", &SPAWN_CONDITION, Optional), f("priority", &S::Int, Required)]));
 static ASSET_VARIANT: S = S::Record(&[f("asset_id", &S::Location, Required), f("spawn_conditions", &SPAWN_CONDITIONS, Required)]);

@@ -103,26 +103,14 @@ public final class ItemStack implements DataComponentHolder {
 		Component.translatable("item.op_warning.line3").withStyle(ChatFormatting.RED)
 	);
 	private static final Component UNBREAKABLE_TOOLTIP = Component.translatable("item.unbreakable").withStyle(ChatFormatting.BLUE);
-	public static final MapCodec<ItemStack> MAP_CODEC = MapCodec.recursive(
-		"ItemStack",
-		codec -> RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					Item.CODEC.fieldOf("id").forGetter(ItemStack::getItemHolder),
-					ExtraCodecs.intRange(1, 99).fieldOf("count").orElse(1).forGetter(ItemStack::getCount),
-					DataComponentPatch.CODEC.optionalFieldOf("components", DataComponentPatch.EMPTY).forGetter(itemStack -> itemStack.components.asPatch())
-				)
-				.apply(instance, ItemStack::new)
-		)
+	/** Rust decodes, validates and encodes stacks (`content/data/items.rs`). */
+	private static final net.minecraft.resources.NativeValues.ValueCodec<ItemStack> NATIVE_CODEC = net.minecraft.resources.NativeValues.codec(
+		net.minecraft.resources.NativeValues.Kind.ITEM_STACK, NativeItemStacks::project, NativeItemStacks::unproject
 	);
-	public static final Codec<ItemStack> CODEC = Codec.lazyInitialized(MAP_CODEC::codec);
-	public static final Codec<ItemStack> SINGLE_ITEM_CODEC = Codec.lazyInitialized(
-		() -> RecordCodecBuilder.create(
-			instance -> instance.group(
-					Item.CODEC.fieldOf("id").forGetter(ItemStack::getItemHolder),
-					DataComponentPatch.CODEC.optionalFieldOf("components", DataComponentPatch.EMPTY).forGetter(itemStack -> itemStack.components.asPatch())
-				)
-				.apply(instance, (holder, dataComponentPatch) -> new ItemStack(holder, 1, dataComponentPatch))
-		)
+	public static final MapCodec<ItemStack> MAP_CODEC = NATIVE_CODEC.mapCodec();
+	public static final Codec<ItemStack> CODEC = NATIVE_CODEC;
+	public static final Codec<ItemStack> SINGLE_ITEM_CODEC = net.minecraft.resources.NativeValues.codec(
+		net.minecraft.resources.NativeValues.Kind.SINGLE_ITEM, NativeItemStacks::projectSingle, NativeItemStacks::unprojectSingle
 	);
 	public static final Codec<ItemStack> STRICT_CODEC = CODEC.validate(ItemStack::validateStrict);
 	public static final Codec<ItemStack> STRICT_SINGLE_ITEM_CODEC = SINGLE_ITEM_CODEC.validate(ItemStack::validateStrict);

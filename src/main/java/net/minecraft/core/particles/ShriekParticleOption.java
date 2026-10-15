@@ -8,10 +8,6 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
 public class ShriekParticleOption implements ParticleOptions {
-	public static final MapCodec<ShriekParticleOption> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(Codec.INT.fieldOf("delay").forGetter(shriekParticleOption -> shriekParticleOption.delay))
-			.apply(instance, ShriekParticleOption::new)
-	);
 	public static final StreamCodec<RegistryFriendlyByteBuf, ShriekParticleOption> STREAM_CODEC = StreamCodec.composite(
 		ByteBufCodecs.VAR_INT, shriekParticleOption -> shriekParticleOption.delay, ShriekParticleOption::new
 	);

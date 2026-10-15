@@ -8,10 +8,6 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
 public record SculkChargeParticleOptions(float roll) implements ParticleOptions {
-	public static final MapCodec<SculkChargeParticleOptions> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(Codec.FLOAT.fieldOf("roll").forGetter(sculkChargeParticleOptions -> sculkChargeParticleOptions.roll))
-			.apply(instance, SculkChargeParticleOptions::new)
-	);
 	public static final StreamCodec<RegistryFriendlyByteBuf, SculkChargeParticleOptions> STREAM_CODEC = StreamCodec.composite(
 		ByteBufCodecs.FLOAT, sculkChargeParticleOptions -> sculkChargeParticleOptions.roll, SculkChargeParticleOptions::new
 	);

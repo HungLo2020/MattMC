@@ -33,8 +33,9 @@ nautilus variants.
   them, and `"type"` is written last.
 - **Delegated values:** values belonging to registries Java still owns are
   resolved and encoded by those registries' codecs. These are text components,
-  holders, enchantment effect components, int providers and particle options.
-  Sounds are parsed by Rust and looked up by ID.
+  holders and enchantment effect components. Int providers and particle
+  options are [native value types](NATIVE-VALUES.md), decoded inline. Sounds
+  are parsed by Rust and looked up by ID.
 - **Holder sets** (carvers, features, item and enchantment sets, spawn-condition
   biomes and structures) are parsed by Rust as `HolderSetCodec` reads them: a
   `#tag`, one ID, or a list of IDs. Java looks each one up in the decode
@@ -111,9 +112,11 @@ regression.
 
 ## Known differences
 
-- Error messages differ from DFU's text. The recorded corpus matches the
-  observer's normalized outcomes; parse and encode failures can both become
-  `ERR`, so this is not a universal acceptance/error-equivalence guarantee.
+- Registry decode errors differ from DFU's text and stop at the first error,
+  without a partial value. The recorded corpus matches the observer's
+  normalized outcomes; parse and encode failures can both become `ERR`, so
+  this is not a universal acceptance/error-equivalence guarantee. Value types
+  follow DFU's messages exactly ([native value types](NATIVE-VALUES.md)).
 - A rejected file stops at its first error. The load error report can then
   list fewer missing references than Frozen's, but the load fails either way.
 - `VanillaRegistries.createLookup()` (IDE-only command validation and data
@@ -122,8 +125,7 @@ regression.
   keys. Worldgen ownership is a separate migration goal.
 - Packet stream codecs (`DIRECT_STREAM_CODEC`, used for inline holders in
   item stacks) are unchanged Java packet code.
-- Text components, enchantment effects, int providers and particle options
-  still decode through Java codecs. They belong to other migration goals.
+- Text components and enchantment effects still decode through Java codecs.
 
 ## Verification (2026-10-13)
 

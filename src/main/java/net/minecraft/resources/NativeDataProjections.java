@@ -157,9 +157,9 @@ public final class NativeDataProjections {
 		NativeData.Variant variant = (NativeData.Variant)value;
 		Object[] f = variant.fields();
 		return switch (variant.index()) {
-			case 0 -> new EnchantmentsByCost(context.holderSet(f[0], Registries.ENCHANTMENT, ENCHANTMENTS), context.slot(f[1], IntProvider.CODEC));
+			case 0 -> new EnchantmentsByCost(context.holderSet(f[0], Registries.ENCHANTMENT, ENCHANTMENTS), IntProvider.project(f[1]));
 			case 1 -> new EnchantmentsByCostWithDifficulty(context.holderSet(f[0], Registries.ENCHANTMENT, ENCHANTMENTS), (Integer)f[1], (Integer)f[2]);
-			default -> new SingleEnchantment(context.slot(f[0], Enchantment.CODEC), context.slot(f[1], IntProvider.CODEC));
+			default -> new SingleEnchantment(context.slot(f[0], Enchantment.CODEC), IntProvider.project(f[1]));
 		};
 	}
 
@@ -307,9 +307,9 @@ public final class NativeDataProjections {
 
 	public static Object enchantmentProviderOut(EnchantmentProvider v, NativeData.Builder b) {
 		return switch (v) {
-			case EnchantmentsByCost p -> new NativeData.Variant(0, new Object[]{b.slot(p.enchantments(), ENCHANTMENTS), b.slot(p.cost(), IntProvider.CODEC)});
+			case EnchantmentsByCost p -> new NativeData.Variant(0, new Object[]{b.slot(p.enchantments(), ENCHANTMENTS), IntProvider.unproject(p.cost())});
 			case EnchantmentsByCostWithDifficulty p -> new NativeData.Variant(1, new Object[]{b.slot(p.enchantments(), ENCHANTMENTS), p.minCost(), p.maxCostSpan()});
-			case SingleEnchantment p -> new NativeData.Variant(2, new Object[]{b.slot(p.enchantment(), Enchantment.CODEC), b.slot(p.level(), IntProvider.CODEC)});
+			case SingleEnchantment p -> new NativeData.Variant(2, new Object[]{b.slot(p.enchantment(), Enchantment.CODEC), IntProvider.unproject(p.level())});
 			default -> throw new IllegalArgumentException("Unknown enchantment provider " + v);
 		};
 	}

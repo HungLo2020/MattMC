@@ -1,41 +1,33 @@
 package net.minecraft.network.chat;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DataResult;
-import com.mojang.serialization.Lifecycle;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 public interface HoverEvent {
-	Codec<HoverEvent> CODEC = HoverEvent.Action.CODEC.dispatch("action", HoverEvent::action, action -> action.codec);
+	/** Rust decodes, validates and encodes events (`content/data/text.rs`). */
+	net.minecraft.resources.NativeValues.ValueCodec<HoverEvent> CODEC = net.minecraft.resources.NativeValues.codec(
+		net.minecraft.resources.NativeValues.Kind.HOVER_EVENT, (value, context) -> NativeEvents.hover((net.minecraft.resources.NativeData.Variant)value, context), NativeEvents::hover
+	);
 
 	HoverEvent.Action action();
 
 	public static enum Action implements StringRepresentable {
-		SHOW_TEXT("show_text", true, HoverEvent.ShowText.CODEC),
-		SHOW_ITEM("show_item", true, HoverEvent.ShowItem.CODEC),
-		SHOW_ENTITY("show_entity", true, HoverEvent.ShowEntity.CODEC);
+		SHOW_TEXT("show_text", true),
+		SHOW_ITEM("show_item", true),
+		SHOW_ENTITY("show_entity", true);
 
-		public static final Codec<HoverEvent.Action> UNSAFE_CODEC = StringRepresentable.fromValues(HoverEvent.Action::values);
-		public static final Codec<HoverEvent.Action> CODEC = UNSAFE_CODEC.validate(HoverEvent.Action::filterForSerialization);
 		private final String name;
 		private final boolean allowFromServer;
-		final MapCodec<? extends HoverEvent> codec;
 
-		private Action(final String string2, final boolean bl, final MapCodec<? extends HoverEvent> mapCodec) {
+		private Action(final String string2, final boolean bl) {
 			this.name = string2;
 			this.allowFromServer = bl;
-			this.codec = mapCodec;
 		}
 
 		public boolean isAllowedFromServer() {
@@ -50,21 +42,9 @@ public interface HoverEvent {
 		public String toString() {
 			return "<action " + this.name + ">";
 		}
-
-		private static DataResult<HoverEvent.Action> filterForSerialization(HoverEvent.Action action) {
-			return !action.isAllowedFromServer() ? DataResult.error(() -> "Action not allowed: " + action) : DataResult.success(action, Lifecycle.stable());
-		}
 	}
 
 	public static class EntityTooltipInfo {
-		public static final MapCodec<HoverEvent.EntityTooltipInfo> CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					BuiltInRegistries.ENTITY_TYPE.byNameCodec().fieldOf("id").forGetter(entityTooltipInfo -> entityTooltipInfo.type),
-					UUIDUtil.LENIENT_CODEC.fieldOf("uuid").forGetter(entityTooltipInfo -> entityTooltipInfo.uuid),
-					ComponentSerialization.CODEC.optionalFieldOf("name").forGetter(entityTooltipInfo -> entityTooltipInfo.name)
-				)
-				.apply(instance, HoverEvent.EntityTooltipInfo::new)
-		);
 		public final EntityType<?> type;
 		public final UUID uuid;
 		public final Optional<Component> name;
@@ -111,10 +91,6 @@ public interface HoverEvent {
 	}
 
 	public record ShowEntity(HoverEvent.EntityTooltipInfo entity) implements HoverEvent {
-		public static final MapCodec<HoverEvent.ShowEntity> CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(HoverEvent.EntityTooltipInfo.CODEC.forGetter(HoverEvent.ShowEntity::entity)).apply(instance, HoverEvent.ShowEntity::new)
-		);
-
 		@Override
 		public HoverEvent.Action action() {
 			return HoverEvent.Action.SHOW_ENTITY;
@@ -122,8 +98,6 @@ public interface HoverEvent {
 	}
 
 	public record ShowItem(ItemStack item) implements HoverEvent {
-		public static final MapCodec<HoverEvent.ShowItem> CODEC = ItemStack.MAP_CODEC.xmap(HoverEvent.ShowItem::new, HoverEvent.ShowItem::item);
-
 		public ShowItem(ItemStack item) {
 			item = item.copy();
 			this.item = item;
@@ -144,10 +118,6 @@ public interface HoverEvent {
 	}
 
 	public record ShowText(Component value) implements HoverEvent {
-		public static final MapCodec<HoverEvent.ShowText> CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(ComponentSerialization.CODEC.fieldOf("value").forGetter(HoverEvent.ShowText::value)).apply(instance, HoverEvent.ShowText::new)
-		);
-
 		@Override
 		public HoverEvent.Action action() {
 			return HoverEvent.Action.SHOW_TEXT;

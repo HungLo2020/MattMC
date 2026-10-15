@@ -3,12 +3,10 @@ package net.minecraft.world.level.gameevent;
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.netty.buffer.ByteBuf;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
-import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.server.level.ServerLevel;
@@ -17,13 +15,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 public class EntityPositionSource implements PositionSource {
-	public static final MapCodec<EntityPositionSource> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				UUIDUtil.CODEC.fieldOf("source_entity").forGetter(EntityPositionSource::getUuid),
-				Codec.FLOAT.fieldOf("y_offset").orElse(0.0F).forGetter(entityPositionSource -> entityPositionSource.yOffset)
-			)
-			.apply(instance, (uUID, float_) -> new EntityPositionSource(Either.right(Either.left(uUID)), float_))
-	);
 	public static final StreamCodec<ByteBuf, EntityPositionSource> STREAM_CODEC = StreamCodec.composite(
 		ByteBufCodecs.VAR_INT,
 		EntityPositionSource::getId,
@@ -36,6 +27,15 @@ public class EntityPositionSource implements PositionSource {
 
 	public EntityPositionSource(Entity entity, float f) {
 		this(Either.left(entity), f);
+	}
+
+	/** A source naming its entity by UUID, as saves hold it. */
+	public static EntityPositionSource ofUuid(UUID uuid, float yOffset) {
+		return new EntityPositionSource(Either.right(Either.left(uuid)), yOffset);
+	}
+
+	public float yOffset() {
+		return this.yOffset;
 	}
 
 	private EntityPositionSource(Either<Entity, Either<UUID, Integer>> either, float f) {
@@ -80,8 +80,9 @@ public class EntityPositionSource implements PositionSource {
 
 	public static class Type implements PositionSourceType<EntityPositionSource> {
 		@Override
+		@SuppressWarnings("unchecked")
 		public MapCodec<EntityPositionSource> codec() {
-			return EntityPositionSource.CODEC;
+			return (MapCodec<EntityPositionSource>)(MapCodec<?>)PositionSource.CODEC.dispatchCase("minecraft:entity");
 		}
 
 		@Override

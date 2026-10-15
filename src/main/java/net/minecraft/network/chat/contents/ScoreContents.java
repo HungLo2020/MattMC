@@ -2,9 +2,6 @@ package net.minecraft.network.chat.contents;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.datafixers.util.Either;
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.commands.CommandSourceStack;
@@ -23,20 +20,6 @@ import net.minecraft.world.scores.Scoreboard;
 import org.jetbrains.annotations.Nullable;
 
 public record ScoreContents(Either<SelectorPattern, String> name, String objective) implements ComponentContents {
-	public static final MapCodec<ScoreContents> INNER_CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				Codec.either(SelectorPattern.CODEC, Codec.STRING).fieldOf("name").forGetter(ScoreContents::name),
-				Codec.STRING.fieldOf("objective").forGetter(ScoreContents::objective)
-			)
-			.apply(instance, ScoreContents::new)
-	);
-	public static final MapCodec<ScoreContents> MAP_CODEC = INNER_CODEC.fieldOf("score");
-
-	@Override
-	public MapCodec<ScoreContents> codec() {
-		return MAP_CODEC;
-	}
-
 	private ScoreHolder findTargetName(CommandSourceStack commandSourceStack) throws CommandSyntaxException {
 		Optional<SelectorPattern> optional = this.name.left();
 		if (optional.isPresent()) {

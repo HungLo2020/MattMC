@@ -56,7 +56,7 @@ public final class NativeBiomes {
 	private static BiomeSpecialEffects effects(Object[] e, NativeData.Context context) {
 		Optional<AmbientParticleSettings> particle = Optional.ofNullable(e[8]).map(p -> {
 			Object[] fields = NativeData.record(p);
-			return new AmbientParticleSettings(context.slot(fields[0], ParticleTypes.CODEC), (Float)fields[1]);
+			return new AmbientParticleSettings(ParticleTypes.project(fields[0], context), (Float)fields[1]);
 		});
 		Optional<AmbientMoodSettings> mood = Optional.ofNullable(e[10]).map(m -> {
 			Object[] fields = NativeData.record(m);
@@ -124,7 +124,7 @@ public final class NativeBiomes {
 			e.getDryFoliageColorOverride().orElse(null),
 			e.getGrassColorOverride().orElse(null),
 			e.getGrassColorModifier().getSerializedName(),
-			e.getAmbientParticleSettings().map(p -> new Object[]{b.slot(p.getOptions(), ParticleTypes.CODEC), p.probability()}).orElse(null),
+			e.getAmbientParticleSettings().map(p -> new Object[]{ParticleTypes.unproject(p.getOptions(), b), p.probability()}).orElse(null),
 			e.getAmbientLoopSoundEvent().map(b::sound).orElse(null),
 			e.getAmbientMoodSettings().map(m -> new Object[]{b.sound(m.getSoundEvent()), m.getTickDelay(), m.getBlockSearchExtent(), m.getSoundPositionOffset()}).orElse(null),
 			e.getAmbientAdditionsSettings().map(a -> new Object[]{b.sound(a.getSoundEvent()), a.getTickChance()}).orElse(null),

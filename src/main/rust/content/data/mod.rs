@@ -5,11 +5,14 @@
 //! packs can override or add them. Java's registry objects are projections.
 //! See docs/development/game-model/DATA-DEFINITIONS.md.
 pub mod ffi;
+pub mod items;
 pub mod registries;
 pub mod schema;
+pub mod text;
 #[cfg(test)]
 mod tests;
 pub mod value;
+pub mod values;
 
 use schema::{Cx, D, R};
 use value::{Mode, Node};
@@ -33,7 +36,7 @@ fn registry(index: usize) -> R<&'static registries::Registry> {
 pub fn decode(index: usize, network: bool, node: &Node, mode: Mode, registry_ops: bool) -> R<Definition> {
     let reg = registry(index)?;
     let mut cx = Cx::new(mode, registry_ops);
-    let value = schema::decode(if network { reg.network } else { reg.direct }, node, &mut cx)?;
+    let value = schema::decode(if network { reg.network } else { reg.direct }, node, &mut cx).map_err(|f| f.msg)?;
     Ok(Definition { registry: index, network, value, slots: cx.slots, logs: cx.logs })
 }
 
@@ -53,7 +56,7 @@ pub fn define(index: usize, value: D, slots: usize) -> R<Definition> {
 }
 
 /// Encodes a stored definition in direct or network form.
-pub fn encode(def: &Definition, network: bool) -> R<schema::O> {
+pub fn encode(def: &Definition, network: bool) -> R<schema::O<'_>> {
     let reg = registry(def.registry)?;
     let stored = if def.network { reg.network } else { reg.direct };
     schema::encode(if network { reg.network } else { reg.direct }, stored, &def.value)

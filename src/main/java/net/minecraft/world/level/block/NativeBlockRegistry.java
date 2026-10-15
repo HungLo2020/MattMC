@@ -52,16 +52,31 @@ public final class NativeBlockRegistry {
         return Holder.READY;
     }
 
+    /** Why installing failed, once it has; callers report it as their exception's cause. */
+    private static volatile Throwable failure;
+
+    /** Why the registry could not be installed, or null while it hasn't failed. */
+    public static Throwable failure() {
+        return failure;
+    }
+
     private static boolean install() {
         try {
             Export export = export();
-            if (export == null) return false;
+            if (export == null) {
+                failure = new IllegalStateException("Java's block registry has no native export");
+                return false;
+            }
             try (Arena arena = Arena.ofConfined()) {
                 int result = (int)INSTALL.invokeExact(arena.allocateFrom(ValueLayout.JAVA_INT, export.ints), export.ints.length,
                     arena.allocateFrom(ValueLayout.JAVA_BYTE, export.bytes), export.bytes.length);
+                if (result != 1) {
+                    failure = new IllegalStateException("Rust rejected the block registry (status " + result + ")");
+                }
                 return result == 1;
             }
         } catch (Throwable error) {
+            failure = error;
             return false;
         }
     }

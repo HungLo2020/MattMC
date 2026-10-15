@@ -1,25 +1,17 @@
 package net.minecraft.util.valueproviders;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DataResult;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.resources.NativeData;
+import net.minecraft.resources.NativeValues;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
 public class UniformInt extends IntProvider {
-	public static final MapCodec<UniformInt> CODEC = RecordCodecBuilder.<UniformInt>mapCodec(
-			instance -> instance.group(
-					Codec.INT.fieldOf("min_inclusive").forGetter(uniformInt -> uniformInt.minInclusive),
-					Codec.INT.fieldOf("max_inclusive").forGetter(uniformInt -> uniformInt.maxInclusive)
-				)
-				.apply(instance, UniformInt::new)
-		)
-		.validate(
-			uniformInt -> uniformInt.maxInclusive < uniformInt.minInclusive
-				? DataResult.error(() -> "Max must be at least min, min_inclusive: " + uniformInt.minInclusive + ", max_inclusive: " + uniformInt.maxInclusive)
-				: DataResult.success(uniformInt)
-		);
+	/** The uniform case's fields without a type (`content/data/values.rs`). */
+	public static final NativeValues.ValueCodec<UniformInt> CODEC = NativeValues.codec(
+		NativeValues.Kind.UNIFORM_INT,
+		value -> UniformInt.of((Integer)NativeData.record(value)[0], (Integer)NativeData.record(value)[1]),
+		uniform -> new Object[]{uniform.getMinValue(), uniform.getMaxValue()}
+	);
 	private final int minInclusive;
 	private final int maxInclusive;
 

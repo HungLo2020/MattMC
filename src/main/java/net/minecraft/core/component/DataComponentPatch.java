@@ -21,42 +21,10 @@ import org.jetbrains.annotations.Nullable;
 
 public final class DataComponentPatch {
 	public static final DataComponentPatch EMPTY = new DataComponentPatch(Reference2ObjectMaps.emptyMap());
-	public static final Codec<DataComponentPatch> CODEC = Codec.dispatchedMap(DataComponentPatch.PatchKey.CODEC, DataComponentPatch.PatchKey::valueCodec)
-		.xmap((Map<DataComponentPatch.PatchKey, ?> map) -> {
-			if (map.isEmpty()) {
-				return EMPTY;
-			} else {
-				Reference2ObjectMap<DataComponentType<?>, Optional<?>> reference2ObjectMap = new Reference2ObjectArrayMap<>(map.size());
-
-				for (Entry<DataComponentPatch.PatchKey, ?> entry : map.entrySet()) {
-					DataComponentPatch.PatchKey patchKey = (DataComponentPatch.PatchKey)entry.getKey();
-					if (patchKey.removed()) {
-						reference2ObjectMap.put(patchKey.type(), Optional.empty());
-					} else {
-						reference2ObjectMap.put(patchKey.type(), Optional.of(entry.getValue()));
-					}
-				}
-
-				return new DataComponentPatch(reference2ObjectMap);
-			}
-		}, (DataComponentPatch dataComponentPatch) -> {
-			@SuppressWarnings("unchecked")
-			Map<DataComponentPatch.PatchKey, Object> reference2ObjectMap = new Reference2ObjectArrayMap<>(dataComponentPatch.map.size());
-
-			for (Entry<DataComponentType<?>, Optional<?>> entry : Reference2ObjectMaps.fastIterable(dataComponentPatch.map)) {
-				DataComponentType<?> dataComponentType = (DataComponentType<?>)entry.getKey();
-				if (!dataComponentType.isTransient()) {
-					Optional<?> optional = (Optional<?>)entry.getValue();
-					if (optional.isPresent()) {
-						reference2ObjectMap.put(new DataComponentPatch.PatchKey(dataComponentType, false), optional.get());
-					} else {
-						reference2ObjectMap.put(new DataComponentPatch.PatchKey(dataComponentType, true), Unit.INSTANCE);
-					}
-				}
-			}
-
-			return (Map)reference2ObjectMap;
-		});
+	/** Rust decodes, validates and encodes patches (`content/data/items.rs`). */
+	public static final Codec<DataComponentPatch> CODEC = net.minecraft.resources.NativeValues.codec(
+		net.minecraft.resources.NativeValues.Kind.COMPONENT_PATCH, net.minecraft.world.item.NativeItemStacks::patch, net.minecraft.world.item.NativeItemStacks::patch
+	);
 	public static final StreamCodec<RegistryFriendlyByteBuf, DataComponentPatch> STREAM_CODEC = createStreamCodec(new DataComponentPatch.CodecGetter() {
 		@Override
 		public <T> StreamCodec<RegistryFriendlyByteBuf, T> apply(DataComponentType<T> dataComponentType) {

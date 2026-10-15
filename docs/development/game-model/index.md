@@ -109,6 +109,9 @@ one set of systems.
   default components as SNBT and the two-step Java projection.
 - [Data-driven definitions](DATA-DEFINITIONS.md) (current): biomes and the
   data-driven entity and item registries, parsed, stored and encoded by Rust.
+- [Native value types](NATIVE-VALUES.md) (current): int and float providers,
+  level-based values, particle options and position sources, decoded,
+  validated and encoded by Rust with DFU's error and partial-result rules.
 - [Rust block registry](RUST-BLOCK-REGISTRY.md) (current): how Phase 1 works,
   how to add a column or consumer, constraints and tests.
 - [Native block state definitions](BLOCK-DEFINITIONS.md) (current work): ordered

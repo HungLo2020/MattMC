@@ -14,16 +14,6 @@ public class SpellParticleOption implements ParticleOptions {
 	private final int color;
 	private final float power;
 
-	public static MapCodec<SpellParticleOption> codec(ParticleType<SpellParticleOption> particleType) {
-		return RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					ExtraCodecs.RGB_COLOR_CODEC.optionalFieldOf("color", -1).forGetter(spellParticleOption -> spellParticleOption.color),
-					Codec.FLOAT.optionalFieldOf("power", 1.0F).forGetter(spellParticleOption -> spellParticleOption.power)
-				)
-				.apply(instance, (integer, float_) -> new SpellParticleOption(particleType, integer, float_))
-		);
-	}
-
 	public static StreamCodec<? super ByteBuf, SpellParticleOption> streamCodec(ParticleType<SpellParticleOption> particleType) {
 		return StreamCodec.composite(
 			ByteBufCodecs.INT,
@@ -43,6 +33,10 @@ public class SpellParticleOption implements ParticleOptions {
 	@Override
 	public ParticleType<SpellParticleOption> getType() {
 		return this.type;
+	}
+
+	public int color() {
+		return this.color;
 	}
 
 	public float getRed() {

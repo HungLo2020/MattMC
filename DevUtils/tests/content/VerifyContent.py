@@ -61,7 +61,9 @@ def main() -> None:
             for side in (("frozen", "current") if pair % 2 == 0 else ("current", "frozen")):
                 tree = ROOT if side == "current" else reference
                 dump = out / f"{side}-{pair + 1}.txt"
-                output = command([java, "-Xmx4g", "--enable-native-access=ALL-UNNAMED",
+                # Implicit exceptions keep their detailed messages however warm
+                # the JIT is, so recorded throw messages compare deterministically.
+                output = command([java, "-Xmx4g", "-XX:-OmitStackTraceInFastThrow", "--enable-native-access=ALL-UNNAMED",
                                   "-Dmattmc.rust.natives.dir=" + str(tree / "build/rust/native"),
                                   "-cp", str(classes) + os.pathsep + cp[side], args.observer, str(dump), *args.sections],
                                  out, out / f"{side}-{pair + 1}.log", env)

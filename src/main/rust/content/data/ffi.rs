@@ -11,11 +11,14 @@
 //! 5 double, 6 string, 7 list, 8 map, 9 record, 10 variant (u16 case, u32
 //! count, fields), 11 slot (u32), 12 sound reference (string), 13 inline
 //! sound (string, u8 has range, f32 range), 14 holder set slot (u32, u8
-//! parsed, then u32 sets, each 0 tag string or 1 u32 IDs and strings).
+//! parsed, then u32 sets, each 0 tag string or 1 u32 IDs and strings),
+//! 15 a number as its source held it (a tree number node).
 //!
 //! Encoded values (`O`): 1 false, 2 true, 3 int, 4 float, 5 double,
 //! 6 string, 7 list, 8 map, 11 slot (u32), 14 slot omitted when Java's
-//! value equals its default (u32), 15 registered sound (string).
+//! value equals its default (u32), 15 registered sound (string), 16 int
+//! list (u32 count, ints), 17 a number of its Java type (tree number
+//! node), 18 a delegated map codec's entries merged into the map (u32).
 
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -105,6 +108,10 @@ impl In<'_> {
             }
             11 => D::Slot(self.u32()?),
             14 => D::Holders(self.u32()?, None),
+            15 => match self.node()?.value {
+                Value::Number(n) => D::Num(n),
+                _ => return Err("decoded number is not a number".into()),
+            },
             12 => D::SoundRef(self.string()?),
             13 => {
                 let id = self.string()?;
@@ -153,7 +160,39 @@ impl In<'_> {
 #[derive(Default)]
 struct Out(Vec<u8>);
 
+thread_local! {
+    /// A reusable output buffer; taken while in use, so a nested call (Java
+    /// calling back into Rust) gets a fresh one.
+    static SPARE: std::cell::Cell<Vec<u8>> = const { std::cell::Cell::new(Vec::new()) };
+    /// A value call's result that did not fit Java's buffer.
+    static PENDING: std::cell::Cell<Vec<u8>> = const { std::cell::Cell::new(Vec::new()) };
+}
+
+/// Copies a value call's result into `out` when it fits, else keeps it for
+/// `mattmc_value_take_pending`; returns its full length.
+unsafe fn finish(o: Out, out: *mut u8, capacity: i64) -> i64 {
+    let n = o.0.len() as i64;
+    if !out.is_null() && capacity >= n {
+        std::ptr::copy_nonoverlapping(o.0.as_ptr(), out, o.0.len());
+        o.recycle();
+    } else {
+        PENDING.with(|p| p.set(o.0));
+    }
+    n
+}
+
 impl Out {
+    fn with_capacity(n: usize) -> Out {
+        let mut v = SPARE.with(|s| s.take());
+        v.clear();
+        v.reserve(n);
+        Out(v)
+    }
+
+    /// Returns the buffer for the next call on this thread.
+    fn recycle(self) {
+        SPARE.with(|s| s.set(self.0));
+    }
     fn u8(&mut self, v: u8) {
         self.0.push(v);
     }
@@ -277,6 +316,10 @@ impl Out {
                 self.u8(u8::from(range.is_some()));
                 self.u32(range.unwrap_or(0.0).to_bits());
             }
+            D::Num(n) => {
+                self.u8(15);
+                self.node(&Node::new(Value::Number(n.clone())));
+            }
             D::Holders(slot, refs) => {
                 self.u8(14);
                 self.u32(*slot);
@@ -306,6 +349,11 @@ impl Out {
     fn encoded(&mut self, o: &O) {
         match o {
             O::Bool(v) => self.u8(if *v { 2 } else { 1 }),
+            O::IntList(items) => {
+                self.u8(16);
+                self.u32(items.len() as u32);
+                items.iter().for_each(|i| self.u32(*i as u32));
+            }
             O::Int(v) => {
                 self.u8(3);
                 self.u32(*v as u32);
@@ -347,6 +395,14 @@ impl Out {
                 self.u8(15);
                 self.string(s);
             }
+            O::Num(n) => {
+                self.u8(17);
+                self.node(&Node::new(Value::Number(n.clone())));
+            }
+            O::SlotMerge(i) => {
+                self.u8(18);
+                self.u32(*i);
+            }
         }
     }
 }
@@ -363,22 +419,28 @@ fn payload(entry: &Entry) -> Vec<u8> {
         Ok(def) => {
             o.u8(1);
             o.decoded(&def.value);
-            o.u32(def.slots.len() as u32);
-            for slot in &def.slots {
-                match slot {
-                    None => o.u8(0),
-                    Some(node) => {
-                        o.u8(1);
-                        o.u32(node.index.unwrap_or(u32::MAX));
-                        o.node(node);
-                    }
-                }
-            }
-            o.u32(def.logs.len() as u32);
-            def.logs.iter().for_each(|l| o.string(l));
+            o.slots(&def.slots, &def.logs);
         }
     }
     o.0
+}
+
+impl Out {
+    fn slots(&mut self, slots: &[Option<Node>], logs: &[String]) {
+        self.u32(slots.len() as u32);
+        for slot in slots {
+            match slot {
+                None => self.u8(0),
+                Some(node) => {
+                    self.u8(1);
+                    self.u32(node.index.unwrap_or(u32::MAX));
+                    self.node(node);
+                }
+            }
+        }
+        self.u32(logs.len() as u32);
+        logs.iter().for_each(|l| self.string(l));
+    }
 }
 
 unsafe fn slice<'a>(ptr: *const u8, len: i64) -> &'a [u8] {
@@ -392,8 +454,17 @@ unsafe fn copy_out(table: &[u8], out: *mut u8, capacity: i64) -> i64 {
     table.len() as i64
 }
 
+/// A data call's handle when it met a block state the block registry could
+/// not be installed for (`schema::BLOCKS_MISSING`); nothing is stored.
+const BLOCKS_MISSING_HANDLE: i64 = -2;
+
 fn guarded(f: impl FnOnce() -> R<Definition>) -> i64 {
-    let entry = catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|_| Err("data decode panicked".into()));
+    let (entry, thrown) = super::schema::thrown_scope(|| catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|_| Err("data decode panicked".into())));
+    let entry = match thrown {
+        Some((super::schema::BLOCKS_MISSING, _, _)) => return BLOCKS_MISSING_HANDLE,
+        Some((_, message, _)) => Err(message),
+        None => entry,
+    };
     keep(entry.map(Arc::new))
 }
 
@@ -442,17 +513,180 @@ pub unsafe extern "C" fn mattmc_data_payload(handle: i64, out: *mut u8, capacity
 pub unsafe extern "C" fn mattmc_data_encode(handle: i64, network: i32, out: *mut u8, capacity: i64) -> i64 {
     let Some(def) = get(handle as u64) else { return -1 };
     let mut o = Out::default();
-    match catch_unwind(AssertUnwindSafe(|| super::encode(&def, network != 0))).unwrap_or_else(|_| Err("data encode panicked".into())) {
-        Ok(value) => {
+    let (result, thrown) = super::schema::thrown_scope(|| catch_unwind(AssertUnwindSafe(|| super::encode(&def, network != 0))).unwrap_or_else(|_| Err("data encode panicked".into())));
+    match (thrown, result) {
+        // Status 2: the block registry could not be installed.
+        (Some((super::schema::BLOCKS_MISSING, _, _)), _) => o.u8(2),
+        (_, Ok(value)) => {
             o.u8(1);
             o.encoded(&value);
         }
-        Err(error) => {
+        (_, Err(error)) => {
             o.u8(0);
             o.string(&error);
         }
     }
     copy_out(&o.0, out, capacity)
+}
+
+/// Decodes a value tree as a value kind (`content/data/values.rs`), checking
+/// `[min, max]` when `bounded`. Copies into `out` when it fits: status 1 and
+/// the value, or 0, the error, u8 partial present and the partial; then the
+/// slots and logs as in a definition's payload. Status 2 and a message is an
+/// exception Java's codec throws. Returns the full length.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_value_decode(kind: i32, mode: i32, bounded: i32, min: f64, max: f64, bytes: *const u8, len: i64, out: *mut u8, capacity: i64) -> i64 {
+    let input = slice(bytes, len);
+    let bounds = (bounded != 0).then_some(super::values::Bounds { min, max });
+    let mode = if mode == 1 { Mode::Nbt } else { Mode::Json };
+    value_result(input, out, capacity, |node| super::values::decode(kind as usize, node, mode, bounds))
+}
+
+/// Decodes one dispatch case of a value kind from a map without `type`
+/// (named by `case`, UTF-8); the result as `mattmc_value_decode`.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_value_decode_case(kind: i32, mode: i32, case: *const u8, case_len: i64, bytes: *const u8, len: i64, out: *mut u8, capacity: i64) -> i64 {
+    let input = slice(bytes, len);
+    let case = String::from_utf8_lossy(slice(case, case_len)).into_owned();
+    let mode = if mode == 1 { Mode::Nbt } else { Mode::Json };
+    value_result(input, out, capacity, |node| super::values::decode_case(kind as usize, &case, node, mode))
+}
+
+/// Data component types whose value codecs are native (u32 count, paths).
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_item_native_components(out: *mut u8, capacity: i64) -> i64 {
+    let mut o = Out::default();
+    let names = super::items::native_components();
+    o.u32(names.len() as u32);
+    names.iter().for_each(|n| o.string(n));
+    copy_out(&o.0, out, capacity)
+}
+
+/// A value kind's dispatch case names (u32 count, strings), or count 0.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_value_case_names(kind: i32, out: *mut u8, capacity: i64) -> i64 {
+    let mut o = Out::default();
+    let names = super::values::case_names(kind as usize).unwrap_or_default();
+    o.u32(names.len() as u32);
+    names.iter().for_each(|n| o.string(n));
+    finish(o, out, capacity)
+}
+
+/// Copies the result a value call kept because it did not fit, clearing it
+/// once copied; returns its full length, or -1 when none is kept. Java takes
+/// it right after growing its buffer, so the call (and any Java callbacks
+/// it made) never runs twice.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_value_take_pending(out: *mut u8, capacity: i64) -> i64 {
+    let kept = PENDING.with(|p| p.take());
+    if kept.is_empty() {
+        return -1;
+    }
+    let n = kept.len() as i64;
+    if !out.is_null() && capacity >= n {
+        std::ptr::copy_nonoverlapping(kept.as_ptr(), out, kept.len());
+        Out(kept).recycle();
+    } else {
+        PENDING.with(|p| p.set(kept));
+    }
+    n
+}
+
+unsafe fn value_result(input: &[u8], out: *mut u8, capacity: i64, decode: impl FnOnce(&Node) -> (super::schema::DR, super::schema::Cx)) -> i64 {
+    let (decoded, thrown) = super::schema::thrown_scope(|| {
+        catch_unwind(AssertUnwindSafe(|| match (In { bytes: input, pos: 0, next_index: 0 }).node() {
+            Ok(node) => decode(&node),
+            Err(error) => (Err(error.into()), super::schema::Cx::new(Mode::Json, false)),
+        }))
+    });
+    let mut o = Out::with_capacity(256);
+    match (thrown, decoded) {
+        (Some((class, message, id)), _) => {
+            // Status 2: Java throws the exception class (0 illegal argument,
+            // 1 null pointer) with the message, or rethrows its own
+            // exception `id` (`JAVA_THROWN`).
+            o.u8(2);
+            o.u8(class);
+            o.u32(id);
+            o.string(&message);
+        }
+        (None, Err(_)) => {
+            o.u8(0);
+            o.string("value decode panicked");
+            o.u8(0);
+            o.slots(&[], &[]);
+        }
+        (None, Ok((Ok(d), cx))) => {
+            o.u8(1);
+            o.decoded(&d);
+            o.slots(&cx.slots, &cx.logs);
+        }
+        (None, Ok((Err(fail), cx))) => {
+            o.u8(0);
+            o.string(&fail.msg);
+            match &fail.partial {
+                Some(partial) => {
+                    o.u8(1);
+                    o.decoded(partial);
+                }
+                None => o.u8(0),
+            }
+            o.slots(&cx.slots, &cx.logs);
+        }
+    }
+    finish(o, out, capacity)
+}
+
+/// Encodes a value Java built (decoded form), with its codec's checks;
+/// copies status 1 and the encoded value, or 0 and the error, into `out`
+/// when it fits; returns the full length.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_value_encode(kind: i32, bounded: i32, min: f64, max: f64, bytes: *const u8, len: i64, out: *mut u8, capacity: i64) -> i64 {
+    let input = slice(bytes, len);
+    let bounds = (bounded != 0).then_some(super::values::Bounds { min, max });
+    let mut o = Out::with_capacity(256);
+    let (result, thrown) = super::schema::thrown_scope(|| {
+        catch_unwind(AssertUnwindSafe(|| {
+            let d = In { bytes: input, pos: 0, next_index: 0 }.decoded()?;
+            let value = super::values::encode(kind as usize, &d, bounds)?;
+            // Serialized while `value` borrows `d`.
+            o.u8(1);
+            o.encoded(&value);
+            Ok::<_, String>(())
+        }))
+        .unwrap_or_else(|_| Err("value encode panicked".into()))
+    });
+    if let Some((class, message, id)) = thrown {
+        // Status 2 as in `value_result`: Java throws for `class`.
+        o.0.clear();
+        o.u8(2);
+        o.u8(class);
+        o.u32(id);
+        o.string(&message);
+    } else if let Err(error) = result {
+        o.0.clear();
+        o.u8(0);
+        o.string(&error);
+    }
+    finish(o, out, capacity)
+}
+
+/// Installs Java's callback for codecs Java still owns (`schema::JavaDecode`).
+#[no_mangle]
+pub extern "C" fn mattmc_value_set_java_decode(decode: super::schema::JavaDecode) {
+    super::schema::set_java_decode(decode);
+}
+
+/// Installs Java's callback that installs the block registry on first need.
+#[no_mangle]
+pub extern "C" fn mattmc_value_set_install_blocks(install: super::schema::InstallBlocks) {
+    super::schema::set_install_blocks(install);
+}
+
+/// Installs Java's callback for string parsers Java owns (`schema::Leaf`).
+#[no_mangle]
+pub extern "C" fn mattmc_value_set_leaf_check(check: super::schema::LeafCheck) {
+    super::schema::set_leaf_check(check);
 }
 
 #[no_mangle]

@@ -3,11 +3,7 @@ package net.minecraft.network.chat.contents;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import com.mojang.datafixers.util.Either;
-import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -19,31 +15,15 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentContents;
-import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
-import net.minecraft.util.ExtraCodecs;
 import net.minecraft.world.entity.Entity;
 import org.jetbrains.annotations.Nullable;
 
 public class TranslatableContents implements ComponentContents {
 	public static final Object[] NO_ARGS = new Object[0];
-	private static final Codec<Object> PRIMITIVE_ARG_CODEC = ExtraCodecs.JAVA.validate(TranslatableContents::filterAllowedArguments);
-	private static final Codec<Object> ARG_CODEC = Codec.either(PRIMITIVE_ARG_CODEC, ComponentSerialization.CODEC)
-		.xmap(
-			either -> either.map(object -> object, component -> Objects.requireNonNullElse(component.tryCollapseToString(), component)),
-			object -> object instanceof Component component ? Either.right(component) : Either.left(object)
-		);
-	public static final MapCodec<TranslatableContents> MAP_CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				Codec.STRING.fieldOf("translate").forGetter(translatableContents -> translatableContents.key),
-				Codec.STRING.lenientOptionalFieldOf("fallback").forGetter(translatableContents -> Optional.ofNullable(translatableContents.fallback)),
-				ARG_CODEC.listOf().optionalFieldOf("with").forGetter(translatableContents -> adjustArgs(translatableContents.args))
-			)
-			.apply(instance, TranslatableContents::create)
-	);
 	private static final FormattedText TEXT_PERCENT = FormattedText.of("%");
 	private static final FormattedText TEXT_NULL = FormattedText.of("null");
 	private final String key;
@@ -79,11 +59,6 @@ public class TranslatableContents implements ComponentContents {
 		this.key = string;
 		this.fallback = string2;
 		this.args = objects;
-	}
-
-	@Override
-	public MapCodec<TranslatableContents> codec() {
-		return MAP_CODEC;
 	}
 
 	private void decompose() {

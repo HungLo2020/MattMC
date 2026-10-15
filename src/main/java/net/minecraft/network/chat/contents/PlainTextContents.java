@@ -1,17 +1,11 @@
 package net.minecraft.network.chat.contents;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Optional;
 import net.minecraft.network.chat.ComponentContents;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.Style;
 
 public interface PlainTextContents extends ComponentContents {
-	MapCodec<PlainTextContents> MAP_CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(Codec.STRING.fieldOf("text").forGetter(PlainTextContents::text)).apply(instance, PlainTextContents::create)
-	);
 	PlainTextContents EMPTY = new PlainTextContents() {
 		public String toString() {
 			return "empty";
@@ -28,11 +22,6 @@ public interface PlainTextContents extends ComponentContents {
 	}
 
 	String text();
-
-	@Override
-	default MapCodec<PlainTextContents> codec() {
-		return MAP_CODEC;
-	}
 
 	public record LiteralContents(String text) implements PlainTextContents {
 		@Override

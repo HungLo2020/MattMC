@@ -402,7 +402,16 @@ pub mod number {
         if let Ok(value) = text.parse::<i64>() {
             return value as i32;
         }
-        big_decimal_low_bits(text) as i32
+        big_decimal_low_bits(text) as u32 as i32
+    }
+
+    /// `longValue`: `Long.parseLong`, else `new BigDecimal(text).longValue()`
+    /// (truncated, low 64 bits).
+    pub fn long_value(text: &str) -> i64 {
+        if let Ok(value) = text.parse::<i64>() {
+            return value;
+        }
+        big_decimal_low_bits(text) as i64
     }
 
     /// `Float.parseFloat`.
@@ -415,8 +424,8 @@ pub mod number {
         text.parse::<f64>().unwrap_or(f64::NAN)
     }
 
-    /// The low 32 bits of a decimal number's integer part (toward zero).
-    fn big_decimal_low_bits(text: &str) -> u32 {
+    /// The low 64 bits of a decimal number's integer part (toward zero).
+    fn big_decimal_low_bits(text: &str) -> u64 {
         let (negative, rest) = match text.strip_prefix('-') {
             Some(rest) => (true, rest),
             None => (false, text),
@@ -429,14 +438,14 @@ pub mod number {
         let digits: Vec<u8> = whole.bytes().chain(fraction.bytes()).map(|b| b - b'0').collect();
         // The integer part has `whole.len() + exponent` digits of `digits`.
         let integer_digits = whole.len() as i64 + exponent;
-        let mut value: u32 = 0;
+        let mut value: u64 = 0;
         if integer_digits > 0 {
             let take = integer_digits.min(digits.len() as i64) as usize;
             for &d in &digits[..take] {
-                value = value.wrapping_mul(10).wrapping_add(u32::from(d));
+                value = value.wrapping_mul(10).wrapping_add(u64::from(d));
             }
-            // Trailing zeros beyond the mantissa; 10^32 is 0 modulo 2^32.
-            for _ in 0..(integer_digits - take as i64).min(32) {
+            // Trailing zeros beyond the mantissa; 10^64 is 0 modulo 2^64.
+            for _ in 0..(integer_digits - take as i64).min(64) {
                 value = value.wrapping_mul(10);
             }
         }

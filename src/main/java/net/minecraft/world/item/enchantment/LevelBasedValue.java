@@ -1,31 +1,58 @@
 package net.minecraft.world.item.enchantment;
 
-import com.mojang.datafixers.util.Either;
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.List;
 import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.NativeData;
+import net.minecraft.resources.NativeValues;
 import net.minecraft.util.Mth;
 
 public interface LevelBasedValue {
-	Codec<LevelBasedValue> DISPATCH_CODEC = BuiltInRegistries.ENCHANTMENT_LEVEL_BASED_VALUE_TYPE
-		.byNameCodec()
-		.dispatch(LevelBasedValue::codec, mapCodec -> mapCodec);
-	Codec<LevelBasedValue> CODEC = Codec.either(LevelBasedValue.Constant.CODEC, DISPATCH_CODEC)
-		.xmap(
-			either -> either.map(constant -> constant, levelBasedValue -> levelBasedValue),
-			levelBasedValue -> levelBasedValue instanceof LevelBasedValue.Constant constant ? Either.left(constant) : Either.right(levelBasedValue)
-		);
+	/** Rust decodes, validates and encodes values (`content/data/values.rs`). */
+	NativeValues.ValueCodec<LevelBasedValue> CODEC = NativeValues.codec(NativeValues.Kind.LEVEL_BASED_VALUE, LevelBasedValue::project, LevelBasedValue::unproject);
 
+	/** The type registry's entries: each case's fields as the native codec reads them. */
 	static MapCodec<? extends LevelBasedValue> bootstrap(Registry<MapCodec<? extends LevelBasedValue>> registry) {
-		Registry.register(registry, "clamped", LevelBasedValue.Clamped.CODEC);
-		Registry.register(registry, "fraction", LevelBasedValue.Fraction.CODEC);
-		Registry.register(registry, "levels_squared", LevelBasedValue.LevelsSquared.CODEC);
-		Registry.register(registry, "linear", LevelBasedValue.Linear.CODEC);
-		return Registry.register(registry, "lookup", LevelBasedValue.Lookup.CODEC);
+		Registry.register(registry, "clamped", CODEC.dispatchCase("minecraft:clamped"));
+		Registry.register(registry, "fraction", CODEC.dispatchCase("minecraft:fraction"));
+		Registry.register(registry, "levels_squared", CODEC.dispatchCase("minecraft:levels_squared"));
+		Registry.register(registry, "linear", CODEC.dispatchCase("minecraft:linear"));
+		return Registry.register(registry, "lookup", CODEC.dispatchCase("minecraft:lookup"));
+	}
+
+	/** A value from its decoded form: a constant, or a typed value. */
+	static LevelBasedValue project(Object value) {
+		NativeData.Variant either = (NativeData.Variant)value;
+		if (either.index() == 0) {
+			return new LevelBasedValue.Constant((Float)either.fields()[0]);
+		}
+		NativeData.Variant typed = (NativeData.Variant)either.fields()[0];
+		Object[] f = typed.fields();
+		return switch (typed.index()) {
+			case 0 -> new LevelBasedValue.Clamped(project(f[0]), (Float)f[1], (Float)f[2]);
+			case 1 -> new LevelBasedValue.Fraction(project(f[0]), project(f[1]));
+			case 2 -> new LevelBasedValue.LevelsSquared((Float)f[0]);
+			case 3 -> new LevelBasedValue.Linear((Float)f[0], (Float)f[1]);
+			case 4 -> new LevelBasedValue.Lookup(NativeData.list(f[0]).stream().map(Float.class::cast).toList(), project(f[1]));
+			default -> throw new IllegalStateException("Unknown level-based value case " + typed.index());
+		};
+	}
+
+	/** A value's decoded form, for Rust to check and encode. */
+	static Object unproject(LevelBasedValue value) {
+		return switch (value) {
+			case LevelBasedValue.Constant v -> new NativeData.Variant(0, new Object[]{v.value()});
+			case LevelBasedValue.Clamped v -> typed(0, unproject(v.value()), v.min(), v.max());
+			case LevelBasedValue.Fraction v -> typed(1, unproject(v.numerator()), unproject(v.denominator()));
+			case LevelBasedValue.LevelsSquared v -> typed(2, v.added());
+			case LevelBasedValue.Linear v -> typed(3, v.base(), v.perLevelAboveFirst());
+			case LevelBasedValue.Lookup v -> typed(4, List.copyOf(v.values()), unproject(v.fallback()));
+			default -> throw new IllegalArgumentException("Unknown level-based value " + value);
+		};
+	}
+
+	private static NativeData.Variant typed(int index, Object... fields) {
+		return new NativeData.Variant(1, new Object[]{new NativeData.Variant(index, fields)});
 	}
 
 	static LevelBasedValue.Constant constant(float f) {
@@ -46,125 +73,46 @@ public interface LevelBasedValue {
 
 	float calculate(int i);
 
-	MapCodec<? extends LevelBasedValue> codec();
-
 	public record Clamped(LevelBasedValue value, float min, float max) implements LevelBasedValue {
-		public static final MapCodec<LevelBasedValue.Clamped> CODEC = RecordCodecBuilder.<LevelBasedValue.Clamped>mapCodec(
-				instance -> instance.group(
-						LevelBasedValue.CODEC.fieldOf("value").forGetter(LevelBasedValue.Clamped::value),
-						Codec.FLOAT.fieldOf("min").forGetter(LevelBasedValue.Clamped::min),
-						Codec.FLOAT.fieldOf("max").forGetter(LevelBasedValue.Clamped::max)
-					)
-					.apply(instance, LevelBasedValue.Clamped::new)
-			)
-			.validate(
-				clamped -> clamped.max <= clamped.min
-					? DataResult.error(() -> "Max must be larger than min, min: " + clamped.min + ", max: " + clamped.max)
-					: DataResult.success(clamped)
-			);
-
 		@Override
 		public float calculate(int i) {
 			return Mth.clamp(this.value.calculate(i), this.min, this.max);
 		}
-
-		@Override
-		public MapCodec<LevelBasedValue.Clamped> codec() {
-			return CODEC;
-		}
 	}
 
 	public record Constant(float value) implements LevelBasedValue {
-		public static final Codec<LevelBasedValue.Constant> CODEC = Codec.FLOAT.xmap(LevelBasedValue.Constant::new, LevelBasedValue.Constant::value);
-		public static final MapCodec<LevelBasedValue.Constant> TYPED_CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(Codec.FLOAT.fieldOf("value").forGetter(LevelBasedValue.Constant::value)).apply(instance, LevelBasedValue.Constant::new)
-		);
-
 		@Override
 		public float calculate(int i) {
 			return this.value;
 		}
-
-		@Override
-		public MapCodec<LevelBasedValue.Constant> codec() {
-			return TYPED_CODEC;
-		}
 	}
 
 	public record Fraction(LevelBasedValue numerator, LevelBasedValue denominator) implements LevelBasedValue {
-		public static final MapCodec<LevelBasedValue.Fraction> CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					LevelBasedValue.CODEC.fieldOf("numerator").forGetter(LevelBasedValue.Fraction::numerator),
-					LevelBasedValue.CODEC.fieldOf("denominator").forGetter(LevelBasedValue.Fraction::denominator)
-				)
-				.apply(instance, LevelBasedValue.Fraction::new)
-		);
-
 		@Override
 		public float calculate(int i) {
 			float f = this.denominator.calculate(i);
 			return f == 0.0F ? 0.0F : this.numerator.calculate(i) / f;
 		}
-
-		@Override
-		public MapCodec<LevelBasedValue.Fraction> codec() {
-			return CODEC;
-		}
 	}
 
 	public record LevelsSquared(float added) implements LevelBasedValue {
-		public static final MapCodec<LevelBasedValue.LevelsSquared> CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(Codec.FLOAT.fieldOf("added").forGetter(LevelBasedValue.LevelsSquared::added)).apply(instance, LevelBasedValue.LevelsSquared::new)
-		);
-
 		@Override
 		public float calculate(int i) {
 			return Mth.square(i) + this.added;
 		}
-
-		@Override
-		public MapCodec<LevelBasedValue.LevelsSquared> codec() {
-			return CODEC;
-		}
 	}
 
 	public record Linear(float base, float perLevelAboveFirst) implements LevelBasedValue {
-		public static final MapCodec<LevelBasedValue.Linear> CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					Codec.FLOAT.fieldOf("base").forGetter(LevelBasedValue.Linear::base),
-					Codec.FLOAT.fieldOf("per_level_above_first").forGetter(LevelBasedValue.Linear::perLevelAboveFirst)
-				)
-				.apply(instance, LevelBasedValue.Linear::new)
-		);
-
 		@Override
 		public float calculate(int i) {
 			return this.base + this.perLevelAboveFirst * (i - 1);
 		}
-
-		@Override
-		public MapCodec<LevelBasedValue.Linear> codec() {
-			return CODEC;
-		}
 	}
 
 	public record Lookup(List<Float> values, LevelBasedValue fallback) implements LevelBasedValue {
-		public static final MapCodec<LevelBasedValue.Lookup> CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					Codec.FLOAT.listOf().fieldOf("values").forGetter(LevelBasedValue.Lookup::values),
-					LevelBasedValue.CODEC.fieldOf("fallback").forGetter(LevelBasedValue.Lookup::fallback)
-				)
-				.apply(instance, LevelBasedValue.Lookup::new)
-		);
-
 		@Override
 		public float calculate(int i) {
 			return i <= this.values.size() ? (Float)this.values.get(i - 1) : this.fallback.calculate(i);
-		}
-
-		@Override
-		public MapCodec<LevelBasedValue.Lookup> codec() {
-			return CODEC;
 		}
 	}
 }

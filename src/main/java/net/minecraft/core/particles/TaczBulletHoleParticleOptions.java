@@ -9,16 +9,6 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 
 public class TaczBulletHoleParticleOptions implements ParticleOptions {
-	public static final MapCodec<TaczBulletHoleParticleOptions> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				Direction.CODEC.fieldOf("direction").forGetter(TaczBulletHoleParticleOptions::direction),
-				BlockPos.CODEC.fieldOf("pos").forGetter(TaczBulletHoleParticleOptions::pos),
-				Codec.STRING.optionalFieldOf("ammo_id", "").forGetter(TaczBulletHoleParticleOptions::ammoId),
-				Codec.STRING.optionalFieldOf("gun_id", "").forGetter(TaczBulletHoleParticleOptions::gunId),
-				Codec.STRING.optionalFieldOf("gun_display_id", "").forGetter(TaczBulletHoleParticleOptions::gunDisplayId)
-			)
-			.apply(instance, TaczBulletHoleParticleOptions::new)
-	);
 	public static final StreamCodec<RegistryFriendlyByteBuf, TaczBulletHoleParticleOptions> STREAM_CODEC = StreamCodec.ofMember(
 		TaczBulletHoleParticleOptions::writeToNetwork, TaczBulletHoleParticleOptions::readFromNetwork
 	);

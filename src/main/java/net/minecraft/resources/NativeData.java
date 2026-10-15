@@ -12,7 +12,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.JsonOps;
-import java.io.ByteArrayOutputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
@@ -51,7 +50,7 @@ import org.slf4j.Logger;
  * registries' codecs.
  */
 public final class NativeData {
-	private static final Logger LOGGER = LogUtils.getLogger();
+	static final Logger LOGGER = LogUtils.getLogger();
 	private static final Cleaner CLEANER = Cleaner.create();
 	private static final MethodHandle DECODE_FILE = handle("mattmc_data_decode_file",
 		FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
@@ -73,7 +72,7 @@ public final class NativeData {
 
 
 
-	private static MethodHandle handle(String name, FunctionDescriptor descriptor) {
+	static MethodHandle handle(String name, FunctionDescriptor descriptor) {
 		return NativeLibraryLoader.downcallHandle("mattmc_rust", name, descriptor);
 	}
 
@@ -117,9 +116,9 @@ public final class NativeData {
 
 	/** Collects a Java-built object's delegated values while it is described. */
 	public static final class Builder {
-		private final List<Object> values = new ArrayList<>();
-		private final List<Codec<?>> codecs = new ArrayList<>();
-		private final List<Object> defaults = new ArrayList<>();
+		final List<Object> values = new ArrayList<>();
+		final List<Codec<?>> codecs = new ArrayList<>();
+		final List<Object> defaults = new ArrayList<>();
 
 		/** A delegated value its codec encodes. */
 		public Slot slot(Object value, Codec<?> codec) {
@@ -158,6 +157,10 @@ public final class NativeData {
 	public record Slot(int index) {
 	}
 
+	/** A number kept as its source's Java type ({@code ExtraCodecs.JAVA} values). */
+	public record JavaNumber(Number value) {
+	}
+
 	public record SoundRef(String id) {
 	}
 
@@ -188,6 +191,7 @@ public final class NativeData {
 
 		@Override
 		public <T> DataResult<Pair<E, T>> decode(DynamicOps<T> ops, T input) {
+			requireBlocks();
 			List<T> nodes = new ArrayList<>();
 			Out out = new Out();
 			write(ops, input, nodes, out);
@@ -202,18 +206,21 @@ public final class NativeData {
 			} catch (Throwable e) {
 				throw new IllegalStateException("Rust data decode failed", e);
 			}
+			this.checkBlocks(handle, "Decoding");
 			return this.project(handle, new Source<>(ops, nodes), ops instanceof RegistryOps<?> r ? r.withParent(JsonOps.INSTANCE) : null)
 				.map(e -> Pair.of(e, ops.empty()));
 		}
 
 		/** Decodes a data pack file's bytes; references resolve against {@code ops}. */
 		public DataResult<E> decodeFile(RegistryOps<JsonElement> ops, byte[] bytes) {
+			requireBlocks();
 			long handle;
 			try (Arena arena = Arena.ofConfined()) {
 				handle = (long)DECODE_FILE.invokeExact(this.kind.ordinal(), this.network ? 1 : 0, copy(arena, bytes), (long)bytes.length);
 			} catch (Throwable e) {
 				throw new IllegalStateException("Rust data decode failed", e);
 			}
+			this.checkBlocks(handle, "Decoding");
 			return this.project(handle, null, ops);
 		}
 
@@ -258,7 +265,11 @@ public final class NativeData {
 				element = defined.getOrThrow();
 			}
 			ByteBuffer in = ByteBuffer.wrap(table(ENCODE, element.handle, this.network ? 1 : 0)).order(ByteOrder.LITTLE_ENDIAN);
-			if (in.get() == 0) {
+			byte status = in.get();
+			if (status == 2) {
+				throw blocksMissing("Encoding " + (this.kind == Kind.BIOME ? "biomes" : this.kind.toString()));
+			}
+			if (status == 0) {
 				String error = string(in);
 				return DataResult.error(() -> error);
 			}
@@ -269,6 +280,24 @@ public final class NativeData {
 				return DataResult.error(failure::getMessage);
 			}
 			return prefix.equals(ops.empty()) ? DataResult.success(result) : ops.getMap(result).flatMap(map -> ops.mergeToMap(prefix, map));
+		}
+
+		/** Throws if the call met a block state without the block registry (Rust stored nothing). */
+		private void checkBlocks(long handle, String verb) {
+			if (handle == BLOCKS_MISSING_HANDLE) {
+				throw blocksMissing(verb + " " + (this.kind == Kind.BIOME ? "biomes" : this.kind.toString()));
+			}
+		}
+
+		/**
+		 * Biomes embed particle options, whose block states Rust reads from the
+		 * block registry. Rust installs it on the first block state it meets
+		 * ({@link #installBlocks}), so only bootstrap must have finished.
+		 */
+		private void requireBlocks() {
+			if (this.kind == Kind.BIOME && net.minecraft.server.Bootstrap.bootstrapDuration.get() < 0) {
+				throw new IllegalStateException("Decoding biomes needs the native block registry");
+			}
 		}
 
 		/** Stores a Java-built object's definition in Rust, which checks it against the schema. */
@@ -284,6 +313,7 @@ public final class NativeData {
 			} catch (Throwable e) {
 				throw new IllegalStateException("Rust data define failed", e);
 			}
+			this.checkBlocks(handle, "Encoding");
 			ByteBuffer in = ByteBuffer.wrap(table(PAYLOAD, handle, 0)).order(ByteOrder.LITTLE_ENDIAN);
 			if (in.get() == 0) {
 				String error = string(in);
@@ -311,11 +341,13 @@ public final class NativeData {
 	}
 
 	/** A projection's stored definition (in network form when synchronization decoded it) and resolved slots. */
-	private record Element(long handle, boolean network, Object[] values, Codec<?>[] codecs, Object[] defaults) {
+	record Element(long handle, boolean network, Object[] values, Codec<?>[] codecs, Object[] defaults) {
+		/** No delegated slots. */
+		static final Element EMPTY = new Element(0L, false, new Object[0], new Codec<?>[0], new Object[0]);
 	}
 
 	/** The input a tree came from, for resolving delegated nodes from their originals. */
-	private record Source<T>(DynamicOps<T> ops, List<T> nodes) {
+	record Source<T>(DynamicOps<T> ops, List<T> nodes) {
 		<A> DataResult<A> parse(Codec<A> codec, int index) {
 			return codec.parse(this.ops, this.nodes.get(index));
 		}
@@ -340,10 +372,20 @@ public final class NativeData {
 			this.source = source;
 			this.jsonOps = jsonOps;
 			int count = in.getInt();
+			this.payload = in;
+			if (count == 0) {
+				this.indices = NO_INTS;
+				this.trees = NO_TREES;
+				this.present = NO_FLAGS;
+				this.treeStarts = NO_INTS;
+				this.values = NO_OBJECTS;
+				this.codecs = NO_CODECS;
+				this.defaults = NO_OBJECTS;
+				return;
+			}
 			this.indices = new int[count];
 			this.trees = new JsonElement[count];
 			this.present = new boolean[count];
-			this.payload = in;
 			this.treeStarts = new int[count];
 			for (int i = 0; i < count; i++) {
 				this.present[i] = in.get() != 0;
@@ -357,6 +399,28 @@ public final class NativeData {
 			this.values = new Object[count];
 			this.codecs = new Codec<?>[count];
 			this.defaults = new Object[count];
+		}
+
+		private static final int[] NO_INTS = new int[0];
+		private static final JsonElement[] NO_TREES = new JsonElement[0];
+		private static final boolean[] NO_FLAGS = new boolean[0];
+		private static final Object[] NO_OBJECTS = new Object[0];
+		private static final Codec<?>[] NO_CODECS = new Codec<?>[0];
+
+		/** A value codec's context: slots resolve from Java's own input nodes, or were decoded already. */
+		@SuppressWarnings({"unchecked", "rawtypes"})
+		static Context forValue(DynamicOps<Object> ops, List<Object> nodes, @Nullable RegistryOps<JsonElement> jsonOps, ByteBuffer in, List<Object> resolved) {
+			Context context = new Context(new Source(ops, nodes), jsonOps, in);
+			context.resolved = resolved;
+			return context;
+		}
+
+		/** Values Java already decoded for slots while Rust decoded (`NativeValues.JavaCodec`). */
+		@Nullable
+		private List<Object> resolved;
+
+		void resolved(List<Object> resolved) {
+			this.resolved = resolved;
 		}
 
 		static final class Failure extends RuntimeException {
@@ -389,7 +453,11 @@ public final class NativeData {
 			return result;
 		}
 
+		@SuppressWarnings("unchecked")
 		private <A> A parse(int i, Codec<A> codec) {
+			if (this.resolved != null && i < this.resolved.size() && this.resolved.get(i) != null) {
+				return (A)this.resolved.get(i);
+			}
 			DataResult<A> result = this.source != null && this.indices[i] != -1
 				? this.source.parse(codec, this.indices[i])
 				: codec.parse(this.jsonOps != null ? this.jsonOps : JsonOps.INSTANCE, this.tree(i));
@@ -546,7 +614,7 @@ public final class NativeData {
 		}
 	}
 
-	private static MemorySegment copy(Arena arena, byte[] bytes) {
+	static MemorySegment copy(Arena arena, byte[] bytes) {
 		MemorySegment segment = arena.allocate(Math.max(1, bytes.length));
 		// Direct-buffer copies throughout: heap segments (MemorySegment.ofArray,
 		// toArray) passing through the JDK's shared segment-access code during
@@ -594,7 +662,17 @@ public final class NativeData {
 	}
 
 	/** Preorder tree of {@code value}; see `content/data/ffi.rs`. */
-	private static <T> void write(DynamicOps<T> ops, @Nullable T value, List<T> nodes, Out out) {
+	@SuppressWarnings("unchecked")
+	static <T> void write(DynamicOps<T> ops, @Nullable T value, List<T> nodes, Out out) {
+		// The two ops games use, walked directly; the same classification as below.
+		if (value instanceof net.minecraft.nbt.Tag tag && opsBase(ops) == net.minecraft.nbt.NbtOps.INSTANCE) {
+			writeTag(tag, (List<Object>)nodes, out);
+			return;
+		}
+		if (value instanceof JsonElement json && opsBase(ops) == JsonOps.INSTANCE) {
+			writeJson(json, (List<Object>)nodes, out);
+			return;
+		}
 		nodes.add(value);
 		if (value == null || value.equals(ops.empty())) {
 			out.write(0);
@@ -666,26 +744,321 @@ public final class NativeData {
 		out.write(bool.isSuccess() ? (bool.getOrThrow() ? 2 : 1) : 0);
 	}
 
-	private static final class Out extends ByteArrayOutputStream {
-		void u32(int v) {
-			this.write(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(v).array(), 0, 4);
-		}
+	/** The ops a {@code RegistryOps} delegates to, or {@code ops} itself. */
+	static DynamicOps<?> opsBase(DynamicOps<?> ops) {
+		return ops instanceof RegistryOps<?> registryOps ? registryOps.delegate : ops;
+	}
 
-		void u64(long v) {
-			this.write(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(v).array(), 0, 8);
-		}
-
-		void string(String s) {
-			byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
-			this.u32(bytes.length);
-			this.write(bytes, 0, bytes.length);
+	/** {@link #write} for {@code NbtOps}: maps, collections, strings and numbers. */
+	private static void writeTag(net.minecraft.nbt.Tag tag, List<Object> nodes, Out out) {
+		nodes.add(tag);
+		switch (tag) {
+			case net.minecraft.nbt.CompoundTag compound -> {
+				out.write(12);
+				out.u32(compound.size());
+				for (Map.Entry<String, net.minecraft.nbt.Tag> entry : compound.entrySet()) {
+					out.string(entry.getKey());
+					writeTag(entry.getValue(), nodes, out);
+				}
+			}
+			case net.minecraft.nbt.CollectionTag collection -> {
+				out.write(11);
+				out.u32(collection.size());
+				for (int i = 0; i < collection.size(); i++) {
+					writeTag(collection.get(i), nodes, out);
+				}
+			}
+			case net.minecraft.nbt.StringTag(String string) -> {
+				out.write(10);
+				out.string(string);
+			}
+			case net.minecraft.nbt.ByteTag(byte b) -> {
+				out.write(4);
+				out.write(b);
+			}
+			case net.minecraft.nbt.ShortTag(short v) -> {
+				out.write(5);
+				out.write(v);
+				out.write(v >> 8);
+			}
+			case net.minecraft.nbt.IntTag(int v) -> {
+				out.write(6);
+				out.u32(v);
+			}
+			case net.minecraft.nbt.LongTag(long v) -> {
+				out.write(7);
+				out.u64(v);
+			}
+			case net.minecraft.nbt.FloatTag(float v) -> {
+				out.write(8);
+				out.u32(Float.floatToRawIntBits(v));
+			}
+			case net.minecraft.nbt.DoubleTag(double v) -> {
+				out.write(9);
+				out.u64(Double.doubleToRawLongBits(v));
+			}
+			default -> out.write(0);
 		}
 	}
 
-	private static String string(ByteBuffer in) {
-		byte[] bytes = new byte[in.getInt()];
+	/** {@link #write} for {@code JsonOps}: objects (null members absent), arrays and primitives. */
+	private static void writeJson(@Nullable JsonElement json, List<Object> nodes, Out out) {
+		nodes.add(json);
+		switch (json) {
+			case null -> out.write(0);
+			case JsonObject object -> {
+				out.write(12);
+				out.u32(object.size());
+				for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
+					out.string(entry.getKey());
+					JsonElement member = entry.getValue();
+					writeJson(member instanceof JsonNull ? null : member, nodes, out);
+				}
+			}
+			case JsonArray array -> {
+				out.write(11);
+				out.u32(array.size());
+				for (JsonElement item : array) {
+					writeJson(item, nodes, out);
+				}
+			}
+			case JsonPrimitive primitive when primitive.isString() -> {
+				out.write(10);
+				out.string(primitive.getAsString());
+			}
+			case JsonPrimitive primitive when primitive.isNumber() -> {
+				switch (primitive.getAsNumber()) {
+					case Byte b -> {
+						out.write(4);
+						out.write(b);
+					}
+					case Short v -> {
+						out.write(5);
+						out.write(v);
+						out.write(v >> 8);
+					}
+					case Integer v -> {
+						out.write(6);
+						out.u32(v);
+					}
+					case Long v -> {
+						out.write(7);
+						out.u64(v);
+					}
+					case Float v -> {
+						out.write(8);
+						out.u32(Float.floatToRawIntBits(v));
+					}
+					case Double v -> {
+						out.write(9);
+						out.u64(Double.doubleToRawLongBits(v));
+					}
+					case Number other -> {
+						out.write(3);
+						out.string(other.toString());
+					}
+				}
+			}
+			case JsonPrimitive primitive when primitive.isBoolean() -> out.write(primitive.getAsBoolean() ? 2 : 1);
+			default -> out.write(0);
+		}
+	}
+
+	/** A growable little-endian byte buffer for FFI inputs. */
+	static final class Out {
+		private byte[] buf = new byte[256];
+		private int count;
+
+		private void ensure(int extra) {
+			if (this.count + extra > this.buf.length) {
+				this.buf = java.util.Arrays.copyOf(this.buf, Math.max(this.buf.length * 2, this.count + extra));
+			}
+		}
+
+		void write(int b) {
+			this.ensure(1);
+			this.buf[this.count++] = (byte)b;
+		}
+
+		void write(byte[] bytes, int offset, int length) {
+			this.ensure(length);
+			System.arraycopy(bytes, offset, this.buf, this.count, length);
+			this.count += length;
+		}
+
+		void u32(int v) {
+			this.ensure(4);
+			byte[] b = this.buf;
+			int c = this.count;
+			b[c] = (byte)v;
+			b[c + 1] = (byte)(v >> 8);
+			b[c + 2] = (byte)(v >> 16);
+			b[c + 3] = (byte)(v >> 24);
+			this.count = c + 4;
+		}
+
+		void u64(long v) {
+			this.u32((int)v);
+			this.u32((int)(v >> 32));
+		}
+
+		void string(String s) {
+			int length = s.length();
+			// ASCII strings, the common case, need no encoder.
+			this.ensure(4 + length);
+			int start = this.count + 4;
+			for (int i = 0; i < length; i++) {
+				char c = s.charAt(i);
+				if (c >= 0x80) {
+					byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
+					this.u32(bytes.length);
+					this.write(bytes, 0, bytes.length);
+					return;
+				}
+				this.buf[start + i] = (byte)c;
+			}
+			this.u32(length);
+			this.count += length;
+		}
+
+		void reset() {
+			this.count = 0;
+		}
+
+		int size() {
+			return this.count;
+		}
+
+		byte[] toByteArray() {
+			return java.util.Arrays.copyOf(this.buf, this.count);
+		}
+
+		/** Copies the bytes into {@code segment} at offset 0. */
+		void copyTo(MemorySegment segment) {
+			MemorySegment.copy(this.buf, 0, segment, ValueLayout.JAVA_BYTE, 0, this.count);
+		}
+	}
+
+	/**
+	 * Recent short ASCII strings (field names, IDs). Strings are immutable, so
+	 * racing threads only miss.
+	 */
+	private static final String[] STRINGS = new String[1024];
+
+	static String string(ByteBuffer in) {
+		int length = in.getInt();
+		if (in.hasArray()) {
+			byte[] array = in.array();
+			int at = in.arrayOffset() + in.position();
+			in.position(in.position() + length);
+			if (length > 48) {
+				return new String(array, at, length, StandardCharsets.UTF_8);
+			}
+			int hash = length;
+			boolean ascii = true;
+			for (int i = 0; i < length; i++) {
+				byte b = array[at + i];
+				hash = hash * 31 + b;
+				ascii &= b >= 0;
+			}
+			if (!ascii) {
+				return new String(array, at, length, StandardCharsets.UTF_8);
+			}
+			int slot = (hash ^ hash >>> 16) & (STRINGS.length - 1);
+			String cached = STRINGS[slot];
+			if (cached != null && cached.length() == length) {
+				boolean same = true;
+				for (int i = 0; i < length && same; i++) {
+					same = cached.charAt(i) == array[at + i];
+				}
+				if (same) {
+					return cached;
+				}
+			}
+			String string = new String(array, at, length, StandardCharsets.ISO_8859_1);
+			STRINGS[slot] = string;
+			return string;
+		}
+		if (length <= 48) {
+			int at = in.position();
+			int hash = length;
+			boolean ascii = true;
+			for (int i = 0; i < length; i++) {
+				byte b = in.get(at + i);
+				hash = hash * 31 + b;
+				ascii &= b >= 0;
+			}
+			if (ascii) {
+				int slot = (hash ^ hash >>> 16) & (STRINGS.length - 1);
+				String cached = STRINGS[slot];
+				if (cached != null && cached.length() == length) {
+					boolean same = true;
+					for (int i = 0; i < length && same; i++) {
+						same = cached.charAt(i) == in.get(at + i);
+					}
+					if (same) {
+						in.position(at + length);
+						return cached;
+					}
+				}
+				byte[] bytes = new byte[length];
+				in.get(bytes);
+				String string = new String(bytes, StandardCharsets.ISO_8859_1);
+				STRINGS[slot] = string;
+				return string;
+			}
+		}
+		byte[] bytes = new byte[length];
 		in.get(bytes);
 		return new String(bytes, StandardCharsets.UTF_8);
+	}
+
+	/** A number node of the input tree format (tags 3 to 9). */
+	static Number readNumber(ByteBuffer in) {
+		return switch (in.get()) {
+			case 3 -> new LazilyParsedNumber(string(in));
+			case 4 -> in.get();
+			case 5 -> in.getShort();
+			case 6 -> in.getInt();
+			case 7 -> in.getLong();
+			case 8 -> in.getFloat();
+			case 9 -> in.getDouble();
+			default -> throw new IllegalStateException("Not a native number tag");
+		};
+	}
+
+	static void writeNumber(Out out, Number number) {
+		switch (number) {
+			case Byte b -> {
+				out.write(4);
+				out.write(b);
+			}
+			case Short v -> {
+				out.write(5);
+				out.write(v);
+				out.write(v >> 8);
+			}
+			case Integer v -> {
+				out.write(6);
+				out.u32(v);
+			}
+			case Long v -> {
+				out.write(7);
+				out.u64(v);
+			}
+			case Float v -> {
+				out.write(8);
+				out.u32(Float.floatToRawIntBits(v));
+			}
+			case Double v -> {
+				out.write(9);
+				out.u64(Double.doubleToRawLongBits(v));
+			}
+			default -> {
+				out.write(3);
+				out.string(number.toString());
+			}
+		}
 	}
 
 	/** Skips one input tree. */
@@ -751,7 +1124,7 @@ public final class NativeData {
 	}
 
 	/** A decoded value for Rust (see `content/data/ffi.rs`). */
-	private static void writeDecoded(Out out, @Nullable Object value) {
+	static void writeDecoded(Out out, @Nullable Object value) {
 		switch (value) {
 			case null -> out.write(0);
 			case Boolean b -> out.write(b ? 2 : 1);
@@ -804,6 +1177,10 @@ public final class NativeData {
 				out.write(11);
 				out.u32(slot.index());
 			}
+			case JavaNumber number -> {
+				out.write(15);
+				writeNumber(out, number.value());
+			}
 			case SoundRef sound -> {
 				out.write(12);
 				out.string(sound.id());
@@ -819,7 +1196,7 @@ public final class NativeData {
 	}
 
 	/** A decoded value (see `content/data/ffi.rs`). */
-	private static Object decoded(ByteBuffer in) {
+	static Object decoded(ByteBuffer in) {
 		return switch (in.get()) {
 			case 0 -> null;
 			case 1 -> false;
@@ -859,6 +1236,7 @@ public final class NativeData {
 				yield new Variant(index, fields);
 			}
 			case 11 -> new Slot(in.getInt());
+			case 15 -> new JavaNumber(readNumber(in));
 			case 12 -> new SoundRef(string(in));
 			case 13 -> {
 				String id = string(in);
@@ -890,8 +1268,129 @@ public final class NativeData {
 	}
 
 	/** Builds Rust's encoding in {@code ops}, filling delegated slots with their codecs. */
+	@SuppressWarnings("unchecked")
+	static <T> T build(DynamicOps<T> ops, ByteBuffer in, @Nullable Element element) {
+		// The two ops games use, built directly: the same trees `createMap` and
+		// `createList` produce.
+		DynamicOps<?> base = opsBase(ops);
+		if (base == net.minecraft.nbt.NbtOps.INSTANCE) {
+			return (T)buildTag(ops, in, element);
+		}
+		if (base == JsonOps.INSTANCE) {
+			return (T)buildJson(ops, in, element);
+		}
+		return buildGeneric(ops, in, element);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static <T> net.minecraft.nbt.Tag buildTag(DynamicOps<T> ops, ByteBuffer in, @Nullable Element element) {
+		int position = in.position();
+		return switch (in.get()) {
+			case 1 -> net.minecraft.nbt.ByteTag.valueOf(false);
+			case 2 -> net.minecraft.nbt.ByteTag.valueOf(true);
+			case 3 -> net.minecraft.nbt.IntTag.valueOf(in.getInt());
+			case 4 -> net.minecraft.nbt.FloatTag.valueOf(in.getFloat());
+			case 5 -> net.minecraft.nbt.DoubleTag.valueOf(in.getDouble());
+			case 6 -> net.minecraft.nbt.StringTag.valueOf(string(in));
+			case 7 -> {
+				net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+				for (int i = in.getInt(); i > 0; i--) {
+					list.add(buildTag(ops, in, element));
+				}
+				yield list;
+			}
+			case 8 -> {
+				net.minecraft.nbt.CompoundTag compound = new net.minecraft.nbt.CompoundTag();
+				for (int i = in.getInt(); i > 0; i--) {
+					String key = string(in);
+					int entry = in.position();
+					byte entryTag = in.get();
+					if (entryTag == 18) {
+						T merged = encodeSlot(ops, element, in.getInt());
+						if (merged instanceof net.minecraft.nbt.CompoundTag map) {
+							for (Map.Entry<String, net.minecraft.nbt.Tag> e : map.entrySet()) {
+								compound.put(e.getKey(), e.getValue());
+							}
+						} else {
+							throw new Context.Failure("Not a map: " + merged);
+						}
+						continue;
+					}
+					if (entryTag == 14) {
+						int slot = in.getInt();
+						if (Objects.equals(element.values[slot], element.defaults[slot])) {
+							continue;
+						}
+						compound.put(key, (net.minecraft.nbt.Tag)encodeSlot(ops, element, slot));
+						continue;
+					}
+					in.position(entry);
+					compound.put(key, buildTag(ops, in, element));
+				}
+				yield compound;
+			}
+			default -> {
+				in.position(position);
+				yield (net.minecraft.nbt.Tag)buildGeneric(ops, in, element);
+			}
+		};
+	}
+
+	private static <T> JsonElement buildJson(DynamicOps<T> ops, ByteBuffer in, @Nullable Element element) {
+		int position = in.position();
+		return switch (in.get()) {
+			case 1 -> new JsonPrimitive(false);
+			case 2 -> new JsonPrimitive(true);
+			case 3 -> new JsonPrimitive(in.getInt());
+			case 4 -> new JsonPrimitive(in.getFloat());
+			case 5 -> new JsonPrimitive(in.getDouble());
+			case 6 -> new JsonPrimitive(string(in));
+			case 7 -> {
+				JsonArray array = new JsonArray();
+				for (int i = in.getInt(); i > 0; i--) {
+					array.add(buildJson(ops, in, element));
+				}
+				yield array;
+			}
+			case 8 -> {
+				JsonObject object = new JsonObject();
+				for (int i = in.getInt(); i > 0; i--) {
+					String key = string(in);
+					int entry = in.position();
+					byte entryTag = in.get();
+					if (entryTag == 18) {
+						Object merged = encodeSlot(ops, element, in.getInt());
+						if (merged instanceof JsonObject map) {
+							for (Map.Entry<String, JsonElement> e : map.entrySet()) {
+								object.add(e.getKey(), e.getValue());
+							}
+						} else {
+							throw new Context.Failure("Not a JSON object: " + merged);
+						}
+						continue;
+					}
+					if (entryTag == 14) {
+						int slot = in.getInt();
+						if (Objects.equals(element.values[slot], element.defaults[slot])) {
+							continue;
+						}
+						object.add(key, (JsonElement)encodeSlot(ops, element, slot));
+						continue;
+					}
+					in.position(entry);
+					object.add(key, buildJson(ops, in, element));
+				}
+				yield object;
+			}
+			default -> {
+				in.position(position);
+				yield (JsonElement)buildGeneric(ops, in, element);
+			}
+		};
+	}
+
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	private static <T> T build(DynamicOps<T> ops, ByteBuffer in, Element element) {
+	private static <T> T buildGeneric(DynamicOps<T> ops, ByteBuffer in, @Nullable Element element) {
 		int tag = in.get();
 		return switch (tag) {
 			case 1 -> ops.createBoolean(false);
@@ -912,7 +1411,14 @@ public final class NativeData {
 				for (int i = in.getInt(); i > 0; i--) {
 					String key = string(in);
 					int position = in.position();
-					if (in.get() == 14) {
+					byte entryTag = in.get();
+					if (entryTag == 18) {
+						// A delegated MapCodec's entries, merged into this map.
+						T merged = encodeSlot(ops, element, in.getInt());
+						ops.getMapValues(merged).getOrThrow(Context.Failure::new).forEach(entries::add);
+						continue;
+					}
+					if (entryTag == 14) {
 						int slot = in.getInt();
 						if (Objects.equals(element.values[slot], element.defaults[slot])) {
 							continue;
@@ -927,6 +1433,25 @@ public final class NativeData {
 			}
 			case 11 -> encodeSlot(ops, element, in.getInt());
 			case 14 -> encodeSlot(ops, element, in.getInt());
+			case 17 -> {
+				Number number = readNumber(in);
+				yield switch (number) {
+					case Byte b -> ops.createByte(b);
+					case Short v -> ops.createShort(v);
+					case Integer v -> ops.createInt(v);
+					case Long v -> ops.createLong(v);
+					case Float v -> ops.createFloat(v);
+					case Double v -> ops.createDouble(v);
+					default -> ops.createNumeric(number);
+				};
+			}
+			case 16 -> {
+				int[] ints = new int[in.getInt()];
+				for (int i = 0; i < ints.length; i++) {
+					ints[i] = in.getInt();
+				}
+				yield ops.createIntList(java.util.stream.IntStream.of(ints));
+			}
 			case 15 -> {
 				String id = string(in);
 				if (ops instanceof RegistryOps<?>) {
@@ -1014,5 +1539,50 @@ public final class NativeData {
 			case CHICKEN_VARIANT -> Registries.CHICKEN_VARIANT;
 			case ZOMBIE_NAUTILUS_VARIANT -> Registries.ZOMBIE_NAUTILUS_VARIANT;
 		};
+	}
+
+	static {
+		try {
+			MethodHandle install = java.lang.invoke.MethodHandles.lookup().findStatic(NativeData.class, "installBlocks", java.lang.invoke.MethodType.methodType(int.class));
+			MemorySegment stub = java.lang.foreign.Linker.nativeLinker().upcallStub(install, FunctionDescriptor.of(ValueLayout.JAVA_INT), Arena.global());
+			MethodHandle set = handle("mattmc_value_set_install_blocks", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+			set.invokeExact(stub);
+		} catch (Throwable e) {
+			throw new IllegalStateException("Cannot install the native block registry callback", e);
+		}
+	}
+
+	/** What {@code ready()} itself threw during a callback, if it did. */
+	private static volatile Throwable installError;
+
+	/** A data call's handle when it met a block state the registry couldn't be installed for. */
+	static final long BLOCKS_MISSING_HANDLE = -2;
+	/** The status-2 exception class Rust reports for that (`schema::BLOCKS_MISSING`). */
+	static final int BLOCKS_MISSING = 4;
+
+	/**
+	 * Rust's first block state of a call: installs the block registry (1 once
+	 * installed). It never throws into Rust. If installing fails, Rust ends the
+	 * call with its BLOCKS_MISSING exception pending, so no further callback
+	 * runs, and the Java entry point throws {@link #blocksMissing}.
+	 */
+	private static int installBlocks() {
+		try {
+			if (net.minecraft.world.level.block.NativeBlockRegistry.ready()) {
+				return 1;
+			}
+		} catch (Throwable e) {
+			// ready() catches installation errors itself; anything else is kept for the report.
+			if (installError == null) {
+				installError = e;
+			}
+		}
+		return 0;
+	}
+
+	/** The guard's exception for a call that met a block state without the registry, caused by the installation failure. */
+	static IllegalStateException blocksMissing(String action) {
+		Throwable cause = net.minecraft.world.level.block.NativeBlockRegistry.failure();
+		return new IllegalStateException(action + " needs the native block registry", cause != null ? cause : installError);
 	}
 }
