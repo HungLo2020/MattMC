@@ -24,6 +24,9 @@ compatibility ownership.
 Canonical [block-light source production](RUST-BLOCK-LIGHT-SOURCES.md) now
 enumerates primary section owners and appends native work directly. Java keeps
 node checks and contextual chunk lookup; compatibility chunks retain callbacks.
+Server PRE/propagation/POST batch policy and scheduled admission belong to the
+[native threaded coordinator](RUST-THREADED-LIGHTING.md); per-engine section and
+publication orchestration above remains Java.
 
 ## How a pass works
 

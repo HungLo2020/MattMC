@@ -1,12 +1,7 @@
 package net.minecraft.server.level;
 
-import com.mojang.datafixers.util.Pair;
 import net.logging.LogUtils;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectList;
-import it.unimi.dsi.fastutil.objects.ObjectListIterator;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.IntSupplier;
 import net.minecraft.SharedConstants;
 import net.minecraft.Util;
@@ -27,11 +22,10 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 	public static final int DEFAULT_BATCH_SIZE = 1000;
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private final ConsecutiveExecutor consecutiveExecutor;
-	private final ObjectList<Pair<ThreadedLevelLightEngine.TaskType, Runnable>> lightTasks = new ObjectArrayList<>();
+	private final NativeLightTasks lightTasks = new NativeLightTasks();
+	private final Runnable propagation = super::runLightUpdates;
 	private final ChunkMap chunkMap;
 	private final ChunkTaskDispatcher taskDispatcher;
-	private final int taskPerBatch = 1000;
-	private final AtomicBoolean scheduled = new AtomicBoolean();
 
 	public ThreadedLevelLightEngine(
 		LightChunkGetter lightChunkGetter, ChunkMap chunkMap, boolean bl, ConsecutiveExecutor consecutiveExecutor, ChunkTaskDispatcher chunkTaskDispatcher
@@ -125,8 +119,7 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 
 	private void addTask(int i, int j, IntSupplier intSupplier, ThreadedLevelLightEngine.TaskType taskType, Runnable runnable) {
 		this.taskDispatcher.submit(() -> {
-			this.lightTasks.add(Pair.of(taskType, runnable));
-			if (this.lightTasks.size() >= 1000) {
+			if (this.lightTasks.append(taskType == TaskType.POST_UPDATE, runnable)) {
 				this.runUpdate();
 			}
 		}, ChunkPos.asLong(i, j), intSupplier);
@@ -182,37 +175,16 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 	}
 
 	public void tryScheduleUpdate() {
-		if ((!this.lightTasks.isEmpty() || super.hasLightWork()) && this.scheduled.compareAndSet(false, true)) {
+		if (this.lightTasks.requestSchedule(this.lightTasks.pending() != 0 || super.hasLightWork())) {
 			this.consecutiveExecutor.schedule(() -> {
 				this.runUpdate();
-				this.scheduled.set(false);
+				this.lightTasks.finishSchedule();
 			});
 		}
 	}
 
 	private void runUpdate() {
-		int i = Math.min(this.lightTasks.size(), 1000);
-		ObjectListIterator<Pair<ThreadedLevelLightEngine.TaskType, Runnable>> objectListIterator = this.lightTasks.iterator();
-
-		int j;
-		for (j = 0; objectListIterator.hasNext() && j < i; j++) {
-			Pair<ThreadedLevelLightEngine.TaskType, Runnable> pair = (Pair<ThreadedLevelLightEngine.TaskType, Runnable>)objectListIterator.next();
-			if (pair.getFirst() == ThreadedLevelLightEngine.TaskType.PRE_UPDATE) {
-				pair.getSecond().run();
-			}
-		}
-
-		objectListIterator.back(j);
-		super.runLightUpdates();
-
-		for (int var5 = 0; objectListIterator.hasNext() && var5 < i; var5++) {
-			Pair<ThreadedLevelLightEngine.TaskType, Runnable> pair = (Pair<ThreadedLevelLightEngine.TaskType, Runnable>)objectListIterator.next();
-			if (pair.getFirst() == ThreadedLevelLightEngine.TaskType.POST_UPDATE) {
-				pair.getSecond().run();
-			}
-
-			objectListIterator.remove();
-		}
+		this.lightTasks.runUpdate(this.propagation);
 	}
 
 	public CompletableFuture<?> waitForPendingTasks(int i, int j) {

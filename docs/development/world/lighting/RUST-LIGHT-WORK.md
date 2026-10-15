@@ -29,7 +29,9 @@ engine or world simulation out of Java.
   contract remains; this does not certify arbitrary concurrent or reentrant use.
 
 Java still owns `blockNodesToCheck`, section admission, contextual callbacks,
-column extraction, publication scheduling and compatibility propagation loops.
+column extraction, per-engine publication and compatibility propagation loops.
+The server's outer batch/scheduling policy has its separate
+[threaded coordinator](RUST-THREADED-LIGHTING.md).
 Rust owns pending queues even when those compatibility loops execute. No GPU
 resource, presenter or rendering boundary is involved.
 

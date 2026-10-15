@@ -3,8 +3,11 @@
 World light-source data, live light storage and propagation are separate from
 rendering. Live layers also support independent client packet imports. The
 renderer’s [bulk terrain-light consumer](../../rendering/RUST-TERRAIN-LIGHTING.md)
-borrows retained generations; Java still owns light-engine orchestration and
-contextual rendering callbacks.
+borrows retained generations. Rust owns threaded server batch coordination;
+Java retains contextual callbacks and the remaining per-engine orchestration.
+
+- [Threaded lighting coordination](RUST-THREADED-LIGHTING.md): native live task
+  batches, PRE/POST phases, scheduling admission, lifetime and verification.
 
 - [Rust DH lighting pass](RUST-DH-LIGHTING.md): whole native producer and
   direct CPU light consumers, executable Frozen stale-counter/escape regressions
