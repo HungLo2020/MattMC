@@ -29,6 +29,36 @@ The checked table has no Fortune or Silk Touch branch. Explosion decay can reduc
 
 **Break and replant the pod.** Cocoa does not implement MattMC's mature-crop use-to-harvest or hoe-area-harvest callbacks: its class extends the ordinary horizontal block family, whose inherited interaction does not harvest. [Cocoa class][cocoa-class] · [Parent class][horizontal-block] · [Default interaction][default-use]
 
+### Piston-assisted harvesting
+
+A [Piston](Pistons.md#facing-and-power) can break a Cocoa pod, but it does not
+leave a planted crop behind. Cocoa's current native definition uses the
+**destroy** reaction: extension runs the pod's block loot and removes it instead
+of moving an intact pod. A Sticky Piston is unnecessary for this action.
+[Native Cocoa definition][piston-catalog] · [Destroy property][piston-physics]
+· [Extension decision][piston-resolver] · [Drops and removal][piston-drops]
+
+For a small manually controlled setup:
+
+1. Keep the Jungle timber fixed and grow a pod on one of its horizontal sides
+2. Put an ordinary Piston immediately in front of the pod, aimed **through the
+   pod toward its timber**. The line is Piston, pod, timber; target the pod's
+   cell rather than pushing the support
+3. Wait for **age 2**, then power the Piston. The direct destroy branch stops at
+   the pod, leaving the timber out of the moving group
+4. Remove power, let the head retract, collect the loose beans and use one to
+   replant the cleared side. The replacement starts at age 0
+
+[Direct-target resolution][piston-resolver] · [Support and placement][piston-cocoa]
+· [Default age][piston-template] · [Bean placement consumption][piston-item]
+
+With bundled loot and block drops enabled, a mature pod yields **three beans**;
+an immature pod yields **one**. The Piston does not wait for maturity or plant
+the replacement, so repeated pulses alone do not sustain this crop. Keep the
+pod cell clear after retraction and reserve a bean for replanting. These are
+source-derived setup steps, **not a tested circuit, harvest rate or item-collection
+guarantee**. [Age-dependent loot][piston-loot] · [Block-drop gate][piston-drop-gate]
+
 ## Uses
 
 - **Brown Dye:** one bean crafts into **one Brown Dye**. [Recipe][brown-dye]
@@ -47,6 +77,12 @@ The placed pod is `minecraft:cocoa`; its planting and harvested item is `minecra
 ## Sources and verification
 
 Source-reviewed at `85428ea17c51c31ddb67b6c1060b78f4c3a13515` on 2026-10-02. Inline source links identify the exact implementation and bundled data used here. No in-game growth timing, harvest, mob-interaction, or placement test was run. Data packs, world-generation settings, and game rules can change these results; quoted ordinary drops assume block drops are enabled.
+
+Piston-assisted harvesting was source-reviewed on **2026-10-15** at
+`e36baa9f35a8c05f7ed960ac858f54ef3f40f699`, tracing native property installation,
+the active Piston destruction path, Cocoa support/placement and bundled loot.
+No gameplay or circuit test was run; earlier review evidence remains preserved.
+[Native registration][piston-registration] · [Property installation][piston-install]
 
 [cocoa-registration]: https://github.com/HungLo2020/MattMC/blob/85428ea17c51c31ddb67b6c1060b78f4c3a13515/src/main/java/net/minecraft/world/level/block/Blocks.java#L2590-L2600
 [cocoa-item]: https://github.com/HungLo2020/MattMC/blob/85428ea17c51c31ddb67b6c1060b78f4c3a13515/src/main/java/net/minecraft/world/item/Items.java#L1692-L1695
@@ -71,3 +107,14 @@ Source-reviewed at `85428ea17c51c31ddb67b6c1060b78f4c3a13515` on 2026-10-02. Inl
 [cookies]: https://github.com/HungLo2020/MattMC/blob/85428ea17c51c31ddb67b6c1060b78f4c3a13515/src/main/resources/data/minecraft/recipe/crafting/cookie.json#L1-L15
 [cocoa-compost]: https://github.com/HungLo2020/MattMC/blob/85428ea17c51c31ddb67b6c1060b78f4c3a13515/src/main/java/net/minecraft/world/level/block/ComposterBlock.java#L131-L136
 [compost-roll]: https://github.com/HungLo2020/MattMC/blob/85428ea17c51c31ddb67b6c1060b78f4c3a13515/src/main/java/net/minecraft/world/level/block/ComposterBlock.java#L304-L317
+[piston-catalog]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/rust/content/block/definitions/catalog.rs#L426
+[piston-physics]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/rust/content/block/definitions/physics.rs#L584-L590
+[piston-resolver]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/java/net/minecraft/world/level/block/piston/PistonStructureResolver.java#L24-L49
+[piston-drops]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/java/net/minecraft/world/level/block/piston/PistonBaseBlock.java#L264-L300
+[piston-cocoa]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/java/net/minecraft/world/level/block/CocoaBlock.java#L63-L107
+[piston-template]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/rust/content/block/definitions/templates.rs#L81
+[piston-item]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/java/net/minecraft/world/item/BlockItem.java#L47-L82
+[piston-loot]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/resources/data/minecraft/loot_table/blocks/cocoa.json#L1-L35
+[piston-drop-gate]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/java/net/minecraft/world/level/block/Block.java#L420-L425
+[piston-registration]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/java/net/minecraft/world/level/block/Blocks.java#L5001-L5007
+[piston-install]: https://github.com/HungLo2020/MattMC/blob/e36baa9f35a8c05f7ed960ac858f54ef3f40f699/src/main/java/net/minecraft/world/level/block/state/NativeBlockDefinitions.java#L99-L122

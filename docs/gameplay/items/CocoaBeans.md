@@ -14,6 +14,8 @@ Use one bean to plant Cocoa against a horizontal side of Jungle Log, Jungle Wood
 
 The bean itself has no food component. Its crop grows without irrigation or a light threshold in the checked code, and is harvested by breaking and replanting. See [Cocoa](../blocks/Cocoa.md) for growth, Bone Meal, and harvesting controls. [Item registration][cocoa-item] · [Growth][cocoa-growth]
 
+For mechanical harvesting, use the [Cocoa Piston setup](../blocks/Cocoa.md#piston-assisted-harvesting), including pod targeting, maturity and replanting limits.
+
 ## Notes
 
 - Item ID: `minecraft:cocoa_beans`; the placed block is `minecraft:cocoa`. [Registrations][cocoa-item]
