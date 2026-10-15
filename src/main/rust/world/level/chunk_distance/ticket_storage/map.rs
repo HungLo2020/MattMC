@@ -269,6 +269,16 @@ impl Mark {
         self.pos
     }
 
+    /// The iterator's `last`: the slot of the entry last returned, -1 if none.
+    pub(crate) fn last(&self) -> i32 {
+        self.last
+    }
+
+    /// The iterator's `c`: entries left, counted down as each `nextEntry` begins.
+    pub(crate) fn left(&self) -> usize {
+        self.left
+    }
+
     pub(crate) fn has_next(&self) -> bool {
         self.left != 0
     }

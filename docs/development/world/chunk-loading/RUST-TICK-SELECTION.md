@@ -47,7 +47,17 @@ next promote. The projection holds the holder objects themselves.
     simulation run, change what later steps see, exactly as with the Java map.
   - When the view shrinks or grows under a walk, the walk throws the original
     `ArrayIndexOutOfBoundsException` or `NullPointerException` (same messages).
-  - The entry count is fixed when the walk starts.
+  - The entry count is fixed when the walk starts. It counts down as each step
+    begins, so it is also down after a step that throws. Java takes the native
+    count after every step.
+  - `getSpawnCandidateChunks()` returns the original iterator API, including
+    `remove()` (fastutil `MapIterator.remove`): `IllegalStateException` with
+    nothing to remove, the zero key, backward shifts that move keys into the
+    walk's wrapped list, and removal of a wrapped key. Failures reading the
+    wrapped list, in `next` or `remove`, throw the original
+    `NullPointerException` or `IndexOutOfBoundsException`.
+  - A removal from outside of a key the walk has wrapped makes the original
+    iterator probe forever. The port does the same, so don't do that.
 - **Locks and lifetime.**
   - Every view call holds the view's lock only while it runs; no lock is held
     while Java runs.
@@ -84,7 +94,12 @@ cargo test --release --lib level_view   # from src/main/rust
 - [`NativeLevelViewTest`](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/minecraft/server/level/NativeLevelViewTest.java)
   runs the same histories on a real fastutil map and on the native view: zero key,
   collisions, growth, shrink, and scripted mutation during walks (including the
-  iterator exceptions). It also checks that a walk outlives its wrapper.
+  iterator exceptions). It also runs scripted `keySet().iterator()` histories with
+  `remove`, continuation after caught exceptions and outside growth or shrink,
+  comparing every outcome and the final order, and checks that a walk outlives
+  its wrapper.
+  - Once the JIT compiles fastutil's iterator hot, the original can throw a
+    message-less exception; the test then compares only the exception class.
 - The benchmark times, per step, a simulation run, both walks, the spawn count and
   entity-tick-rate point reads. It's a harness workload, not a whole-server
   measurement.

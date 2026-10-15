@@ -185,6 +185,102 @@ class NativeLevelViewTest {
 		return out;
 	}
 
+	/** One iterator operation's outcome, with a message-less (JIT fast-throw) exception
+	 * normalized to its class so it compares with the candidate's. */
+	static String outcome(RuntimeException e) {
+		String name = e.getClass().getName();
+		return e.getMessage() == null ? name : name + ": " + e.getMessage();
+	}
+
+	static String normalize(String expected, String actual) {
+		return !expected.contains(":") && actual.startsWith(expected + ":") ? expected : actual;
+	}
+
+	/**
+	 * Scripted {@code keySet().iterator()} histories on the original map and the native
+	 * walk: hasNext, nextLong and remove (including remove before next and repeated
+	 * remove), external puts and removes that grow or shrink the table, the zero key and
+	 * dense colliding keys (backward shifts that wrap move keys into the wrapped list), and
+	 * continuing after a caught exception. Every outcome and the final map order must match.
+	 */
+	@Test
+	void iteratorRemovalAndContinuationAfterExceptionsMatchFastutil() {
+		Random random = new Random(19);
+		int removals = 0, exceptions = 0, continued = 0;
+		for (int round = 0; round < 400; round++) {
+			Pair pair = new Pair();
+			// Dense small keys collide and fill runs that wrap past the table's end.
+			int span = 8 + random.nextInt(120);
+			long[] pool = new long[span];
+			for (int i = 0; i < span; i++) pool[i] = random.nextInt(4) == 0 ? random.nextInt(1 << 20) : i - span / 2;
+			int size = random.nextInt(span);
+			for (int i = 0; i < size; i++) pair.set(pool[random.nextInt(span)], random.nextInt(33));
+			Iterator<Long> originalIterator = pair.original.keySet().iterator();
+			it.unimi.dsi.fastutil.longs.LongIterator original = (it.unimi.dsi.fastutil.longs.LongIterator)originalIterator;
+			LongIterator candidate = pair.candidate.keys();
+			List<String> expected = new ArrayList<>(), actual = new ArrayList<>();
+			boolean threw = false, removedThrough = false;
+			for (int step = 0; step < 300; step++) {
+				int op = random.nextInt(10);
+				String e, a;
+				if (op < 5) {
+					e = run(() -> Long.toString(original.nextLong()));
+					a = run(() -> Long.toString(candidate.nextLong()));
+				} else if (op < 8) {
+					e = run(() -> { original.remove(); return "removed"; });
+					a = run(() -> { candidate.remove(); return "removed"; });
+					if (e.equals("removed")) {
+						removals++;
+						removedThrough = true;
+					}
+				} else if (op == 8) {
+					e = Boolean.toString(original.hasNext());
+					a = Boolean.toString(candidate.hasNext());
+				} else {
+					// External mutation mid-walk: grow (many puts) or shrink (many removes).
+					// After an iterator removal the walk may hold wrapped keys, and the
+					// original spins forever looking for one removed from outside, so
+					// from then on outside changes only add.
+					boolean grow = removedThrough || random.nextBoolean();
+					int count = 1 + random.nextInt(grow ? 60 : span);
+					for (int i = 0; i < count; i++) {
+						long k = grow && random.nextBoolean() ? random.nextInt(1 << 20) : pool[random.nextInt(span)];
+						pair.set(k, grow ? random.nextInt(33) : 33);
+					}
+					e = a = "mutated";
+				}
+				a = normalize(e, a);
+				expected.add(e);
+				actual.add(a);
+				boolean failed = e.startsWith("java.lang.") && !e.startsWith("java.lang.IllegalStateException");
+				if (failed) {
+					exceptions++;
+					threw = true;
+				} else if (threw) {
+					continued++;
+				}
+				if (!original.hasNext() && !candidate.hasNext() && random.nextInt(4) == 0) break;
+			}
+			assertEquals(expected, actual, "round " + round);
+			pair.compare(probes(random, pool), "round " + round + " after iterator");
+		}
+		assertTrue(removals > 100, "too few removals: " + removals);
+		assertTrue(exceptions > 0, "no iterator exception was exercised");
+		assertTrue(continued > 0, "no operation followed a caught exception");
+	}
+
+	interface Op {
+		String get();
+	}
+
+	static String run(Op op) {
+		try {
+			return op.get();
+		} catch (RuntimeException e) {
+			return outcome(e);
+		}
+	}
+
 	@Test
 	void keyIteratorMatchesKeySetIterator() {
 		Random random = new Random(3);

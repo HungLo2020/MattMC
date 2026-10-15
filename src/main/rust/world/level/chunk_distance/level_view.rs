@@ -87,6 +87,21 @@ pub(crate) enum Step {
     /// The walk ran below slot 0 (the view grew mid-walk) and read the
     /// iterator's never-created wrapped-key list: Java's `NullPointerException`.
     NullWrapped,
+    /// It read past the wrapped-key list: `LongArrayList.getLong`'s
+    /// `IndexOutOfBoundsException` (index, list size).
+    WrappedIndex(i32, usize),
+}
+
+/// What an iterator `remove()` did.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Removal {
+    Removed,
+    /// No entry to remove: Java's `IllegalStateException`.
+    IllegalState,
+    /// The removed slot lies past a table that shrank under the walk.
+    OutOfBounds(i32, usize),
+    NullWrapped,
+    WrappedIndex(i32, usize),
 }
 
 /// A `fastIterable` / `keySet().iterator()` walk; holds its view alive.
@@ -110,6 +125,7 @@ impl ViewCursor {
                 Ok(index) => index,
                 Err(Fault::ArrayIndex) => return Ok(Step::OutOfBounds(self.out_of_bounds_index(), view.map.table_len())),
                 Err(Fault::NullPointer) => return Ok(Step::NullWrapped),
+                Err(Fault::IndexOutOfBounds) => return Ok(Step::WrappedIndex(self.wrapped_index(), self.wrapped_len())),
                 Err(error) => return Err(error),
             };
             let key = view.map.key_at(index)?;
@@ -124,6 +140,38 @@ impl ViewCursor {
     /// The position `nextEntry` read past the table.
     fn out_of_bounds_index(&self) -> i32 {
         self.cursor.mark().position()
+    }
+
+    /// The wrapped-list index the walk read (`-pos - 1`).
+    fn wrapped_index(&self) -> i32 {
+        -self.cursor.mark().position() - 1
+    }
+
+    fn wrapped_len(&self) -> usize {
+        self.cursor.wrapped().as_ref().map_or(0, Vec::len)
+    }
+
+    /// The iterator's `c` (entries left), including any step that threw.
+    pub(crate) fn left(&self) -> usize {
+        self.cursor.mark().left()
+    }
+
+    /// `remove()` of the entry last returned (fastutil `MapIterator.remove`):
+    /// the zero key, a backward shift (which may move a key into the wrapped
+    /// list), or `remove(key)` for a wrapped key.
+    pub(crate) fn remove(&mut self) -> Result<Removal, Fault> {
+        let mut view = self.view.lock();
+        match self.cursor.remove(&mut view.map) {
+            Ok(_) => Ok(Removal::Removed),
+            Err(Fault::IllegalState) => Ok(Removal::IllegalState),
+            // `shiftKeys(last)` writes `key[last]` first: past a shrunk table that
+            // throws for `last`, before anything changes.
+            Err(Fault::ArrayIndex) => Ok(Removal::OutOfBounds(self.cursor.mark().last(), view.map.table_len())),
+            // A wrapped-path removal reads the wrapped list as `nextEntry` does.
+            Err(Fault::NullPointer) => Ok(Removal::NullWrapped),
+            Err(Fault::IndexOutOfBounds) => Ok(Removal::WrappedIndex(self.wrapped_index(), self.wrapped_len())),
+            Err(error) => Err(error),
+        }
     }
 }
 
@@ -191,6 +239,23 @@ mod tests {
         cursor.next(i32::MAX).unwrap();
         view.lock().apply(&(2..=200).map(|i| (i * 7919, 33)).collect::<Vec<_>>()).unwrap();
         assert!(walk(&mut cursor, i32::MAX).iter().any(|step| matches!(step, Step::OutOfBounds(..))));
+    }
+
+    #[test]
+    fn cursor_removal_follows_map_iterator_remove() {
+        let view = shared(&[(0, 30), (1, 31), (2, 32)]);
+        let mut cursor = ViewCursor::new(view.clone());
+        // Nothing returned yet: IllegalStateException.
+        assert_eq!(cursor.remove().unwrap(), Removal::IllegalState);
+        let Step::Entry(first, _) = cursor.next(i32::MAX).unwrap() else { panic!() };
+        assert_eq!(first, 0, "the zero key comes first");
+        assert_eq!(cursor.remove().unwrap(), Removal::Removed);
+        // Removing twice is IllegalStateException; the count is unchanged by removal.
+        assert_eq!(cursor.remove().unwrap(), Removal::IllegalState);
+        assert_eq!(cursor.left(), 2);
+        assert_eq!(walk(&mut cursor, i32::MAX).len(), 2);
+        assert_eq!(view.lock().len(), 2);
+        assert_eq!(view.lock().get(0), 33);
     }
 
     #[test]

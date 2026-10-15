@@ -7,7 +7,7 @@
 //! Status: 0 ok, -3 allocation failure, -14 internal fault.
 use std::sync::Arc;
 
-use super::level_view::{LevelView, SharedView, Step, ViewCursor};
+use super::level_view::{LevelView, Removal, SharedView, Step, ViewCursor};
 use super::ticket_storage::Fault;
 
 fn fault(fault: Fault) -> i64 {
@@ -113,13 +113,42 @@ pub unsafe extern "C" fn mattmc_level_view_cursor_release(id: u64) {
     }
 }
 
+/// `remove()` of the entry last returned: 0 done, 4 Java's IllegalStateException,
+/// 2 an ArrayIndexOutOfBoundsException with `out = [index, length]`, 3 and 5 the
+/// wrapped-list exceptions as for `next`, or a negative fault. `out[2]` is the
+/// walk's remaining count.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_level_view_cursor_remove(id: u64, out: *mut i64) -> i32 {
+    let cursor = cursor(id);
+    let status = match cursor.remove() {
+        Ok(Removal::Removed) => 0,
+        Ok(Removal::IllegalState) => 4,
+        Ok(Removal::OutOfBounds(index, length)) => {
+            out.write(i64::from(index));
+            out.add(1).write(length as i64);
+            2
+        }
+        Ok(Removal::NullWrapped) => 3,
+        Ok(Removal::WrappedIndex(index, size)) => {
+            out.write(i64::from(index));
+            out.add(1).write(size as i64);
+            5
+        }
+        Err(error) => return fault(error) as i32,
+    };
+    out.add(2).write(cursor.left() as i64);
+    status
+}
+
 /// The next entry with level <= `max_level`: 1 with `out = [key, level]`, 0 at
 /// the end, 2 for Java's ArrayIndexOutOfBoundsException with `out = [index,
-/// length]`, 3 for its NullPointerException (the null wrapped list), or a
-/// negative fault.
+/// length]`, 3 for its NullPointerException (the null wrapped list), 5 for the
+/// wrapped list's IndexOutOfBoundsException with `out = [index, size]`, or a
+/// negative fault. `out[2]` is the walk's remaining count (fastutil's `c`).
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_level_view_cursor_next(id: u64, max_level: i32, out: *mut i64) -> i32 {
-    match cursor(id).next(max_level) {
+    let cursor = cursor(id);
+    let status = match cursor.next(max_level) {
         Ok(Step::Entry(key, level)) => {
             out.write(key);
             out.add(1).write(i64::from(level));
@@ -132,8 +161,16 @@ pub unsafe extern "C" fn mattmc_level_view_cursor_next(id: u64, max_level: i32, 
             2
         }
         Ok(Step::NullWrapped) => 3,
-        Err(error) => fault(error) as i32,
-    }
+        Ok(Step::WrappedIndex(index, size)) => {
+            out.write(i64::from(index));
+            out.add(1).write(size as i64);
+            5
+        }
+        Err(error) => return fault(error) as i32,
+    };
+    // The iterator's `c` after this step, whether it returned or threw.
+    out.add(2).write(cursor.left() as i64);
+    status
 }
 
 /// One `setLevel(key, level)` (the tracker rule), for callers outside a graph run.

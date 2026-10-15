@@ -39,6 +39,7 @@ final class NativeLevelView {
 	private static final MethodHandle CURSOR = handle("cursor", FunctionDescriptor.of(J, J));
 	private static final MethodHandle CURSOR_RELEASE = handle("cursor_release", FunctionDescriptor.ofVoid(J));
 	private static final MethodHandle CURSOR_NEXT = handle("cursor_next", FunctionDescriptor.of(I, J, I, ValueLayout.ADDRESS), Linker.Option.critical(true));
+	private static final MethodHandle CURSOR_REMOVE = handle("cursor_remove", FunctionDescriptor.of(I, J, ValueLayout.ADDRESS), Linker.Option.critical(true));
 
 	private final MemorySegment owner;
 	private final long id;
@@ -136,8 +137,10 @@ final class NativeLevelView {
 	private final class Walk implements LongIterator {
 		private final MemorySegment cursor;
 		private final long cursorId;
-		private final long[] out = new long[2];
-		/** fastutil's {@code c}: the entries left, fixed at creation and counted down by each step. */
+		/** [key or index, level or length, remaining count]. */
+		private final long[] out = new long[3];
+		/** fastutil's {@code c}: the native walk's remaining count after its last step,
+		 * including a step that threw (the original counts down before it can throw). */
 		private int left;
 		private long key;
 
@@ -169,19 +172,19 @@ final class NativeLevelView {
 			try { status = (int)CURSOR_NEXT.invokeExact(this.cursorId, maxLevel, MemorySegment.ofArray(this.out)); }
 			catch (Throwable t) { throw failure(t); }
 			finally { Reference.reachabilityFence(this.cursor); }
+			if (status >= 0) {
+				this.left = (int)this.out[2];
+			}
 			switch (status) {
 				case 1 -> {
-					this.left--;
 					this.key = this.out[0];
 					return true;
 				}
 				case 0 -> {
-					this.left = 0;
 					return false;
 				}
 				case 2 -> throw new ArrayIndexOutOfBoundsException("Index " + this.out[0] + " out of bounds for length " + this.out[1]);
-				// fastutil's MapIterator read its never-created wrapped list (JDK helpful-NPE text).
-				case 3 -> throw new NullPointerException("Cannot invoke \"it.unimi.dsi.fastutil.longs.LongArrayList.getLong(int)\" because \"this.wrapped\" is null");
+				case 3, 5 -> throw wrappedFailure(status);
 				default -> {
 					check(status);
 					throw new IllegalStateException("Native level view cursor status " + status);
@@ -189,9 +192,41 @@ final class NativeLevelView {
 			}
 		}
 
+		/** The original iterator's failure reading its wrapped-key list: null (never
+		 * created; JDK helpful-NPE text) or an index past it (fastutil's message). */
+		private RuntimeException wrappedFailure(int status) {
+			if (status == 3) {
+				return new NullPointerException("Cannot invoke \"it.unimi.dsi.fastutil.longs.LongArrayList.getLong(int)\" because \"this.wrapped\" is null");
+			}
+			return new IndexOutOfBoundsException("Index (" + this.out[0] + ") is greater than or equal to list size (" + this.out[1] + ")");
+		}
+
 		@Override
 		public boolean hasNext() {
 			return this.left != 0;
+		}
+
+		/** fastutil {@code MapIterator.remove()}: removes the entry last returned from the view. */
+		@Override
+		public void remove() {
+			int status;
+			try { status = (int)CURSOR_REMOVE.invokeExact(this.cursorId, MemorySegment.ofArray(this.out)); }
+			catch (Throwable t) { throw failure(t); }
+			finally { Reference.reachabilityFence(this.cursor); }
+			if (status >= 0) {
+				this.left = (int)this.out[2];
+			}
+			switch (status) {
+				case 0 -> {
+				}
+				case 4 -> throw new IllegalStateException();
+				case 2 -> throw new ArrayIndexOutOfBoundsException("Index " + this.out[0] + " out of bounds for length " + this.out[1]);
+				case 3, 5 -> throw wrappedFailure(status);
+				default -> {
+					check(status);
+					throw new IllegalStateException("Native level view cursor status " + status);
+				}
+			}
 		}
 
 		@Override
