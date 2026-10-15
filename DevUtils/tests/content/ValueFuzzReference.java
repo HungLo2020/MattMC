@@ -200,10 +200,19 @@ public final class ValueFuzzReference {
 
     static String outcome(Codec<Object> codec, DataResult<?> result) {
         if (result.isError()) {
-            return "ERR " + result.error().orElseThrow().message() + (result.hasResultOrPartial() ? " (partial)" : "");
+            // A partial's contents are compared too, through both encodings.
+            return "ERR " + result.error().orElseThrow().message() + (result.hasResultOrPartial() ? " (partial " + partial(codec, result) + ")" : "");
         }
         Object value = result.getOrThrow();
         return "OK " + encode(codec, value);
+    }
+
+    static String partial(Codec<Object> codec, DataResult<?> result) {
+        try {
+            return encode(codec, result.resultOrPartial().orElseThrow());
+        } catch (RuntimeException e) {
+            return "encode " + thrown(e);
+        }
     }
 
     static String encode(Codec<Object> codec, Object value) {
@@ -544,13 +553,23 @@ public final class ValueFuzzReference {
     static String outcomeOps(Codec<Object> codec, DataResult<?> result, com.mojang.serialization.DynamicOps<JsonElement> json,
             com.mojang.serialization.DynamicOps<net.minecraft.nbt.Tag> nbt) {
         if (result.isError()) {
-            return "ERR " + result.error().orElseThrow().message() + (result.hasResultOrPartial() ? " (partial)" : "");
+            // A partial's contents are compared too, through both encodings.
+            return "ERR " + result.error().orElseThrow().message()
+                + (result.hasResultOrPartial() ? " (partial " + encoded(codec, result.resultOrPartial().orElseThrow(), json, nbt) + ")" : "");
         }
-        Object value = result.getOrThrow();
-        DataResult<JsonElement> j = codec.encodeStart(json, value);
-        DataResult<?> n = codec.encodeStart(nbt, value);
-        return "OK " + (j.isError() ? "ERR " + j.error().orElseThrow().message() : unordered(j.getOrThrow()).toString()) + " nbt="
-            + (n.isError() ? "ERR " + n.error().orElseThrow().message() : n.getOrThrow().toString());
+        return "OK " + encoded(codec, result.getOrThrow(), json, nbt);
+    }
+
+    static String encoded(Codec<Object> codec, Object value, com.mojang.serialization.DynamicOps<JsonElement> json,
+            com.mojang.serialization.DynamicOps<net.minecraft.nbt.Tag> nbt) {
+        try {
+            DataResult<JsonElement> j = codec.encodeStart(json, value);
+            DataResult<?> n = codec.encodeStart(nbt, value);
+            return (j.isError() ? "ERR " + j.error().orElseThrow().message() : unordered(j.getOrThrow()).toString()) + " nbt="
+                + (n.isError() ? "ERR " + n.error().orElseThrow().message() : n.getOrThrow().toString());
+        } catch (RuntimeException e) {
+            return "encode " + thrown(e);
+        }
     }
 
     static void worldgen(List<String> out) {

@@ -98,6 +98,19 @@ not proof of an untouched cold biome-codec path.
   Java path is faster (4.7 ms against 6.4 ms per 68 biomes). This repeated-file
   workload differs from a single load; it remains a measured regression for
   that scope, not evidence that every repeated-load workload is unaffected.
+- **Per registry (2026-10-15, at `594aeaf2`):**
+  [`RegistryTiming`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/content/RegistryTiming.java)
+  (`TimeContent.py --observer RegistryTiming`) times each worldgen
+  registry's files through the loader's per-file path after warmup, which
+  shows where a whole-load difference comes from.
+  - **Warm decode vs Frozen, 5 pairs:** 75.2 ms against 71.2 ms per round.
+    Rust-decoded registries account for most of the difference, enchantments
+    most of all (2.08 against 1.41 ms). That enchantment cost was the same
+    before the effect move (2.07 against 2.19 ms on `186614ce`).
+  - **Cold `worldgen_load`, 9 pairs, release references:**
+    - 512 ms against Frozen's 476 ms (+7.6%);
+    - 504 ms against `186614ce`'s 519 ms.
+    Matched runs of the same code differed by about 5%.
 - **Gameplay** (small DH fixture, moving camera, four alternating runs per side
   against pre-change Current): average FPS 82.3 against 81.2, median frame
   8.59 ms against 8.46 ms, and p99 59.8 ms against 68.5 ms. Swap reached
@@ -121,6 +134,17 @@ regression.
   normalized outcomes; parse and encode failures can both become `ERR`, so
   this is not a universal acceptance/error-equivalence guarantee. Value types
   follow DFU's messages exactly ([native value types](NATIVE-VALUES.md)).
+- Measured with `DataFuzzReference` recording messages and partials for the
+  tree and NBT paths (2026-10-15, at `599dd6c1`), 11,244 of 37,418 rows
+  differ from Frozen. There are two causes, both older than the enchantment
+  effect move:
+  - The data path never returns a partial.
+  - Errors from Rust's decode and from Java's later resolution (holder-set
+    lookups, delegated slots) aren't joined, so only one of them is reported.
+  The enchantment effect move changed which message survives in about 7,500
+  of those rows: the effect error now shows and the holder lookup error
+  doesn't. On the file path that live loading uses, the same rows are
+  rejected; that row records only `ERR`, so its diagnostics aren't compared.
 - A rejected file stops at its first error. The load error report can then
   list fewer missing references than Frozen's, but the load fails either way.
 - `VanillaRegistries.createLookup()` (IDE-only command validation and data

@@ -49,6 +49,8 @@ dumps every content section. `VerifyContent.py` compiles it once against
 Frozen and runs it in alternating fresh JVMs on Frozen and Current, and the
 full dumps must be identical. `--sections` limits the sections and
 `--reference-repo` compares against another build, such as pre-change Current.
+The reference must already be built at the commit you name; see
+[native value checks](NATIVE-VALUES.md#checks).
 The JUnit test and the Rust test compare against Frozen's recorded dump
 (`src/test/resources/content/frozen-content-identities.txt.gz`).
 

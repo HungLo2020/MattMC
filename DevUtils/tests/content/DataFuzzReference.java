@@ -30,7 +30,8 @@ import net.minecraft.server.packs.resources.Resource;
  * JSON text) go through the registry loader's file path, the direct codec over
  * a parsed JSON tree, and the network codec (direct when not synchronized)
  * over NBT. Each row is the outcome: "ERR", or a hash of the decoded element's
- * direct and network encodings. Arguments: the output file.
+ * direct and network encodings. Tree and NBT errors keep their message and
+ * their partial value's encodings. Arguments: the output file.
  */
 public final class DataFuzzReference {
     private DataFuzzReference() {}
@@ -130,20 +131,26 @@ public final class DataFuzzReference {
         try {
             var result = direct.parse(registries.createSerializationContext(JsonOps.INSTANCE), element);
             if (DEBUG && result.isError() && debugged++ < 6) System.out.println("TREE " + result);
-            return result.result().map(b -> {
-                try { return outcome(b); } catch (Exception e) { return "ERR"; }
-            }).orElse("ERR");
+            return result(result);
         } catch (Throwable e) {
             return "ERR";
         }
     }
 
+    /** An outcome, or the error's message and its partial value's encodings. */
+    static String result(com.mojang.serialization.DataResult<Object> result) {
+        if (result.isError()) {
+            return "ERR " + result.error().orElseThrow().message() + result.resultOrPartial().map(p -> {
+                try { return " (partial " + outcome(p) + ")"; } catch (Exception e) { return " (partial unencodable)"; }
+            }).orElse("");
+        }
+        try { return outcome(result.getOrThrow()); } catch (Exception e) { return "ERR"; }
+    }
+
     static String nbt(JsonElement element) {
         try {
             var tag = JsonOps.INSTANCE.convertTo(NbtOps.INSTANCE, element);
-            return network.parse(registries.createSerializationContext(NbtOps.INSTANCE), tag).result().map(b -> {
-                try { return outcome(b); } catch (Exception e) { return "ERR"; }
-            }).orElse("ERR");
+            return result(network.parse(registries.createSerializationContext(NbtOps.INSTANCE), tag));
         } catch (Throwable e) {
             return "ERR";
         }

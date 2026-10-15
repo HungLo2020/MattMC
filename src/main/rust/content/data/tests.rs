@@ -254,6 +254,17 @@ fn nbt_messages_follow_nbt_ops() {
 }
 
 #[test]
+fn color_channels_wrap_as_java() {
+    // `Mth.floor` at the i32 boundary: the cast saturates, `i - 1` wraps to
+    // i32::MAX, so out-of-range channels are 0xFF (Frozen: -65281). Same in
+    // debug and release builds.
+    for (color, expected) in [("[1,0,-2147483649]", -65281), ("[1,0,2147483648]", -65281), ("[-2147483649,0,0.5]", -65409)] {
+        let d = value(4, &format!(r#"{{"type":"dust","color":{color},"scale":1}}"#), Mode::Json, None).unwrap();
+        assert!(format!("{d:?}").contains(&format!("Int({expected})")), "{color}: {d:?}");
+    }
+}
+
+#[test]
 fn weight_overflow_throws_as_java() {
     let (_, thrown) = schema::thrown_scope(|| value(0, r#"{"type":"weighted_list","distribution":[{"data":1,"weight":2147483647},{"data":2,"weight":1}]}"#, Mode::Json, None));
     assert_eq!(thrown.map(|t| t.1).as_deref(), Some("Sum of weights must be <= 2147483647"));

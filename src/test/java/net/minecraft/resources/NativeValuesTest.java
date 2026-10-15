@@ -238,4 +238,54 @@ class NativeValuesTest {
             failureField.set(null, previous);
         }
     }
+
+    static final String EXPLODE = "{\"type\":\"minecraft:explode\",\"radius\":2,\"block_interaction\":\"trigger\","
+        + "\"small_particle\":{\"type\":\"minecraft:gust_emitter_small\"},\"large_particle\":{\"type\":\"minecraft:gust_emitter_large\"},"
+        + "\"sound\":{\"sound_id\":\"minecraft:a\"}";
+
+    static DataResult<net.minecraft.world.item.enchantment.effects.EnchantmentEntityEffect> explode(String blockParticles) {
+        return net.minecraft.world.item.enchantment.effects.EnchantmentEntityEffect.CODEC.parse(JsonOps.INSTANCE,
+            JsonParser.parseString(EXPLODE + (blockParticles == null ? "" : ",\"block_particles\":" + blockParticles) + "}"));
+    }
+
+    static net.minecraft.world.item.enchantment.effects.ExplodeEffect explodePartial(DataResult<?> result) {
+        assertTrue(result.isError());
+        return assertInstanceOf(net.minecraft.world.item.enchantment.effects.ExplodeEffect.class, result.resultOrPartial().orElseThrow());
+    }
+
+    // A delegated optionalFieldOf(name, default) (`P::JavaDefault`) keeps
+    // DFU's partials: an invalid value leaves the default, a partial its own.
+    @Test void delegatedDefaultFieldsKeepDfuPartials() {
+        var absent = assertInstanceOf(net.minecraft.world.item.enchantment.effects.ExplodeEffect.class, explode(null).getOrThrow());
+        assertTrue(absent.blockParticles().unwrap().isEmpty());
+        Codec<?> original = NativeValues.JavaCodec.EXPLOSION_PARTICLES.codec();
+        var invalid = explode("5");
+        assertEquals(original.parse(JsonOps.INSTANCE, JsonParser.parseString("5")).error().orElseThrow().message(), invalid.error().orElseThrow().message());
+        var partial = explodePartial(invalid);
+        assertTrue(partial.blockParticles().unwrap().isEmpty());
+        assertEquals(LevelBasedValue.constant(2), partial.radius());
+        // The leaf's own partial is kept, not replaced by the default.
+        WeightedList<Object> kept = WeightedList.of(new Weighted<>(new net.minecraft.core.particles.ExplosionParticleInfo(
+            net.minecraft.core.particles.ParticleTypes.FLAME, 1.0F, 1.0F), 1));
+        withDelegates(codec -> codec != original ? codec : watched(codec, () -> DataResult.error(() -> "kept", Pair.of(kept, JsonOps.INSTANCE.empty()))), () -> {
+            var result = explode("[]");
+            assertEquals("kept", result.error().orElseThrow().message());
+            assertSame(kept, explodePartial(result).blockParticles());
+        });
+        // An exception the leaf throws leaves the decode unchanged.
+        Throwable thrown = new IllegalStateException("leaf");
+        withDelegates(codec -> codec != original ? codec : watched(codec, () -> { throw sneaky(thrown); }),
+            () -> assertSame(thrown, assertThrows(Throwable.class, () -> explode("[]"))));
+    }
+
+    // `Mth.floor` at the i32 boundary wraps as Java does, in debug and
+    // release native builds alike (Frozen: -65281).
+    @Test void colorChannelsWrapAtTheIntBoundary() {
+        for (String color : List.of("[1,0,-2147483649]", "[1,0,2147483648]")) {
+            var options = net.minecraft.core.particles.ParticleTypes.CODEC.parse(JsonOps.INSTANCE,
+                JsonParser.parseString("{\"type\":\"dust\",\"color\":" + color + ",\"scale\":1}")).getOrThrow();
+            assertEquals("{\"color\":-65281,\"scale\":1.0,\"type\":\"minecraft:dust\"}",
+                net.minecraft.core.particles.ParticleTypes.CODEC.encodeStart(JsonOps.INSTANCE, options).getOrThrow().toString());
+        }
+    }
 }

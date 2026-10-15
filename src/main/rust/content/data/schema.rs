@@ -1155,10 +1155,12 @@ fn record(fields: &[F], map: &Node, cx: &mut Cx) -> DR {
             (P::LenientDefault(d), None) => Ok(d.to_d()),
             (P::LenientDefault(d), Some(n)) => Ok(decode(field.schema, n, cx).unwrap_or(d.to_d())),
             (P::Default(d) | P::DefaultAlways(d) | P::OrElse(d), None) => Ok(d.to_d()),
-            (P::JavaDefault, None) => Ok(match (cx.slot(None), field.schema) {
-                (D::Slot(i), S::HolderSet { .. } | S::HolderSetList) => D::Holders(i, None),
-                (slot, _) => slot,
-            }),
+            (P::JavaDefault, None) => Ok(java_default(field.schema, cx)),
+            // As `Optional` above: an invalid value leaves Java's default as the partial.
+            (P::JavaDefault, Some(n)) => match decode(field.schema, n, cx) {
+                Err(Fail { msg, partial: None }) => Err(Fail { msg, partial: Some(java_default(field.schema, cx)) }),
+                result => result,
+            },
             (P::Lenient, Some(n)) => Ok(decode(field.schema, n, cx).unwrap_or(D::Absent)),
             // `OptionalFieldCodec` sets the partial to the parsed partial or
             // `Optional.empty()`: an invalid value leaves absent (or the default).
@@ -1175,6 +1177,14 @@ fn record(fields: &[F], map: &Node, cx: &mut Cx) -> DR {
         });
     }
     parts.all(D::Record)
+}
+
+/// A `JavaDefault` field's default: an empty slot Java fills with it.
+fn java_default(schema: &S, cx: &mut Cx) -> D {
+    match (cx.slot(None), schema) {
+        (D::Slot(i), S::HolderSet { .. } | S::HolderSetList) => D::Holders(i, None),
+        (slot, _) => slot,
+    }
 }
 
 fn entity_names() -> &'static std::collections::HashSet<&'static str> {

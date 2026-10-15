@@ -407,11 +407,11 @@ pub static BLOCK_POS: S = S::Then(&S::IntStream, three_ints);
 /// `UUIDUtil.CODEC`: four ints.
 pub static UUID: S = S::Then(&S::IntStream, four_ints);
 
-/// `Mth.floor(f * 255.0F)`.
+/// `Mth.floor(f * 255.0F)`: the cast saturates and `i - 1` wraps, as in Java.
 fn channel(f: f32) -> i32 {
     let v = f * 255.0;
     let i = v as i32;
-    if v < i as f32 { i - 1 } else { i }
+    if v < i as f32 { i.wrapping_sub(1) } else { i }
 }
 
 /// `ExtraCodecs.RGB_COLOR_CODEC`: an int, or `[r, g, b]` floats as opaque RGB.

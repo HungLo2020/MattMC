@@ -128,7 +128,8 @@ and were measured against DFU 8.0.16:
   - A check (`validate`, `comapFlatMap`) runs on a partial value too, and
     appends its message.
   - A strict optional field with an invalid value leaves the absent value (or
-    its default) as the partial.
+    its default) as the partial. That includes a delegated default Java holds
+    (`P::JavaDefault`, such as an explode effect's `block_particles`).
   - `NativeValues` returns partials to Java, so `resultOrPartial` callers see
     the same objects.
 - **promotePartial.** `promotePartial` logs once, with the combined message.
@@ -152,12 +153,22 @@ JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyContent.py --obse
 JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyContent.py --observer ValueFuzzReference --reference-repo ../pre-change --output build/values-pre
 ```
 
+`--reference-repo` runs that checkout's compiled classes and
+`build/rust/native` as they are; the drivers never build it. After checking
+out a different commit there, rebuild it with
+`./gradlew -PmattmcRustProfile=release classes`. A Gradle test task rebuilds
+`build/rust/native` in the dev profile, so don't time a checkout after running
+its tests without rebuilding.
+**Integer wrapping:** debug builds check integer overflow and release
+  builds don't, so arithmetic that Java wraps must use `wrapping_*`, such as
+  `Mth.floor` for an out-of-range color channel.
+
 [`ValueFuzzReference`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/content/ValueFuzzReference.java)
 compiles unchanged against both builds. It covers:
 
 - Each codec and bounded form over generated inputs, with every path replaced
   or removed, decoded from JSON and NBT. Rows record full error messages,
-  partial flags and both encodings.
+  both encodings, and each partial value's encodings, not just its presence.
 - The per-type case codecs.
 - Encoding of Java-built values.
 - Its `worldgen` section, which dumps every loaded worldgen element: features,
