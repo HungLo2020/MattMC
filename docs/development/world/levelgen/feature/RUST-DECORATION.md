@@ -64,8 +64,9 @@ miss calculates temperature using the supplied **sea level**, so the cache
 history is part of the result. Rust therefore asks Java's own
 `Biome.warmEnoughToRain(pos, level.getSeaLevel())` (`OP_WARM`) on the calling
 thread, at the points `shouldFreeze` and `shouldSnow` call it (a synchronous callback that updates the cache, never memoized or reordered): the position
-below for ice first, then the surface position for snow, only when the biome has
-precipitation. Java's cache sees the same sequence as Java's feature would make.
+below for ice first in every column, then the surface position for snow only
+when the biome has precipitation. [Current call order][current-freeze-calls] ·
+[Expected per-column count][current-freeze-count]. Java's cache sees the same sequence as Java's feature would make.
 This is retained Java cache ownership, not a native temperature. With
 `-Dmattmc.worldgen.verifyDecoration=true` each native freeze placement checks
 that the caches (entries and FIFO order) and call counts equal Java's replay
@@ -219,3 +220,5 @@ See [recorded results](RUST-DECORATION-RESULTS.md).
 [temperature-cache]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/biome/Biome.java#L64-L72
 [temperature-lookup]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/biome/Biome.java#L113-L185
 [native-temperature]: https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/levelgen/decoration/freeze.rs
+[current-freeze-calls]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/rust/world/level/levelgen/decoration/freeze.rs#L54-L72
+[current-freeze-count]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/java/net/minecraft/world/level/levelgen/NativeFreezeVerification.java#L125-L130

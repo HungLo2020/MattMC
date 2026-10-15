@@ -60,6 +60,23 @@ You cannot put a Shulker Box **inside another Shulker Box** through the normal m
 
 A Dispenser can place an available box item using the ordinary placement/component-restoration path. All 17 box variants have that behavior registered. This does not by itself describe or validate a complete loading machine. [Dispenser registration][dispense-registration] · [Placement behavior][dispense]
 
+### Dispenser placement and Piston recovery
+
+A Dispenser targets the block space **directly in front of its opening**, but that does not always become the box's lid direction. For an ordinary box item, **any non-air block immediately below the destination makes the lid face upward**; with air below, the lid faces the Dispenser's output direction. A solid floor is therefore a simple way to get an upright box from a horizontal Dispenser. Leave the lid clearance described [above](#placement-and-opening). [Destination and clicked face][cycle-dispense] · [Box facing][cycle-facing]
+
+If that destination is not replaceable, placement fails and the selected box **stays in the Dispenser**; this handler does not fall back to ejecting it as a loose item. Successful placement consumes one box item and restores its supported saved components, so a filled box can be placed with its cargo. A [Dropper](DispenserAndDropper.md#dropper-transfer-and-ejection) does not perform this placement action. [Replaceability check][cycle-context] · [Failure, restoration and consumption][cycle-place]
+
+An extending **ordinary Piston** can break a Shulker Box into its item instead of sliding the placed container along. All 17 variants have the native **Destroy** push reaction, which is handled before the ordinary block-entity movement rejection. With bundled loot and block drops enabled, the Piston supplies the box's block entity to the loot path, preserving the same saved contents/name/lock/loot fields as ordinary collection. A Sticky Piston is unnecessary. [Native variants][cycle-native] · [Push reaction][cycle-physics] · [Piston eligibility][cycle-push] · [Destruction and block entity][cycle-break] · [Box loot][cycle-loot] · [Drop spawning gate][cycle-drops]
+
+For a small **source-derived, untested manual cycle**:
+
+1. Face a horizontal Dispenser into a clear cell over a solid floor. Aim a separately controlled Piston at that same cell from a perpendicular side; start with its head retracted and leave room above the box's lid.
+2. Load only the intended box and activate the Dispenser once. After placement, fill the box by hand or through the [Hopper rules](#nesting-and-automation) above.
+3. Stop transfers, close the box and extend the Piston. Collect the dropped packed box before continuing; the stored cargo is not a promise of protection for the loose item.
+4. Retract the Piston fully before dispensing another box. A non-replaceable block in the cell, including the extended head, prevents the next ordinary placement. Keep the two controls independent rather than driving both devices with one unexamined pulse.
+
+Try the sequence with an empty box before valuable cargo. This describes placement and recovery, not a tested automatic loader, full-box detector, collection mechanism or timing circuit. Disabling block drops or changing loot can remove the expected recovery item. [Dispenser controls](DispenserAndDropper.md#facing-loading-and-activation) · [Piston controls](Pistons.md#facing-and-power) · [Dropped-item hazards](#fire-explosions-and-lost-items)
+
 ## Fire, explosions, and lost items
 
 A dropped box has no default fire- or explosion-resistance component. If accepted damage destroys that **item entity**, the container-item destruction handler releases its stored items as separate drops at the same position. Those drops remain exposed to the fire, lava, further blasts, or other hazards there; this is not safe recovery storage. [Item defaults][items] · [Resistance check][resistance] · [Damage and destruction][item-entity] · [Contents release][block-item] · [Released entities][item-utils]
@@ -68,7 +85,20 @@ An explosion breaking the **placed block** uses its block-loot path, which can c
 
 ## Sources and verification
 
+Dispenser placement and Piston recovery were additionally source-reviewed on **2026-10-15** at `729f781906b5545735eee043ae2a4d085f637f18`. Checked current native push properties, placement direction and rejection, component restoration, Piston destruction and the packed-box loot/removal path. No placement-cycle, cargo-recovery, circuit, timing or item-collection test was run; the earlier family-wide review below retains its original scope.
+
 Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. Reviewed all 17 item/block variants and loot tables, all 16 color recipes, Water Cauldron dispatch, component collection/restoration, live break/use callbacks, and hopper/dispenser callers. No in-game storage, coloring, washing, break/drop, Creative, nesting, automation, fire, explosion, or expiry test was run. Custom loot, recipes, components, game rules, and external editing tools can change these outcomes.
+
+[cycle-dispense]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/java/net/minecraft/core/dispenser/ShulkerBoxDispenseBehavior.java#L16-L34
+[cycle-facing]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/java/net/minecraft/world/level/block/ShulkerBoxBlock.java#L92-L104
+[cycle-context]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/java/net/minecraft/world/item/context/DirectionalPlaceContext.java#L14-L27
+[cycle-place]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/java/net/minecraft/world/item/BlockItem.java#L47-L102
+[cycle-native]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/rust/content/block/definitions/catalog.rs#L710-L726
+[cycle-physics]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/rust/content/block/definitions/physics.rs#L702-L708
+[cycle-push]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/java/net/minecraft/world/level/block/piston/PistonBaseBlock.java#L243-L260
+[cycle-break]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/java/net/minecraft/world/level/block/piston/PistonBaseBlock.java#L284-L299
+[cycle-loot]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/resources/data/minecraft/loot_table/blocks/shulker_box.json#L1-L28
+[cycle-drops]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/java/net/minecraft/world/level/block/Block.java#L420-L425
 
 Related: [Shulker Shell](../items/ShulkerShell.md) · [Shulker](../mobs/Shulker.md) · [Chest](Chest.md) · [Hopper](Hopper.md) · [Blocks](Blocks.md)
 

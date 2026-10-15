@@ -56,6 +56,7 @@ the player's spawn-selection/explosion interaction.
 | Bone Meal | Attempts growth on the block directly in front; an unsuitable target does not guarantee consumption or growth |
 | Water or Lava Bucket | Attempts the bucket's contents-placement action; success returns an empty Bucket, while a failed placement can eject the filled bucket |
 | Empty Bucket | Attempts pickup from a compatible block in front, such as a collectible fluid source; otherwise falls back to item ejection |
+| Shulker Box, including dyed variants | Places the box in front; see [lid direction, blocked placement and packed-box recovery](ShulkerBox.md#dispenser-placement-and-piston-recovery) |
 | Ordinary item without a special action, such as Cobblestone | Ejects one loose item; it does not place that block |
 
 Water still follows its [dimension and placement restrictions](../items/WaterBucket.md). A successful bucket action can mean evaporation rather than placed water in an ultrawarm dimension. Some other items use equipment, vehicle, tool, or special block behaviors; this table is deliberately not a complete catalog. Do not assume every integrated item has registered automation support.
