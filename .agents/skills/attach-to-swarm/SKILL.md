@@ -113,7 +113,7 @@ Work in your local `master` checkout, reconciling from the assigned base to the
 current remote `master` with `sync-and-resume` when syncing ongoing work. Read and
 follow that existing skill, including preserving dirty/untracked work and its
 limits on history-changing operations. Keep your assigned changes uncommitted
-until the coordinated `sync-and-push` publication sequence. Do not reset away
+until your own `sync-and-push` publication sequence. Do not reset away
 another agent's changes or run a shared-output build. Check scope before editing,
 before publication and after any resume. Treat paths plus interface ownership as
 the boundary; a clean textual merge can still break a shared contract. Request a
@@ -183,7 +183,7 @@ authorizes scope expansion or a decision that was awaiting approval.
 
 Maintain a local, uncommitted checkpoint outside tracked source: board URL,
 agent/hostname/session/capability ID, processed cursor/comment IDs, coordinator sequence,
-active assignment/revision/master base, publication reservation, last tested SHA
+active assignment/revision/master base, publication status, last tested SHA
 and next check-in. Store
 no credentials there. When attached, use supported waits rather than a busy loop:
 suggested reads are 2–5 minutes while assigned/awaiting a response and 10–15
@@ -223,53 +223,55 @@ client. Resume by rereading current state and asking dot if the revision is no
 longer active. `DETACH` reports availability and requests release of any active
 assignment; it is not silently abandoned. Do not discard an old worker's local work.
 
-## Coordinate publication to master
+## Publish independently to master
 
-Any assigned worker may publish its authorized work to `master`; there is no
-permanent merge owner. dot coordinates a **short, exclusive publication turn**
-so agents do not race the shared remote ref. This serializes sync/commit/push,
-not all independent development. Never infer a turn from silence or an expired
-timer, and never treat a board convention as an atomic Git lock.
+Any assigned worker may publish its authorized work to `master` as soon as its
+own scoped work is ready and required checks pass. No coordinator-exclusive turn,
+publication grant or release from another publisher is required. Independent
+devices may run `sync-and-push` concurrently; publication order is nondeterministic.
+This does not waive actual code dependencies, correctness decisions, mandatory
+validation, assignment stops or shared-checkout/resource ownership constraints.
 
-1. Post `READY_TO_PUSH` with agent/hostname/session, assignment revision, current
-   local/remote master SHAs, scoped diff summary and local verification evidence.
-   dot records one publisher/session/assignment and observed remote SHA in the
-   dashboard, linking its explicit grant. Other workers continue independent
-   assigned work but wait to commit/push. No release from an earlier publisher
-   means no overlapping turn; use the same release/fencing handshake above.
-2. In the granted turn, load and follow `sync-and-push`: preserve pending work,
-   fetch the current remote master, integrate/reconcile both sides, inspect
-   interactions even without conflicts and rerun affected tests/performance gates
-   on the exact candidate: current upstream plus only the authorized scoped diff.
-   Preserve unrelated edits with the existing skill's targeted stash/patch flow
-   and keep them out of both the candidate tests and scoped commit; tests that
-   depend on excluded edits do not validate the published tree. Restore preserved
-   work afterward. Resolve routine conflicts; report contradictory intent without
-   discarding either side. Confirm no unresolved entries or lost changes remain.
+1. Read the current dashboard and events before publication; confirm your
+   assignment is still active and resolve any actual dependency or correctness
+   hold affecting your candidate. Post `READY_TO_PUSH` with agent/hostname/session,
+   assignment revision, current local/remote master SHAs, scoped diff summary and
+   local verification evidence. This is a status notice, not a request for a turn;
+   proceed without waiting for dot or an unrelated worker.
+2. Load and follow `sync-and-push`: preserve pending work, fetch the current remote
+   master, integrate/reconcile both sides, inspect interactions even without
+   conflicts and rerun affected tests/performance gates on the exact candidate:
+   current upstream plus only the authorized scoped diff. Preserve unrelated edits
+   with the existing skill's targeted stash/patch flow and keep them out of both
+   the candidate tests and scoped commit; tests that depend on excluded edits do
+   not validate the published tree. Restore preserved work afterward. Resolve
+   routine conflicts; report contradictory intent without discarding either side.
+   Confirm no unresolved entries or lost changes remain.
 3. Fetch again before committing. If remote master advanced, repeat the existing
    skill's preservation/reconciliation/validation while your edits are uncommitted.
    If reconciliation leaves no diff because upstream already contains the intended
-   change, verify that result, report no new commit needed and explicitly release
-   the turn; never create an empty commit. Otherwise create one reviewed scoped
-   commit on the fresh master tip, confirm it matches the exact tested candidate,
-   and push normally to the verified remote `master`. Never force-push, overwrite
-   remote work, use blanket ours/theirs or silently create a feature branch.
+   change, verify that result and report no new commit needed; never create an
+   empty commit. Otherwise create one reviewed scoped commit on the fresh master
+   tip, confirm it matches the exact tested candidate, and push normally to the
+   verified remote `master`. Never force-push, overwrite remote work, use blanket
+   ours/theirs or silently create a feature branch.
 4. If a race rejects the push after the commit exists, preserve it and follow
    `sync-and-push`'s recovery boundary. Report the precise divergence and request
    any additional history-changing authorization; do not improvise a second
-   commit, merge or rewrite. A stale publication grant does not override Git's
+   commit, merge or rewrite. Independent publication does not override Git's
    protections or make a failed push successful.
 5. Verify the remote contains the exact published SHA; report `PUBLISHED` with
-   its parent/base, reconciliation and test evidence, and release the publication
-   turn once no further writes remain. Track required CI for that exact SHA to a
-   terminal result. Claim completion only when mandatory checks pass; report any
-   failures or unrun hardware gates honestly. Later edits need a new turn.
+   its parent/base, reconciliation and test evidence. Track required CI for that
+   exact SHA to a terminal result. Claim completion only when mandatory checks
+   pass; report any failures or unrun hardware gates honestly. Later edits repeat
+   this workflow within the active authorized assignment.
 
 The designated dot coordinator polls registrations, requests and results, keeps
-scope/dependency ownership clear, routes decisions, and grants publication turns
-to the workers themselves. Keep the dashboard's current master observation,
-publisher/turn, roster and last/next expected checks current. Do not imply 24/7
-service from a static post or block safe independent work during queued decisions.
+scope/dependency ownership clear, and routes decisions. Keep the dashboard's
+current master observation, publication status, roster and last/next expected
+checks current. Do not gate an independent worker's ready publication on another
+device or a coordinator acknowledgement. Do not imply 24/7 service from a static
+post or block safe independent work during queued decisions.
 
 Keep the dashboard short with links to active work, blocked decisions and an
 archive of completed assignment/decision/publication events. Preserve original
