@@ -11,10 +11,31 @@ one shared swarm skill, not a background service or a replacement for repository
 instructions. Codex uses `$attach-to-swarm`; Claude Code uses `/attach-to-swarm`
 through the existing `.claude/skills -> ../.agents/skills` symlink.
 
-**All work uses `master`.** Reconcile on sync and before every push with the
+**MattMC migration work uses `master`.** Reconcile on sync and before every push with the
 existing [sync-and-resume](../sync-and-resume/SKILL.md) and
 [sync-and-push](../sync-and-push/SKILL.md) skills. Do not create per-agent feature
 branches or require PRs/a separate merge owner for swarm work.
+
+The user also authorizes assigned **Frozen testing/diagnostic-only commits and
+normal pushes** from the separate Frozen checkout to the existing
+`JavaPerfTesting` branch of `HungLo2020/MattMC`. For assigned Frozen work only,
+substitute `JavaPerfTesting` for `master` in every branch-specific step below,
+including attachment, local work, assignment, release, publication and reporting;
+apply the linked sync skills to that verified `JavaPerfTesting` upstream.
+Verify the checkout's remote, branch and fresh upstream
+before editing or publishing; reconcile and push nonforce within that branch.
+Do not create another branch/repository or merge Frozen and `master` into each
+other. Existing assignment, ownership, preservation and validation gates apply.
+
+Frozen changes must purely aid testing/diagnostics: no changes to baseline
+behavior, logic, RNG, saves, networking, rendering or performance, and no weakened
+tests or expected results. Pin the original reference baseline
+`7a4d181717dc0c7da9086f1a17687dfd522ce417`; record it alongside the exact diagnostic
+commit/patch and actual built reference used. Never silently advance or rebase
+the behavioral oracle. Instrumentation must be opt-in. Keep it disabled for
+acceptance measurements unless observational equivalence, including performance
+impact, is proven under matched conditions. This exception grants no security, workflow
+or credential changes.
 
 ## Authority and identity
 
@@ -134,11 +155,23 @@ new assignment revision before changing shared interfaces or widening scope.
   patch identity if applicable, commands, toolchain/build profile, fixtures,
   hardware, outcomes and evidence links. No test on one SHA certifies a later
   edit or sync. Rerun affected checks after fixes, reconciliation or conflicts.
-- Correctness and performance regressions are unacceptable. Preserve behavior,
+- Correctness regressions are unacceptable. Preserve behavior,
   test failure/retry/cancellation paths where relevant, and compare performance
   against the assigned baseline under comparable conditions. Record workload,
   warmup/repetitions, settings, noise and relevant latency/resource metrics.
   Noisy/inconclusive results are not a pass; do not trade correctness for speed.
+- Apply the normal [migration acceptance policy](../../../docs/development/tooling/MIGRATION-ACCEPTANCE.md).
+  For work beyond its applicable allowance, dot may record a bounded exception
+  under the user's delegated discretion. Only a candidate that demonstrably
+  improves current `master` under matched conditions while retaining measured
+  Frozen conversion/ownership debt is eligible. Only dot may approve this temporary
+  exception before publication; workers cannot self-approve it. Preserve
+  correctness/parity and the measured Frozen baseline. Record exact candidate
+  and baseline SHAs/builds, matched workload, measured deltas, affected scope,
+  responsible owner and an ownership-based exit path with verifiable criteria.
+  Exceeding the applicable 10%/25% allowance triggers review, never a blanket exemption;
+  unrelated slowdowns or broader scope need a new decision. This permission
+  does not allow Frozen behavior/performance changes or waived correctness.
 - Headless/unit checks do not certify gameplay, rendering or hardware-specific
   performance. State missing GPU/display/fixtures honestly and request a
   capability-matched verification assignment. Mandatory missing checks block
@@ -184,28 +217,63 @@ authorizes scope expansion or a decision that was awaiting approval.
 Maintain a local, uncommitted checkpoint outside tracked source: board URL,
 agent/hostname/session/capability ID, processed cursor/comment IDs, coordinator sequence,
 active assignment/revision/master base, publication status, last tested SHA
-and next check-in. Store
-no credentials there. When attached, use supported waits rather than a busy loop:
-suggested reads are 2–5 minutes while assigned/awaiting a response and 10–15
-minutes while idle, adjusted by dot for urgency and API limits. Back off on
+and next check-in. Store no credentials there. Use supported waits rather than a
+busy loop: suggested reads are 2–5 minutes while assigned/awaiting a response and
+10–15 minutes while idle, adjusted by dot for urgency and API limits. Back off on
 errors, honor rate-limit retry guidance, and announce a material access outage.
+A `RESULT` or an empty poll is not `DETACH`: continue the attached polling/wait
+cycle until a user stop, authorized detach, or actual runtime blocker prevents
+it. Report the blocker and next possible check; a stopped runner cannot promise
+indefinite monitoring, and a blocker does not release an active assignment.
 
 For an already-authorized GraphQL client, resolve `repository(owner:"HungLo2020",
-name:"MattMC").discussion(number:888)`, read `body`, `updatedAt`, and
-`comments(first:50, after:$cursor)` with each node's `id`, `url`, `author.login`,
-`body`, `createdAt`, `updatedAt` and `pageInfo { endCursor hasNextPage }`. Consume
-every page before saving the successful cursor; paginate any separately-read
-`replies` independently. Refresh the dashboard and active assignment each poll
-and reconcile edited history on resume; a creation cursor cannot detect edits.
+name:"MattMC").discussion(number:888)` and use these bounded reads:
+
+- **Bootstrap/recovery:** read the current dashboard (`body`, `updatedAt`), its
+  active assignment links and `comments(last:50)`, including
+  `pageInfo { startCursor endCursor hasPreviousPage hasNextPage }`. Reconcile the
+  saved checkpoint with that tail. Back-page with `last:50, before:$startCursor`
+  only to resolve a missing, stale or inconsistent checkpoint/context gap; stop
+  once reconciled. Back-paging must not advance the forward polling cursor past
+  a gap: retain the last contiguous processed checkpoint, collect through its
+  known anchor, then process/checkpoint the recovered pages oldest-to-newest.
+  If no trustworthy anchor exists, establish and record a reconciled bootstrap
+  boundary without claiming unscanned older history was processed. The latest 50
+  are not a complete history audit.
+- **Normal polling:** use `comments(first:50, after:$savedCursor)` from the last
+  successfully processed page. Never restart normal polls with `after:null` or
+  reread the whole history. If the cursor is invalid, preserve it and use the
+  bounded recovery above rather than silently resetting it.
+- **Metadata first:** request `id`, `url`, `author.login`, `createdAt`, `updatedAt`,
+  `isMinimized` and page information, then fetch only needed comment bodies by ID.
+  Use known processed IDs and current dashboard/assignment context to classify
+  them. Fetch an unknown event's body when its relevance is unclear; minimization
+  alone is not evidence that an unknown message is resolved or safe to ignore.
+  Open older resolved/minimized history only when needed for a decision,
+  dependency, provenance check or reconciliation.
+- **Drain and checkpoint:** process every new page and its needed bodies before
+  claiming the queue is current. Save each completed page's non-null `endCursor`
+  and processed IDs; continue while `hasNextPage` is true. An empty response,
+  error or incomplete page keeps the last successfully completed checkpoint,
+  never replacing it with null or skipping unfinished events.
+- Refresh the compact dashboard each poll and read active assigned nodes on
+  resume, before edits and before publication. Compare their `updatedAt` values
+  and reread changed bodies: a creation cursor cannot detect edits. Paginate
+  relevant `replies` and `userContentEdits` independently when inspected; neither
+  belongs to the top-level creation cursor. Operational decisions still require
+  the top-level linked event described above; history remains append-only.
+
 Do not invent a REST Discussions-comments endpoint. See the
 [official API schema](https://docs.github.com/en/graphql/reference/discussions).
 
-If the available connector lacks Discussion support, use the authorized browser
-to reload the exact board, inspect new comments plus the dashboard, and follow
-visible pagination. Retain processed IDs/permalinks; do not assume the first
-screen contains the full queue. Browser reads may reread the page rather than
-provide API-level incremental fetching. Neither a comment nor this skill wakes
-a stopped agent; monitoring exists only while a real supported runner is active.
+If the connector lacks Discussion support, use the authorized browser to reload
+the exact board, inspect the current dashboard/active assignment and the latest
+comments, then follow new comments until the known checkpoint. Retain processed
+IDs/permalinks and follow visible pagination as needed to close a gap; do not
+expand the full history on every poll or assume the first screen is complete.
+Apply the same unknown/minimized-message and recovery rules. Neither a comment
+nor this skill wakes a stopped agent; monitoring exists only while a real
+supported runner is active.
 
 ## Stop, reclaim, and resume safely
 
