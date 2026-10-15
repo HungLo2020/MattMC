@@ -24,6 +24,27 @@ Fortune does not add a multiplier to these building-block drops. A double slab r
 
 The active liquid callbacks also produce building stone. When water is beside or above a lava block, the checked lava position becomes **Obsidian if it is a source**, or **Cobblestone if it is flowing lava**. When lava spreads downward into a water block, that water block becomes **Stone**. Keep the lava source away from the intended Cobblestone contact point. These are source-verified conversion rules; no generator layout was tested for this guide. [Water contact and update callbacks][liquid] · [Downward lava flow][lava]
 
+### Repeatable cobblestone generator
+
+This small **source-derived, untested layout** keeps the Lava source separate from the block you mine. Build it where ordinary Water can remain liquid; normal Water Bucket placement does not work in the Nether. Use full Cobblestone blocks for the enclosure rather than flammable walls or waterlogged partial blocks. [Bucket dimension check][generator-bucket] · [Fluid passage rules][generator-flow]
+
+1. Make a straight, **four-cell channel**, one block wide, with this left-to-right order at a single height:
+
+    | Cell | What belongs there | Floor |
+    | --- | --- | --- |
+    | **W** | Water source | Solid |
+    | **D** | Water flowing down into a pit | One extra block of depth |
+    | **C** | Initially air; the Cobblestone you collect | Solid |
+    | **L** | Lava source | Solid |
+
+2. Enclose the channel's sides and both ends. Only **D** has the deeper cavity; seal that cavity's bottom and sides too. Keep the floor under **C** intact, and leave the channel open above for access.
+3. Place Water at **W** first and let it flow into **D** and its pit. Do not add a second Water source or fill in the pit. Then place Lava at **L**. Its horizontal flow into **C** meets Water beside it and becomes Cobblestone.
+4. From outside the channel, mine **C** with a pickaxe and wait for fluid updates to replace it. Preserve both source cells, the pit and the enclosure. This produces loose mining drops; it is not a guaranteed collection or production-rate design.
+
+The pit is functional, not just spare water storage. Non-source Water above an open downward path prioritizes that path over horizontal spreading. Even after Water occupies the lower cavity, the same-fluid block below still counts as a downward opening. This keeps **D** from sending Water across **C** toward the Lava source in the specified arrangement. Lava entering **C** is flowing rather than a source, so its adjacent-Water conversion produces Cobblestone without replacing **L**. [Downward priority][generator-priority] · [Water-hole test][generator-hole] · [Flowing-state calculation][generator-state] · [Contact conversion][generator-contact]
+
+If it stops working, check the geometry before adding more buckets. **Obsidian at L** means Water reached the source instead of only its flow; recover the Water and rebuild the separation before replacing the lost Lava source. **Stone at a water position** points to the separate downward-Lava-into-Water route, so restore the level channel and solid floor under **C**. Keep the [Soul Soil/Blue Ice Basalt combination](BlackstoneAndBasalt.md#making-basalt-with-lava) out of the contact cell. An empty **C** can also be waiting for a scheduled fluid update; the guide does not promise a fixed regeneration time. [Source/contact distinction][generator-contact] · [Downward Stone conversion][generator-stone] · [Scheduled fluid dispatch][generator-ticks]
+
 ## Uses
 
 These are the construction recipes for this family. The [Furnace](Furnace.md), [Crafting Table](CraftingTable.md) and [Stonecutter](Stonecutter.md) guides explain their interfaces and shared behavior. Recipes are loaded from the active resource data, so server data packs can change them. [Recipe loading][recipes]
@@ -136,7 +157,18 @@ The table is for **ordinary full blocks**, not all shape variants or infested bl
 
 ## Sources and verification
 
+The generator subsection was source-reviewed on **2026-10-15** at `599dd6c1dad1c8c7e418eb016c3405f487892f73`, including current fluid registration, placement/contact callbacks, downward priority, same-fluid pit handling and scheduled execution. Its layout is an inference from those paths; no generator, mining-cycle, item-collection or timing test was run. The earlier family-wide review below retains its original scope.
+
 Source-reviewed on **2026-10-02** at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. Checked active registrations, terrain settings and generator use, all covered block loot, tool tags and player break dispatch, exact crafting/smelting/stonecutting recipes, shape placement, and infestation callbacks. No in-game mining, placement, crafting, generation or Silverfish test was run. The guide covers the named stone/cobblestone families; it does not extend these recipes or drops to every block in the stone category.
+
+[generator-bucket]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/item/BucketItem.java#L100-L135
+[generator-flow]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/material/FlowingFluid.java#L203-L235
+[generator-priority]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/material/FlowingFluid.java#L122-L143
+[generator-hole]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/material/FlowingFluid.java#L308-L313
+[generator-state]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/material/FlowingFluid.java#L164-L200
+[generator-contact]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/block/LiquidBlock.java#L140-L192
+[generator-stone]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/material/LavaFluid.java#L208-L221
+[generator-ticks]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/server/level/ServerLevel.java#L723-L731
 
 [presets]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/level/levelgen/presets/WorldPresets.java#L120-L135
 [overworld]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/worldgen/noise_settings/overworld.json
