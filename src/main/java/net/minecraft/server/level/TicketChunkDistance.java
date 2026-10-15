@@ -80,6 +80,28 @@ final class TicketChunkDistance {
         };
     }
 
+    /** The native handle, for a registry taking this graph's changes; {@link #fence} after the call. */
+    long handleId() {
+        return this.handleId;
+    }
+
+    void fence() {
+        Reference.reachabilityFence(this.handle);
+    }
+
+    /** {@code runUpdates(budget)} leaving the recorded changes for a registry to take;
+     * returns the remaining budget. */
+    int run(int budget) {
+        try {
+            long status = (long)RUN.invokeExact(this.handleId, budget);
+            check(status);
+            return (int)(status >>> 32);
+        }
+        catch (RuntimeException | Error error) { throw error; }
+        catch (Throwable error) { throw new IllegalStateException("Cannot run ticket chunk distance", error); }
+        finally { Reference.reachabilityFence(this.handle); }
+    }
+
     /** Records a chunk's current ticket level without scheduling graph work. */
     void seed(long position, int ticketLevel) {
         long status;

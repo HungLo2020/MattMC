@@ -110,3 +110,79 @@ fn drop_pass_order_follows_the_hash_set() {
     assert_eq!(order, want);
     assert_eq!(registry.work() & 4, 0);
 }
+
+#[test]
+fn transitions_follow_update_futures() {
+    let levels = [33, 32, 31];
+    // Unloaded to entity ticking: all three prepared, no demotion.
+    assert_eq!(transition(levels, MAX + 1, 31), PREPARE_FULL | PREPARE_TICKING | PREPARE_ENTITY);
+    // Entity ticking to full: two unloaded, demoted to FULL (ordinal 1).
+    assert_eq!(transition(levels, 31, 33), UNLOAD_TICKING | UNLOAD_ENTITY | 2 << DEMOTE_SHIFT);
+    // Full to inaccessible: demoted to INACCESSIBLE (ordinal 0).
+    assert_eq!(transition(levels, 33, 34), UNLOAD_FULL | 1 << DEMOTE_SHIFT);
+    // Within one status: nothing.
+    assert_eq!(transition(levels, 36, 40), 0);
+    assert_eq!(transition(levels, 30, 31), 0);
+}
+
+#[test]
+fn holder_levels_follow_scheduling_and_transitions() {
+    let mut registry = Registry::new(MAX).unwrap();
+    let Scheduled::New(id) = registry.schedule(7, 35, false, MAX + 1).unwrap() else { panic!() };
+    registry.commit_new(7, id).unwrap();
+    assert_eq!(registry.levels(id).unwrap(), Levels { level: 35, old_level: MAX + 1, accessible: false });
+    assert_eq!(registry.begin_transition(id).unwrap(), 0);
+    registry.commit_transition(id).unwrap();
+    registry.schedule(7, 32, true, 35).unwrap();
+    // Accessible is marked before the effects; the old level only at commit.
+    assert_eq!(registry.begin_transition(id).unwrap(), PREPARE_FULL | PREPARE_TICKING);
+    assert_eq!(registry.levels(id).unwrap(), Levels { level: 32, old_level: 35, accessible: true });
+    // An effect threw: the same transition is decided again.
+    assert_eq!(registry.begin_transition(id).unwrap(), PREPARE_FULL | PREPARE_TICKING);
+    registry.commit_transition(id).unwrap();
+    assert_eq!(registry.begin_transition(id).unwrap(), 0);
+    registry.schedule(7, 36, true, 32).unwrap();
+    registry.refresh_accessibility(id).unwrap();
+    assert!(!registry.levels(id).unwrap().accessible);
+    // A revived holder keeps its state and takes the new level.
+    registry.schedule(7, MAX + 1, true, 36).unwrap();
+    registry.drop_pass().unwrap();
+    assert_eq!(registry.schedule(7, 33, false, MAX + 1).unwrap(), Scheduled::Revived(id));
+    assert_eq!(registry.levels(id).unwrap(), Levels { level: 33, old_level: 32, accessible: false });
+}
+
+#[test]
+fn level_changes_apply_in_order_and_stop_at_construction() {
+    let mut registry = Registry::new(MAX).unwrap();
+    let Scheduled::New(a) = registry.schedule(1, 33, false, MAX + 1).unwrap() else { panic!() };
+    registry.commit_new(1, a).unwrap();
+    // Unchanged level, unloaded without holder, level change, new holder, then more.
+    registry.take_level_changes(&[(1, 33), (2, MAX + 1), (1, 34), (3, 30), (1, 32)]).unwrap();
+    let mut out = Vec::new();
+    registry.apply_level_changes(16, &mut out).unwrap();
+    let Applied(3, b, Apply::New(30)) = out[1] else { panic!("{out:?}") };
+    assert_eq!(out, vec![Applied(1, a, Apply::Level(34)), Applied(3, b, Apply::New(30))]);
+    registry.commit_new(3, b).unwrap();
+    out.clear();
+    registry.apply_level_changes(16, &mut out).unwrap();
+    assert_eq!(out, vec![Applied(1, a, Apply::Level(32))]);
+    out.clear();
+    registry.apply_level_changes(16, &mut out).unwrap();
+    assert!(out.is_empty());
+    // Construction threw: the id is released and the rest is dropped.
+    registry.take_level_changes(&[(5, 30), (1, 31)]).unwrap();
+    registry.apply_level_changes(16, &mut out).unwrap();
+    let Applied(5, c, Apply::New(30)) = out[0] else { panic!() };
+    registry.abort_new(c);
+    registry.discard_level_changes();
+    out.clear();
+    registry.apply_level_changes(16, &mut out).unwrap();
+    assert!(out.is_empty());
+    assert_eq!(registry.levels(a).unwrap().level, 32);
+    // A limit splits the records without losing any.
+    registry.take_level_changes(&[(1, 30), (3, 31), (1, 29)]).unwrap();
+    registry.apply_level_changes(2, &mut out).unwrap();
+    assert_eq!(out.len(), 2);
+    registry.apply_level_changes(3, &mut out).unwrap();
+    assert_eq!(out[2], Applied(1, a, Apply::Level(29)));
+}

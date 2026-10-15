@@ -22,13 +22,17 @@ graph directly under the graph's lock.
   holder ticket levels, it must go through the tracker.
 - Ticket levels are mirrored exactly as for the simulation tracker: seeded from
   existing tickets, then the storage's current loading level on every listener call.
-- A run replays the original ordered `setLevel` calls into chunk scheduling
-  (`updateChunkScheduling`, `chunksToUpdateFutures`) after Rust finishes;
-  that code never reenters the tracker. `runDistanceUpdates` returns the
-  native remaining budget, which `DistanceManager` uses as its processed count.
+- After Rust finishes a run, the original ordered `setLevel` calls reach chunk
+  scheduling. For `ChunkMap`, the [holder registry](RUST-CHUNK-HOLDERS.md)
+  takes them natively and applies them to holder levels in that order. Other
+  `DistanceManager`s get a Java replay into `updateChunkScheduling`. Either way,
+  holders join `chunksToUpdateFutures` in that order, and the code never
+  reenters the tracker. `runDistanceUpdates` returns the native remaining
+  budget, which `DistanceManager` uses as its processed count.
 - Holder creation beyond `ChunkPos.MAX_COORDINATE_VALUE` throws in `setLevel`.
   Rust stops its run at exactly that call, with the same graph state the
-  original has when it throws, and Java's replay throws the original exception.
+  original has when it throws, and the holder construction throws the original
+  exception (from the registry's records, or Java's replay).
   Production tickets stay inside the world border, so this is a safety net.
 
 ## Verify and measure

@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
-"""Compare the real ChunkMap holder scheduling/unload/eager-save pipeline across
-Frozen, pre-change Current (its sources compiled over the candidate classpath) and
-the candidate. All traces must be identical.
+"""Compare the real ChunkMap holder scheduling, status-transition, unload and
+eager-save pipeline across Frozen, pre-change Current (its sources compiled over the
+candidate classpath) and the candidate. All traces must be identical.
+
+DistanceManager's chunksToUpdateFutures is an identity-hash set, so each side runs twice:
+- exact: -XX:hashCode=2 (every identity hash equal) makes its traversal, including
+  resizes and additions during reentrant passes, the same on every JVM; the full
+  traces (prepare throws and reentry included) must match in order;
+- hash: ordinary identity hashes; the driver replays each recorded add through an
+  independent model of the table and checks every pass ran in the predicted order
+  (0 mismatches required), and the order-independent traces must match.
+Benchmarks use ordinary hashing.
 
   python3 DevUtils/tests/world/chunkholders/VerifyChunkHolders.py --java-home "$JAVA_HOME" \
     --control-ref <pre-change commit> --output /new/dir
@@ -21,7 +30,10 @@ FROZEN_HEAD = '7a4d181717dc0c7da9086f1a17687dfd522ce417'
 DRIVER = ROOT / 'DevUtils/tests/world/chunkholders/VerifyChunkHolders.java'
 # Files the native holder-registry slice replaces; the control side compiles their
 # pre-change sources over the candidate classpath.
-CONTROL_SOURCES = ['server/level/ChunkMap.java', 'server/level/DistanceManager.java', 'server/level/LoadingChunkTracker.java']
+CONTROL_SOURCES = ['server/level/ChunkMap.java', 'server/level/DistanceManager.java', 'server/level/LoadingChunkTracker.java',
+                   'server/level/ChunkHolder.java', 'server/level/NativeChunkHolders.java', 'server/level/TicketChunkDistance.java']
+# Equal identity hashes for the traced runs (see above).
+TRACE_FLAGS = ['-XX:+UnlockExperimentalVMOptions', '-XX:hashCode=2']
 
 
 def sha(path):
@@ -56,11 +68,16 @@ def main():
     result = {'frozen_head': frozen_head, 'control_ref': control_ref, 'native': sha(native), 'driver': sha(DRIVER),
               'candidate_head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'candidate_diff_sha256': candidate_patch_sha(),
-              'scope': 'Real ChunkMap without its constructor: real TicketStorage, ChunkMap.DistanceManager and loading graph '
-                       'driving updateChunkScheduling; promote; real holders with injected full chunks, save dependencies '
+              'scope': 'Real ChunkMap without its constructor: real TicketStorage, ChunkMap.DistanceManager.runAllUpdates '
+                       '(loading graph, holder scheduling, both chunksToUpdateFutures passes) with driver prepare futures '
+                       '(pre-completed, completed later with a chunk, unloaded or failed, or throwing), a reentrant '
+                       'full-status listener (ticket changes and loading runs inside a pass) and the worldgen/light '
+                       'queue-level listeners; promote; real holders with injected full chunks, save dependencies '
                        'completed out of order; tick (unload queue, eager saves) under budgets; saveAllChunks; real '
                        'ChunkMap.save with writes completed or failed by the driver; driver clock for the 10 s save throttle. '
-                       'Observed through ChunkMap methods: visible order and levels, updating/visible identity, size, '
+                       'Observed through ChunkMap and holder methods: visible order and levels, updating/visible identity, '
+                       'per-holder level, accessibility, queue level, full status and future identity, prepare/listener '
+                       'effects in order, pending chunksToUpdateFutures in traversal order, size, '
                        'save/unload/level-unload/failure order, active writes. 8 seeds x 2000 steps.',
               'passed': False}
     env = os.environ.copy()
@@ -104,16 +121,30 @@ def main():
         command += ['-cp', str(target) + os.pathsep + classpaths[side],
                     'net.minecraft.server.level.VerifyChunkHolders', side, str(output / f'{side}-trace.txt')]
         commands[side] = command
-        data = run(command, f'{side}-run.log')
+        data = run(command[:1] + TRACE_FLAGS + command[1:], f'{side}-run.log')
         trace = re.search(r'TRACE (\w+) (\d+)', data)
         assert trace, f'{side}: no trace'
         result[side] = {'trace': trace.group(1), 'steps': int(trace.group(2))}
-    result['traces_equal'] = len({result[side]['trace'] for side in ('frozen', 'control', 'current')}) == 1
-    if not result['traces_equal']:
+        hashed = command[:-2] + [side, str(output / f'{side}-hash-trace.txt'), 'hash']
+        data = run(hashed, f'{side}-hash-run.log')
+        trace = re.search(r'TRACE (\w+) (\d+)', data)
+        assert trace, f'{side}: no hash trace'
+        oracle = [tuple(map(int, m)) for m in re.findall(r'ORACLE seed \d+ passes (\d+) holders (\d+) mismatches (\d+)', data)]
+        result[side]['hash_trace'] = trace.group(1)
+        # Counters are cumulative across seeds: the last line has the totals.
+        result[side]['oracle'] = dict(zip(('passes', 'holders', 'mismatches'), oracle[-1])) if oracle else None
+    sides = ('frozen', 'control', 'current')
+    result['traces_equal'] = len({result[side]['trace'] for side in sides}) == 1
+    result['hash_traces_equal'] = len({result[side]['hash_trace'] for side in sides}) == 1
+    result['oracle_ok'] = all(result[side]['oracle'] and result[side]['oracle']['passes'] > 0
+                              and result[side]['oracle']['mismatches'] == 0 for side in sides)
+    for suffix, key in (('', 'traces_equal'), ('-hash', 'hash_traces_equal')):
+        if result[key]:
+            continue
         for side in ('control', 'current'):
-            for line, (a, b) in enumerate(zip((output / 'frozen-trace.txt').open(), (output / f'{side}-trace.txt').open())):
+            for line, (a, b) in enumerate(zip((output / f'frozen{suffix}-trace.txt').open(), (output / f'{side}{suffix}-trace.txt').open())):
                 if a != b:
-                    result.setdefault('first_difference', {})[side] = {'line': line, 'frozen': a.strip()[:2000], side: b.strip()[:2000]}
+                    result.setdefault('first_difference' + suffix, {})[side] = {'line': line, 'frozen': a.strip()[:2000], side: b.strip()[:2000]}
                     break
     if args.benchmark:
         timings = {side: [] for side in commands}
@@ -127,7 +158,7 @@ def main():
                                         'with holder scheduling, promotes, unload-queue ticks, eager saves and stubbed writes, '
                                         'plus updating/visible lookups of 40 keys per step; Mockito interception of ChunkMap '
                                         'calls applies equally to every side; 5 warmups then 10 samples per JVM, 3 rounds')
-    result['passed'] = result['traces_equal']
+    result['passed'] = result['traces_equal'] and result['hash_traces_equal'] and result['oracle_ok']
     (output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps({key: value for key, value in result.items() if key not in ('frozen', 'control', 'current')}, indent=2))
     print('PASS' if result['passed'] else 'FAIL')

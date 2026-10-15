@@ -70,6 +70,16 @@ public abstract class DistanceManager {
 	@Nullable
 	protected abstract ChunkHolder updateChunkScheduling(long l, int i, @Nullable ChunkHolder chunkHolder, int j);
 
+	/** Whether {@link #applyLoadingLevels} takes the loading graph's changes natively, instead of
+	 * the tracker replaying them into {@link #updateChunkScheduling}. */
+	protected boolean appliesLoadingLevels() {
+		return false;
+	}
+
+	protected void applyLoadingLevels(TicketChunkDistance distance) {
+		throw new UnsupportedOperationException();
+	}
+
 	public boolean runAllUpdates(ChunkMap chunkMap) {
 		this.naturalSpawnChunkCounter.runAllUpdates();
 		this.simulationChunkTracker.runAllUpdates();

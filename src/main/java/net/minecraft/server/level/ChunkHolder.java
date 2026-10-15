@@ -35,7 +35,14 @@ public class ChunkHolder extends GenerationChunkHolder {
 	private volatile CompletableFuture<ChunkResult<LevelChunk>> fullChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
 	private volatile CompletableFuture<ChunkResult<LevelChunk>> tickingChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
 	private volatile CompletableFuture<ChunkResult<LevelChunk>> entityTickingChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
+	/** The native registry owning this holder's level state while it holds the holder's id;
+	 * null for a standalone holder, or once the unload completes and the state moves here. */
+	@Nullable
+	private NativeChunkHolders registry;
+	private final int registryId;
+	/** A standalone holder's state; a registry holder's is native. */
 	private int oldTicketLevel;
+	/** The level; for a registry holder, a mirror of the native level, written where the original sets it. */
 	private int ticketLevel;
 	private int queueLevel;
 	private boolean hasChangedSections;
@@ -45,6 +52,7 @@ public class ChunkHolder extends GenerationChunkHolder {
 	private final LevelLightEngine lightEngine;
 	private final ChunkHolder.LevelChangeListener onLevelChange;
 	private final ChunkHolder.PlayerProvider playerProvider;
+	/** A standalone holder's state; a registry holder's is native. */
 	private boolean wasAccessibleSinceLastSave;
 	private CompletableFuture<?> pendingFullStateConfirmation = CompletableFuture.completedFuture(null);
 	private CompletableFuture<?> sendSync = CompletableFuture.completedFuture(null);
@@ -58,7 +66,23 @@ public class ChunkHolder extends GenerationChunkHolder {
 		ChunkHolder.LevelChangeListener levelChangeListener,
 		ChunkHolder.PlayerProvider playerProvider
 	) {
+		this(chunkPos, i, levelHeightAccessor, levelLightEngine, levelChangeListener, playerProvider, null, -1);
+	}
+
+	/** A holder whose level state the registry already holds for {@code registryId}. */
+	ChunkHolder(
+		ChunkPos chunkPos,
+		int i,
+		LevelHeightAccessor levelHeightAccessor,
+		LevelLightEngine levelLightEngine,
+		ChunkHolder.LevelChangeListener levelChangeListener,
+		ChunkHolder.PlayerProvider playerProvider,
+		@Nullable NativeChunkHolders registry,
+		int registryId
+	) {
 		super(chunkPos);
+		this.registry = registry;
+		this.registryId = registryId;
 		this.levelHeightAccessor = levelHeightAccessor;
 		this.lightEngine = levelLightEngine;
 		this.onLevelChange = levelChangeListener;
@@ -66,7 +90,12 @@ public class ChunkHolder extends GenerationChunkHolder {
 		this.oldTicketLevel = ChunkLevel.MAX_LEVEL + 1;
 		this.ticketLevel = this.oldTicketLevel;
 		this.queueLevel = this.oldTicketLevel;
-		this.setTicketLevel(i);
+		if (registry == null) {
+			this.setTicketLevel(i);
+		} else {
+			// The registry set this level and the unloaded old level when it allocated the id.
+			this.ticketLevel = i;
+		}
 		this.changedBlocksPerSection = new ShortSet[levelHeightAccessor.getSectionsCount()];
 	}
 
@@ -253,6 +282,27 @@ public class ChunkHolder extends GenerationChunkHolder {
 	}
 
 	public void setTicketLevel(int i) {
+		if (this.registry != null) {
+			this.registry.holderSet(this.registryId, 0, i);
+		}
+
+		this.ticketLevel = i;
+	}
+
+	/**
+	 * The registry is freeing this holder's id (its unload completed): its state moves
+	 * to these fields, since a reference may outlive the unload (for example in a
+	 * pending set a throwing pass kept) and the id may be reused by another holder.
+	 */
+	void detach(long levels) {
+		this.ticketLevel = (int)(levels & 0xFFFF);
+		this.oldTicketLevel = (int)(levels >>> 16 & 0xFFFF);
+		this.wasAccessibleSinceLastSave = (levels >>> 32 & 1) != 0;
+		this.registry = null;
+	}
+
+	/** The registry already holds level {@code i}: update the mirror. */
+	void mirrorTicketLevel(int i) {
 		this.ticketLevel = i;
 	}
 
@@ -271,39 +321,44 @@ public class ChunkHolder extends GenerationChunkHolder {
 		chunkMap.onFullChunkStatusChange(this.pos, fullChunkStatus);
 	}
 
+	/**
+	 * Rust decides the transition from the old and current levels (and marks the holder
+	 * accessible); this executes its effects in the original order. The old level is
+	 * committed only after the effects and the listener, so a throwing effect leaves the
+	 * transition to be decided again.
+	 */
 	protected void updateFutures(ChunkMap chunkMap, Executor executor) {
-		FullChunkStatus fullChunkStatus = ChunkLevel.fullStatus(this.oldTicketLevel);
-		FullChunkStatus fullChunkStatus2 = ChunkLevel.fullStatus(this.ticketLevel);
-		boolean bl = fullChunkStatus.isOrAfter(FullChunkStatus.FULL);
-		boolean bl2 = fullChunkStatus2.isOrAfter(FullChunkStatus.FULL);
-		this.wasAccessibleSinceLastSave |= bl2;
-		if (!bl && bl2) {
+		long effects;
+		if (this.registry != null) {
+			effects = this.registry.beginTransition(this.registryId);
+		} else {
+			effects = NativeChunkHolders.transition(this.oldTicketLevel, this.ticketLevel);
+			this.wasAccessibleSinceLastSave = this.wasAccessibleSinceLastSave | ChunkLevel.fullStatus(this.ticketLevel).isOrAfter(FullChunkStatus.FULL);
+		}
+
+		if ((effects & NativeChunkHolders.PREPARE_FULL) != 0) {
 			this.fullChunkFuture = chunkMap.prepareAccessibleChunk(this);
 			this.scheduleFullChunkPromotion(chunkMap, this.fullChunkFuture, executor, FullChunkStatus.FULL);
 			this.addSaveDependency(this.fullChunkFuture);
 		}
 
-		if (bl && !bl2) {
+		if ((effects & NativeChunkHolders.UNLOAD_FULL) != 0) {
 			this.fullChunkFuture.complete(UNLOADED_LEVEL_CHUNK);
 			this.fullChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
 		}
 
-		boolean bl3 = fullChunkStatus.isOrAfter(FullChunkStatus.BLOCK_TICKING);
-		boolean bl4 = fullChunkStatus2.isOrAfter(FullChunkStatus.BLOCK_TICKING);
-		if (!bl3 && bl4) {
+		if ((effects & NativeChunkHolders.PREPARE_TICKING) != 0) {
 			this.tickingChunkFuture = chunkMap.prepareTickingChunk(this);
 			this.scheduleFullChunkPromotion(chunkMap, this.tickingChunkFuture, executor, FullChunkStatus.BLOCK_TICKING);
 			this.addSaveDependency(this.tickingChunkFuture);
 		}
 
-		if (bl3 && !bl4) {
+		if ((effects & NativeChunkHolders.UNLOAD_TICKING) != 0) {
 			this.tickingChunkFuture.complete(UNLOADED_LEVEL_CHUNK);
 			this.tickingChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
 		}
 
-		boolean bl5 = fullChunkStatus.isOrAfter(FullChunkStatus.ENTITY_TICKING);
-		boolean bl6 = fullChunkStatus2.isOrAfter(FullChunkStatus.ENTITY_TICKING);
-		if (!bl5 && bl6) {
+		if ((effects & NativeChunkHolders.PREPARE_ENTITY) != 0) {
 			if (this.entityTickingChunkFuture != UNLOADED_LEVEL_CHUNK_FUTURE) {
 				throw (IllegalStateException)Util.pauseInIde(new IllegalStateException());
 			}
@@ -313,25 +368,34 @@ public class ChunkHolder extends GenerationChunkHolder {
 			this.addSaveDependency(this.entityTickingChunkFuture);
 		}
 
-		if (bl5 && !bl6) {
+		if ((effects & NativeChunkHolders.UNLOAD_ENTITY) != 0) {
 			this.entityTickingChunkFuture.complete(UNLOADED_LEVEL_CHUNK);
 			this.entityTickingChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
 		}
 
-		if (!fullChunkStatus2.isOrAfter(fullChunkStatus)) {
-			this.demoteFullChunk(chunkMap, fullChunkStatus2);
+		FullChunkStatus demotion = NativeChunkHolders.demotion(effects);
+		if (demotion != null) {
+			this.demoteFullChunk(chunkMap, demotion);
 		}
 
 		this.onLevelChange.onLevelChange(this.pos, this::getQueueLevel, this.ticketLevel, this::setQueueLevel);
-		this.oldTicketLevel = this.ticketLevel;
+		if (this.registry != null) {
+			this.registry.holderSet(this.registryId, 1, 0);
+		} else {
+			this.oldTicketLevel = this.ticketLevel;
+		}
 	}
 
 	public boolean wasAccessibleSinceLastSave() {
-		return this.wasAccessibleSinceLastSave;
+		return this.registry != null ? (this.registry.holderLevels(this.registryId) >>> 32 & 1) != 0 : this.wasAccessibleSinceLastSave;
 	}
 
 	public void refreshAccessibility() {
-		this.wasAccessibleSinceLastSave = ChunkLevel.fullStatus(this.ticketLevel).isOrAfter(FullChunkStatus.FULL);
+		if (this.registry != null) {
+			this.registry.holderSet(this.registryId, 2, 0);
+		} else {
+			this.wasAccessibleSinceLastSave = ChunkLevel.fullStatus(this.ticketLevel).isOrAfter(FullChunkStatus.FULL);
+		}
 	}
 
 	@FunctionalInterface

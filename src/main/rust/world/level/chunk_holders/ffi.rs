@@ -7,7 +7,8 @@
 //! return the negated pair count needed when the buffer is too small.
 use std::sync::{Mutex, MutexGuard};
 
-use super::{Registry, Scheduled};
+use super::{Applied, Apply, Registry, Scheduled};
+use crate::world::level::chunk_distance::ticket_ffi;
 use crate::world::level::chunk_distance::ticket_storage::Fault;
 
 fn fault(fault: Fault) -> i64 {
@@ -202,4 +203,100 @@ pub unsafe extern "C" fn mattmc_chunk_holders_set_next_save(id: u64, mode: i32, 
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_chunk_holders_work(id: u64) -> i32 {
     registry(id).work()
+}
+
+/// The FULL, BLOCK_TICKING and ENTITY_TICKING levels (`ChunkLevel.byStatus`).
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_status_levels(id: u64, full: i32, block_ticking: i32, entity_ticking: i32) {
+    registry(id).set_status_levels(full, block_ticking, entity_ticking);
+}
+
+/// `updateFutures`' effects between two levels, for a holder with no registry.
+#[no_mangle]
+pub extern "C" fn mattmc_chunk_holders_transition(old_level: i32, level: i32, full: i32, block_ticking: i32, entity_ticking: i32) -> i64 {
+    super::transition([full, block_ticking, entity_ticking], old_level, level)
+}
+
+/// Moves the loading graph's drained changes (from its last run) into the
+/// registry. The graph is locked only to copy them; the locks never nest.
+/// Caller must provide live handles for both.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_take_levels(id: u64, distance: u64) -> i64 {
+    let changes = {
+        let mut distance = ticket_ffi::shared(distance).lock();
+        let field = distance.field_mut();
+        let mut changes = Vec::new();
+        if changes.try_reserve(field.changes().len()).is_err() {
+            return -3;
+        }
+        changes.extend_from_slice(field.changes());
+        field.clear_changes();
+        changes
+    };
+    match registry(id).take_level_changes(&changes) {
+        Ok(()) => 0,
+        Err(error) => fault(error),
+    }
+}
+
+/// Applies the next taken changes to holders, writing up to `capacity`
+/// `(chunk, word)` records: word bits 0..8 kind (0 update, 1 level, 2 new),
+/// 8..40 holder id, 40.. level. Returns the count; 0 when all are applied.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_apply_levels(id: u64, buffer: *mut i64, capacity: i32) -> i32 {
+    let mut registry = registry(id);
+    let mut applied = Vec::new();
+    if let Err(error) = registry.apply_level_changes(capacity.max(0) as usize, &mut applied) {
+        return fault(error) as i32;
+    }
+    for (index, &Applied(key, holder, apply)) in applied.iter().enumerate() {
+        let (kind, level) = match apply {
+            Apply::Update => (0i64, 0),
+            Apply::Level(level) => (1, level),
+            Apply::New(level) => (2, level),
+        };
+        buffer.add(index * 2).write(key);
+        buffer.add(index * 2 + 1).write(kind | i64::from(holder) << 8 | i64::from(level) << 40);
+    }
+    applied.len() as i32
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_discard_levels(id: u64) {
+    registry(id).discard_level_changes();
+}
+
+/// Holder state: level in bits 0..16, old level 16..32, bit 32 accessible
+/// (levels are 0..=MAX_LEVEL + 1); or a negative fault.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_holder_levels(id: u64, holder: i32) -> i64 {
+    match registry(id).levels(holder as u32) {
+        Ok(state) => i64::from(state.level as u16) | i64::from(state.old_level as u16) << 16 | i64::from(state.accessible) << 32,
+        Err(error) => fault(error),
+    }
+}
+
+/// Holder state changes: mode 0 `setTicketLevel(value)`, 1 `oldTicketLevel = ticketLevel`, 2 `refreshAccessibility`.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_holder_set(id: u64, holder: i32, mode: i32, value: i32) -> i64 {
+    let mut registry = registry(id);
+    let result = match mode {
+        0 => registry.set_level(holder as u32, value),
+        1 => registry.commit_transition(holder as u32),
+        2 => registry.refresh_accessibility(holder as u32),
+        _ => Err(crate::world::level::chunk_distance::ticket_storage::Fault::IllegalState),
+    };
+    match result {
+        Ok(()) => 0,
+        Err(error) => fault(error),
+    }
+}
+
+/// `updateFutures`' decision for the holder; marks it accessible when it now is.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_begin_transition(id: u64, holder: i32) -> i64 {
+    match registry(id).begin_transition(holder as u32) {
+        Ok(effects) => effects,
+        Err(error) => fault(error),
+    }
 }

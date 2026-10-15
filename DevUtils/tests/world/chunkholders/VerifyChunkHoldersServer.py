@@ -4,8 +4,12 @@
 Starts a disposable flat world on loopback with ticks frozen. Forceloads distant
 chunks, writes blocks in them, releases them so they unload, and checks that the
 unload saved them and they reload; releases and re-adds a chunk so its pending
-holder is revived; saves, restarts and checks persistence. Run the same driver on
-the candidate and on a --class-overlay of pre-change classes; both must pass.
+holder is revived; saves, restarts and checks persistence. Then a status-transition
+lifecycle: a forced chunk's neighbours sit at block-ticking (level 32) and full (33)
+status, so an item there does not fall and sand does not; forcing the neighbour
+promotes both (the item falls, the sand's scheduled tick runs), and releasing it
+demotes it again (a new item stays). Run the same driver on the candidate and on a
+--class-overlay of pre-change classes; both must pass.
 
 --inject-readonly-region adds a separately reported experiment (not a gate): a
 read-only region directory during a save into a new region file. Writes into
@@ -108,6 +112,27 @@ def main():
         server.step(40)
         check('forced chunk reloaded after restart', 'if loaded 320 -60 320')
         check('saved block survives restart', 'if block 321 -55 321 minecraft:gold_block')
+        # Status transitions: chunk (100,100) forced at level 31; (101,100) is 32, (102,100) is 33.
+        item_box = 'type=item,x=1620,y=-51,z=1604,dx=1,dy=3,dz=1'
+        server.command_batch(['forceload add 1600 1604'])
+        server.step(40)
+        server.command_batch(['summon minecraft:item 1620.5 -50 1604.5 {Item:{id:"minecraft:stone",count:1},PickupDelay:32767s}',
+                              'setblock 1636 -50 1604 minecraft:sand'])
+        server.step(20)
+        check('block-ticking chunk does not tick entities', f'if entity @e[{item_box}]')
+        check('full chunk does not run block ticks', 'if block 1636 -50 1604 minecraft:sand')
+        server.command_batch(['forceload add 1616 1604'])
+        server.step(40)
+        check('promoted to entity ticking: the item fell', f'unless entity @e[{item_box}]')
+        check('promoted to block ticking: the sand fell', 'unless block 1636 -50 1604 minecraft:sand')
+        server.command_batch(['forceload remove 1616 1604'])
+        server.step(40)
+        server.command_batch(['summon minecraft:item 1622.5 -50 1606.5 {Item:{id:"minecraft:dirt",count:1},PickupDelay:32767s}'])
+        server.step(20)
+        check('demoted from entity ticking: a new item stays', 'if entity @e[type=item,x=1622,y=-51,z=1606,dx=1,dy=3,dz=1]')
+        server.command_batch(['forceload remove 1600 1604'])
+        server.step(200)
+        check('released transition chunk unloads', 'unless loaded 1600 -60 1604')
         server.command_batch(['forceload remove all'])
         server.step(200)
         check('remove all unloads', 'unless loaded 320 -60 320')

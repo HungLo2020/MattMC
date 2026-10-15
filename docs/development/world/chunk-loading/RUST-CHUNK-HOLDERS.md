@@ -8,15 +8,24 @@ owns that structure:
 
 - the updating, visible and pending-unload maps;
 - the drop set and the eager-save set;
-- the save throttle.
+- the save throttle;
+- each holder's level state: its ticket level, the level its futures last
+  reflected, and whether it was accessible since the last save.
 
-It also makes the scheduling and unload decisions.
+It also makes the scheduling and unload decisions, applies the loading graph's
+level changes to holders directly, and decides each holder's status
+transition.
 [`NativeChunkHolders`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/server/level/NativeChunkHolders.java)
 is the bridge.
 
 Java keeps:
 
 - the `ChunkHolder` objects (by native id), their futures and status work;
+- the effects of each status transition: preparing and unloading futures,
+  promotion and demotion listeners, save dependencies and the queue-level
+  listeners;
+- `DistanceManager.chunksToUpdateFutures` and its two passes (see below);
+- a mirror of each holder's ticket level for fast reads;
 - save IO and the unload queue's runnables;
 - `visibleChunkMap`, a projection rebuilt from the native order at each promote.
 
@@ -43,6 +52,29 @@ The holder's futures and `GenerationChunkHolder` are unchanged.
   Java constructs a new holder between `schedule` and `commit_new`. If the
   constructor throws, `abort_new` releases the id and nothing is inserted, as
   in the original.
+- **Loading hand-off.** `LoadingChunkTracker.runDistanceUpdates` runs the native
+  loading graph, then `ChunkMap.applyLoadingLevels`. Rust takes the graph's
+  changes and applies them in replay order: it compares each change with the
+  holder's native level, schedules the holder and sets its level. Java receives
+  records: mirror a level, construct a holder, and add the holder to
+  `chunksToUpdateFutures`.
+  - Records stop after each construction. If the constructor throws, the rest of
+    that run's changes are discarded, as the original replay ended there.
+  - Other `DistanceManager` subclasses (tests) keep the Java replay through
+    `updateChunkScheduling`.
+- **Status transitions.** `ChunkHolder.updateFutures` asks Rust for the
+  transition from the old level to the current one, then runs the effects in the
+  original order.
+  - Rust marks the holder accessible before the effects.
+  - The old level is committed only after the effects and the level listener.
+    If an effect throws, the next pass decides the same transition again.
+  - A standalone holder (no registry) keeps its state in Java but uses the same
+    native decision.
+- **`chunksToUpdateFutures` stays Java.** It is a `ReferenceOpenHashSet`, so its
+  traversal follows identity hashes. It is kept as an explicit ordering
+  adapter, with both passes: every `updateHighestAllowedStatus`, then every
+  `updateFutures`. A throw in either pass keeps the whole set, so the next run
+  processes every holder again, including the ones already done.
 - **Unloading.** The drop pass moves holders to the pending unloads in drop-set
   order. Java then attaches each holder's save-future callback
   (`scheduleUnload`), which only queues a runnable.
@@ -50,6 +82,9 @@ The holder's futures and `GenerationChunkHolder` are unchanged.
     at its chunk (`finish_unload`, by identity). Rust then frees the id.
   - A completion left over from an earlier unload of a revived or freed holder
     finds no matching id.
+  - Freeing the id moves the holder's level state back into its Java fields. A
+    reference can outlive the unload, for example in a pending set that a
+    throwing pass kept, and the id may already belong to another holder.
 - **Threads.**
   - The light engine, `hasChunk`/`isPositionTicking` and mods read
     `visibleChunkMap` off the main thread. It stays a volatile, immutable
@@ -57,7 +92,18 @@ The holder's futures and `GenerationChunkHolder` are unchanged.
   - Updating lookups go through Rust's lock. Java resolves the id to a holder
     under the same monitor that frees and reuses ids, so an off-thread reader
     (Distant Horizons' generator) never gets another chunk's holder.
-  - Neither lock is held while Java runs.
+  - Neither lock is held while Java runs. Taking the loading changes copies
+    them under the graph's lock, then applies them under the registry's; the
+    two locks never nest.
+  - `getTicketLevel` reads the Java mirror. It is written where the original
+    wrote the field.
+  - Off-thread readers (worldgen, light, debug, Distant Horizons) use only Java
+    fields: the level mirror, queue level and futures. Everything routed
+    through the registry runs on the main thread only: `updateFutures`,
+    `wasAccessibleSinceLastSave`, `refreshAccessibility` and `finishUnload`
+    with `detach`. That is the same thread that frees and reuses ids, so a
+    holder detaches before its id can be reused. Keep any new off-thread
+    caller off these methods.
 - **Saving.** `ChunkMap.save`, its failure handling and IOWorker recovery are
   unchanged Java. Only the throttle map (`nextChunkSaveTime`) moved.
 
@@ -78,14 +124,42 @@ save-recovery test. It drives:
 
 - the real `TicketStorage`, `ChunkMap.DistanceManager` and loading graph into
   `updateChunkScheduling`, plus promotes;
+- the real `runAllUpdates`, with prepare futures that are complete, complete
+  later (with a chunk, unloaded, or failed) or throw;
+- a full-status listener that reenters, adding a ticket and running the loading
+  graph inside a pass;
+- after a holder constructor throws, the updating holders left around both
+  coordinate-bound keys, then a retry;
+- a fixed scenario before the random steps: a pass throws while the update set
+  holds a dropping holder, that holder's unload completes, new holders take the
+  freed ids, and the retry pass runs the old holder's transition. On the native
+  side the driver also prints whether the id was reused (`SCENARIO`, outside the
+  digest);
 - holders with injected full chunks and out-of-order save dependencies;
 - tickets at the coordinate bound, where holder creation throws;
 - `tick` under budgets, and `saveAllChunks` with and without flushing;
 - the real `ChunkMap.save`, with writes completed or failed by the driver and
   some snapshots failing synchronously.
 
-It observes only through `ChunkMap` methods, so Frozen, the pre-change sources
-and the candidate run the same driver; all three traces must match. An
+It observes only through `ChunkMap` and public holder methods, so Frozen, the
+pre-change sources and the candidate run the same driver. It records:
+
+- per-holder level, accessibility, queue level, full status and future identity;
+- prepare, listener and queue-level effects in order;
+- the pending set in traversal order.
+
+Each side runs in two modes, and all three sides must match in each:
+
+- **Exact** (`-XX:hashCode=2`): every identity hash is equal, so the set's
+  traversal is the same on every JVM. The ordered traces must match, including
+  throws and reentry.
+- **Hash** (ordinary identity hashes): the driver records each add with its hash
+  and replays them through its own model of fastutil's table. Every pass must
+  run in the predicted order. Stubs decide by chunk rather than call order,
+  prepares complete at once, and nothing reenters or throws inside a pass. A
+  pending future completed by an unloading pass would release save dependencies
+  in pass order. So the traces still compare across JVMs, and pending futures
+  are covered by exact mode. An
 off-thread reader checks every visible and updating lookup for the right
 chunk (updating only on the native registry: the original map is unsafe to
 read off-thread).
@@ -111,3 +185,8 @@ recovery tests.
   map's insertion order first.
 - *Unload order differs:* check the drop set's capacity and iterator removal
   against the fastutil port.
+- *Hash-mode oracle mismatch:* something other than the passes added to or
+  iterated `chunksToUpdateFutures`, or the model no longer matches the fastutil
+  version. Compare `TableModel` with `ReferenceOpenHashSet`.
+- *A holder's level reads wrong:* the mirror and the native level diverged.
+  Every native level change must be mirrored where the original set the field.

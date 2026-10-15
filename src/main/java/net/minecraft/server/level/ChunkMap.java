@@ -121,6 +121,8 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	// Rust owns the holder registry (updating/visible/pending maps, drop and eager-save
 	// sets, save throttle); visibleChunkMap is the promoted map's published projection.
 	private NativeChunkHolders holders = new NativeChunkHolders(ChunkLevel.MAX_LEVEL);
+	/** applyLoadingLevels' record buffer (main thread). */
+	private long[] levelRecords = new long[512];
 	private volatile Long2ObjectLinkedOpenHashMap<ChunkHolder> visibleChunkMap = new Long2ObjectLinkedOpenHashMap<>();
 	private final List<ChunkGenerationTask> pendingGenerationTasks = new ArrayList();
 	final ServerLevel level;
@@ -251,6 +253,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	private void initializeVerification() {
 		this.holders = new NativeChunkHolders(ChunkLevel.MAX_LEVEL);
 		this.visibleChunkMap = new Long2ObjectLinkedOpenHashMap<>();
+		this.levelRecords = new long[512];
 	}
 
 	@Nullable
@@ -374,21 +377,22 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 
 	@Nullable
 	ChunkHolder updateChunkScheduling(long l, int i, @Nullable ChunkHolder chunkHolder, int j) {
-		// Rust decides and updates the drop set, pending unloads and updating map;
-		// Java sets holder levels and constructs new holders.
+		// Rust decides and updates the drop set, pending unloads, updating map and holder
+		// levels; Java mirrors levels and constructs new holders. The loading tracker
+		// normally applies its changes natively (applyLoadingLevels) instead.
 		long action = this.holders.schedule(l, i, chunkHolder != null, j);
 		switch ((int)(action & 255)) {
 			case NativeChunkHolders.LEVEL:
-				chunkHolder.setTicketLevel(i);
+				chunkHolder.mirrorTicketLevel(i);
 				return chunkHolder;
 			case NativeChunkHolders.REVIVED:
 				chunkHolder = this.holders.holder((int)(action >>> 8));
-				chunkHolder.setTicketLevel(i);
+				chunkHolder.mirrorTicketLevel(i);
 				return chunkHolder;
 			case NativeChunkHolders.NEW:
 				int holderId = (int)(action >>> 8);
 				try {
-					chunkHolder = new ChunkHolder(new ChunkPos(l), i, this.level, this.lightEngine, this::onLevelChange, this);
+					chunkHolder = this.newHolder(l, i, holderId);
 				} catch (Throwable throwable) {
 					this.holders.abortNew(holderId);
 					throw throwable;
@@ -398,6 +402,52 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 				return chunkHolder;
 			default:
 				return chunkHolder;
+		}
+	}
+
+	private ChunkHolder newHolder(long l, int i, int holderId) {
+		return new ChunkHolder(new ChunkPos(l), i, this.level, this.lightEngine, this::onLevelChange, this, this.holders, holderId);
+	}
+
+	/**
+	 * The loading graph's level changes from its last run, applied to holders by Rust in
+	 * the original replay order: Rust schedules each holder and sets its level, and this
+	 * mirrors levels, constructs new holders and adds each holder to
+	 * {@code chunksToUpdateFutures} (still a Java identity-hash set: its traversal order
+	 * is the original's). A holder constructor that throws ends the replay, as it did.
+	 */
+	void applyLoadingLevels(TicketChunkDistance distance) {
+		this.holders.takeLevels(distance);
+		long[] records = this.levelRecords;
+		int n;
+		while ((n = this.holders.applyLevels(records)) > 0) {
+			for (int index = 0; index < n; index++) {
+				long l = records[index * 2];
+				long word = records[index * 2 + 1];
+				int holderId = (int)(word >>> 8);
+				int i = (int)(word >>> 40);
+				ChunkHolder chunkHolder;
+				switch ((int)(word & 255)) {
+					case NativeChunkHolders.APPLY_NEW -> {
+						try {
+							chunkHolder = this.newHolder(l, i, holderId);
+						} catch (Throwable throwable) {
+							this.holders.abortNew(holderId);
+							this.holders.discardLevels();
+							throw throwable;
+						}
+
+						this.holders.commitNew(l, holderId, chunkHolder);
+					}
+					case NativeChunkHolders.APPLY_LEVEL -> {
+						chunkHolder = this.holders.holder(holderId);
+						chunkHolder.mirrorTicketLevel(i);
+					}
+					default -> chunkHolder = this.holders.holder(holderId);
+				}
+
+				this.distanceManager.chunksToUpdateFutures.add(chunkHolder);
+			}
 		}
 	}
 
@@ -1281,6 +1331,16 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 		@Override
 		protected boolean isChunkToRemove(long l) {
 			return ChunkMap.this.holders.dropping(l);
+		}
+
+		@Override
+		protected boolean appliesLoadingLevels() {
+			return true;
+		}
+
+		@Override
+		protected void applyLoadingLevels(TicketChunkDistance distance) {
+			ChunkMap.this.applyLoadingLevels(distance);
 		}
 
 		@Nullable

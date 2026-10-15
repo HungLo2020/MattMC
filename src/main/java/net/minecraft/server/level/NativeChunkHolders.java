@@ -48,6 +48,23 @@ final class NativeChunkHolders {
 	private static final MethodHandle NEXT_SAVE = handle("next_save", FunctionDescriptor.of(J, J, J));
 	private static final MethodHandle SET_NEXT_SAVE = handle("set_next_save", FunctionDescriptor.of(J, J, I, J, J));
 	private static final MethodHandle WORK = handle("work", FunctionDescriptor.of(I, J));
+	private static final MethodHandle STATUS_LEVELS = handle("status_levels", FunctionDescriptor.ofVoid(J, I, I, I));
+	private static final MethodHandle TRANSITION = handle("transition", FunctionDescriptor.of(J, I, I, I, I, I));
+	private static final MethodHandle TAKE_LEVELS = handle("take_levels", FunctionDescriptor.of(J, J, J));
+	private static final MethodHandle APPLY_LEVELS = heap("apply_levels", FunctionDescriptor.of(I, J, ValueLayout.ADDRESS, I));
+	private static final MethodHandle DISCARD_LEVELS = handle("discard_levels", FunctionDescriptor.ofVoid(J));
+	private static final MethodHandle HOLDER_LEVELS = handle("holder_levels", FunctionDescriptor.of(J, J, I));
+	private static final MethodHandle HOLDER_SET = handle("holder_set", FunctionDescriptor.of(J, J, I, I, I));
+	private static final MethodHandle BEGIN_TRANSITION = handle("begin_transition", FunctionDescriptor.of(J, J, I));
+	private static final int FULL_LEVEL = ChunkLevel.byStatus(FullChunkStatus.FULL);
+	private static final int BLOCK_TICKING_LEVEL = ChunkLevel.byStatus(FullChunkStatus.BLOCK_TICKING);
+	private static final int ENTITY_TICKING_LEVEL = ChunkLevel.byStatus(FullChunkStatus.ENTITY_TICKING);
+
+	/** Status-transition effects ({@link #beginTransition}), in {@code updateFutures}' order. */
+	static final long PREPARE_FULL = 1, UNLOAD_FULL = 1 << 1, PREPARE_TICKING = 1 << 2, UNLOAD_TICKING = 1 << 3,
+		PREPARE_ENTITY = 1 << 4, UNLOAD_ENTITY = 1 << 5;
+	/** Applied level-change kinds ({@link #applyLevels}). */
+	static final int APPLY_UPDATE = 0, APPLY_LEVEL = 1, APPLY_NEW = 2;
 
 	static final int UNCHANGED = 0;
 	static final int LEVEL = 1;
@@ -76,6 +93,70 @@ final class NativeChunkHolders {
 			throw t;
 		}
 		this.ids.defaultReturnValue(-1);
+		try { STATUS_LEVELS.invokeExact(this.id, FULL_LEVEL, BLOCK_TICKING_LEVEL, ENTITY_TICKING_LEVEL); }
+		catch (Throwable t) { throw failure(t); }
+		finally { Reference.reachabilityFence(this.owner); }
+	}
+
+	/** {@code updateFutures}' effects between two levels, for a holder without a registry. */
+	static long transition(int oldLevel, int level) {
+		try { return (long)TRANSITION.invokeExact(oldLevel, level, FULL_LEVEL, BLOCK_TICKING_LEVEL, ENTITY_TICKING_LEVEL); }
+		catch (Throwable t) { throw failure(t); }
+	}
+
+	/** The demotion target of a transition's effects, or null. */
+	@Nullable
+	static FullChunkStatus demotion(long effects) {
+		int status = (int)(effects >>> 8 & 255);
+		return status == 0 ? null : FullChunkStatus.values()[status - 1];
+	}
+
+	/** Moves the loading graph's changes from its last run into the registry. */
+	void takeLevels(TicketChunkDistance distance) {
+		try { check((long)TAKE_LEVELS.invokeExact(this.id, distance.handleId())); }
+		catch (Throwable t) { throw failure(t); }
+		finally {
+			Reference.reachabilityFence(this.owner);
+			distance.fence();
+		}
+	}
+
+	/**
+	 * Applies the next taken level changes to holders natively: (chunk, word) records in
+	 * {@code buffer}, word bits 0..8 kind, 8..40 holder id, 40.. level. Returns the record
+	 * count, 0 when all are applied; an {@link #APPLY_NEW} record is always the last.
+	 */
+	int applyLevels(long[] buffer) {
+		try { return (int)check((int)APPLY_LEVELS.invokeExact(this.id, MemorySegment.ofArray(buffer), buffer.length / 2)); }
+		catch (Throwable t) { throw failure(t); }
+		finally { Reference.reachabilityFence(this.owner); }
+	}
+
+	void discardLevels() {
+		try { DISCARD_LEVELS.invokeExact(this.id); }
+		catch (Throwable t) { throw failure(t); }
+		finally { Reference.reachabilityFence(this.owner); }
+	}
+
+	/** Bits 0..16 ticket level, 16..32 old level, bit 32 accessible since the last save. */
+	long holderLevels(int holderId) {
+		try { return check((long)HOLDER_LEVELS.invokeExact(this.id, holderId)); }
+		catch (Throwable t) { throw failure(t); }
+		finally { Reference.reachabilityFence(this.owner); }
+	}
+
+	/** Mode 0 {@code setTicketLevel(value)}, 1 old level = level, 2 {@code refreshAccessibility}. */
+	void holderSet(int holderId, int mode, int value) {
+		try { check((long)HOLDER_SET.invokeExact(this.id, holderId, mode, value)); }
+		catch (Throwable t) { throw failure(t); }
+		finally { Reference.reachabilityFence(this.owner); }
+	}
+
+	/** {@code updateFutures}' effects for the holder; marks it accessible when it now is. */
+	long beginTransition(int holderId) {
+		try { return check((long)BEGIN_TRANSITION.invokeExact(this.id, holderId)); }
+		catch (Throwable t) { throw failure(t); }
+		finally { Reference.reachabilityFence(this.owner); }
 	}
 
 	private static void release(MemorySegment pointer) {
@@ -218,11 +299,13 @@ final class NativeChunkHolders {
 	synchronized boolean finishUnload(long key, ChunkHolder holder) {
 		int holderId = this.ids.getInt(holder);
 		if (holderId < 0) return false;
+		long levels = this.holderLevels(holderId);
 		boolean removed;
 		try { removed = (int)FINISH_UNLOAD.invokeExact(this.id, key, holderId) != 0; }
 		catch (Throwable t) { throw failure(t); }
 		finally { Reference.reachabilityFence(this.owner); }
 		if (removed) {
+			holder.detach(levels);
 			this.holders[holderId] = null;
 			this.ids.removeInt(holder);
 		}

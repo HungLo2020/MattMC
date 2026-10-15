@@ -56,6 +56,13 @@ class LoadingChunkTracker {
 	}
 
 	public int runDistanceUpdates(int i) {
-		return this.distance.runUpdates(i, this.levelSink);
+		if (!this.distanceManager.appliesLoadingLevels()) {
+			return this.distance.runUpdates(i, this.levelSink);
+		}
+
+		// ChunkMap's registry applies the changes to its holders natively, in this order.
+		int remaining = this.distance.run(i);
+		this.distanceManager.applyLoadingLevels(this.distance);
+		return remaining;
 	}
 }
