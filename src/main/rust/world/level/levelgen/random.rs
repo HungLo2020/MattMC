@@ -62,6 +62,12 @@ impl Xoroshiro {
     pub fn next_float(&mut self) -> f32 {
         ((self.next_long() as u64) >> 40) as f32 * 5.960_464_5e-8_f32
     }
+
+    /// `nextDouble`: `nextBits(53) * 1.110223E-16F` is float arithmetic in
+    /// Java, so the result has float precision.
+    pub fn next_double(&mut self) -> f64 {
+        f64::from(((self.next_long() as u64) >> 11) as i64 as f32 * 1.110_223e-16_f32)
+    }
 }
 
 /// `LegacyRandomSource` (single-threaded; the Java atomics only detect misuse).
@@ -159,6 +165,13 @@ impl Random {
         match self {
             Random::Xoroshiro(random) => random.next_float(),
             Random::Legacy(random) => random.next_float(),
+        }
+    }
+
+    pub fn next_double(&mut self) -> f64 {
+        match self {
+            Random::Xoroshiro(random) => random.next_double(),
+            Random::Legacy(random) => random.next_double(),
         }
     }
 }

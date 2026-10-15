@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.core.Registry;
 import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.biome.Biome;
@@ -372,6 +373,36 @@ final class NativeSurface implements SurfaceRules.SurfaceRule {
             }
         }
         return new Slots(ints, longs, doubles, keep);
+    }
+
+    /** {@link #nativeSlots} with every slot a scalar evaluation can answer
+     * natively: biome conditions (kind 4 over a range of sorted registry ids
+     * appended to {@code biomeIds}, as the compiler resolves them) and
+     * temperature (kind 5, which the evaluation asks Java). Null when any slot
+     * needs Java, or the rule has continuations or extension rules. */
+    @Nullable
+    Slots scalarSlots(it.unimi.dsi.fastutil.ints.IntArrayList biomeIds) {
+        if (rules.length != 0) return null;
+        Slots slots = nativeSlots();
+        for (int slot = 0; slot < conditionSources.length; slot++) {
+            var source = conditionSources[slot];
+            if (source instanceof SurfaceRules.BiomeConditionSource biome) {
+                int[] ids = registry.listElements().filter(holder -> biome.biomeNameTest.test(holder.key()))
+                    .mapToInt(holder -> registry.getId(holder.value())).distinct().sorted().toArray();
+                System.arraycopy(new int[]{4, biomeIds.size(), ids.length, 0}, 0, slots.ints(), slot * 4, 4);
+                biomeIds.addElements(biomeIds.size(), ids);
+            } else if (source == SurfaceRules.Temperature.INSTANCE) {
+                slots.ints()[slot * 4] = 5;
+            } else if (slots.ints()[slot * 4] == 0) {
+                return null;
+            }
+        }
+        return slots;
+    }
+
+    /** The compiled program, for a native evaluation that copies it. */
+    int[] program() {
+        return program;
     }
 
     /** The context's noise chunk, for its preliminary surface levels. */

@@ -28,6 +28,12 @@ pub(crate) enum Slot {
     Gradient { low: i32, high: i32, random: Positional },
     /// A noise threshold: `NormalNoise.getValue(x, 0, z)` in [min, max].
     Noise { state: *const State, min: f64, max: f64 },
+    /// `SurfaceRules.Temperature`: `coldEnoughToSnow` of the context's biome,
+    /// which Java answers (its temperature cache is part of the result).
+    Temperature,
+    /// A biome condition over sorted registry ids `[start, start + len)` of the
+    /// owner's id table (contexts without native quart biomes).
+    Biome { start: u32, len: u32 },
 }
 
 /// `SurfaceSystem.bandOffset` from its noise value: `(int)Math.round(noise * 4.0)`.
@@ -291,70 +297,79 @@ impl SurfaceChunk {
                 frame[SECONDARY_READY] = 1;
             }
             -3 if !self.inputs.levels.is_null() => {
-                frame[MIN_SURFACE] = self.min_surface_level(frame[SURFACE_DEPTH])?;
+                let levels = unsafe { &*self.inputs.levels };
+                frame[MIN_SURFACE] = min_surface_level(levels, &mut self.corners, x, z, frame[SURFACE_DEPTH])?;
                 frame[MIN_SURFACE_READY] = 1;
             }
             slot if slot >= 0 => match self.slots.get(slot as usize).copied().unwrap_or(Slot::Java) {
                 Slot::Java => return Ok(false),
                 Slot::Steep => {
                     if self.steep_answer < 0 {
-                        self.steep_answer = self.steep() as i8;
+                        self.steep_answer = steep(self.storage(), x, z) as i8;
                     }
                     condition(self.steep_answer != 0, frame);
                 }
-                Slot::Gradient { low, high, random } => {
-                    // The evaluator asks only inside the band: map(y, low, high, 1, 0).
-                    let (yd, lo, hi) = (y as f64, low as f64, high as f64);
-                    let d = crate::world::level::levelgen::math::lerp((yd - lo) / (hi - lo), 1.0, 0.0);
-                    condition(((random.at(x, y, z).next_float()) as f64) < d, frame);
-                }
-                Slot::Noise { state, min, max } => {
-                    let value = unsafe { noise_eval(state, x as f64, 0.0, z as f64, 0.0, 0.0, 0) };
-                    condition(value >= min && value <= max, frame);
-                }
+                Slot::Temperature | Slot::Biome { .. } => return Ok(false),
+                Slot::Gradient { low, high, random } => condition(gradient(low, high, random, x, y, z), frame),
+                Slot::Noise { state, min, max } => condition(noise_threshold(state, min, max, x, z), frame),
             },
             _ => return Ok(false),
         }
         Ok(true)
     }
+}
 
-    /// `SurfaceRules.Context.getMinSurfaceLevel`: the preliminary surface levels
-    /// at the column's surface cell corners, interpolated, plus surface depth - 8.
-    fn min_surface_level(&mut self, surface_depth: i32) -> Result<i32, Error> {
-        let (i, j) = (self.x >> 4, self.z >> 4);
-        let corners = match self.corners {
-            Some((cell, corners)) if cell == (i, j) => corners,
-            _ => {
-                let levels = unsafe { &*self.inputs.levels };
-                let xs = [i << 4, (i + 1) << 4, i << 4, (i + 1) << 4];
-                let zs = [j << 4, j << 4, (j + 1) << 4, (j + 1) << 4];
-                let mut corners = [0i32; 4];
-                with_frame(levels, |frame| levels.surface_levels(frame, &xs, &zs, &mut corners)).map_err(|_| Error::Evaluation(-5))?;
-                self.corners = Some(((i, j), corners));
-                corners
-            }
-        };
-        let fx = ((self.x & 15) as f32 / 16.0f32) as f64;
-        let fz = ((self.z & 15) as f32 / 16.0f32) as f64;
-        let level = lerp2(fx, fz, corners[0] as f64, corners[1] as f64, corners[2] as f64, corners[3] as f64);
-        // Mth.floor, then + surfaceDepth - 8.
-        let k = level as i32;
-        let k = if level < k as f64 { k.wrapping_sub(1) } else { k };
-        Ok(k.wrapping_add(surface_depth).wrapping_sub(8))
-    }
+/// A vertical gradient inside its band: `map(y, low, high, 1, 0)` against the
+/// position's random float.
+pub(crate) fn gradient(low: i32, high: i32, random: Positional, x: i32, y: i32, z: i32) -> bool {
+    let (yd, lo, hi) = (y as f64, low as f64, high as f64);
+    let d = crate::world::level::levelgen::math::lerp((yd - lo) / (hi - lo), 1.0, 0.0);
+    (random.at(x, y, z).next_float() as f64) < d
+}
 
-    /// `SurfaceRules.Context.SteepMaterialCondition.compute` on the storage's heightmap.
-    fn steep(&self) -> bool {
-        let (i, j) = (self.x & 15, self.z & 15);
-        let height = |x: i32, z: i32| self.storage().height(x, z);
-        let (k, l) = ((j - 1).max(0), (j + 1).min(15));
-        let (m, n) = (height(i, k), height(i, l));
-        if n >= m + 4 {
-            return true;
+/// A noise threshold: `NormalNoise.getValue(x, 0, z)` in [min, max].
+pub(crate) fn noise_threshold(state: *const State, min: f64, max: f64, x: i32, z: i32) -> bool {
+    let value = unsafe { noise_eval(state, x as f64, 0.0, z as f64, 0.0, 0.0, 0) };
+    value >= min && value <= max
+}
+
+/// `SurfaceRules.Context.getMinSurfaceLevel`: the preliminary surface levels
+/// at the column's surface cell corners, interpolated, plus surface depth - 8.
+/// `corners` keeps the last surface cell's levels, as `preliminarySurfaceCache` does.
+pub(crate) fn min_surface_level(levels: &Program, corners: &mut Option<((i32, i32), [i32; 4])>, x: i32, z: i32, surface_depth: i32) -> Result<i32, Error> {
+    let (i, j) = (x >> 4, z >> 4);
+    let cell = match *corners {
+        Some((cell, values)) if cell == (i, j) => values,
+        _ => {
+            let xs = [i << 4, (i + 1) << 4, i << 4, (i + 1) << 4];
+            let zs = [j << 4, j << 4, (j + 1) << 4, (j + 1) << 4];
+            let mut values = [0i32; 4];
+            with_frame(levels, |frame| levels.surface_levels(frame, &xs, &zs, &mut values)).map_err(|_| Error::Evaluation(-5))?;
+            *corners = Some(((i, j), values));
+            values
         }
-        let (o, p) = ((i - 1).max(0), (i + 1).min(15));
-        height(o, j) >= height(p, j) + 4
+    };
+    let fx = ((x & 15) as f32 / 16.0f32) as f64;
+    let fz = ((z & 15) as f32 / 16.0f32) as f64;
+    let level = lerp2(fx, fz, cell[0] as f64, cell[1] as f64, cell[2] as f64, cell[3] as f64);
+    // Mth.floor, then + surfaceDepth - 8.
+    let k = level as i32;
+    let k = if level < k as f64 { k.wrapping_sub(1) } else { k };
+    Ok(k.wrapping_add(surface_depth).wrapping_sub(8))
+}
+
+/// `SurfaceRules.Context.SteepMaterialCondition.compute` on the storage's
+/// `WORLD_SURFACE_WG` heightmap.
+pub(crate) fn steep(storage: &ProtoStorage, x: i32, z: i32) -> bool {
+    let (i, j) = (x & 15, z & 15);
+    let height = |x: i32, z: i32| storage.height(x, z);
+    let (k, l) = ((j - 1).max(0), (j + 1).min(15));
+    let (m, n) = (height(i, k), height(i, l));
+    if n >= m + 4 {
+        return true;
     }
+    let (o, p) = ((i - 1).max(0), (i + 1).min(15));
+    height(o, j) >= height(p, j) + 4
 }
 
 #[cfg(test)]

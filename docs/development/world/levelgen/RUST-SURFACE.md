@@ -24,18 +24,34 @@ otherwise Java resolves the selected quart biome holders per column.
 
 Java still owns the 16×16 X/Z column loop, its per-column context update and
 biome lookup for extensions, registry bindings, noise/random objects,
-temperature and custom callbacks. The badlands and frozen-ocean extensions
+temperature (see [Temperature](#temperature)) and custom callbacks. The badlands and frozen-ocean extensions
 also remain Java (reading and writing Rust-owned storage through a block
 column on eligible chunks). The existing
 `SurfaceRules` Java bindings remain available to extensions and provide a test
-oracle. Carvers' `topMaterial` uses the native rule evaluator through a scalar
-adapter; these contexts retain their supplied Java biome lookup and predicate.
+oracle. Carvers' `topMaterial` runs entirely in Rust on eligible chunks
+([carvers](carver/RUST-CARVERS.md)); other carving keeps the scalar adapter
+with its supplied Java biome lookup and predicate.
 
 Unknown extension rules/conditions, specialized chunk/system/biome-manager
 subclasses, and unusually large/deep rule trees use the incremental Java column
 traversal with native rule evaluation. This preserves callbacks that inspect or
 mutate the chunk. These compatibility paths are not covered by the performance
 claim for shipped rules on ordinary chunks.
+
+## Temperature
+
+`SurfaceRules.Temperature` stays a Java answer, on every route. Java's
+`Biome.getTemperature` keeps a per-thread cache (`Long2FloatLinkedOpenHashMap`
+of 1024 entries, first-in eviction) keyed by position alone, although the
+value depends on the sea level passed in. A biome evaluated at one position
+under two sea levels on one thread therefore answers from cache history, and
+every Java caller (surface rules, precipitation, freezing, structures, entities,
+rendering) shares that cache. A native temperature would neither read nor
+update it. The carvers' native top material calls `coldEnoughToSnow` back at
+the point Java's evaluation would; the SURFACE stage asks Java as before.
+`SnowAndFreezeFeature` (`decoration/freeze.rs`) computes temperatures natively
+and does not observe or update this cache: identical for biomes evaluated
+under one sea level, which shipped presets give every biome.
 
 ## Ordering and arithmetic
 

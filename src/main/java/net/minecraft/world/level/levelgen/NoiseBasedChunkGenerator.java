@@ -309,7 +309,7 @@ public final class NoiseBasedChunkGenerator extends ChunkGenerator {
 		if (NativeCarvers.eligible(chunkAccess, noiseChunk, carvingContext)) {
 			// Rust selects each neighbour's carvers (sampling carver biomes not yet cached) and carves.
 			var selection = NativeCarvers.select(this, this.biomeSource, randomState, chunks, chunkAccess.getPos());
-			if (selection != null && NativeCarvers.run(carvingContext, chunkAccess, aquifer, l, selection, biomeManager2::getBiome)) return;
+			if (selection != null && NativeCarvers.run(carvingContext, chunkAccess, noiseChunk, aquifer, l, selection, biomeManager2)) return;
 		}
 		this.carveAll(chunks, l, randomState, chunkAccess, worldgenRandom, carvingContext, biomeManager2, aquifer, carvingMask);
 	}

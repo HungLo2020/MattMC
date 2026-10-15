@@ -10,6 +10,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.ref.Reference;
 import java.util.function.Function;
+import net.minecraft.world.level.biome.BiomeManager;
 import java.util.concurrent.atomic.AtomicLong;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.SharedConstants;
@@ -66,6 +67,7 @@ final class NativeCarvers {
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final MemorySegment TOP;
+    private static final MemorySegment COLD;
     private static final MemorySegment SIN;
     // The stage running on this thread, for the top-material upcall.
     private static final ThreadLocal<Top> CURRENT = new ThreadLocal<>();
@@ -75,11 +77,15 @@ final class NativeCarvers {
     static final AtomicLong CHUNKS = new AtomicLong();
     // Top-material upcalls answered, so tests can prove the callback ran.
     static final AtomicLong TOP_CALLS = new AtomicLong();
+    // Temperature conditions of native top materials, which Java answers.
+    static final AtomicLong COLD_CALLS = new AtomicLong();
     // Neighbour carver biomes Rust sampled.
     static final AtomicLong SAMPLED = new AtomicLong();
 
     static String statistics() {
-        return "carvedChunks=" + CHUNKS.get() + " carverBiomesSampled=" + SAMPLED.get() + " carverTopCalls=" + TOP_CALLS.get();
+        return "carvedChunks=" + CHUNKS.get() + " carverBiomesSampled=" + SAMPLED.get() + " carverTopCalls=" + TOP_CALLS.get()
+            + " carverTopNative=" + NativeTopMaterial.nativeCalls() + " carverTopDeclined=" + NativeTopMaterial.DECLINED.get() + " carverTopCold=" + COLD_CALLS.get()
+            + " carverTopVerified=" + NativeTopMaterial.verification()[0] + " carverTopMismatched=" + NativeTopMaterial.verification()[1];
     }
 
     static {
@@ -88,6 +94,10 @@ final class NativeCarvers {
                 int.class, int.class, MemorySegment.class, MemorySegment.class, int.class, MemorySegment.class));
             TOP = Linker.nativeLinker().upcallStub(top, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
                 ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS), Arena.global());
+            MethodHandle cold = MethodHandles.lookup().findStatic(NativeCarvers.class, "cold", MethodType.methodType(int.class, int.class, int.class,
+                int.class, int.class));
+            COLD = Linker.nativeLinker().upcallStub(cold, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+                ValueLayout.JAVA_INT, ValueLayout.JAVA_INT), Arena.global());
         } catch (ReflectiveOperationException error) {
             throw new ExceptionInInitializerError(error);
         }
@@ -232,6 +242,9 @@ final class NativeCarvers {
         final BlockPos.MutableBlockPos position = new BlockPos.MutableBlockPos();
         @Nullable
         Throwable failure;
+        /** The chunk's native top material binding, for the temperature upcall. */
+        @Nullable
+        NativeTopMaterial nativeTop;
 
         Top(CarvingContext context, Function<BlockPos, Holder<Biome>> biomes, ChunkAccess chunk) {
             this.context = context;
@@ -261,6 +274,23 @@ final class NativeCarvers {
             return -2;
         } finally {
             if (top.list != null) leaf.set(ValueLayout.JAVA_INT, 0, top.list.previousNativeLeaf());
+        }
+    }
+
+    /** {@code Biome.coldEnoughToSnow} for a native top material's temperature
+     * condition, where Java's evaluation would make the same call: the biome's
+     * per-thread temperature cache sees the same sequence. 1 cold, 0 warm, -2 on failure. */
+    private static int cold(int biome, int x, int y, int z) {
+        Top top = CURRENT.get();
+        if (top == null || top.nativeTop == null) return -2;
+        COLD_CALLS.incrementAndGet();
+        try {
+            Biome value = top.nativeTop.registry.byId(biome);
+            if (value == null) return -2;
+            return value.coldEnoughToSnow(top.position.set(x, y, z), top.nativeTop.seaLevel) ? 1 : 0;
+        } catch (Throwable error) {
+            if (top.failure == null) top.failure = error;
+            return -2;
         }
     }
 
@@ -333,8 +363,9 @@ final class NativeCarvers {
     /** Carves the chunk natively: {@code neighbours} are the configured carvers of
      * every chunk within 8, in applyCarvers' order (x, z, carvers). False, with
      * the chunk untouched, leaves the carving to Java. */
-    static boolean run(CarvingContext context, ChunkAccess chunk, Aquifer aquifer, long seed, Selection selection,
-                       Function<BlockPos, Holder<Biome>> biomes) {
+    static boolean run(CarvingContext context, ChunkAccess chunk, NoiseChunk noise, Aquifer aquifer, long seed, Selection selection,
+                       BiomeManager biomeManager) {
+        Function<BlockPos, Holder<Biome>> biomes = biomeManager::getBiome;
         List<ConfiguredWorldCarver<?>> carvers = selection.tables.carvers();
         for (ConfiguredWorldCarver<?> carver : carvers) {
             if (!supports(carver)) return false;
@@ -441,11 +472,26 @@ final class NativeCarvers {
             int status;
             Top top = new Top(context, biomes, chunk);
             top.list = selection.list;
+            Holder<Biome> fixed = selection.list == null && selection.tables.source() instanceof net.minecraft.world.level.biome.FixedBiomeSource source
+                ? source.possibleBiomes().iterator().next() : null;
+            NativeTopMaterial nativeTop = NativeTopMaterial.create(context, chunk, noise, biomeManager, biomes, selection.list, fixed);
+            top.nativeTop = nativeTop;
             try (Arena arena = Arena.ofConfined()) {
                 int[] intArray = ints.toIntArray();
                 MemorySegment intMemory = arena.allocateFrom(ValueLayout.JAVA_INT, intArray);
                 MemorySegment maskMemory = arena.allocateFrom(ValueLayout.JAVA_LONG, maskWords);
-                long[] pointers = new long[22];
+                long[] pointers = new long[27];
+                MemorySegment leafBiomes = null;
+                if (nativeTop != null) {
+                    pointers[22] = nativeTop.handle;
+                    pointers[23] = nativeTop.zoomSeed;
+                    if (nativeTop.leafBiomes != null) {
+                        leafBiomes = arena.allocateFrom(ValueLayout.JAVA_INT, nativeTop.leafBiomes);
+                        pointers[24] = leafBiomes.address();
+                    }
+                    pointers[25] = nativeTop.fixedBiome;
+                    pointers[26] = COLD.address();
+                }
                 MemorySegment leafSettings = null;
                 if (selection.program != null) {
                     leafSettings = arena.allocateFrom(ValueLayout.JAVA_INT, selection.tables.leafSettings());
@@ -489,6 +535,7 @@ final class NativeCarvers {
                     CURRENT.remove();
                     Reference.reachabilityFence(binding);
                     Reference.reachabilityFence(selection.program);
+                    if (nativeTop != null) Reference.reachabilityFence(nativeTop.keep());
                 }
                 if (status == 0) {
                     // Rust's carver biome choices fill the neighbours' caches; its previous leaf is the thread's.
@@ -518,6 +565,9 @@ final class NativeCarvers {
                 throw error;
             } catch (Throwable error) {
                 throw new IllegalStateException("Native carving failed", error);
+            } finally {
+                // The binding is shared and freed with its NativeTopMaterial; keep it reachable through the stage.
+                Reference.reachabilityFence(nativeTop);
             }
             // Input the stage does not model: Java carves the chunk.
             if (status == -1) return false;

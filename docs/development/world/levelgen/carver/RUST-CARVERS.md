@@ -42,13 +42,25 @@ over:
   (centres, ranking, decision, native fluid statuses and barrier noise, over
   Java's own caches); a disabled aquifer answers its fluid picker.
 
-The only call back into Java is `CarvingContext.topMaterial`, for dirt below a
-carved grass or mycelium block. It is an FFM upcall that first copies the
-storage's current heightmaps into the Java chunk, because the rule may test
-steep, and carries the climate search's previous leaf in and out (the rule's
-biome conditions search the climate tree too). It evaluates the [native surface
-program](../RUST-SURFACE.md), with Java answering the same requests it answers
-for the SURFACE stage. The storage, the mask words, the aquifer's caches and its schedule flag
+`CarvingContext.topMaterial`, for dirt below a carved grass or mycelium
+block, also runs in Rust
+([`surface/scalar.rs`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/surface/scalar.rs),
+bound per chunk by
+[`NativeTopMaterial`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/levelgen/NativeTopMaterial.java)).
+It evaluates the surface rule as `NativeSurface.tryApply` does on a fresh
+context: surface depth from the surface noise and positional random, then
+every request in Rust (band offset, secondary noise, preliminary surface,
+steep on the storage's heightmap, gradients, noise thresholds and biome
+membership). A temperature condition calls Java's `coldEnoughToSnow` back at
+the point Java's evaluation would ([why](../RUST-SURFACE.md#temperature)). The context's biome is looked up lazily, at most
+once per call, as Java's memoized supplier does: the biome manager's zoom, then
+the fixed biome or the climate search from the thread's previous leaf, which
+the lookup moves. A rule needing Java (an extension, a non-native noise or
+random, a biome without a key) binds to null and the stage keeps Java's upcall,
+which copies the storage's heightmaps into the Java chunk first and carries
+the previous leaf in and out.
+`-Dmattmc.worldgen.javaCarverTopMaterial=true` keeps the upcall for every chunk.
+The storage, the mask words, the aquifer's caches and its schedule flag
 install once at the end. Canonical sections use the
 [native handoff](../RUST-STAGE-HANDOFF.md), preserving isolated inputs and
 modified-only installation without Java palette/word reconstruction.
@@ -77,7 +89,38 @@ have. A top-material exception aborts the stage and is rethrown; a failed
 carver-biome sample (`-5`) throws.
 
 The decoration statistics line reports `carvedChunks=`, `carverBiomesSampled=`
-(neighbours Rust sampled) and `carverTopCalls=`.
+(neighbours Rust sampled), `carverTopCalls=` (Java upcalls), `carverTopNative=`,
+`carverTopDeclined=` (chunks whose rule kept the upcall), `carverTopCold=`
+(temperature conditions Java answered), and the verification counts below.
+
+## Known regression: the End
+
+The End's `TheEndBiomeSource` is neither a multi-noise nor a fixed source, so
+its chunks never reach the native stage: Current runs Java's own carver loop.
+Even so, the audit agent's matched `generateCarvers` timing (same workload,
+serial) shows that loop at about 150–170 µs per chunk in Current against
+about 46–53 µs in Frozen. The earliest saved Current baseline
+(`94e748593`) was 391 µs, so the gap predates the native top material and
+the FEATURES transaction. Its cause is **not established**: Java sampling
+attributes Current's time mostly to `WorldGenRegion.getChunk` under
+`carverBiome` and to native end-island noise, but it cannot see native frames.
+This workload is not within the performance budget; it needs its own
+investigation (native-frame profiles of Current and Frozen on an End-only
+run).
+
+## Verify the top material
+
+`-Dmattmc.worldgen.verifyCarverTop=true` (or `NativeTopMaterial.setVerify`)
+runs every native top material and then Java's upcall from the same storage
+state and previous leaf. The stage keeps Java's answer and counts a mismatch
+when the state or the leaf afterwards differs (`carverTopVerified=`,
+`carverTopMismatched=`).
+[`NativeTopMaterialTest`](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/minecraft/world/level/levelgen/NativeTopMaterialTest.java)
+does this over every vanilla setting, three seeds and biome-edge chunks. It
+also uses a floor rule that reaches every request kind, because vanilla
+rules reach only biomes and the preliminary surface from the carvers. It
+checks that the native route makes no Java upcall and that disabling the
+binding keeps the upcall.
 `-Dmattmc.worldgen.javaCarvers=true` keeps Java's carvers for comparisons.
 
 ## Preserve these contracts

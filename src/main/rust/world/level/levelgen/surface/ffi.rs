@@ -58,6 +58,7 @@ pub unsafe extern "C" fn mattmc_surface_step(
 }
 
 use super::chunk::{Biomes, Inputs, Slot, SurfaceChunk};
+use super::scalar::ScalarSurface;
 use crate::world::level::levelgen::random::Positional;
 use crate::world::level::levelgen::router::Program;
 use crate::world::level::levelgen::synth::State;
@@ -106,20 +107,8 @@ fn parse(i: &[i32], seed: i64, l: &[i64], d: &[f64]) -> Option<(i32, Option<Biom
         return None;
     }
     let mut at = 9;
-    let mut slots = Vec::with_capacity(count);
-    for k in 0..count {
-        let h = i.get(at..at + 4)?;
-        slots.push(match h[0] {
-            0 => Slot::Java,
-            1 => Slot::Steep,
-            // Without a band the evaluator's bounds answer every Y.
-            2 if h[1] >= h[2] => Slot::Java,
-            2 => Slot::Gradient { low: h[1], high: h[2], random: Positional::from_abi(h[3], l[k * 2], l[k * 2 + 1])? },
-            3 if l[k * 2] != 0 => Slot::Noise { state: l[k * 2] as *const State, min: d[k * 2], max: d[k * 2 + 1] },
-            _ => return None,
-        });
-        at += 4;
-    }
+    let slots = parse_slots(i.get(at..at + count * 4)?, l, d, false)?;
+    at += count * 4;
     let biomes = if uses_biomes {
         let count = sizes[0] * sizes[1] * sizes[2];
         let ids = i.get(at..at + count)?.to_vec();
@@ -129,6 +118,91 @@ fn parse(i: &[i32], seed: i64, l: &[i64], d: &[f64]) -> Option<(i32, Option<Biom
         None
     };
     (at == i.len()).then_some((default_block, biomes, slots))
+}
+
+/// Condition slots, four ints each: [kind (0 Java, 1 steep, 2 vertical
+/// gradient, 3 noise threshold; with `extended` also 4 biome over id range
+/// [low, low + high), 5 temperature), gradient low, high, positional random
+/// kind]. `l` and `d` hold two values per slot.
+fn parse_slots(h: &[i32], l: &[i64], d: &[f64], extended: bool) -> Option<Vec<Slot>> {
+    let count = h.len() / 4;
+    if h.len() % 4 != 0 || l.len() < count * 2 || d.len() < count * 2 {
+        return None;
+    }
+    (0..count)
+        .map(|k| {
+            let h = &h[k * 4..k * 4 + 4];
+            Some(match h[0] {
+                0 => Slot::Java,
+                1 => Slot::Steep,
+                // Without a band the evaluator's bounds answer every Y.
+                2 if h[1] >= h[2] && !extended => Slot::Java,
+                2 => Slot::Gradient { low: h[1], high: h[2], random: Positional::from_abi(h[3], l[k * 2], l[k * 2 + 1])? },
+                3 if l[k * 2] != 0 => Slot::Noise { state: l[k * 2] as *const State, min: d[k * 2], max: d[k * 2 + 1] },
+                4 if extended => Slot::Biome { start: u32::try_from(h[1]).ok()?, len: u32::try_from(h[2]).ok()? },
+                5 => Slot::Temperature,
+                _ => return None,
+            })
+        })
+        .collect()
+}
+
+/// `SurfaceSystem.topMaterial`'s rule for the carvers ([`ScalarSurface`]).
+/// `slots` holds four ints per slot (see [`parse_slots`], extended kinds
+/// allowed), `slot_longs`/`slot_doubles` two values each; `biome_ids` the biome
+/// slots' sorted registry ids. `inputs`: [band noise, secondary noise,
+/// preliminary surface program, surface noise], none 0. `depth` is the surface
+/// depth's positional random: [kind, a, b]. Returns 0 when the rule cannot be
+/// answered natively.
+/// # Safety
+/// The arrays are readable for their lengths; the states and program stay
+/// alive and unchanged while the handle is used.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_surface_scalar_create(program: *const i32, program_len: i32, slots: *const i32, slot_count: i32, slot_longs: *const i64,
+    slot_doubles: *const f64, biome_ids: *const i32, biome_count: i32, inputs: *const i64, depth: *const i64, way_below_min_y: i32) -> u64 {
+    if program.is_null() || slots.is_null() || slot_longs.is_null() || slot_doubles.is_null() || biome_ids.is_null() || inputs.is_null() || depth.is_null()
+        || !(16..=1 << 20).contains(&program_len) || !(0..=65536).contains(&slot_count) || !(0..=1 << 20).contains(&biome_count)
+    {
+        return 0;
+    }
+    let count = slot_count as usize;
+    let h = unsafe { std::slice::from_raw_parts(slots, count * 4) };
+    let l = unsafe { std::slice::from_raw_parts(slot_longs, count * 2) };
+    let d = unsafe { std::slice::from_raw_parts(slot_doubles, count * 2) };
+    let Some(slots) = parse_slots(h, l, d, true) else { return 0 };
+    let ids = unsafe { std::slice::from_raw_parts(biome_ids, biome_count as usize) }.to_vec();
+    let n = unsafe { std::slice::from_raw_parts(inputs, 4) };
+    let r = unsafe { std::slice::from_raw_parts(depth, 3) };
+    let Some(random) = Positional::from_abi(r[0] as i32, r[1], r[2]) else { return 0 };
+    let inputs = Inputs { band: n[0] as *const State, secondary: n[1] as *const State, levels: n[2] as *const Program };
+    let program = unsafe { std::slice::from_raw_parts(program, program_len as usize) }.to_vec();
+    match unsafe { ScalarSurface::new(program, slots, ids, inputs, n[3] as *const State, random, way_below_min_y) } {
+        Some(scalar) => Box::into_raw(Box::new(scalar)) as u64,
+        None => 0,
+    }
+}
+
+/// The scalar route's answered requests by kind (see [`super::scalar::REQUESTS`]).
+/// # Safety
+/// `out` has eight writable i64s.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_surface_scalar_requests(out: *mut i64) {
+    if out.is_null() {
+        return;
+    }
+    let out = unsafe { std::slice::from_raw_parts_mut(out, 8) };
+    for (k, counter) in super::scalar::REQUESTS.iter().enumerate() {
+        out[k] = counter.load(std::sync::atomic::Ordering::Relaxed) as i64;
+    }
+}
+
+/// # Safety
+/// A handle from `mattmc_surface_scalar_create`, not used afterwards.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_surface_scalar_release(handle: u64) {
+    if handle != 0 {
+        drop(unsafe { Box::from_raw(handle as *mut ScalarSurface) });
+    }
 }
 
 unsafe fn chunk<'a>(handle: u64) -> &'a mut SurfaceChunk {

@@ -3,7 +3,48 @@ use crate::world::level::levelgen::aquifer::substance::Substance;
 use crate::world::level::levelgen::proto_chunk::{ffi::storage, ProtoStorage};
 use crate::world::level::levelgen::random::Positional;
 use crate::world::level::levelgen::router::{Binding, Program};
+use crate::world::level::levelgen::surface::scalar::ScalarSurface;
 use crate::world::level::levelgen::synth::State;
+
+/// Top materials the stage answered natively, for the decoration statistics.
+pub(crate) static NATIVE_TOP_CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The native top-material count since start.
+#[no_mangle]
+pub extern "C" fn mattmc_carvers_native_top_calls() -> i64 {
+    NATIVE_TOP_CALLS.load(std::sync::atomic::Ordering::Relaxed) as i64
+}
+
+/// Verification: each native top material also runs Java's upcall from the same
+/// previous leaf; the state and the leaf afterwards must agree, and the stage
+/// continues with Java's.
+static VERIFY_TOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static TOP_VERIFIED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static TOP_MISMATCHED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// The first mismatch: x, y, z, native state, Java state, native leaf, Java leaf.
+static FIRST_MISMATCH: std::sync::Mutex<Option<[i32; 7]>> = std::sync::Mutex::new(None);
+
+#[no_mangle]
+pub extern "C" fn mattmc_carvers_verify_top(enabled: i32) {
+    VERIFY_TOP.store(enabled != 0, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// [verified, mismatched] counts, then the first mismatch's seven words (or zeros).
+/// # Safety
+/// `out` has nine writable i64s.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_carvers_top_verification(out: *mut i64) {
+    if out.is_null() {
+        return;
+    }
+    let out = unsafe { std::slice::from_raw_parts_mut(out, 9) };
+    out[0] = TOP_VERIFIED.load(std::sync::atomic::Ordering::Relaxed) as i64;
+    out[1] = TOP_MISMATCHED.load(std::sync::atomic::Ordering::Relaxed) as i64;
+    let first = FIRST_MISMATCH.lock().map(|m| m.unwrap_or([0; 7])).unwrap_or([0; 7]);
+    for (k, v) in first.iter().enumerate() {
+        out[2 + k] = *v as i64;
+    }
+}
 
 /// Java's top-material callback: (x, y, z, fluid, WORLD_SURFACE_WG raw,
 /// OCEAN_FLOOR_WG raw, words, the climate search's previous leaf in and out)
@@ -35,7 +76,20 @@ const NODES: usize = 19;
 const NODE_COUNT: usize = 20;
 /// Per climate-tree node: its leaf biome's carver settings index (-1 for branches).
 const LEAF_SETTINGS: usize = 21;
-const POINTERS: usize = 22;
+/// A native top-material binding (`mattmc_surface_scalar_create`), or 0 for Java's upcall.
+const TOP: usize = 22;
+/// The biome manager's zoom seed, for the native top material's biome.
+const ZOOM_SEED: usize = 23;
+/// Each climate leaf's biome registry id (with the climate program), or 0.
+const LEAF_BIOMES: usize = 24;
+/// A fixed biome source's registry id (without a climate program).
+const FIXED_BIOME: usize = 25;
+/// Java's `coldEnoughToSnow(biome registry id, x, y, z)` for the native top
+/// material's temperature condition: 1 cold, 0 warm, negative on failure.
+const COLD: usize = 26;
+const POINTERS: usize = 27;
+
+type ColdCallback = unsafe extern "C" fn(i32, i32, i32, i32) -> i32;
 
 // Fixed int slots before the configurations and operations.
 const HEADER: usize = 39;
@@ -221,13 +275,79 @@ pub unsafe extern "C" fn mattmc_carvers_run(storage_handle: u64, pointers: *cons
         _ => return -1,
     };
     let storage_ptr: *mut ProtoStorage = storage;
-    let mut callback = |x: i32, y: i32, z: i32, fluid: bool, storage: &ProtoStorage| -> Result<i32, i32> {
+    let callback = |x: i32, y: i32, z: i32, fluid: bool, storage: &ProtoStorage| -> Result<i32, i32> {
         let (surface, floor) = (storage.heightmap_raw(false), storage.heightmap_raw(true));
         // Java's top material searches the climate tree too: hand it the previous leaf and take it back.
         let mut leaf = previous.get();
         let state = unsafe { top(x, y, z, fluid as i32, surface.as_ptr(), floor.as_ptr(), height_words as i32, &mut leaf) };
         previous.set(leaf);
         if state < -1 { Err(state) } else { Ok(state) }
+    };
+    let scalar = if p[TOP] == 0 { None } else { Some(unsafe { &*(p[TOP] as *const ScalarSurface) }) };
+    if scalar.is_some() && p[COLD] == 0 {
+        return -1;
+    }
+    // SAFETY: Java passes its upcall stub's address with the binding.
+    let cold_callback: Option<ColdCallback> = (p[COLD] != 0).then(|| unsafe { std::mem::transmute::<usize, ColdCallback>(p[COLD] as usize) });
+    let mut cold = |biome: i32, pos: [i32; 3]| -> Result<bool, ()> {
+        let callback = cold_callback.ok_or(())?;
+        match unsafe { callback(biome, pos[0], pos[1], pos[2]) } {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(()),
+        }
+    };
+    let leaf_biomes: &[i32] = match (&scalar, climate) {
+        (Some(_), Some(_)) if p[LEAF_BIOMES] == 0 => return -1,
+        (Some(_), Some(_)) => unsafe { std::slice::from_raw_parts(p[LEAF_BIOMES] as *const i32, nodes.len()) },
+        _ => &[],
+    };
+    let mut top_sampler = climate.map(|program| crate::world::level::biome::search::Sampler::new(program, nodes, previous.get()));
+    let (zoom_seed, fixed_biome) = (p[ZOOM_SEED], p[FIXED_BIOME] as i32);
+    // BiomeManager.getBiome over the generator's biome source: the zoomed quart,
+    // then the fixed biome or the climate search from the thread's previous leaf.
+    let mut biome_at = |x: i32, y: i32, z: i32| -> Result<i32, ()> {
+        let mut index = [0i32];
+        if unsafe { crate::world::level::biome::fiddled_distance::surface_biomes(zoom_seed, x, z, y, 1, index.as_mut_ptr()) } != 0 {
+            return Err(());
+        }
+        let base_y = (y - 2) >> 2;
+        let q_count = ((y.wrapping_add(1).wrapping_sub(3)) >> 2) - base_y + 2;
+        let column = index[0] / q_count;
+        let (qx, qy, qz) = (((x - 2) >> 2) + (column >> 1), base_y + index[0] % q_count, ((z - 2) >> 2) + (column & 1));
+        match top_sampler.as_mut() {
+            None => Ok(fixed_biome),
+            Some(sampler) => {
+                sampler.previous = previous.get();
+                let leaf = crate::world::level::biome::search::leaf_at(sampler, qx, qy, qz).map_err(|_| ())?;
+                previous.set(sampler.previous);
+                leaf_biomes.get(usize::try_from(leaf).map_err(|_| ())?).copied().ok_or(())
+            }
+        }
+    };
+    let mut native_top = |x: i32, y: i32, z: i32, fluid: bool, storage: &ProtoStorage| -> Result<i32, i32> {
+        match scalar {
+            Some(scalar) if VERIFY_TOP.load(std::sync::atomic::Ordering::Relaxed) => {
+                let before = previous.get();
+                let native = scalar.top_material(storage, x, y, z, fluid, &mut biome_at, &mut cold).map_err(|_| -3);
+                let native_leaf = previous.get();
+                previous.set(before);
+                let java = callback(x, y, z, fluid, storage);
+                TOP_VERIFIED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if native != java || native_leaf != previous.get() {
+                    TOP_MISMATCHED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    if let Ok(mut first) = FIRST_MISMATCH.lock() {
+                        first.get_or_insert([x, y, z, native.unwrap_or_else(|e| e), java.unwrap_or_else(|e| e), native_leaf, previous.get()]);
+                    }
+                }
+                java
+            }
+            Some(scalar) => {
+                NATIVE_TOP_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                scalar.top_material(storage, x, y, z, fluid, &mut biome_at, &mut cold).map_err(|_| -3)
+            }
+            None => callback(x, y, z, fluid, storage),
+        }
     };
     let mut sampler = climate.map(|program| crate::world::level::biome::search::Sampler::new(program, nodes, previous.get()));
     let mut select = |x: i32, z: i32| -> Result<usize, Error> {
@@ -253,7 +373,7 @@ pub unsafe extern "C" fn mattmc_carvers_run(storage_handle: u64, pointers: *cons
         configs: &configs,
         aquifer,
         schedule: i[11] != 0,
-        top: &mut callback,
+        top: &mut native_top,
     };
     let result = stage.run(seed, &mut neighbours, &settings, &mut select);
     let schedule = stage.schedule;

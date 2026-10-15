@@ -4,5 +4,6 @@ mod evaluator;
 mod ffi;
 mod frame;
 mod program;
+pub(crate) mod scalar;
 #[cfg(test)]
 mod tests;

@@ -383,6 +383,18 @@ public class SurfaceSystem {
 		return this.surfaceSecondaryNoise;
 	}
 
+	/** The carvers' native top material bindings for this system (NativeTopMaterial). */
+	volatile Object nativeTopMaterials;
+
+	/** getSurfaceDepth's noise and positional random, for the native carver top material. */
+	NormalNoise surfaceNoise() {
+		return this.surfaceNoise;
+	}
+
+	PositionalRandomFactory noiseRandom() {
+		return this.noiseRandom;
+	}
+
 	int bandOffset(int x, int z) {
 		return (int)Math.round(this.clayBandsOffsetNoise.getValue(x, 0.0, z) * 4.0);
 	}

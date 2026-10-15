@@ -52,9 +52,20 @@ class NativeCarversTest {
 
     /** A chunk through NOISE and SURFACE, then CARVERS with Java's or the native carvers. */
     static NativeNoiseFillTest.Filled carve(Holder<NoiseGeneratorSettings> setting, long seed, ChunkPos pos, boolean nativeCarvers) {
+        return carve(setting, setting.value().surfaceRule(), seed, pos, nativeCarvers);
+    }
+
+    /** {@link #carve} with the SURFACE stage built by {@code surface} (the carvers' top material keeps the setting's rule). */
+    static NativeNoiseFillTest.Filled carve(Holder<NoiseGeneratorSettings> setting, SurfaceRules.RuleSource surface, long seed, ChunkPos pos, boolean nativeCarvers) {
+        return carve(setting, surface, RandomState.create(setting.value(), NativeNoiseFillTest.registries.lookupOrThrow(Registries.NOISE), seed), seed, pos,
+            nativeCarvers);
+    }
+
+    /** {@link #carve} with a given RandomState, so chunks can share its surface system. */
+    static NativeNoiseFillTest.Filled carve(Holder<NoiseGeneratorSettings> setting, SurfaceRules.RuleSource surface, RandomState random, long seed, ChunkPos pos,
+                                            boolean nativeCarvers) {
         var registries = NativeNoiseFillTest.registries;
         var config = setting.value();
-        var random = RandomState.create(config, registries.lookupOrThrow(Registries.NOISE), seed);
         var filled = NativeNoiseFillTest.fill(setting, random, pos, true);
         var chunk = filled.chunk();
         chunk.setPersistedStatus(ChunkStatus.NOISE);
@@ -62,7 +73,7 @@ class NativeCarversTest {
         var generator = new NoiseBasedChunkGenerator(biomeSource, setting);
         var manager = new BiomeManager((x, y, z) -> biomeSource.getNoiseBiome(x, y, z, random.sampler()), BiomeManager.obfuscateSeed(seed));
         random.surfaceSystem().buildSurface(random, manager, registries.lookupOrThrow(Registries.BIOME), config.useLegacyRandomSource(),
-            new WorldGenerationContext(generator, chunk), chunk, filled.noise(), config.surfaceRule());
+            new WorldGenerationContext(generator, chunk), chunk, filled.noise(), surface);
         chunk.setPersistedStatus(ChunkStatus.SURFACE);
         Map<Long, ChunkAccess> neighbours = new HashMap<>();
         var height = LevelHeightAccessor.create(config.noiseSettings().minY(), config.noiseSettings().height());
