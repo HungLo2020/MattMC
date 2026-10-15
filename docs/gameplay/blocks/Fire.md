@@ -1,6 +1,6 @@
 # Fire and Soul Fire
 
-**Fire** and **Soul Fire** are placed hazards and light sources. Create them with an ignition item; neither has an ordinary inventory block item to collect. Breaking either gives no item, including with Silk Touch. For a controllable cooking block, see [Campfires](Campfires.md). [Block registrations][blocks] · [Checked item registry][items] · [Fire loot][fire-loot] · [Soul Fire loot][soul-loot]
+**Fire** and **Soul Fire** are placed hazards and light sources. Create them with an ignition item; neither has an ordinary inventory block item to collect. Breaking either gives no item, including with Silk Touch. For a controllable cooking block, see [Campfires](Campfires.md), including [building beside wood and avoiding accidental ignition](Campfires.md#building-beside-wood). [Block registrations][blocks] · [Checked item registry][items] · [Fire loot][fire-loot] · [Soul Fire loot][soul-loot]
 
 ## Comparing the fires
 

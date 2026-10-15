@@ -31,6 +31,14 @@ In an **ultrawarm dimension such as the Nether**, the bucket handler evaporates 
 
 Rain alone does **not** extinguish these Campfires. Their inherited precipitation callback does nothing, and the cooking ticker does not test weather. [Precipitation callback][rain] · [Campfire callbacks][campfire] · [Cooking ticker][cooking]
 
+### Building beside wood
+
+**Neither Campfire variant spreads fire to neighboring blocks.** A lit Campfire or Soul Campfire can sit on a wooden floor or beside a wooden wall without its own burning behavior igniting that timber. Separate [Fire blocks](Fire.md#support-persistence-and-spread) still have their own spread rules. [Campfire callbacks][hearth-block] · [Server ticker][hearth-ticker] · [Cooking loop][hearth-cooking] · [Inherited tick defaults][hearth-defaults]
+
+Keep players, animals and Bees off the hot block: the [contact-damage rules](#contact-damage-and-immunity) still apply. Turning off `doFireTick` does not itself disable Campfire contact damage. [Current contact callback][hearth-contact] · [Separate Fire tick gate][hearth-fire]
+
+When relighting, aim at the **dry, unlit Campfire**. Flint and Steel or a Fire Charge used on nearby timber, or on a Campfire that is already lit or waterlogged, can instead attempt to place a separate Fire or Soul Fire block beside the clicked face. That placement still needs a suitable destination; the ignition item does not treat every click near the hearth as a Campfire-lighting action. [Relighting eligibility][hearth-can-light] · [Flint and Steel branches][hearth-flint] · [Fire Charge branches][hearth-charge] · [Placed fire selection][hearth-fire-type]
+
 ## Cooking four items
 
 Hold an eligible raw ingredient and **use the block once per item**, without Sneak/Crouch. Each successful use takes one item and fills the first empty cooking slot. You can mix four different eligible foods; you do not need to aim at a particular visible corner. Food can be placed on an unlit Campfire, but it will not cook until the block is lit. Full slots prevent further insertion. Creative insertion keeps the held ingredient while placing a one-item copy. [Block use][food-use] · [First-empty-slot insertion][insert] · [One-item consumption][consume] · [Secondary-use routing][use]
@@ -109,6 +117,8 @@ As a source-derived example, place one Campfire where you can reach it from the 
 ## Verification scope
 
 Source-reviewed at MattMC commit `96e5604a6abaec697de2004b1ba9775e303bfba7` on 2026-10-02. Both registrations, valid block-entity forms and tick dispatch, all bundled campfire recipes, crafting tags, interactions, damage/immunity, smoke, the Taiga acquisition example, trade selection, mining loot, and persistence were checked. No cooking, damage, smoke, Bee, Dispenser, or world-generation gameplay test was run.
+
+Hearth fire-spread boundaries and ignition-tool targeting were additionally source-reviewed on **2026-10-15** at `5f9c0b3b819a72d374882418c0e7c08145096ac4`. Native flags, active tick/contact dispatch and ignition branches were checked; no in-game wooden-building, ignition, fire-spread or damage test was run.
 
 [blocks]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/Blocks.java#L5423-L5447
 [cooking]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/entity/CampfireBlockEntity.java#L41-L100
@@ -198,3 +208,14 @@ Source-reviewed at MattMC commit `96e5604a6abaec697de2004b1ba9775e303bfba7` on 2
 [loot-soul_campfire]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/resources/data/minecraft/loot_table/blocks/soul_campfire.json
 [drop-rule]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/block/Block.java#L411-L416
 [chunk-remove]: https://github.com/HungLo2020/MattMC/blob/96e5604a6abaec697de2004b1ba9775e303bfba7/src/main/java/net/minecraft/world/level/chunk/LevelChunk.java#L311-L357
+
+[hearth-block]: https://github.com/HungLo2020/MattMC/blob/5f9c0b3b819a72d374882418c0e7c08145096ac4/src/main/java/net/minecraft/world/level/block/CampfireBlock.java
+[hearth-ticker]: https://github.com/HungLo2020/MattMC/blob/5f9c0b3b819a72d374882418c0e7c08145096ac4/src/main/java/net/minecraft/world/level/block/CampfireBlock.java#L312-L327
+[hearth-cooking]: https://github.com/HungLo2020/MattMC/blob/5f9c0b3b819a72d374882418c0e7c08145096ac4/src/main/java/net/minecraft/world/level/block/entity/CampfireBlockEntity.java#L53-L100
+[hearth-defaults]: https://github.com/HungLo2020/MattMC/blob/5f9c0b3b819a72d374882418c0e7c08145096ac4/src/main/java/net/minecraft/world/level/block/state/BlockBehaviour.java#L344-L348
+[hearth-contact]: https://github.com/HungLo2020/MattMC/blob/5f9c0b3b819a72d374882418c0e7c08145096ac4/src/main/java/net/minecraft/world/level/block/CampfireBlock.java#L110-L119
+[hearth-fire]: https://github.com/HungLo2020/MattMC/blob/5f9c0b3b819a72d374882418c0e7c08145096ac4/src/main/java/net/minecraft/world/level/block/FireBlock.java#L140-L215
+[hearth-can-light]: https://github.com/HungLo2020/MattMC/blob/5f9c0b3b819a72d374882418c0e7c08145096ac4/src/main/java/net/minecraft/world/level/block/CampfireBlock.java#L334-L338
+[hearth-flint]: https://github.com/HungLo2020/MattMC/blob/5f9c0b3b819a72d374882418c0e7c08145096ac4/src/main/java/net/minecraft/world/item/FlintAndSteelItem.java#L25-L58
+[hearth-charge]: https://github.com/HungLo2020/MattMC/blob/5f9c0b3b819a72d374882418c0e7c08145096ac4/src/main/java/net/minecraft/world/item/FireChargeItem.java#L29-L55
+[hearth-fire-type]: https://github.com/HungLo2020/MattMC/blob/5f9c0b3b819a72d374882418c0e7c08145096ac4/src/main/java/net/minecraft/world/level/block/BaseFireBlock.java#L45-L51
