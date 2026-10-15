@@ -49,6 +49,8 @@ The spin attack lasts up to **20 ticks** and can end early on a living-entity co
 - **Impaling I–V:** adds **2.5 damage per level** against types in the bundled aquatic tag. That includes fish, Guardians, Squids, Dolphins, Turtles, Axolotls, Tadpoles, and both Nautilus types. **Drowned is absent**; simply being wet or underwater does not satisfy this enchantment's target test. [Impaling condition][impaling] · [Target-tag link][impaling-tag] · [Aquatic members][aquatic]
 - **Channeling I:** a successful thrown-Trident hit can summon lightning during a **thunderstorm** when the struck entity can see the sky. Its block-hit branch needs a sky-exposed **Lightning Rod** during a thunderstorm. Ordinary melee hits and rain without thunder do not satisfy those conditions. [Channeling][channeling] · [Entity/block effect dispatch][thrown]
 
+For deliberate block activation, use the [Lightning Rod Channeling checklist](../blocks/LightningRods.md#deliberate-strikes-with-channeling), including target variants, missed shots and strike hazards.
+
 Riptide excludes **Loyalty and Channeling** in normal enchantment combinations; Loyalty and Channeling can be paired with each other. Impaling can accompany either approach. [Riptide exclusions][riptide-exclusive] · [Riptide definition][riptide] · [Impaling definition][impaling]
 
 ### Durability and repair
