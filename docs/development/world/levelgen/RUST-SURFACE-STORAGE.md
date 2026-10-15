@@ -156,8 +156,16 @@ checks or independently inspect the raw measurement artifacts.
 `-Dmattmc.worldgen.javaSurfaceStorage=true` keeps the Java stage loop, for
 comparison runs. Its canonical containers now use
 [Rust live storage](../chunk/RUST-LIVE-SECTIONS.md); the historical measurements
-below predate that ownership change. Stage import/install still builds temporary
-Java arrays and palettes. Direct Rust-to-Rust handoff remains migration work.
+below predate that ownership change.
+
+On the admitted Rust-storage route, canonical section
+[capture](https://github.com/HungLo2020/MattMC/blob/5a9ad77375db1ba37ae9029120d220380f772300/src/main/java/net/minecraft/world/level/levelgen/NativeProtoChunk.java#L81-L96)
+and [result preparation](https://github.com/HungLo2020/MattMC/blob/5a9ad77375db1ba37ae9029120d220380f772300/src/main/java/net/minecraft/world/level/levelgen/NativeProtoChunk.java#L214-L240)
+already use the native handoff. Java palette and packed-word projections remain
+in compatibility fallbacks; Java heightmap and post-processing arrays still
+exist. See [handoff ownership and compatibility](RUST-STAGE-HANDOFF.md#ownership-and-compatibility)
+for the remaining copying, packing and failure limits. The historical timings
+below do not measure this newer transfer path.
 
 ## Preserve these contracts
 
