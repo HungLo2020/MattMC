@@ -35,8 +35,13 @@ reads table 3. Registration happens in two steps:
    each SNBT value
    ([`snbt.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/item/snbt.rs))
    and hands Java NBT, which the component type's own save codec decodes.
+
    Values must bind first because codecs look entries up by name, and tag
    references must exist before tags freeze.
+
+The additional [native component structures](ITEM-COMPONENTS.md) apply inside
+item patches and stacks. Their standalone save codecs, including this bootstrap
+path, remain Java. The item catalog and its SNBT values are unchanged.
 
 Items share one value per distinct component and SNBT (533 values for
 1,728 item components). The distinct values decode in parallel, and

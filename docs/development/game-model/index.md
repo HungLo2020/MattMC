@@ -112,6 +112,9 @@ one set of systems.
 - [Native value types](NATIVE-VALUES.md) (current): int and float providers,
   level-based values, particle options and position sources, decoded,
   validated and encoded by Rust with DFU's error and partial-result rules.
+- [Persistent item component codecs](ITEM-COMPONENTS.md) (current): native
+  component structures, original Java leaves, bootstrap and encoder-cache
+  constraints, and component-specific parity checks.
 - [Rust block registry](RUST-BLOCK-REGISTRY.md) (current): how Phase 1 works,
   how to add a column or consumer, constraints and tests.
 - [Native block state definitions](BLOCK-DEFINITIONS.md) (current work): ordered

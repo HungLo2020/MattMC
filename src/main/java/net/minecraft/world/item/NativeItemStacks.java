@@ -51,6 +51,12 @@ public final class NativeItemStacks {
 	private record Native(BiFunction<Object, NativeData.Context, Object> project, BiFunction<Object, NativeData.Builder, Object> unproject) {
 	}
 
+	/** Adapts a typed projection without initializing component registries at codec construction. */
+	@SuppressWarnings("unchecked")
+	private static <E> Native nativeValue(NativeData.Projector<E> projector, NativeData.Unprojector<E> unprojector) {
+		return new Native(projector::project, (value, builder) -> unprojector.unproject((E)value, builder));
+	}
+
 	private static Native same() {
 		return new Native((value, context) -> value, (value, builder) -> value);
 	}
@@ -69,6 +75,21 @@ public final class NativeItemStacks {
 
 	private static Map<DataComponentType<?>, Native> natives() {
 		Map<String, Native> byName = Map.ofEntries(
+			Map.entry("break_sound", nativeValue(NativeItemComponentValues::sound, NativeItemComponentValues::sound)),
+			Map.entry("repairable", nativeValue(NativeItemComponentValues::repairable, NativeItemComponentValues::repairable)),
+			Map.entry("enchantable", nativeValue(NativeItemComponentValues::enchantable, NativeItemComponentValues::enchantable)),
+			Map.entry("damage_resistant", nativeValue(NativeItemComponentValues::damageResistant, NativeItemComponentValues::damageResistant)),
+			Map.entry("trim", nativeValue(NativeItemComponentValues::trim, NativeItemComponentValues::trim)),
+			Map.entry("instrument", nativeValue(NativeItemComponentValues::instrument, NativeItemComponentValues::instrument)),
+			Map.entry("jukebox_playable", nativeValue(NativeItemComponentValues::jukebox, NativeItemComponentValues::jukebox)),
+			Map.entry("provides_trim_material", nativeValue(NativeItemComponentValues::providesTrim, NativeItemComponentValues::providesTrim)),
+			Map.entry("banner_patterns", nativeValue(NativeItemComponentValues::bannerPatterns, NativeItemComponentValues::bannerPatterns)),
+			Map.entry("food", nativeValue(NativeItemComponentValues::food, NativeItemComponentValues::food)),
+			Map.entry("attribute_modifiers", nativeValue(NativeItemComponentValues::attributes, NativeItemComponentValues::attributes)),
+			Map.entry("potion_contents", nativeValue(NativeItemComponentValues::potion, NativeItemComponentValues::potion)),
+			Map.entry("suspicious_stew_effects", nativeValue(NativeItemComponentValues::stew, NativeItemComponentValues::stew)),
+			Map.entry("written_book_content", nativeValue(NativeItemComponentValues::writtenBook, NativeItemComponentValues::writtenBook)),
+			Map.entry("bees", nativeValue(NativeItemComponentValues::bees, NativeItemComponentValues::bees)),
 			Map.entry("max_stack_size", same()),
 			Map.entry("max_damage", same()),
 			Map.entry("damage", same()),
@@ -213,6 +234,11 @@ public final class NativeItemStacks {
 			if (v == null) {
 				builder.remove(type);
 			} else {
+				if (v instanceof NativeData.Variant delegated && delegated.index() == 0xFFFF) {
+					// Custom DynamicOps kept the original complete component codec.
+					builder.set(type, context.slot(delegated.fields()[0], type.codecOrThrow()));
+					return;
+				}
 				Native n = NATIVE.get(type);
 				builder.set(type, n != null ? n.project().apply(v, context) : context.slot(v, type.codecOrThrow()));
 			}

@@ -7,6 +7,7 @@
 pub mod enchant;
 pub mod ffi;
 pub mod items;
+pub mod item_components;
 pub mod registries;
 pub mod schema;
 pub mod text;
@@ -53,8 +54,11 @@ pub fn decode(index: usize, network: bool, node: &Node, mode: Mode, registry_ops
 
 /// [`decode`], keeping a failure's partial definition (`DataResult.Error`'s partial).
 pub fn decode_partial(index: usize, network: bool, node: &Node, mode: Mode, registry_ops: bool) -> Result<Definition, Failed> {
+    decode_partial_with_context(index, network, node, Cx::new(mode, registry_ops))
+}
+
+pub fn decode_partial_with_context(index: usize, network: bool, node: &Node, mut cx: Cx) -> Result<Definition, Failed> {
     let reg = registry(index)?;
-    let mut cx = Cx::new(mode, registry_ops);
     match schema::decode(if network { reg.network } else { reg.direct }, node, &mut cx) {
         Ok(value) => Ok(Definition { registry: index, network, value, slots: cx.slots, logs: cx.logs }),
         Err(fail) => Err(Failed {

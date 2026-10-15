@@ -247,6 +247,21 @@ pub fn component_schema(path: &str) -> Option<&'static S> {
         "pot_decorations" => &POT_DECORATIONS,
         "charged_projectiles" => &ITEM_LIST,
         "use_remainder" => &ITEM_STACK,
+        "break_sound" => &super::item_components::BREAK_SOUND,
+        "repairable" => &super::item_components::REPAIRABLE,
+        "enchantable" => &super::item_components::ENCHANTABLE,
+        "damage_resistant" => &super::item_components::DAMAGE_RESISTANT,
+        "trim" => &super::item_components::TRIM,
+        "instrument" => &super::item_components::INSTRUMENT,
+        "jukebox_playable" => &super::item_components::JUKEBOX_PLAYABLE,
+        "provides_trim_material" => &super::item_components::PROVIDES_TRIM_MATERIAL,
+        "banner_patterns" => &super::item_components::BANNER_PATTERNS,
+        "food" => &super::item_components::FOOD,
+        "attribute_modifiers" => &super::item_components::ATTRIBUTE_MODIFIERS,
+        "potion_contents" => &super::item_components::POTION_CONTENTS,
+        "suspicious_stew_effects" => &super::item_components::SUSPICIOUS_STEW_EFFECTS,
+        "written_book_content" => &super::item_components::WRITTEN_BOOK_CONTENT,
+        "bees" => &super::item_components::BEES,
         _ => return None,
     })
 }
@@ -282,6 +297,14 @@ fn decode_value(path: &str, removed: bool, node: &Node, cx: &mut Cx) -> DR {
             Value::Map(_) => Ok(D::Absent),
             _ => Err(schema::not_msg("map", node, cx.mode).into()),
         };
+    }
+    if cx.generic_component_ops && super::item_components::is_bulk_component(path) {
+        // Reserved component-only tag: distinguishes a complete component from a native
+        // schema whose root happens to be a delegated holder slot.
+        return schema::map_result(
+            schema::java_delegate(schema::JAVA_COMPONENT, 0, &format!("minecraft:{path}"), node, cx),
+            |slot| D::Variant(u16::MAX, vec![slot]),
+        );
     }
     match component_schema(path) {
         Some(s) => schema::decode(s, node, cx),
@@ -346,6 +369,7 @@ fn encode_patch(d: &D) -> R<O<'_>> {
     let D::Map(entries) = d else { return Err("not a component patch".into()) };
     let mut out = Vec::new();
     for (path, value) in entries {
+        let value = complete_component_slot(path, value);
         match value {
             D::Absent => out.push((std::borrow::Cow::Borrowed(patch_keys(path).ok_or("unknown component")?.1.as_str()), O::Map(Vec::new()))),
             value => {
@@ -365,10 +389,20 @@ fn encode_patch(d: &D) -> R<O<'_>> {
 fn check_patch(d: &D) -> R<()> {
     let D::Map(entries) = d else { return Ok(()) };
     for (path, value) in entries {
+        let value = complete_component_slot(path, value);
         if let (Some(s), false) = (component_schema(path), matches!(value, D::Absent | D::Slot(_))) {
             schema::check(s, value)?;
         }
     }
     Ok(())
+}
+
+/// Stored definitions retain the generic-ops callback marker too; both
+/// checking and encoding must use its complete component slot.
+fn complete_component_slot<'a>(path: &str, value: &'a D) -> &'a D {
+    match value {
+        D::Variant(u16::MAX, fields) if super::item_components::is_bulk_component(path) => &fields[0],
+        other => other,
+    }
 }
 

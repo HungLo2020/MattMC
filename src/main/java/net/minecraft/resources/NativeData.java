@@ -54,6 +54,8 @@ public final class NativeData {
 	private static final Cleaner CLEANER = Cleaner.create();
 	private static final MethodHandle DECODE_FILE = handle("mattmc_data_decode_file",
 		FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
+	private static final MethodHandle DECODE_FILE_GENERIC_COMPONENTS = handle("mattmc_data_decode_file_generic_components",
+		FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 	private static final MethodHandle DECODE_TREE = handle("mattmc_data_decode_tree",
 		FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 	private static final MethodHandle PAYLOAD = handle("mattmc_data_payload",
@@ -168,11 +170,13 @@ public final class NativeData {
 		@Override
 		public <T> DataResult<Pair<E, T>> decode(DynamicOps<T> ops, T input) {
 			requireBlocks();
+			boolean nativeComponents = nativeComponentInput(ops, input);
 			List<T> nodes = new ArrayList<>();
 			Out out = new Out();
 			write(ops, input, nodes, out);
 			// NbtOps reads numbers as booleans; JsonOps does not.
-			int mode = ops.getBooleanValue(ops.createInt(1)).isSuccess() ? 1 : 0;
+			int mode = (ops.getBooleanValue(ops.createInt(1)).isSuccess() ? 1 : 0)
+				| (nativeComponents ? 0 : 4);
 			boolean registryOps = ops instanceof RegistryOps<?>;
 			byte[] bytes = out.toByteArray();
 			NativeValues.DataCall call;
@@ -196,12 +200,13 @@ public final class NativeData {
 		/** Decodes a data pack file's bytes; references resolve against {@code ops}. */
 		public DataResult<E> decodeFile(RegistryOps<JsonElement> ops, byte[] bytes) {
 			requireBlocks();
+			MethodHandle decoder = nativeComponentOps(ops) ? DECODE_FILE : DECODE_FILE_GENERIC_COMPONENTS;
 			NativeValues.DataCall call;
 			try (Arena arena = Arena.ofConfined()) {
 				MemorySegment segment = copy(arena, bytes);
 				// Java codecs Rust calls back decode the file's JSON with the loader's ops.
 				call = NativeValues.dataCall(ops, List.of(), JAVA_THROWN_HANDLE, () ->
-					(long)DECODE_FILE.invokeExact(this.kind.ordinal(), this.network ? 1 : 0, segment, (long)bytes.length));
+					(long)decoder.invokeExact(this.kind.ordinal(), this.network ? 1 : 0, segment, (long)bytes.length));
 			} catch (Throwable e) {
 				throw new IllegalStateException("Rust data decode failed", e);
 			}
@@ -682,6 +687,46 @@ public final class NativeData {
 	/** The ops a {@code RegistryOps} delegates to, or {@code ops} itself. */
 	static DynamicOps<?> opsBase(DynamicOps<?> ops) {
 		return ops instanceof RegistryOps<?> registryOps ? registryOps.delegate : ops;
+	}
+
+	/** Only the exact transparent registry wrapper may admit native component structures. */
+	static boolean nativeComponentOps(DynamicOps<?> ops) {
+		DynamicOps<?> base = ops.getClass() == RegistryOps.class ? ((RegistryOps<?>)ops).delegate : ops;
+		return base == JsonOps.INSTANCE || base == net.minecraft.nbt.NbtOps.INSTANCE;
+	}
+
+	/** Decline before conversion: arbitrary Number implementations can run code. */
+	static boolean nativeComponentInput(DynamicOps<?> ops, Object input) {
+		if (!nativeComponentOps(ops)) return false;
+		if (ops instanceof RegistryOps<?> registryOps && !registryOps.hasControlledFinalizedLookups()) return false;
+		return !(input instanceof JsonElement json) || inertJsonScalars(json);
+	}
+
+	private static boolean inertJsonScalars(@Nullable JsonElement json) {
+		return switch (json) {
+			case null -> true;
+			case JsonNull ignored -> true;
+			case JsonObject object -> {
+				boolean inert = true;
+				for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
+					if (!inertJsonScalars(entry.getValue())) { inert = false; break; }
+				}
+				yield inert;
+			}
+			case JsonArray array -> {
+				boolean inert = true;
+				for (JsonElement element : array) if (!inertJsonScalars(element)) { inert = false; break; }
+				yield inert;
+			}
+			case JsonPrimitive primitive -> {
+				if (!primitive.isNumber()) yield true;
+				Class<?> type = primitive.getAsNumber().getClass();
+				yield type == Byte.class || type == Short.class || type == Integer.class || type == Long.class
+					|| type == Float.class || type == Double.class || type == LazilyParsedNumber.class
+					|| type == java.math.BigInteger.class || type == java.math.BigDecimal.class;
+			}
+			default -> false;
+		};
 	}
 
 	/** {@link #write} for {@code NbtOps}: maps, collections, strings and numbers. */

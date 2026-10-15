@@ -421,6 +421,9 @@ impl PartialEq for D {
 /// Decoding state: the source's rules, delegated input nodes and logged partial errors.
 pub struct Cx {
     pub mode: Mode,
+    /// The new bulk item-component schemas only specialize the exact JSON/NBT
+    /// ops. Other ops retain their original complete component codec callback.
+    pub generic_component_ops: bool,
     /// Whether the source is a `RegistryOps` (registry references resolve; otherwise sounds are inline).
     pub registry_ops: bool,
     pub slots: Vec<Option<Node>>,
@@ -429,7 +432,7 @@ pub struct Cx {
 
 impl Cx {
     pub fn new(mode: Mode, registry_ops: bool) -> Cx {
-        Cx { mode, registry_ops, slots: Vec::new(), logs: Vec::new() }
+        Cx { mode, registry_ops, generic_component_ops: false, slots: Vec::new(), logs: Vec::new() }
     }
     fn slot(&mut self, node: Option<Node>) -> D {
         self.slots.push(node);

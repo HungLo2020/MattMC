@@ -198,10 +198,10 @@ class NativeDataTest {
         var ops = registries.createSerializationContext(JsonOps.INSTANCE);
         @SuppressWarnings("unchecked")
         var codec = (NativeData.DataCodec<Object>)(Object)codecs(NativeData.Kind.PAINTING_VARIANT)[0];
-        Codec<?> food = net.minecraft.core.component.DataComponents.FOOD.codecOrThrow();
+        Codec<?> consumable = net.minecraft.core.component.DataComponents.CONSUMABLE.codecOrThrow();
         Codec<?> tool = net.minecraft.core.component.DataComponents.TOOL.codecOrThrow();
         String title = "{\"text\":\"a\",\"hover_event\":{\"action\":\"show_item\",\"id\":\"minecraft:stone\",\"components\":"
-            + "{\"minecraft:food\":{\"nutrition\":\"x\",\"saturation\":1},\"minecraft:tool\":{\"rules\":5}}}}";
+            + "{\"minecraft:consumable\":{\"consume_seconds\":\"x\"},\"minecraft:tool\":{\"rules\":5}}}}";
         String file = "{\"width\":99,\"height\":3,\"asset_id\":\"minecraft:a\",\"title\":" + title + "}";
         String textError = net.minecraft.network.chat.ComponentSerialization.CODEC.parse(ops, com.google.gson.JsonParser.parseString(title))
             .error().orElseThrow().message();
@@ -214,16 +214,16 @@ class NativeDataTest {
         assertEquals(messages[1], messages[0]);
         assertTrue(messages[0].contains(textError), messages[0]);
         assertTrue(messages[0].contains("99"), messages[0]);
-        assertEquals(List.of(food, tool, food, tool), calls);
+        assertEquals(List.of(consumable, tool, consumable, tool), calls);
 
         // A nested answer larger than Rust's buffer is retried, not decoded again.
         calls.clear();
         String longMessage = "y".repeat(5000);
-        NativeValuesTest.withDelegates(c -> c != food ? c : NativeValuesTest.watched(c, () -> {
+        NativeValuesTest.withDelegates(c -> c != consumable ? c : NativeValuesTest.watched(c, () -> {
             calls.add(c);
             return com.mojang.serialization.DataResult.error(() -> longMessage);
         }), () -> assertTrue(codec.decodeFile(ops, file.getBytes(java.nio.charset.StandardCharsets.UTF_8))
             .error().orElseThrow().message().contains(longMessage)));
-        assertEquals(List.of(food), calls);
+        assertEquals(List.of(consumable), calls);
     }
 }

@@ -29,9 +29,12 @@ public record EitherHolder<T>(Either<Holder<T>, ResourceKey<T>> contents) {
 		Codec<ResourceKey<T>> unresolvedKeys = new Codec<ResourceKey<T>>() {
 			@Override
 			public <O> DataResult<Pair<ResourceKey<T>, O>> decode(DynamicOps<O> dynamicOps, O object) {
-				return dynamicOps instanceof RegistryOps<O> registryOps && registryOps.keepsUnresolvedKeys()
-					? keys.decode(dynamicOps, object)
-					: DataResult.error(() -> "Cannot parse as key without registry");
+				// Validate the key before applying the bootstrap-only permission,
+				// as the original key codec did even when keys were disallowed.
+				return keys.decode(dynamicOps, object).flatMap(pair ->
+					dynamicOps instanceof RegistryOps<O> registryOps && registryOps.keepsUnresolvedKeys()
+						? DataResult.success(pair)
+						: DataResult.error(() -> "Cannot parse as key without registry"));
 			}
 
 			@Override

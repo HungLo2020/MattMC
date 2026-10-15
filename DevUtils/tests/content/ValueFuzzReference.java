@@ -595,6 +595,130 @@ public final class ValueFuzzReference {
         }
     }
 
+    record ComponentCase(String path, String input) {}
+
+    static final ComponentCase[] ITEM_COMPONENT_INPUTS = {
+        new ComponentCase("break_sound", "\"minecraft:entity.generic.eat\""),
+        new ComponentCase("repairable", "{\"items\":[\"minecraft:stone\",\"minecraft:stick\"]}"),
+        new ComponentCase("repairable", "{\"items\":\"#minecraft:logs\"}"),
+        new ComponentCase("enchantable", "{\"value\":12}"),
+        new ComponentCase("damage_resistant", "{\"types\":\"#minecraft:is_fire\"}"),
+        new ComponentCase("trim", "{\"material\":\"minecraft:iron\",\"pattern\":\"minecraft:coast\"}"),
+        new ComponentCase("instrument", "\"minecraft:ponder_goat_horn\""),
+        new ComponentCase("jukebox_playable", "\"minecraft:cat\""),
+        new ComponentCase("provides_trim_material", "\"minecraft:iron\""),
+        new ComponentCase("banner_patterns", "[{\"pattern\":\"minecraft:stripe_bottom\",\"color\":\"red\"},{\"pattern\":\"minecraft:cross\",\"color\":\"blue\"}]"),
+        new ComponentCase("food", "{\"nutrition\":4,\"saturation\":2.4,\"can_always_eat\":true}"),
+        new ComponentCase("attribute_modifiers", "[{\"type\":\"minecraft:attack_damage\",\"id\":\"test:boost\",\"amount\":1.5,\"operation\":\"add_value\",\"slot\":\"mainhand\",\"display\":{\"type\":\"override\",\"value\":{\"text\":\"bonus\"}}}]"),
+        new ComponentCase("attribute_modifiers", "[{\"type\":\"minecraft:attack_damage\",\"id\":\"test:boost\",\"amount\":1.5,\"operation\":\"add_value\"}]"),
+        new ComponentCase("potion_contents", "{\"potion\":\"minecraft:healing\",\"custom_color\":123,\"custom_effects\":[{\"id\":\"minecraft:speed\",\"duration\":100}],\"custom_name\":\"boost\"}"),
+        new ComponentCase("potion_contents", "\"minecraft:healing\""),
+        new ComponentCase("suspicious_stew_effects", "[{\"id\":\"minecraft:speed\",\"duration\":100}]"),
+        new ComponentCase("written_book_content", "{\"title\":{\"raw\":\"Test\",\"filtered\":\"Safe\"},\"author\":\"Tester\",\"pages\":[\"page\",{\"raw\":{\"text\":\"raw\"},\"filtered\":{\"text\":\"safe\"}}],\"generation\":1,\"resolved\":false}"),
+        new ComponentCase("bees", "[{\"entity_data\":{\"id\":\"minecraft:bee\",\"Health\":10.0},\"ticks_in_hive\":2,\"min_ticks_in_hive\":10}]"),
+        new ComponentCase("enchantments", "{\"minecraft:sharpness\":2,\"minecraft:unbreaking\":1}"),
+        new ComponentCase("stored_enchantments", "{\"minecraft:sharpness\":2}"),
+        new ComponentCase("enchantments", "{\"sharpness\":2,\"minecraft:sharpness\":3}")
+    };
+
+    /** Registry-aware component, patch, stack, nested-container and hover cases.
+     * The same observer compiles unchanged against Frozen and Current; no
+     * native implementation is used to construct its expected outcomes.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static void itemComponents(List<String> out, boolean fullContract) throws ReflectiveOperationException {
+        try (var packs = new net.minecraft.server.packs.resources.MultiPackResourceManager(net.minecraft.server.packs.PackType.SERVER_DATA,
+                List.of(net.minecraft.server.packs.repository.ServerPacksSource.createVanillaPackSource()))) {
+            var layers = net.minecraft.server.RegistryLayer.createRegistryAccess();
+            var tags = net.minecraft.tags.TagLoader.loadTagsForExistingRegistries(packs, layers.getLayer(net.minecraft.server.RegistryLayer.STATIC));
+            var lookups = net.minecraft.tags.TagLoader.buildUpdatedLookups(layers.getAccessForLoading(net.minecraft.server.RegistryLayer.WORLDGEN), tags);
+            var loaded = net.minecraft.resources.RegistryDataLoader.load(packs, lookups, net.minecraft.resources.RegistryDataLoader.WORLDGEN_REGISTRIES);
+            var access = layers.replaceFrom(net.minecraft.server.RegistryLayer.WORLDGEN, loaded).compositeAccess();
+            var jsonOps = access.createSerializationContext(JsonOps.INSTANCE);
+            var nbtOps = access.createSerializationContext(NbtOps.INSTANCE);
+            var successfulTypes = new java.util.HashSet<String>();
+            int caseNumber = 0;
+            for (var fixture : ITEM_COMPONENT_INPUTS) {
+                Codec<Object> direct = (Codec<Object>)net.minecraft.core.registries.BuiltInRegistries.DATA_COMPONENT_TYPE
+                    .getValue(net.minecraft.resources.ResourceLocation.withDefaultNamespace(fixture.path())).codecOrThrow();
+                JsonElement root = json(fixture.input());
+                if (direct.parse(jsonOps, root).isSuccess()) successfulTypes.add(fixture.path());
+                List<JsonElement> inputs = new ArrayList<>();
+                inputs.add(root);
+                for (var replacement : REPLACEMENTS) if (replacement != null) inputs.add(replacement);
+                List<List<Object>> paths = new ArrayList<>();
+                paths(root, List.of(), paths);
+                for (var path : paths) for (var replacement : REPLACEMENTS) inputs.add(mutate(root, path, replacement));
+                for (var input : inputs) {
+                    var patch = new JsonObject();
+                    patch.add("minecraft:" + fixture.path(), input.deepCopy());
+                    var stack = new JsonObject();
+                    stack.addProperty("id", "minecraft:stick");
+                    stack.add("components", patch);
+                    var nested = json("{\"id\":\"minecraft:shulker_box\",\"components\":{\"minecraft:container\":[{\"slot\":0}]}}").getAsJsonObject();
+                    nested.getAsJsonObject("components").getAsJsonArray("minecraft:container").get(0).getAsJsonObject().add("item", stack);
+                    var hover = json("{\"text\":\"parent\",\"hover_event\":{\"action\":\"show_item\",\"id\":\"minecraft:stick\"}}").getAsJsonObject();
+                    hover.getAsJsonObject("hover_event").add("components", patch);
+                    Codec<?>[] codecs = {direct, net.minecraft.core.component.DataComponentPatch.CODEC, net.minecraft.world.item.ItemStack.CODEC,
+                        net.minecraft.world.item.ItemStack.SINGLE_ITEM_CODEC, net.minecraft.world.item.ItemStack.CODEC,
+                        field(net.minecraft.network.chat.ComponentSerialization.class, "CODEC")};
+                    JsonElement[] forms = {input, patch, stack, stack, nested, hover};
+                    for (int route = 0; route < forms.length; route++) {
+                        Codec<Object> codec = (Codec<Object>)codecs[route];
+                        String j, n;
+                        try { j = fullContract ? componentDecodeOutcome(codec, jsonOps, forms[route], jsonOps, nbtOps)
+                            : componentOutcome(codec, codec.parse(jsonOps, forms[route]), jsonOps, nbtOps); }
+                        catch (Throwable e) { j = thrown(e); }
+                        try {
+                            var tag = JsonOps.INSTANCE.convertTo(NbtOps.INSTANCE, forms[route]);
+                            n = fullContract ? componentDecodeOutcome(codec, nbtOps, tag, jsonOps, nbtOps)
+                                : componentOutcome(codec, codec.parse(nbtOps, tag), jsonOps, nbtOps);
+                        }
+                        catch (Throwable e) { n = thrown(e); }
+                        out.add("item_component " + fixture.path() + " " + caseNumber + " " + route + " json=" + j + " | nbt=" + n);
+                    }
+                    caseNumber++;
+                }
+            }
+            var expected = new java.util.HashSet<String>();
+            for (var fixture : ITEM_COMPONENT_INPUTS) expected.add(fixture.path());
+            if (!successfulTypes.equals(expected)) {
+                expected.removeAll(successfulTypes);
+                throw new IllegalStateException("No successful direct fixture for " + expected);
+            }
+            out.add("component_coverage types=" + successfulTypes.size() + " mutated_inputs=" + caseNumber + " routes=6");
+        }
+    }
+
+    /** Observe the full public Codec contract, including metadata parse() drops. */
+    static <T> String componentDecodeOutcome(Codec<Object> codec, com.mojang.serialization.DynamicOps<T> ops, T input,
+            net.minecraft.resources.RegistryOps<JsonElement> jsonOps, net.minecraft.resources.RegistryOps<net.minecraft.nbt.Tag> nbtOps) {
+        var decoded = codec.decode(ops, input);
+        String value = componentOutcome(codec, decoded.map(com.mojang.datafixers.util.Pair::getFirst), jsonOps, nbtOps);
+        String remainder = decoded.resultOrPartial().map(pair -> String.valueOf(pair.getSecond())
+            + " same_input=" + (pair.getSecond() == input)).orElse("absent");
+        String encoded = decoded.resultOrPartial().map(pair -> {
+            var result = codec.encode(pair.getFirst(), ops, ops.empty());
+            return " lifecycle=" + result.lifecycle() + " error=" + result.error().map(DataResult.Error::message)
+                + " result=" + result.resultOrPartial();
+        }).orElse("absent");
+        return value + " decode_lifecycle=" + decoded.lifecycle() + " remainder=" + remainder + " encode=" + encoded;
+    }
+
+    static String componentOutcome(Codec<Object> codec, DataResult<Object> result,
+            net.minecraft.resources.RegistryOps<JsonElement> jsonOps, net.minecraft.resources.RegistryOps<net.minecraft.nbt.Tag> nbtOps) {
+        String message = result.error().map(e -> "ERR " + e.message()).orElse("OK");
+        if (!result.hasResultOrPartial()) return message;
+        Object value = result.resultOrPartial().orElseThrow();
+        try {
+            var j = codec.encodeStart(jsonOps, value);
+            var n = codec.encodeStart(nbtOps, value);
+            return message + (result.isError() ? " partial=" : " ")
+                + (j.isError() ? "ERR " + j.error().orElseThrow().message() : j.getOrThrow().toString())
+                + " nbt=" + (n.isError() ? "ERR " + n.error().orElseThrow().message() : n.getOrThrow().toString());
+        } catch (Throwable e) { return message + " encode=" + thrown(e); }
+    }
+
     public static void main(String[] args) throws Exception {
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();
@@ -602,10 +726,14 @@ public final class ValueFuzzReference {
         sections.put("values", new ArrayList<>());
         sections.put("worldgen", new ArrayList<>());
         sections.put("enchant", new ArrayList<>());
-        values(sections.get("values"));
-        worldgen(sections.get("worldgen"));
-        enchant(sections.get("enchant"));
+        sections.put("item_components", new ArrayList<>());
+        sections.put("item_component_contract", new ArrayList<>());
         var selected = args.length > 1 ? List.of(args).subList(1, args.length) : List.copyOf(sections.keySet());
+        if (selected.contains("values")) values(sections.get("values"));
+        if (selected.contains("worldgen")) worldgen(sections.get("worldgen"));
+        if (selected.contains("enchant")) enchant(sections.get("enchant"));
+        if (selected.contains("item_components")) itemComponents(sections.get("item_components"), false);
+        if (selected.contains("item_component_contract")) itemComponents(sections.get("item_component_contract"), true);
         var text = new StringBuilder();
         var summary = new StringBuilder("VALUE_FUZZ_REFERENCE");
         for (String section : selected) {

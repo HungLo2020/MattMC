@@ -446,10 +446,24 @@ fn guarded(f: impl FnOnce() -> Result<Definition, super::Failed>) -> i64 {
 /// Decodes a data pack file of `registry` into the store; returns its handle.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_data_decode_file(registry: i32, network: i32, bytes: *const u8, len: i64) -> i64 {
-    let input = slice(bytes, len);
+    decode_file_with_component_ops(registry, network, slice(bytes, len), false)
+}
+
+/// File decoding with the original complete component codecs for custom ops.
+/// The original file export and its ABI retain their existing behavior.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_data_decode_file_generic_components(registry: i32, network: i32, bytes: *const u8, len: i64) -> i64 {
+    decode_file_with_component_ops(registry, network, slice(bytes, len), true)
+}
+
+fn decode_file_with_component_ops(registry: i32, network: i32, input: &[u8], generic_component_ops: bool) -> i64 {
     // Java parses text that isn't JSON itself, for the loader's own exception.
     let Ok(node) = crate::content::json::parse_into::<Node>(input) else { return JSON_INVALID_HANDLE };
-    guarded(|| super::decode_partial(registry as usize, network != 0, &node, Mode::Json, true))
+    guarded(|| {
+        let mut cx = super::schema::Cx::new(Mode::Json, true);
+        cx.generic_component_ops = generic_component_ops;
+        super::decode_partial_with_context(registry as usize, network != 0, &node, cx)
+    })
 }
 
 /// Decodes a value tree from Java (`mode` 0 JsonOps, 1 NbtOps) into the store; returns its handle.
@@ -458,7 +472,9 @@ pub unsafe extern "C" fn mattmc_data_decode_tree(registry: i32, network: i32, mo
     let input = slice(bytes, len);
     guarded(|| {
         let node = In { bytes: input, pos: 0, next_index: 0 }.node()?;
-        super::decode_partial(registry as usize, network != 0, &node, if mode == 1 { Mode::Nbt } else { Mode::Json }, registry_ops != 0)
+        let mut cx = super::schema::Cx::new(if mode & 1 == 1 { Mode::Nbt } else { Mode::Json }, registry_ops != 0);
+        cx.generic_component_ops = mode & 4 != 0;
+        super::decode_partial_with_context(registry as usize, network != 0, &node, cx)
     })
 }
 
@@ -517,8 +533,13 @@ pub unsafe extern "C" fn mattmc_value_decode(kind: i32, mode: i32, bounded: i32,
     let bounds = (bounded != 0).then_some(super::values::Bounds { min, max });
     // Bit 0: NbtOps; bit 1: RegistryOps (registry file codecs take references).
     let registry_ops = mode & 2 != 0;
+    let generic_component_ops = mode & 4 != 0;
     let mode = if mode & 1 == 1 { Mode::Nbt } else { Mode::Json };
-    value_result(input, out, capacity, |node| super::values::decode(kind as usize, node, mode, registry_ops, bounds))
+    value_result(input, out, capacity, |node| {
+        let mut cx = super::schema::Cx::new(mode, registry_ops);
+        cx.generic_component_ops = generic_component_ops;
+        super::values::decode_with_context(kind as usize, node, bounds, cx)
+    })
 }
 
 /// Decodes one dispatch case of a value kind from a map without `type`
@@ -528,8 +549,13 @@ pub unsafe extern "C" fn mattmc_value_decode_case(kind: i32, mode: i32, case: *c
     let input = slice(bytes, len);
     let case = String::from_utf8_lossy(slice(case, case_len)).into_owned();
     let registry_ops = mode & 2 != 0;
+    let generic_component_ops = mode & 4 != 0;
     let mode = if mode & 1 == 1 { Mode::Nbt } else { Mode::Json };
-    value_result(input, out, capacity, |node| super::values::decode_case(kind as usize, &case, node, mode, registry_ops))
+    value_result(input, out, capacity, |node| {
+        let mut cx = super::schema::Cx::new(mode, registry_ops);
+        cx.generic_component_ops = generic_component_ops;
+        super::values::decode_case_with_context(kind as usize, &case, node, cx)
+    })
 }
 
 /// Data component types whose value codecs are native (u32 count, paths).

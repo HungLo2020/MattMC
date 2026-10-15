@@ -70,11 +70,14 @@ native codec.
 
 ## Item components
 
-- **Native components:** a component whose value codec is native is decoded
-  and encoded by Rust. Its schema is in `component_schema` in `items.rs`, and
-  its projection is in `NativeItemStacks` and `NativeItemComponents`. There
-  are 35 so far, including the plain values, text, lore and containers.
+- **Native patch routes:** Rust's patch path has schemas and projections for
+  50 components, including plain values, text, lore and containers. Schemas
+  are in `component_schema` in `items.rs`; projections are in `NativeItemStacks`,
+  `NativeItemComponents` and `NativeItemComponentValues`. Cached encodings
+  continue through Java's registered codec as described below.
   `NativeItemStacks` checks at startup that the Java and Rust lists match.
+  The [component codec guide](ITEM-COMPONENTS.md) describes the additional
+  structures, original standalone codecs, custom-ops fallback and Java leaves.
 - **Other components:** every other component runs its Java codec while Rust
   decodes (`schema::java_delegate`), so errors and partial results still
   compose exactly.
@@ -97,7 +100,7 @@ native codec.
   conditions, validated against the component's context), damage types,
   attributes, game events, block state providers, block predicates,
   explosion particles, holder sets and sound events.
-- **Data packs:** for a file Rust parsed, a leaf's JSON text is sent to the
+- **Data packs:** for a file Rust parsed, a leaf's binary input tree is sent to the
   callback; `NativeValues.dataCall` gives the decode a frame, and an
   exception the leaf throws leaves the load as that same exception.
 - **Ordering:** a component map of eight or more entries iterates in identity

@@ -302,7 +302,10 @@ pub struct Bounds {
 /// Decodes a value of kind `index`, then checks `bounds`; the context holds
 /// delegated slots and logs.
 pub fn decode(index: usize, node: &super::value::Node, mode: super::value::Mode, registry_ops: bool, bounds: Option<Bounds>) -> (super::schema::DR, super::schema::Cx) {
-    let mut cx = super::schema::Cx::new(mode, registry_ops);
+    decode_with_context(index, node, bounds, super::schema::Cx::new(mode, registry_ops))
+}
+
+pub fn decode_with_context(index: usize, node: &super::value::Node, bounds: Option<Bounds>, mut cx: super::schema::Cx) -> (super::schema::DR, super::schema::Cx) {
     let kind = match kind(index) {
         Ok(kind) => kind,
         Err(error) => return (Err(error.into()), cx),
@@ -335,6 +338,10 @@ pub fn case_names(index: usize) -> R<Vec<&'static str>> {
 /// One dispatch case's fields from a map without `type` (the case's
 /// `MapCodec`, as a type registry holds it), wrapped as the full kind decodes.
 pub fn decode_case(index: usize, case_name: &str, node: &super::value::Node, mode: super::value::Mode, registry_ops: bool) -> (super::schema::DR, super::schema::Cx) {
+    decode_case_with_context(index, case_name, node, super::schema::Cx::new(mode, registry_ops))
+}
+
+pub fn decode_case_with_context(index: usize, case_name: &str, node: &super::value::Node, mut cx: super::schema::Cx) -> (super::schema::DR, super::schema::Cx) {
     use super::schema::{check_result, decode_fields, map_result};
     fn within(s: &'static S, name: &str, node: &super::value::Node, cx: &mut super::schema::Cx) -> Option<super::schema::DR> {
         Some(match s {
@@ -356,7 +363,6 @@ pub fn decode_case(index: usize, case_name: &str, node: &super::value::Node, mod
             _ => return None,
         })
     }
-    let mut cx = super::schema::Cx::new(mode, registry_ops);
     let name = case_name.strip_prefix("minecraft:").unwrap_or(case_name);
     let result = match kind(index) {
         Ok(kind) => within(kind.schema, name, node, &mut cx).unwrap_or_else(|| Err(format!("No case {case_name} in value kind {index}").into())),

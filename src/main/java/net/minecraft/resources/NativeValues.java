@@ -67,7 +67,20 @@ public final class NativeValues {
 		STRUCTURES,
 		BIOMES,
 		CARVERS,
-		FEATURES;
+		FEATURES,
+		/** Item component leaves (content/data/item_components.rs). */
+		TRIM_MATERIAL,
+		TRIM_PATTERN,
+		INSTRUMENT_HOLDER,
+		JUKEBOX_HOLDER,
+		PROVIDED_TRIM_MATERIAL,
+		BANNER_PATTERN,
+		MOB_EFFECT,
+		POTION_HOLDER,
+		MOB_EFFECT_INSTANCE,
+		BOOK_PAGE,
+		BEE_ENTITY_DATA,
+		ITEM_ATTRIBUTE_DISPLAY;
 
 		static final JavaCodec[] VALUES = values();
 
@@ -98,6 +111,18 @@ public final class NativeValues {
 				case BIOMES -> Conditions.BIOMES;
 				case CARVERS -> net.minecraft.world.level.biome.NativeBiomes.CARVERS;
 				case FEATURES -> net.minecraft.world.level.biome.NativeBiomes.FEATURES;
+				case TRIM_MATERIAL -> net.minecraft.world.item.equipment.trim.TrimMaterial.CODEC;
+				case TRIM_PATTERN -> net.minecraft.world.item.equipment.trim.TrimPattern.CODEC;
+				case INSTRUMENT_HOLDER -> Conditions.INSTRUMENT_HOLDER;
+				case JUKEBOX_HOLDER -> Conditions.JUKEBOX_HOLDER;
+				case PROVIDED_TRIM_MATERIAL -> Conditions.PROVIDED_TRIM_MATERIAL;
+				case BANNER_PATTERN -> net.minecraft.world.level.block.entity.BannerPattern.CODEC;
+				case MOB_EFFECT -> net.minecraft.world.effect.MobEffect.CODEC;
+				case POTION_HOLDER -> net.minecraft.world.item.alchemy.Potion.CODEC;
+				case MOB_EFFECT_INSTANCE -> net.minecraft.world.effect.MobEffectInstance.CODEC;
+				case BOOK_PAGE -> net.minecraft.world.item.component.WrittenBookContent.CONTENT_CODEC;
+				case BEE_ENTITY_DATA -> Conditions.BEE_ENTITY_DATA;
+				case ITEM_ATTRIBUTE_DISPLAY -> net.minecraft.world.item.component.ItemAttributeModifiers.Display.CODEC;
 			};
 		}
 
@@ -121,6 +146,10 @@ public final class NativeValues {
 			static final Codec<?> ENCHANTMENTS = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.ENCHANTMENT);
 			static final Codec<?> STRUCTURES = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.STRUCTURE);
 			static final Codec<?> BIOMES = net.minecraft.core.RegistryCodecs.homogeneousList(net.minecraft.core.registries.Registries.BIOME);
+			static final Codec<?> INSTRUMENT_HOLDER = net.minecraft.world.item.EitherHolder.codec(net.minecraft.core.registries.Registries.INSTRUMENT, net.minecraft.world.item.Instrument.CODEC);
+			static final Codec<?> JUKEBOX_HOLDER = net.minecraft.world.item.EitherHolder.codec(net.minecraft.core.registries.Registries.JUKEBOX_SONG, net.minecraft.world.item.JukeboxSong.CODEC);
+			static final Codec<?> PROVIDED_TRIM_MATERIAL = net.minecraft.world.item.EitherHolder.codec(net.minecraft.core.registries.Registries.TRIM_MATERIAL, net.minecraft.world.item.equipment.trim.TrimMaterial.CODEC);
+			static final Codec<?> BEE_ENTITY_DATA = net.minecraft.world.item.component.TypedEntityData.codec(net.minecraft.world.entity.EntityType.CODEC);
 		}
 	}
 
@@ -500,13 +529,17 @@ public final class NativeValues {
 				frame.ops = (DynamicOps<Object>)ops;
 				frame.nodes.clear();
 				frame.resolved.clear();
+				boolean nativeComponents = NativeData.nativeComponentInput(ops, input);
 				NativeData.Out out = scratch.out;
 				out.reset();
 				NativeData.write(ops, input, (List<T>)frame.nodes, out);
 				DynamicOps<?> base = NativeData.opsBase(ops);
-				// Bit 0: NbtOps reads numbers as booleans; bit 1: RegistryOps, whose registry file codecs (sounds) take references.
+				// Bit 0: NBT boolean rules; bit 1: registry references.
+				// Bit 2 keeps the newly transferred components on their original
+				// codecs for custom ops, whose errors/partials a tree cannot describe.
 				int mode = (base == net.minecraft.nbt.NbtOps.INSTANCE ? 1 : base == JsonOps.INSTANCE ? 0 : ops.getBooleanValue(ops.createInt(1)).isSuccess() ? 1 : 0)
-					| (ops instanceof RegistryOps<?> ? 2 : 0);
+					| (ops instanceof RegistryOps<?> ? 2 : 0)
+					| (nativeComponents ? 0 : 4);
 				state.frames.push(frame);
 				ByteBuffer in;
 				try {
