@@ -44,6 +44,14 @@ Pumpkin and Melon are in the Axe mining tag, and neither registration requires a
 
 These plants and fruits do **not** inherit MattMC's empty-hand crop reset or **3 × 3 hoe harvesting**. A hoe is useful for preparing soil, but use ordinary block harvesting for fruit. [Wheat-style harvest controls][crop] · [Registered block types][registry]
 
+### Piston fruit harvesting
+
+Aim a [Piston](Pistons.md#facing-and-power) at the **fruit's intended position**, not at the stem or its Farmland. Both Pumpkins and Melons **break instead of moving intact** when the Piston extends into them; a Sticky Piston is unnecessary for this cutting action. The current native definitions give both fruits the destroy reaction, and the active Piston path runs their block loot before removing them. [Native fruit definitions][piston-definitions] · [Destroy property][piston-physics] · [Extension decision][piston-resolver] · [Destruction and drops][piston-drops]
+
+Keep the stem and suitable fruit-floor block in place, then **retract the head so the fruit position is air again**. Losing its attached fruit returns the stem to age 7, but an extended head or water occupying the target prevents a new fruit there. If several sides remain valid, fruit can grow outside a single Piston's reach; cover those positions or keep only the intended growing space valid. Blocking the other directions does not remove the wasted attempts described above. [Mature-stem recovery][piston-attached] · [Direction and air checks][piston-growth]
+
+With bundled loot and block drops enabled, each Piston-broken **Pumpkin yields one Pumpkin**, while each **Melon yields 3–7 Melon Slices**. The drop call supplies an **empty tool**, so it gets neither Silk Touch nor a Fortune bonus; holding an enchanted tool while operating the mechanism does not change that context. Use manual Silk Touch harvesting when you need whole Melon drops. These are loose items: arrange [separate item collection](Hopper.md#picking-up-dropped-items), without replacing the fruit's required growing floor with a Hopper. This is source-derived harvesting guidance, not a tested circuit or collection-efficiency claim. [Empty-tool loot context][piston-tool] · [Pumpkin loot][piston-pumpkin-loot] · [Melon loot][piston-melon-loot] · [Block-drop gate][piston-drop-gate]
+
 ## Carving a Pumpkin
 
 Use **Shears** on an uncarved Pumpkin to replace it with a [Carved Pumpkin](../items/CarvedPumpkin.md) and drop **4 Pumpkin Seeds**. The action normally attempts **one point of Shears wear**, subject to normal durability modifiers. It changes the placed block rather than giving an additional uncarved Pumpkin. [Carving interaction][carve] · [Carving loot][carve-loot]
@@ -57,6 +65,8 @@ Related: [Pumpkin item](../items/Pumpkin.md) · [Melon item](../items/Melon.md) 
 Source-reviewed on **2026-10-01** at `4285adff2e35307c277a3a5bf54ebd064aa5e64b`. No in-game generation, layout comparison, Bone Meal, harvesting, or carving test was run. Recipes and loot describe bundled data; data packs can replace them.
 
 The review checked the registered block types, their current growth and neighbor-update signatures, [block-state dispatch][dispatch], and the server's [random-tick][ticks] and [block-use][use] callers. [Registry loading][worldgen] and [biome decoration][decoration] connect the natural-patch resources to generation. [Loot loading][loot-loading] connects the checked block and carving tables to server drops.
+
+Piston harvesting was source-reviewed on **2026-10-15** at `e1c35961991261469c934bf07f724b99a418ba55`, including native push properties, the active destruction/drop path, mature-stem recovery and growth clearance. No farm, circuit, timing or item-collection test was run. Earlier citations retain their original review scope.
 
 [plains]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/resources/data/minecraft/worldgen/biome/plains.json
 [forest]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/resources/data/minecraft/worldgen/biome/forest.json
@@ -94,3 +104,13 @@ The review checked the registered block types, their current growth and neighbor
 [sparse-placement]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/resources/data/minecraft/worldgen/placed_feature/patch_melon_sparse.json
 [broken-guard]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/java/net/minecraft/world/item/ItemStack.java#L354-L370
 [wear]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/java/net/minecraft/world/item/ItemStack.java#L449-L485
+[piston-definitions]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/rust/content/block/definitions/catalog.rs#L389-L394
+[piston-physics]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/rust/content/block/definitions/physics.rs#L450-L455
+[piston-resolver]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/block/piston/PistonStructureResolver.java#L37-L47
+[piston-drops]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/block/piston/PistonBaseBlock.java#L264-L301
+[piston-attached]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/block/AttachedStemBlock.java#L63-L80
+[piston-growth]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/block/StemBlock.java#L72-L96
+[piston-tool]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/block/Block.java#L355-L384
+[piston-pumpkin-loot]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/resources/data/minecraft/loot_table/blocks/pumpkin.json#L1-L21
+[piston-melon-loot]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/resources/data/minecraft/loot_table/blocks/melon.json#L1-L70
+[piston-drop-gate]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/block/Block.java#L420-L425

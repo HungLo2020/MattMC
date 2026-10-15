@@ -49,12 +49,26 @@ pale moss patches, a water lake's freezing pass) the same way.
 
 Still Java: End spikes (crystal entities), the End gateway and platform,
 fossils (their two template placements run natively), planted huge fungi, and
-features without an encoder. Structure starts and legacy (non-template)
-structure pieces such as mineshafts also stay Java; at about 3% of the
-overworld feature step, mineshafts are the largest of those. They run through the step
-loop's upcall in Java's order. `freeze_top_layer` reads block light from Java
-(a pure upcall); its biome temperature is a pure function of position, so
-Java's per-thread temperature cache never changes a result.
+features without an encoder. Java retains structure-step dispatch in the original
+order and the piece objects, but supported starts and legacy pieces, including
+mineshafts, now use [native structure planning and placement](../structure/RUST-STRUCTURE-PIECES.md).
+Unsupported paths retain Java fallbacks. The earlier mineshaft estimate, roughly 3% of the Overworld feature step,
+describes the preceding Java route, not its current Java-only cost. This boundary
+was source-reviewed at `e1c35961991261469c934bf07f724b99a418ba55` on 2026-10-15;
+no generation or performance test was rerun. [Start dispatch][current-start-dispatch] ·
+[Piece dispatch and fallback][current-piece-dispatch]
+
+`freeze_top_layer` reads block light from Java and computes biome temperature
+directly. That currently assumes stateless temperature equivalence; it does not
+mirror Java's cache history. Java keeps a **per-Biome, per-thread cache keyed only
+by packed position**, although a cache miss calculates temperature using the
+supplied **sea level**. Reusing the same Biome instance and position on one thread
+with different sea levels can therefore make the cached history observable;
+the cache cannot be declared irrelevant unconditionally. This is a source-identified
+parity limitation at the revision above, with correction and acceptance pending,
+not a repaired behavior or a mixed-sea-level runtime result from this wiki review.
+[Java cache scope][temperature-cache] · [Calculation, lookup and sea-level callers][temperature-lookup] ·
+[Native temperature path][native-temperature]
 
 ## Contracts to preserve
 
@@ -192,3 +206,9 @@ See [recorded results](RUST-DECORATION-RESULTS.md).
 3. Read through `level_block_state` (void air outside the world) and write
    through `set_block`; predicates through `Placement::test`.
 4. Run FULL parity, shadow verification and a profile, then time it.
+
+[current-start-dispatch]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/levelgen/structure/Structure.java#L97-L115
+[current-piece-dispatch]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/levelgen/structure/StructureStart.java#L89-L108
+[temperature-cache]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/biome/Biome.java#L64-L72
+[temperature-lookup]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/biome/Biome.java#L113-L185
+[native-temperature]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/rust/world/level/levelgen/decoration/freeze.rs#L66-L112
