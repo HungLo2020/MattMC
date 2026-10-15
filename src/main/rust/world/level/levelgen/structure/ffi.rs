@@ -650,13 +650,17 @@ pub unsafe extern "C" fn mattmc_structure_stub(
     }
 }
 
+/// The largest saved monument origin magnitude the native planner accepts.
+const MONUMENT_ORIGIN_LIMIT: u32 = 1 << 30;
+
 /// `OceanMonumentStructure.regeneratePiecesAfterLoad` for a non-empty saved
 /// start: `setLargeFeatureSeed(seed, chunk)`, the direction draw, then the
 /// building at the saved first piece's box minX/minZ with its saved
 /// orientation (2D data value, or -1 for none: the drawn direction). Writes the
 /// piece words (`OceanMonumentPieces.addNativePieces`) to `out` and the final
-/// Legacy seed to `state[0]`. Returns the word count, or negative when `out`
-/// is too small or the input is invalid (Java then regenerates).
+/// Legacy seed to `state[0]`. Returns the word count, or negative (writing
+/// nothing) when `out` is too small, the input is invalid or the saved origin
+/// is outside the planner's safe envelope: Java then regenerates.
 /// # Safety
 /// `out` has `capacity` writable i32s; `state` one writable i64.
 #[no_mangle]
@@ -665,16 +669,26 @@ pub unsafe extern "C" fn mattmc_structure_monument_regenerate(seed: i64, chunk_x
     if out.is_null() || state.is_null() || capacity < 0 {
         return -1;
     }
-    let mut random = crate::world::level::levelgen::random::Legacy::new(0);
-    random.set_large_feature_seed(seed, chunk_x, chunk_z);
-    let orientation = if orientation < 0 { None } else { Some(orientation) };
-    let Ok(words) = super::monument_plan::plan_at(&mut random, min_x, min_z, orientation) else { return -1 };
+    // Every planned coordinate lies within (-128, +256) of the saved origin (the
+    // building's 58-block box, room boxes within -47..+64 moved by a point inside
+    // it), so within this envelope neither Java's int arithmetic nor the
+    // planner's can wrap. Outside it Java's own body regenerates, wrapping as Java does.
+    if min_x.unsigned_abs() > MONUMENT_ORIGIN_LIMIT || min_z.unsigned_abs() > MONUMENT_ORIGIN_LIMIT {
+        return -3;
+    }
+    let planned = std::panic::catch_unwind(|| {
+        let mut random = crate::world::level::levelgen::random::Legacy::new(0);
+        random.set_large_feature_seed(seed, chunk_x, chunk_z);
+        let orientation = if orientation < 0 { None } else { Some(orientation) };
+        super::monument_plan::plan_at(&mut random, min_x, min_z, orientation).map(|words| (words, random.state()))
+    });
+    let Ok(Ok((words, final_state))) = planned else { return -1 };
     if words.len() > capacity as usize {
         return -2;
     }
     unsafe {
         std::ptr::copy_nonoverlapping(words.as_ptr(), out, words.len());
-        *state = random.state();
+        *state = final_state;
     }
     words.len() as i32
 }

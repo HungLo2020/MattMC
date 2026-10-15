@@ -99,7 +99,11 @@ and planners. A monument loaded from disk regenerates its building in Rust too
 (always consumed), then the building at the saved first piece's box minX/minZ
 with its saved orientation (the drawn one when none was saved), rebuilt by
 `OceanMonumentPieces.addNativePieces`. An empty saved start is returned as it
-is; a declined call runs Java's own body, whose random is local to it.
+is; a declined call runs Java's own body, whose random is local to it. A saved
+origin with |minX| or |minZ| above 2^30 is declined before the planner: every
+planned coordinate lies within a few hundred blocks of the origin, so inside
+that envelope neither Java's nor Rust's integer arithmetic can wrap, and
+outside it Java's body wraps as Java does.
 `monumentsRegenerated=` counts them, and
 [`NativeMonumentRegenerationTest`](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/minecraft/world/level/levelgen/structure/structures/NativeMonumentRegenerationTest.java)
 compares the regenerated building, rooms, child pieces and final random state

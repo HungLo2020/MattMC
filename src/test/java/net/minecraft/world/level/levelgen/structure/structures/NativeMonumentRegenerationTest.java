@@ -164,6 +164,46 @@ class NativeMonumentRegenerationTest {
 		assertNotEquals(east, south, "orientation changes the regenerated building");
 	}
 
+	/** Saved origins outside the planner's safe envelope (|minX|, |minZ| <= 2^30)
+	 * decline before the native planner and keep Java's own body, which wraps as
+	 * Java does; the envelope's edge still plans natively. Each axis, both bounds,
+	 * every orientation and none. */
+	@Test void extremeSavedOriginsKeepJava() throws Exception {
+		int edge = 1 << 30;
+		int[] outside = {Integer.MAX_VALUE - 10, Integer.MIN_VALUE + 10, edge + 1, -edge - 1};
+		List<Direction> orientations = new ArrayList<>(Direction.Plane.HORIZONTAL.stream().toList());
+		var chunk = new ChunkPos(-3, 8);
+		int declined = 0;
+		for (int value : outside) {
+			for (int axis = 0; axis < 2; axis++) {
+				int minX = axis == 0 ? value : 100, minZ = axis == 1 ? value : -100;
+				for (int o = 0; o <= orientations.size(); o++) {
+					boolean none = o == orientations.size();
+					Direction direction = none ? Direction.NORTH : orientations.get(o);
+					String context = "origin " + minX + "," + minZ + " orientation " + (none ? "null" : direction);
+					long[] state = {12345};
+					assertNull(NativeStructureStubsAccess.regenerate(7, chunk, minX, minZ, none ? null : direction, state), context + " must decline");
+					assertEquals(12345, state[0], () -> context + ": a decline writes nothing");
+					var container = saved(minX, minZ, direction, none);
+					long before = NativeStructureStubsAccess.monumentsRegenerated();
+					var java = regenerate(chunk, 7, container, false);
+					var candidate = regenerate(chunk, 7, container, true);
+					assertEquals(before, NativeStructureStubsAccess.monumentsRegenerated(), () -> context + " stays on Java's path");
+					assertEquals(describe(java), describe(candidate), () -> context);
+					declined++;
+				}
+			}
+		}
+		for (int value : new int[]{edge, -edge}) {
+			var container = saved(value, -value, Direction.WEST, false);
+			long before = NativeStructureStubsAccess.monumentsRegenerated();
+			var candidate = regenerate(chunk, 7, container, true);
+			assertEquals(before + 1, NativeStructureStubsAccess.monumentsRegenerated(), "the envelope edge " + value + " plans natively");
+			assertEquals(describe(regenerate(chunk, 7, container, false)), describe(candidate), "edge " + value);
+		}
+		System.out.println("MONUMENT_EXTREME declined=" + declined);
+	}
+
 	@Test void emptyContainerIsReturnedUnchanged() {
 		var empty = new PiecesContainer(List.of());
 		long before = NativeStructureStubsAccess.monumentsRegenerated();
