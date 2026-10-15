@@ -62,7 +62,7 @@ import org.slf4j.Logger;
 public final class NativeDecoration {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final int PLACED = 1, NOT_PLACED = 0, UNAVAILABLE_CHUNK = -2, BROKEN_BINDING = -3, JAVA_ROUTE = -4, PANIC = -5, CALLBACK_FAILED = -6;
-	private static final int OP_UPDATE_SHAPE_AT_EDGE = 1, OP_BEEHIVE_PRESENT = 2, OP_STORE_BEES = 3, OP_PLACE_JAVA = 4, OP_TEST_PREDICATE = 5, OP_STRUCTURES = 6, OP_PLACE_FEATURE = 7, OP_JAVA_STEP = 8, OP_MATH_LOG = 9, OP_FAR_STATE = 10, OP_FAR_HEIGHT = 11, OP_FAR_BIOME = 12, OP_MATH_POW = 13, OP_MATH_SIN = 14, OP_MATH_COS = 15, OP_BLOCK_LIGHT = 16, OP_STURDY = 17, OP_CENTER_SUPPORT = 18, OP_BIOME_TAG = 19, OP_COLLISION_FACE = 20, OP_TOUCH = 21;
+	private static final int OP_UPDATE_SHAPE_AT_EDGE = 1, OP_BEEHIVE_PRESENT = 2, OP_STORE_BEES = 3, OP_PLACE_JAVA = 4, OP_TEST_PREDICATE = 5, OP_STRUCTURES = 6, OP_PLACE_FEATURE = 7, OP_JAVA_STEP = 8, OP_MATH_LOG = 9, OP_FAR_STATE = 10, OP_FAR_HEIGHT = 11, OP_FAR_BIOME = 12, OP_MATH_POW = 13, OP_MATH_SIN = 14, OP_MATH_COS = 15, OP_BLOCK_LIGHT = 16, OP_STURDY = 17, OP_CENTER_SUPPORT = 18, OP_BIOME_TAG = 19, OP_COLLISION_FACE = 20, OP_TOUCH = 21, OP_WARM = 22;
 	private static final MethodHandle CREATE = handle("program_create", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 	private static final MethodHandle RELEASE = handle("program_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
 	private static final MethodHandle PLAN_CREATE = handle("plan_create", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
@@ -197,6 +197,8 @@ public final class NativeDecoration {
 	/** Native placements by outermost feature kind (1 ore, 2 replace blobs, 3 glowstone, 4 spring, 5–7 selectors, 8 tree). */
 	private static final java.util.concurrent.atomic.LongAdder[] NATIVE_BY_KIND = adders(64);
 	private static final java.util.concurrent.atomic.LongAdder PIECES = new java.util.concurrent.atomic.LongAdder();
+	// SnowAndFreezeFeature temperatures Java answered (OP_WARM).
+	static final java.util.concurrent.atomic.LongAdder WARM_CALLS = new java.util.concurrent.atomic.LongAdder();
 	/** Step loops whose biome set Java gathered. */
 	private static final java.util.concurrent.atomic.LongAdder JAVA_BIOME_SETS = new java.util.concurrent.atomic.LongAdder();
 	/** Replayed events by kind (decoration/write.rs numbering). */
@@ -266,7 +268,8 @@ public final class NativeDecoration {
 			+ " nativeByKind=" + sums(NATIVE_BY_KIND) + " eventsByKind=" + sums(EVENTS_BY_KIND)
 			+ (VERIFY ? " verified=" + VERIFIED.sum() + " mismatched=" + MISMATCHED.sum() : "")
 			+ " templates=" + TEMPLATES.sum() + " javaTemplates=" + new java.util.TreeMap<>(JAVA_TEMPLATES).toString().replace(' ', '_') + " pieces=" + PIECES.sum()
-			+ " javaPieces=" + new java.util.TreeMap<>(JAVA_PIECES).toString().replace(' ', '_') + " " + NativeCarvers.statistics() + " javaBiomeSets=" + JAVA_BIOME_SETS.sum() + " columnHeights=" + NativeColumns.HEIGHTS.get()
+			+ " javaPieces=" + new java.util.TreeMap<>(JAVA_PIECES).toString().replace(' ', '_') + " " + NativeCarvers.statistics() + " javaBiomeSets=" + JAVA_BIOME_SETS.sum() + " columnHeights=" + NativeColumns.HEIGHTS.get() + " freezeWarmCalls=" + WARM_CALLS.sum()
+			+ (VERIFY ? " freezeHistoryVerified=" + NativeFreezeVerification.VERIFIED.sum() + " freezeHistoryMismatched=" + NativeFreezeVerification.MISMATCHED.sum() : "")
 			+ " " + NativeJigsaw.statistics() + " structureStubs=" + NativeStructureStubs.PLANNED.get() + " sequenced=" + SEQUENCED.sum() + " sequenceDeclined=" + SEQUENCE_DECLINED.sum() + " sequenceResumed=" + SEQUENCE_RESUMED.sum()
 			+ " txOverlaps=" + net.minecraft.world.level.chunk.DecorationTransaction.OVERLAPS.sum() + " txConflicts=" + net.minecraft.world.level.chunk.DecorationTransaction.CONFLICTS.sum()
 			+ " upcalls=" + upcallSummary() + " setupMs=" + new java.util.TreeMap<>(SETUP_NANOS).entrySet().stream().map(e -> e.getKey() + "=" + e.getValue().sum() / 1_000_000)
@@ -685,6 +688,8 @@ public final class NativeDecoration {
 		int[][] before = VERIFY ? region.captureStatesForVerification() : null;
 		long[] levelRandom = VERIFY ? randomState(level.getRandom()) : null;
 		var maps = VERIFY ? region.mapsForVerification() : null;
+		// SnowAndFreezeFeature (kind 42): Java's per-thread temperature caches must evolve identically.
+		var freeze = VERIFY && program.kind == 42 ? NativeFreezeVerification.begin(region.biomeValues(), level, origin) : null;
 		var call = new Call(region, level, generator, random, program.javaFeatures, program.javaPredicates);
 		call.javaSteps = program.javaSteps;
 		var previous = CURRENT.get();
@@ -717,7 +722,8 @@ public final class NativeDecoration {
 					boolean nativeHas = gaussian.nativeHas();
 					double nativeValue = gaussian.nativeValue();
 					gaussian.nativeSet(gaussianBefore, gaussianValueBefore);
-					verify(region, before, maps, level, generator, random, feature, origin, levelRandom);
+					if (freeze != null) freeze.afterNative();
+					verify(region, before, maps, level, generator, random, feature, origin, levelRandom, freeze);
 					if (gaussian.nativeHas() != nativeHas || nativeHas && Double.doubleToRawLongBits(gaussian.nativeValue()) != Double.doubleToRawLongBits(nativeValue)) {
 						MISMATCHED.increment();
 						LOGGER.warn("Native decoration mismatch for {} at {}: gaussian cache", feature, origin);
@@ -972,8 +978,9 @@ public final class NativeDecoration {
 				return -1;
 			}
 		}
-		if (op == OP_FAR_STATE || op == OP_FAR_HEIGHT || op == OP_FAR_BIOME || op == OP_BLOCK_LIGHT || op == OP_STURDY || op == OP_CENTER_SUPPORT || op == OP_BIOME_TAG || op == OP_COLLISION_FACE) {
-			// Pure reads outside the bound 3x3, answered by the WorldGenRegion as Java's own reads are.
+		if (op == OP_FAR_STATE || op == OP_FAR_HEIGHT || op == OP_FAR_BIOME || op == OP_BLOCK_LIGHT || op == OP_STURDY || op == OP_CENTER_SUPPORT || op == OP_BIOME_TAG || op == OP_COLLISION_FACE
+			|| op == OP_WARM) {
+			// Reads answered by the WorldGenRegion as Java's own reads are; OP_WARM also updates Java's temperature cache.
 			try {
 				var words = args.reinterpret(count * 8L);
 				long[] a = words.toArray(ValueLayout.JAVA_LONG);
@@ -991,6 +998,14 @@ public final class NativeDecoration {
 					case OP_BIOME_TAG -> call.level.getBiome(new BlockPos((int)a[0], (int)a[1], (int)a[2]))
 						.is(net.minecraft.world.level.levelgen.structure.NativeStructurePieces.BIOME_TAGS.get((int)a[3])) ? 1 : 0;
 					case OP_BLOCK_LIGHT -> call.level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, new BlockPos((int)a[0], (int)a[1], (int)a[2]));
+					// SnowAndFreezeFeature's temperature test: not a pure read. It updates
+					// Biome's per-thread temperature cache on this thread, as Java's own
+					// call does, so Rust makes it exactly where Java's feature would.
+					case OP_WARM -> {
+						WARM_CALLS.increment();
+						yield call.region.biomeValues().get((int)a[3]).value().warmEnoughToRain(new BlockPos((int)a[0], (int)a[1], (int)a[2]),
+							call.level.getSeaLevel()) ? 1 : 0;
+					}
 					case OP_FAR_HEIGHT -> call.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.values()[(int)a[0]], (int)a[1], (int)a[2]);
 					default -> {
 						int index = call.region.biomeValues().indexOf(call.level.getNoiseBiome((int)a[0], (int)a[1], (int)a[2]));
@@ -1142,14 +1157,27 @@ public final class NativeDecoration {
 	}
 
 	private static void verify(NativeDecorationRegion region, int[][] before, NativeDecorationRegion.Maps maps, WorldGenLevel level,
-							   ChunkGenerator generator, WorldgenRandom random, PlacedFeature feature, BlockPos origin, @Nullable long[] levelRandom) {
+							   ChunkGenerator generator, WorldgenRandom random, PlacedFeature feature, BlockPos origin, @Nullable long[] levelRandom,
+							   @Nullable NativeFreezeVerification freeze) {
 		int[][] nativeAfter = region.captureStatesForVerification();
 		var nativeMaps = region.mapsForVerification();
 		long[] nativeRandom = levelRandom == null ? null : randomState(level.getRandom());
 		region.restoreStatesForVerification(before);
 		region.restoreMapsForVerification(maps);
 		if (levelRandom != null) restoreRandom(level.getRandom(), levelRandom);
-		feature.placeWithBiomeCheck(level, generator, random, origin);
+		try {
+			long freezeCalls = freeze == null ? 0 : NativeFreezeVerification.expectedCalls(level, origin);
+			boolean placed = feature.placeWithBiomeCheck(level, generator, random, origin);
+			// The biome filter rejects the feature before any temperature call; the
+			// feature itself always reports placed once it runs.
+			if (freeze != null && !freeze.afterJava(placed ? freezeCalls : 0)) {
+				LOGGER.error("Native decoration temperature cache history differs for {} at {}: {}", feature, origin, freeze.difference);
+				MISMATCHED.increment();
+			}
+		} finally {
+			// The native placement is the one that stands: its cache state too, even if the replay threw.
+			if (freeze != null) freeze.finish();
+		}
 		if (nativeRandom != null && !java.util.Arrays.equals(nativeRandom, randomState(level.getRandom()))) {
 			LOGGER.error("Native decoration level random differs for {}", feature);
 			MISMATCHED.increment();

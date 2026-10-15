@@ -58,17 +58,22 @@ was source-reviewed at `e1c35961991261469c934bf07f724b99a418ba55` on 2026-10-15;
 no generation or performance test was rerun. [Start dispatch][current-start-dispatch] ·
 [Piece dispatch and fallback][current-piece-dispatch]
 
-`freeze_top_layer` reads block light from Java and computes biome temperature
-directly. That currently assumes stateless temperature equivalence; it does not
-mirror Java's cache history. Java keeps a **per-Biome, per-thread cache keyed only
-by packed position**, although a cache miss calculates temperature using the
-supplied **sea level**. Reusing the same Biome instance and position on one thread
-with different sea levels can therefore make the cached history observable;
-the cache cannot be declared irrelevant unconditionally. This is a source-identified
-parity limitation at the revision above, with correction and acceptance pending,
-not a repaired behavior or a mixed-sea-level runtime result from this wiki review.
-[Java cache scope][temperature-cache] · [Calculation, lookup and sea-level callers][temperature-lookup] ·
-[Native temperature path][native-temperature]
+`freeze_top_layer` reads block light and biome temperature from Java. Java keeps
+a **per-Biome, per-thread cache keyed only by packed position**, although a cache
+miss calculates temperature using the supplied **sea level**, so the cache
+history is part of the result. Rust therefore asks Java's own
+`Biome.warmEnoughToRain(pos, level.getSeaLevel())` (`OP_WARM`) on the calling
+thread, at the points `shouldFreeze` and `shouldSnow` call it (a synchronous callback that updates the cache, never memoized or reordered): the position
+below for ice first, then the surface position for snow, only when the biome has
+precipitation. Java's cache sees the same sequence as Java's feature would make.
+This is retained Java cache ownership, not a native temperature. With
+`-Dmattmc.worldgen.verifyDecoration=true` each native freeze placement checks
+that the caches (entries and FIFO order) and call counts equal Java's replay
+from the same history (`freezeHistoryVerified=`/`freezeHistoryMismatched=`);
+`-Dmattmc.worldgen.verifyFreezeSeed=true` additionally seeds conflicting
+sea-level entries and fills each cache to its eviction boundary (not a parity
+run). [Java cache scope][temperature-cache] · [Calculation, lookup and sea-level callers][temperature-lookup] ·
+[Native freeze path][native-temperature]
 
 ## Contracts to preserve
 
@@ -211,4 +216,4 @@ See [recorded results](RUST-DECORATION-RESULTS.md).
 [current-piece-dispatch]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/levelgen/structure/StructureStart.java#L89-L108
 [temperature-cache]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/biome/Biome.java#L64-L72
 [temperature-lookup]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/java/net/minecraft/world/level/biome/Biome.java#L113-L185
-[native-temperature]: https://github.com/HungLo2020/MattMC/blob/e1c35961991261469c934bf07f724b99a418ba55/src/main/rust/world/level/levelgen/decoration/freeze.rs#L66-L112
+[native-temperature]: https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/levelgen/decoration/freeze.rs

@@ -1158,7 +1158,6 @@ public final class NativeDecorationEncoder {
 
 	/** {@code freeze.rs}: {@code SnowAndFreezeFeature} with each region biome's climate. */
 	private boolean freeze() throws ReflectiveOperationException {
-		this.words.add(this.generator.getSeaLevel());
 		BlockState snow = Blocks.SNOW.defaultBlockState();
 		this.words.addAll(List.of(stateId(Blocks.ICE.defaultBlockState()), stateId(snow)));
 		var snowy = new ArrayList<BlockState>();
@@ -1180,17 +1179,9 @@ public final class NativeDecorationEncoder {
 		this.checked(0, -1, 0, "snow_layer_floor", st -> !st.is(BlockTags.SNOW_LAYER_CANNOT_SURVIVE_ON)
 			&& (st.is(BlockTags.SNOW_LAYER_CAN_SURVIVE_ON) || Block.isFaceFull(st.getCollisionShape(empty, zero), Direction.UP)
 				|| st.is(Blocks.SNOW) && st.getValue(net.minecraft.world.level.block.SnowLayerBlock.LAYERS) == 8), snow::canSurvive);
-		for (String name : List.of("TEMPERATURE_NOISE", "FROZEN_TEMPERATURE_NOISE", "BIOME_INFO_NOISE")) {
-			var noise = (net.minecraft.world.level.levelgen.synth.PerlinSimplexNoise)field(null, Biome.class, name);
-			this.words.add(this.noise(noise, noise.nativeState().state()));
-		}
+		// Temperatures are Java's own warmEnoughToRain calls (OP_WARM): only precipitation is encoded.
 		this.words.add(this.biomes.size());
-		for (var holder : this.biomes) {
-			var climate = holder.value().climateSettings;
-			this.words.add(climate.hasPrecipitation() ? 1 : 0);
-			this.words.add(Float.floatToRawIntBits(climate.temperature()));
-			this.words.add(climate.temperatureModifier() == Biome.TemperatureModifier.FROZEN ? 1 : 0);
-		}
+		for (var holder : this.biomes) this.words.add(holder.value().climateSettings.hasPrecipitation() ? 1 : 0);
 		return true;
 	}
 

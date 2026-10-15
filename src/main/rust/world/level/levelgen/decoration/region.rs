@@ -135,6 +135,12 @@ pub(crate) const OP_COLLISION_FACE: i32 = 20;
 /// snapshots that chunk (and arms its native sections) before Rust's first
 /// write to it. Pure: it reads Java state only.
 pub(crate) const OP_TOUCH: i32 = 21;
+/// `Biome.warmEnoughToRain(pos, level.getSeaLevel())` for `[x, y, z, region biome
+/// index]` to word 0. A synchronous, **cache-mutating** callback, not a pure read:
+/// it updates Java's per-thread temperature cache (keyed by position alone), so
+/// every call must happen exactly where and when Java's feature makes it. Never
+/// memoize, reorder or skip it.
+pub(crate) const OP_WARM: i32 = 22;
 pub(crate) const OP_FAR_HEIGHT: i32 = 11;
 pub(crate) const OP_FAR_BIOME: i32 = 12;
 
@@ -384,6 +390,15 @@ impl<'a> Region<'a> {
     /// Block light at a position, from Java.
     pub(crate) fn block_light(&self, x: i32, y: i32, z: i32) -> Result<i64> {
         self.far(OP_BLOCK_LIGHT, [x as i64, y as i64, z as i64])
+    }
+
+    /// Java's `warmEnoughToRain` of the region biome `biome` at a position
+    /// ([`OP_WARM`]): one synchronous callback per call, which mutates Java's cache.
+    pub(crate) fn warm_enough_to_rain(&self, biome: u32, x: i32, y: i32, z: i32) -> Result<bool> {
+        self.check_deferred()?;
+        let mut args = [x as i64, y as i64, z as i64, biome as i64];
+        self.pure_call(OP_WARM, &mut args)?;
+        Ok(args[0] != 0)
     }
 
     fn far(&self, op: i32, mut args: [i64; 3]) -> Result<i64> {
