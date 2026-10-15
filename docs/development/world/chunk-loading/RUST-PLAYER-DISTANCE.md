@@ -26,11 +26,13 @@ native [work queue](../lighting/RUST-PRIORITY-QUEUE.md).
   `playerEntered` (both fields `update(pos, 0, true)`); `removePlayer` calls
   `chunkVacated` only when the chunk's player set empties. Change any of those
   call sites together, or presence and the Java map will diverge.
-- A run returns that field's `setLevel(pos, level)` calls in their original
-  order; Java replays them through the original `setLevel`/`onLevelChange`. Map
-  layout, spawn-candidate iteration order and `toUpdate` contents therefore
-  match the original. Nothing in Java reads levels during propagation, so
-  replaying after the run is equivalent. Sinks must not reenter the adapter.
+- A run produces that field's `setLevel(pos, level)` calls in their original
+  order. The player-ticket field returns them, and Java replays them through the
+  original `setLevel`/`onLevelChange`, so its map layout and `toUpdate` contents
+  match the original. The natural-spawn field applies them natively to its
+  [tick-selection view](RUST-TICK-SELECTION.md) (`runInto`), so spawn-candidate
+  iteration order matches. Nothing in Java reads levels during propagation, so
+  applying after the run is equivalent. Sinks must not reenter the adapter.
 - `runAllUpdates` skips the downcall when the last native result reported no
   queued work for that field, as the original returned on an empty queue.
 - The Java adapter owns handle lifetime: an auto arena owns release, every

@@ -1,20 +1,23 @@
 package net.minecraft.server.level;
 
-import it.unimi.dsi.fastutil.longs.Long2ByteMap;
-import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
+import com.google.common.annotations.VisibleForTesting;
+import it.unimi.dsi.fastutil.longs.Long2ByteLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongConsumer;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 
-/** Published level view of the native-owned simulation distance graph. Rust
- * owns propagation and mirrors each chunk's lowest simulating ticket level;
- * each run replays the original ordered {@code setLevel} calls into this map. */
+/** Java side of the native-owned simulation distance graph. Rust owns
+ * propagation, a mirror of each chunk's lowest simulating ticket level and the
+ * published level view (the original {@code Long2ByteOpenHashMap chunks}, in its
+ * exact iteration order): each run applies the original ordered {@code setLevel}
+ * calls to the view natively. */
 public class SimulationChunkTracker {
 	public static final int MAX_LEVEL = 33;
-	protected final Long2ByteMap chunks = new Long2ByteOpenHashMap();
+	/** The original map: levels below 33 stored, default 33. */
+	private final NativeLevelView chunks = new NativeLevelView(33, 33);
 	private final TicketStorage ticketStorage;
 	private final TicketChunkDistance distance = new TicketChunkDistance(TicketChunkDistance.SIMULATION, ChunkLevel.MAX_LEVEL + 1);
-	private final PlayerChunkDistances.LevelSink levelSink = this::setLevel;
 
 	public SimulationChunkTracker(TicketStorage ticketStorage) {
 		this.ticketStorage = ticketStorage;
@@ -26,7 +29,6 @@ public class SimulationChunkTracker {
 		}
 		// The storage notifies the native graph directly; update() is the same call from Java.
 		ticketStorage.setSimulationChunkUpdatedListener(this.distance.listener(ticketStorage, this::update));
-		this.chunks.defaultReturnValue((byte)33);
 	}
 
 	public void update(long l, int i, boolean bl) {
@@ -41,15 +43,22 @@ public class SimulationChunkTracker {
 		return this.chunks.get(l);
 	}
 
-	protected void setLevel(long l, int i) {
-		if (i >= 33) {
-			this.chunks.remove(l);
-		} else {
-			this.chunks.put(l, (byte)i);
-		}
+	public void runAllUpdates() {
+		this.distance.run(Integer.MAX_VALUE);
+		this.chunks.takeTicket(this.distance);
 	}
 
-	public void runAllUpdates() {
-		this.distance.runUpdates(Integer.MAX_VALUE, this.levelSink);
+	/** The original walk over {@code Long2ByteMaps.fastIterable(chunks)}, keeping entity-ticking
+	 * levels: live, so the consumer may change the view exactly as it could change the map. */
+	void forEachEntityTicking(LongConsumer consumer) {
+		this.chunks.forEachAtMost(ChunkLevel.byStatus(FullChunkStatus.ENTITY_TICKING), consumer);
+	}
+
+	/** The published view in iteration order, for verification. */
+	@VisibleForTesting
+	public Long2ByteLinkedOpenHashMap publishedView() {
+		Long2ByteLinkedOpenHashMap view = new Long2ByteLinkedOpenHashMap();
+		this.chunks.forEachAtMost(Integer.MAX_VALUE, l -> view.put(l, (byte)this.getLevel(l)));
+		return view;
 	}
 }

@@ -8,8 +8,10 @@ holder is revived; saves, restarts and checks persistence. Then a status-transit
 lifecycle: a forced chunk's neighbours sit at block-ticking (level 32) and full (33)
 status, so an item there does not fall and sand does not; forcing the neighbour
 promotes both (the item falls, the sand's scheduled tick runs), and releasing it
-demotes it again (a new item stays). Run the same driver on the candidate and on a
---class-overlay of pre-change classes; both must pass.
+demotes it again (a new item stays). Random-tick selection is checked
+without depending on level.random: wheat at a very high randomTickSpeed over a
+fixed number of stepped ticks grows only in entity-ticking chunks. Run the same
+driver on the candidate and on a --class-overlay of pre-change classes; both must pass.
 
 --inject-readonly-region adds a separately reported experiment (not a gate): a
 read-only region directory during a save into a new region file. Writes into
@@ -119,12 +121,24 @@ def main():
         server.command_batch(['summon minecraft:item 1620.5 -50 1604.5 {Item:{id:"minecraft:stone",count:1},PickupDelay:32767s}',
                               'setblock 1636 -50 1604 minecraft:sand'])
         server.step(20)
+        # Random-tick selection, independent of level.random: at 4096 random ticks per
+        # section per tick for a fixed 1000 stepped ticks, wheat in a selected chunk
+        # reaches age 7 (well over 7 expected growths); in an unselected chunk it gets none.
+        server.command_batch(['time set day', 'gamerule randomTickSpeed 4096',
+                              'setblock 1604 -61 1604 minecraft:farmland', 'setblock 1604 -60 1604 minecraft:wheat',
+                              'setblock 1622 -61 1610 minecraft:farmland', 'setblock 1622 -60 1610 minecraft:wheat'])
+        server.step(1000)
+        check('random ticks run in the entity-ticking chunk', 'if block 1604 -60 1604 minecraft:wheat[age=7]')
+        check('no random ticks in a block-ticking-only chunk', 'if block 1622 -60 1610 minecraft:wheat[age=0]')
         check('block-ticking chunk does not tick entities', f'if entity @e[{item_box}]')
         check('full chunk does not run block ticks', 'if block 1636 -50 1604 minecraft:sand')
         server.command_batch(['forceload add 1616 1604'])
         server.step(40)
         check('promoted to entity ticking: the item fell', f'unless entity @e[{item_box}]')
         check('promoted to block ticking: the sand fell', 'unless block 1636 -50 1604 minecraft:sand')
+        server.step(1000)
+        check('promoted chunk joins random-tick selection', 'if block 1622 -60 1610 minecraft:wheat[age=7]')
+        server.command_batch(['gamerule randomTickSpeed 3'])
         server.command_batch(['forceload remove 1616 1604'])
         server.step(40)
         server.command_batch(['summon minecraft:item 1622.5 -50 1606.5 {Item:{id:"minecraft:dirt",count:1},PickupDelay:32767s}'])

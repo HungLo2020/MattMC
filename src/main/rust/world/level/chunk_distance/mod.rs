@@ -5,6 +5,8 @@
 //! Java keeps only published level views rebuilt from each run's ordered changes.
 mod ffi;
 pub(crate) mod graph;
+pub(crate) mod level_view;
+mod level_view_ffi;
 mod position_map;
 mod poi;
 mod poi_ffi;

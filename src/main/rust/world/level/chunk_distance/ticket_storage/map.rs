@@ -104,6 +104,32 @@ impl ListMap {
         }
     }
 
+    /// `put(key, value)`: replaces in place, or inserts (growing as fastutil
+    /// does); returns the previous value or `NONE`.
+    pub(crate) fn put(&mut self, key: i64, value: u32) -> Result<u32, Fault> {
+        match self.find(key) {
+            Ok(pos) => Ok(std::mem::replace(&mut self.values[pos], value)),
+            Err(pos) => {
+                if pos == self.n {
+                    self.zero = true;
+                }
+                self.keys[pos] = key;
+                self.values[pos] = value;
+                let old = self.size;
+                self.size += 1;
+                if old >= self.max_fill {
+                    self.rehash(array_size(self.size + 1).next_power_of_two())?;
+                }
+                Ok(NONE)
+            }
+        }
+    }
+
+    /// The table length (`key.length`), for an out-of-bounds report.
+    pub(crate) fn table_len(&self) -> usize {
+        self.keys.len()
+    }
+
     /// `remove(key)`: the removed value, or `NONE`.
     pub(crate) fn remove(&mut self, key: i64) -> Result<u32, Fault> {
         let Ok(pos) = self.find(key) else { return Ok(NONE) };
@@ -238,6 +264,11 @@ pub(crate) struct Cursor {
 }
 
 impl Mark {
+    /// The iterator's `pos` (the slot it read last).
+    pub(crate) fn position(&self) -> i32 {
+        self.pos
+    }
+
     pub(crate) fn has_next(&self) -> bool {
         self.left != 0
     }

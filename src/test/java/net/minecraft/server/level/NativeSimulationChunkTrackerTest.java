@@ -40,12 +40,12 @@ class NativeSimulationChunkTrackerTest {
         Long2ByteMap view() { return this.chunks; }
     }
 
+    /** The native view is applied in Rust (no Java setLevel replay), so it is compared
+     * by its published iteration order and levels. */
     static final class Native extends SimulationChunkTracker {
-        final List<Change> changes = new ArrayList<>();
         Native(TicketStorage storage) { super(storage); }
-        @Override protected void setLevel(long l, int i) { this.changes.add(new Change(l, i)); super.setLevel(l, i); }
         int level(long l) { return this.getLevel(l); }
-        Long2ByteMap view() { return this.chunks; }
+        Long2ByteMap view() { return this.publishedView(); }
     }
 
     /** Both storages receive the same operation; each gets its own Ticket instances. */
@@ -74,7 +74,6 @@ class NativeSimulationChunkTrackerTest {
         }
 
         void compare(long[] probes, String context) {
-            assertEquals(this.original.changes, this.candidate.changes, () -> context + " setLevel transcript");
             assertEquals(entries(this.original.view()), entries(this.candidate.view()), () -> context + " published iteration order");
             for (long probe : probes) {
                 assertEquals(this.original.level(probe), this.candidate.level(probe), () -> context + " level " + probe);

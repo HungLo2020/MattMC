@@ -2,7 +2,6 @@ package net.minecraft.server.level;
 
 import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
-import it.unimi.dsi.fastutil.longs.Long2ByteMaps;
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntMaps;
@@ -41,9 +40,7 @@ public abstract class DistanceManager {
 	final TicketStorage ticketStorage;
 	// Rust owns both player-distance graphs and their shared player-presence source.
 	private final PlayerChunkDistances playerDistances = new PlayerChunkDistances(8, 32);
-	private final DistanceManager.FixedPlayerDistanceChunkTracker naturalSpawnChunkCounter = new DistanceManager.FixedPlayerDistanceChunkTracker(
-		this.playerDistances, PlayerChunkDistances.NATURAL_SPAWN
-	);
+	private final DistanceManager.NaturalSpawnView naturalSpawnChunkCounter = new DistanceManager.NaturalSpawnView(this.playerDistances);
 	private final DistanceManager.PlayerTicketTracker playerTicketManager = new DistanceManager.PlayerTicketTracker(
 		this.playerDistances, PlayerChunkDistances.PLAYER_TICKETS
 	);
@@ -188,18 +185,12 @@ public abstract class DistanceManager {
 	}
 
 	public void forEachEntityTickingChunk(LongConsumer longConsumer) {
-		for (Entry entry : Long2ByteMaps.fastIterable(this.simulationChunkTracker.chunks)) {
-			byte b = entry.getByteValue();
-			long l = entry.getLongKey();
-			if (ChunkLevel.isEntityTicking(b)) {
-				longConsumer.accept(l);
-			}
-		}
+		this.simulationChunkTracker.forEachEntityTicking(longConsumer);
 	}
 
 	public LongIterator getSpawnCandidateChunks() {
 		this.naturalSpawnChunkCounter.runAllUpdates();
-		return this.naturalSpawnChunkCounter.chunks.keySet().iterator();
+		return this.naturalSpawnChunkCounter.chunks.keys();
 	}
 
 	public String getDebugStatus() {
@@ -208,6 +199,29 @@ public abstract class DistanceManager {
 
 	public boolean hasTickets() {
 		return this.ticketStorage.hasTickets();
+	}
+
+	/** The natural-spawn field's published level view, native-owned: the original
+	 * {@code FixedPlayerDistanceChunkTracker} map (levels above the field's maximum
+	 * removed, default maximum + 2), filled natively from the field's ordered
+	 * {@code setLevel} changes. Its {@code onLevelChange} was a no-op. */
+	static final class NaturalSpawnView {
+		final NativeLevelView chunks;
+		private final PlayerChunkDistances distances;
+
+		NaturalSpawnView(PlayerChunkDistances distances) {
+			this.distances = distances;
+			int maxDistance = distances.maxDistance(PlayerChunkDistances.NATURAL_SPAWN);
+			this.chunks = new NativeLevelView(maxDistance + 2, maxDistance + 1);
+		}
+
+		int getLevel(long l) {
+			return this.chunks.get(l);
+		}
+
+		void runAllUpdates() {
+			this.distances.runInto(PlayerChunkDistances.NATURAL_SPAWN, this.chunks);
+		}
 	}
 
 	/** Published level view of one native distance field. Each run replays the

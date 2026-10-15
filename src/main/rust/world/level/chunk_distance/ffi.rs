@@ -54,7 +54,7 @@ pub extern "C" fn mattmc_player_distance_create(natural_spawn: i32, player_ticke
 
 /// Caller must provide a live numeric handle from create, exclude every
 /// concurrent access (including release), and keep its arena live.
-unsafe fn handle<'a>(id: u64) -> &'a mut PlayerDistances {
+pub(super) unsafe fn handle<'a>(id: u64) -> &'a mut PlayerDistances {
     &mut *std::ptr::with_exposed_provenance_mut::<PlayerDistances>(id as usize)
 }
 

@@ -134,6 +134,24 @@ final class PlayerChunkDistances {
         }
     }
 
+    /** {@code runUpdates(Integer.MAX_VALUE)} for one field, with its ordered
+     * {@code setLevel} calls applied natively to {@code view}. */
+    void runInto(int field, NativeLevelView view) {
+        if (!this.hasWork(field)) return;
+        this.access.lock();
+        try {
+            try {
+                long status = (long)RUN.invokeExact(this.handleId, field, Integer.MAX_VALUE);
+                this.check(status);
+            }
+            catch (RuntimeException | Error error) { throw error; }
+            catch (Throwable error) { throw new IllegalStateException("Cannot run player chunk distances", error); }
+            finally { Reference.reachabilityFence(this.handle); }
+            try { view.takePlayer(this.handleId, field); }
+            finally { Reference.reachabilityFence(this.handle); }
+        } finally { this.access.unlock(); }
+    }
+
     private void check(long status) {
         this.work = (int)(status >>> 8) & 3;
         switch ((int)status & 255) {

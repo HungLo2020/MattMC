@@ -6,8 +6,9 @@ levels drive `inEntityTickingRange`, `inBlockTickingRange` and
 `forEachEntityTickingChunk`. [`chunk_distance/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk_distance)
 owns the graph, pending levels, work queue and a mirror of each chunk's lowest
 simulating ticket level. [`TicketChunkDistance`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/server/level/TicketChunkDistance.java)
-is the lifetime/exception adapter; the tracker keeps only its published
-`chunks` view. There is no Java graph or fallback.
+is the lifetime/exception adapter. The published `chunks` view is a native
+[tick-selection view](RUST-TICK-SELECTION.md). There is no Java graph, map or
+fallback.
 
 The [native ticket storage](RUST-TICKET-STORAGE.md) notifies the graph directly
 under the graph's own lock, which every adapter call also takes. The
@@ -31,8 +32,9 @@ under the graph's own lock, which every adapter call also takes. The
     and [removal callback](https://github.com/HungLo2020/MattMC/blob/5218ac875eda9f2c4151ff1a97795f20f5f356cf/src/main/java/net/minecraft/world/level/TicketStorage.java#L231-L265).
   - Mutating active ticket lists without the listener (`getTickets` results,
     replacing the listener) breaks this; neither happens in production.
-- Runs replay the original ordered `setLevel` calls into the published map, so
-  hot range queries stay in Java and entity-ticking iteration order is unchanged.
+- Runs apply the original ordered `setLevel` calls to the native view in Rust,
+  so its entity-ticking iteration order is unchanged; range queries read it
+  through the view's lock.
 - The tracker binds `TicketChunkDistance.listener(...)`, so its storage
   notifies the graph natively; calling `update` from Java is equivalent.
 
@@ -44,8 +46,9 @@ selects the simulation workloads. It regenerates the original tracker oracle
 from Git and permits only the documented `TicketStorage` accessor.
 
 Java tests attach the original and the native tracker to separate real
-`TicketStorage` instances driven identically and compare ordered `setLevel`
-transcripts, published iteration order and sampled levels: all length-four
+`TicketStorage` instances driven identically and compare the published
+iteration order and sampled levels (the native side has no Java `setLevel`
+transcript since its view is applied in Rust): all length-four
 histories over two chunks and three ticket kinds; seeded churn with load-only,
 simulation-only and dual tickets, duplicates, `replaceTicketLevelOfType`,
 forced chunks and the close/reactivate `removeTicketIf` cycle at edge

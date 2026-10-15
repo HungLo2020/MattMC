@@ -15,6 +15,9 @@
 - [Rust chunk holder registry](RUST-CHUNK-HOLDERS.md): native-owned holder maps,
   scheduling, the loading hand-off, holder levels and status transitions, unload and
   eager-save decisions, off-thread lookups and verification.
+- [Rust tick-selection views](RUST-TICK-SELECTION.md): native simulation and
+  natural-spawn level views, live walks for block-tick and spawn-candidate order,
+  and verification.
 - [Rust ticket storage](RUST-TICKET-STORAGE.md): native-owned ticket lists, expiry,
   forced chunks and persistence, direct tracker notification and verification.
 - [Rust POI village distance](RUST-POI-DISTANCE.md): native-owned section

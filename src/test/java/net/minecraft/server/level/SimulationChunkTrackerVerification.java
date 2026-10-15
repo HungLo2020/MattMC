@@ -2,6 +2,7 @@ package net.minecraft.server.level;
 
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMaps;
+import it.unimi.dsi.fastutil.longs.LongConsumer;
 import java.lang.management.CompilationMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
@@ -29,7 +30,8 @@ public final class SimulationChunkTrackerVerification {
         TicketStorage storage();
         void runAll();
         int level(long position);
-        Long2ByteMap view();
+        /** DistanceManager.forEachEntityTickingChunk. */
+        void forEachEntityTicking(LongConsumer consumer);
     }
 
     static final class OriginalBackend implements Backend {
@@ -38,7 +40,11 @@ public final class SimulationChunkTrackerVerification {
         @Override public TicketStorage storage() { return this.storage; }
         @Override public void runAll() { this.tracker.runAllUpdates(); }
         @Override public int level(long position) { return this.tracker.getLevel(position); }
-        @Override public Long2ByteMap view() { return this.tracker.chunks; }
+        @Override public void forEachEntityTicking(LongConsumer consumer) {
+            for (Long2ByteMap.Entry entry : Long2ByteMaps.fastIterable(this.tracker.chunks)) {
+                if (ChunkLevel.isEntityTicking(entry.getByteValue())) consumer.accept(entry.getLongKey());
+            }
+        }
     }
 
     static final class NativeBackend implements Backend {
@@ -47,7 +53,7 @@ public final class SimulationChunkTrackerVerification {
         @Override public TicketStorage storage() { return this.storage; }
         @Override public void runAll() { this.tracker.runAllUpdates(); }
         @Override public int level(long position) { return this.tracker.getLevel(position); }
-        @Override public Long2ByteMap view() { return this.tracker.chunks; }
+        @Override public void forEachEntityTicking(LongConsumer consumer) { this.tracker.forEachEntityTicking(consumer); }
     }
 
     // Registry entries: initialized by main after bootstrap.
@@ -128,9 +134,9 @@ public final class SimulationChunkTrackerVerification {
             backend.runAll();
             for (long query : tick.queries()) checksum = checksum * 31 + (ChunkLevel.isEntityTicking(backend.level(query)) ? 1 : 2);
             // DistanceManager.forEachEntityTickingChunk
-            for (Long2ByteMap.Entry entry : Long2ByteMaps.fastIterable(backend.view())) {
-                if (ChunkLevel.isEntityTicking(entry.getByteValue())) checksum += entry.getLongKey();
-            }
+            long[] sum = {checksum};
+            backend.forEachEntityTicking(l -> sum[0] += l);
+            checksum = sum[0];
         }
         return checksum;
     }
