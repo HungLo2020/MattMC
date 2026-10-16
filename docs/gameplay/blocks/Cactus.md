@@ -48,6 +48,8 @@ The active contact callback applies **1 damage point**, equivalent to **half a h
 
 **Dropped items can be destroyed by cactus**, including harvested cactus that lands against another part of the plant. An ordinary item entity starts with **5 health** and loses health to accepted contact hits; reaching zero discards it. Item damage resistance is checked, so this is not a promise that every possible item vanishes immediately. Keep collection paths clear of the plant. [Item health][item-health] · [Item damage and destruction][item-damage] · [Item resistance][item-resistance]
 
+For decoration beside a path, see [potted Cactus contact behavior](FlowerPot.md#cactus-and-wither-rose-displays).
+
 Related: [Cactus item](../items/Cactus.md) · [Green Dye](../items/GreenDye.md) · [Cactus Flower](../items/CactusFlower.md) · [Flower Pot](FlowerPot.md) · [Blocks](Blocks.md)
 
 ## Sources and verification

@@ -76,6 +76,8 @@ A verified Wither Rose source is a living entity's death routine **when the kill
 
 A placed Wither Rose attempts to apply **Wither I for 40 ticks** to a living entity inside its block on the server, outside Peaceful difficulty, unless that entity is invulnerable to the Wither damage source. Normal effect acceptance and immunity rules still apply. Continued contact can refresh the effect; its **140-tick stew effect is a separate value**. Keep the plant away from walkways and animal pens. [Wither Rose contact] · [Stew wither_rose]
 
+For a Rose display beside a path, see [the potted form's contact behavior](FlowerPot.md#cactus-and-wither-rose-displays).
+
 ## Bees, pots, and other uses
 
 All 17 flowers are in both the **Bee food item tag** and **Bee-attractive block tag**, but **Wither Rose is a poor apiary choice**: feeding it applies its Wither effect through a special interaction instead of ordinary breeding, and the planted rose can harm a visiting Bee. The other sixteen are ordinary food-tag choices. Pollination checks the **upper half of a Sunflower**; the other tall flowers do not have that special half filter. See [Bee](../mobs/Bee.md#flowers-and-pollination) for reachability, weather, nectar, and housing behavior. [Bee food items] · [Bee-attractive blocks] · [Bee feeding] · [Bee flower checks]
