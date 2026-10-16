@@ -23,6 +23,8 @@ With the required tool where applicable, ordinary mining returns **one matching 
 
 Mud has a **14/16-block-high collision surface**, while its visual and support shapes are full cubes. Standing entities therefore sit lower than on Dirt or Packed Mud, but the block still provides full-block support faces. It remains in place when the block underneath is removed. Mud has no waterlogged state; the name does not mean it contains bucket-recoverable water. [Mud shape and support][mud-shape] · [Default survival][default-shape] · [Empty fluid state][default-fluid]
 
+That low collision surface also lets an ordinary Mud block cover a loose-item collection point: follow [collecting through a Mud floor](Hopper.md#collecting-through-a-mud-floor) for the Hopper setup and its limits. Packed Mud and full Mud Bricks do not provide the same intake access.
+
 Mud is in the **dirt block tag**, unlike Packed Mud and Mud Bricks. This makes it eligible for plants whose support rules accept that tag; follow [sapling and Azalea planting](SaplingsAndAzaleas.md) or the relevant plant guide. It does not replace [Farmland](Farmland.md) for [Wheat](Wheat.md). [Dirt tag][dirt-tag] · [Vegetation support][plant-support] · [Crop support][crop-support]
 
 For an extra root texture, use Mud in the [Muddy Mangrove Roots recipe](TreeLogsAndRoots.md#muddy-mangrove-roots). That guide owns the root block's recipe, axis and harvesting behavior.

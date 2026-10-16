@@ -40,6 +40,22 @@ Without a source container above, the Hopper searches its intake region for drop
 
 Pickup is not a promise that every nearby item, or an item beyond the intake region, will enter. If a container exists above, the normal source-container path takes precedence over searching for loose items. A complete dropped stack may be collected when there is room; a partly accepted stack can remain in the world.
 
+### Collecting through a Mud floor
+
+**Ordinary [Mud](MudAndMudBricks.md#mud) can cover a Hopper while letting it collect loose items resting on that block.** Mud's collision surface is only **14/16 of a block high**, despite its full visual and support shapes. The Hopper tests collision, so Mud does not activate the full-block intake obstruction. Packed Mud, full Mud Bricks and ordinary full-cube Dirt do; their similar appearance or family name does not make them substitutes. [Mud collision][floor-mud] · [Current block registrations][floor-blocks] · [Intake obstruction][floor-intake] · [Collision query][floor-collision]
+
+For a placed Hopper, the search box has the block's **one-block-wide horizontal footprint** and extends vertically from **11/16 above its bottom to the top of the block immediately above**. An item resting on that upper Mud surface can overlap this box; the search does not vacuum an entire surrounding floor or wait for the item to fall through the Mud. [Intake bounds][floor-bounds] · [World-space item query][floor-query] · [Block-relative coordinates][floor-position]
+
+This small collection setup is **source-derived and has not been tested in game**:
+
+1. Point a Hopper into a Chest or other suitable output container, and leave room for the intended item in both inventories
+2. Keep the Hopper unpowered and put **one ordinary Mud block directly above it**, with no gap
+3. Drop an item over that Mud block and let it settle within the Hopper's footprint; inspect the inventories rather than assuming a nearby item was collected
+
+If collection stops, check power, capacity, item position and the covering block. A source container found above, including an intersecting container entity, takes priority over loose-item searching even when it yields nothing. The ordinary [transfer cooldown](#transfer-behavior-and-rate) still applies. This is a single collection spot, not a tested farm, lossless floor or throughput guarantee. [Server ticker and power][floor-ticker] · [Capacity and cooldown][floor-cycle] · [Source-container priority][floor-intake] · [Container lookup][floor-container]
+
+Source-reviewed on **2026-10-16** at `b85b6cbfa9d5482f8b88d73743e80c871250f3bd`, including native block definitions and their active Java shape/ticker consumers. No placement, pickup, circuit or collection-efficiency test was run. [Native definitions][floor-native]
+
 ## Redstone locking
 
 Neighbor redstone power sets `enabled` to false and prevents this Hopper's own push/pull attempt. Removing power enables it again. A [Lever](Lever.md) provides a simple control source.
@@ -131,3 +147,15 @@ Filtering and reserve thresholds were additionally source-reviewed on **2026-10-
 [filter-loose]: https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java#L265-L277
 [filter-native]: https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/rust/content/block/definitions/catalog.rs#L509
 [filter-states]: https://github.com/HungLo2020/MattMC/blob/0d23141bdaf918ce7314fdf3cc2f846df35d04a3/src/main/rust/content/block/definitions/templates.rs#L91
+
+[floor-mud]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/java/net/minecraft/world/level/block/MudBlock.java#L13-L39
+[floor-blocks]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/java/net/minecraft/world/level/block/Blocks.java
+[floor-intake]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java#L215-L243
+[floor-collision]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/java/net/minecraft/world/level/block/state/BlockBehaviour.java#L1023-L1044
+[floor-bounds]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/java/net/minecraft/world/level/block/entity/Hopper.java#L7-L12
+[floor-query]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java#L349-L357
+[floor-position]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java#L400-L417
+[floor-ticker]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/java/net/minecraft/world/level/block/HopperBlock.java#L96-L128
+[floor-cycle]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java#L97-L140
+[floor-container]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/java/net/minecraft/world/level/block/entity/HopperBlockEntity.java#L365-L394
+[floor-native]: https://github.com/HungLo2020/MattMC/blob/b85b6cbfa9d5482f8b88d73743e80c871250f3bd/src/main/rust/content/block/definitions/catalog.rs#L1169
