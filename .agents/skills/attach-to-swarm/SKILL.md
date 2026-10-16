@@ -142,6 +142,23 @@ new assignment revision before changing shared interfaces or widening scope.
 
 ## Work, ask, and verify locally
 
+- Within the assigned outcome, files and interface contract, choose and implement
+  diagnostics, prototypes and architecture autonomously; no per-prototype
+  approval is needed. Optimize for completing the migration. Coordinate scope
+  expansion, shared-interface or other-owner changes, and observable contract
+  changes with dot before proceeding. Existing security, authorization,
+  checkout ownership and publication rules still apply. See the
+  [owner clarification](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18962614).
+
+- Assign and migrate large end-to-end vertical slices per agent: actual owned
+  state, production/mutation and its consumers move together into Rust, rather
+  than getter-by-getter ports that preserve repeated call overhead. dot sets
+  non-overlapping ownership and interface boundaries; workers choose the
+  implementation within them. A larger slice does not authorize scope overlap.
+- Exercise risky contracts in the first working slice, before broad happy-path
+  migration: callbacks, reentry, aliases, custom dispatch and error-prefix
+  behavior where applicable. Preserve their observable semantics and add
+  focused regression evidence before extending the implementation.
 - Reproduce the issue or establish the current baseline locally before changing
   behavior. A negative reproduction is a finding to report, not permission to
   fabricate a fix. Use current subsystem docs and acceptance criteria.
@@ -155,13 +172,32 @@ new assignment revision before changing shared interfaces or widening scope.
   patch identity if applicable, commands, toolchain/build profile, fixtures,
   hardware, outcomes and evidence links. No test on one SHA certifies a later
   edit or sync. Rerun affected checks after fixes, reconciliation or conflicts.
+  Keep Frozen and pre-change baseline artifacts immutable and identified by
+  exact source/build/configuration; do not regenerate or relabel them as a new
+  baseline just because the candidate changed.
+  Reuse exact existing evidence only with recorded impact checks establishing
+  that its tested scope, dependencies, configuration and fixtures are unchanged;
+  do not relabel an earlier run as testing a new candidate.
+- During development, use focused correctness checks and early representative
+  complete-cost measurements, including boundary/conversion and ownership costs.
+  Run required final validation tiers when the candidate is stable, rather than
+  repeating every expensive tier for each prototype. This sequencing does not
+  weaken any mandatory gate or excuse affected-check reruns after later changes.
 - Correctness regressions are unacceptable. Preserve behavior,
   test failure/retry/cancellation paths where relevant, and compare performance
   against the assigned baseline under comparable conditions. Record workload,
   warmup/repetitions, settings, noise and relevant latency/resource metrics.
   Noisy/inconclusive results are not a pass; do not trade correctness for speed.
 - Apply the normal [migration acceptance policy](../../../docs/development/tooling/MIGRATION-ACCEPTANCE.md).
-  For work beyond its applicable allowance, dot may record a bounded exception
+  Standard acceptance requires correctness and matched Frozen-relative results
+  within the applicable allowance: up to 10% slower generally, or up to 25%
+  slower when attributable to the temporary Java/Rust boundary. These allowances
+  are alternatives, never additive. An in-budget migration does not need to
+  improve performance versus Frozen or pre-change Current; pre-change Current
+  remains diagnostic, not an additional acceptance floor. Preserve the policy's
+  workload-specific comparisons, attribution and evidence requirements.
+  The over-budget exception is a separate route with its existing conditions:
+  for work beyond the applicable allowance, dot may record a bounded exception
   under the user's delegated discretion. Only a candidate that demonstrably
   improves current `master` under matched conditions while retaining measured
   Frozen conversion/ownership debt is eligible. Only dot may approve this temporary
