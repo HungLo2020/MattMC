@@ -4,6 +4,7 @@ pub(crate) mod levelgen;
 pub(crate) mod lighting;
 pub(crate) mod chunk_distance;
 pub(crate) mod chunk_holders;
+pub(crate) mod chunk_generation;
 pub(crate) mod chunk;
 pub(crate) mod client_residency;
 pub(crate) mod camera_environment;

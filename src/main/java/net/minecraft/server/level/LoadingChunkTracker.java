@@ -1,36 +1,33 @@
 package net.minecraft.server.level;
 
-import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.world.level.TicketStorage;
 
-/** Java side of the native-owned loading ticket distance graph. Rust owns
- * propagation, the graph's level map and a mirror of each chunk's lowest
- * loading ticket level; each run replays the original ordered {@code setLevel}
- * calls into chunk scheduling. After any {@code setLevel(pos, i)} the holder
- * state reads back {@code i}, so Rust's level map equals {@link #getLevel}
- * provided the tracker exists before any holder, as DistanceManager creates it. */
+/** Native-owned propagation with live Java source and holder effects. Each
+ * query and ordered setter runs at the original graph's evaluation point;
+ * ChunkMap's scheduling method applies holder changes through its native registry. */
 class LoadingChunkTracker {
 	private static final int MAX_LEVEL = ChunkLevel.MAX_LEVEL + 1;
 	private final DistanceManager distanceManager;
 	private final TicketStorage ticketStorage;
 	private final TicketChunkDistance distance = new TicketChunkDistance(TicketChunkDistance.LOADING, MAX_LEVEL);
-	private final PlayerChunkDistances.LevelSink levelSink = this::setLevel;
+	private final TicketChunkDistance.Effects effects = new TicketChunkDistance.Effects() {
+		public int level(long position) { return LoadingChunkTracker.this.getLevel(position); }
+		public int source(long position) { return LoadingChunkTracker.this.getLevelFromSource(position); }
+		public void set(long position, int level) { LoadingChunkTracker.this.setLevel(position, level); }
+	};
 
 	public LoadingChunkTracker(DistanceManager distanceManager, TicketStorage ticketStorage) {
 		this.distanceManager = distanceManager;
 		this.ticketStorage = ticketStorage;
-		// The original graph read ticket levels lazily, including tickets added
-		// before this listener; seed those before any notification arrives.
-		for (LongIterator iterator = ticketStorage.activeTicketChunks(); iterator.hasNext(); ) {
-			long l = iterator.nextLong();
-			this.distance.seed(l, ticketStorage.getTicketLevelAt(l, false));
-		}
-		// The storage notifies the native graph directly; update() is the same call from Java.
-		ticketStorage.setLoadingChunkUpdatedListener(this.distance.listener(ticketStorage, this::update));
+		ticketStorage.setLoadingChunkUpdatedListener(this::update);
 	}
 
 	public void update(long l, int i, boolean bl) {
-		this.distance.update(l, this.ticketStorage.getTicketLevelAt(l, false), i, bl);
+		this.distance.updateEffects(l, i, bl, this.effects);
+	}
+
+	protected int getLevelFromSource(long position) {
+		return this.ticketStorage.getTicketLevelAt(position, false);
 	}
 
 	protected int getLevel(long l) {
@@ -56,13 +53,6 @@ class LoadingChunkTracker {
 	}
 
 	public int runDistanceUpdates(int i) {
-		if (!this.distanceManager.appliesLoadingLevels()) {
-			return this.distance.runUpdates(i, this.levelSink);
-		}
-
-		// ChunkMap's registry applies the changes to its holders natively, in this order.
-		int remaining = this.distance.run(i);
-		this.distanceManager.applyLoadingLevels(this.distance);
-		return remaining;
+		return this.distance.runEffects(i, this.effects);
 	}
 }

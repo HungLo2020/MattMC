@@ -106,3 +106,25 @@ pub unsafe extern "C" fn mattmc_ticket_distance_drain(id: u64, buffer: *mut i64,
     }
     super::ffi::drain_changes(field, buffer, capacity)
 }
+
+/// Prepare an owning operation before any graph mutation. The VM adopts this
+/// handle, then explicitly steps it; registration failure can release unchanged.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_ticket_distance_operation_create(
+    id: u64, run: i32, position: i64, level: i32, decrease: i32, budget: i32,
+) -> u64 {
+    let Ok(operation) = super::graph::TicketOperation::new(retain(id), run != 0, position, level, decrease != 0, budget) else { return 0; };
+    let layout = std::alloc::Layout::new::<super::graph::TicketOperation>();
+    let pointer = std::alloc::alloc(layout).cast::<super::graph::TicketOperation>();
+    if pointer.is_null() { return 0; }
+    pointer.write(operation);
+    pointer.expose_provenance() as u64
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_ticket_distance_operation_step(id: u64, answer: i32) {
+    (&mut *std::ptr::with_exposed_provenance_mut::<super::graph::TicketOperation>(id as usize)).step(answer);
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_ticket_distance_operation_release(id: u64) {
+    if id != 0 { drop(Box::from_raw(std::ptr::with_exposed_provenance_mut::<super::graph::TicketOperation>(id as usize))); }
+}

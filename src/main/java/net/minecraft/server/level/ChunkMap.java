@@ -13,7 +13,6 @@ import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -123,8 +122,8 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	private NativeChunkHolders holders = new NativeChunkHolders(ChunkLevel.MAX_LEVEL);
 	/** applyLoadingLevels' record buffer (main thread). */
 	private long[] levelRecords = new long[512];
-	private volatile Long2ObjectLinkedOpenHashMap<ChunkHolder> visibleChunkMap = new Long2ObjectLinkedOpenHashMap<>();
-	private final List<ChunkGenerationTask> pendingGenerationTasks = new ArrayList();
+	private volatile NativeChunkHolders.Visible visibleChunkMap = this.holders.visible();
+	private final NativeChunkGeneration.Pending pendingGenerationTasks = new NativeChunkGeneration.Pending();
 	final ServerLevel level;
 	private final ThreadedLevelLightEngine lightEngine;
 	public final BlockableEventLoop<Runnable> mainThreadExecutor;
@@ -244,6 +243,8 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 		return this.lightEngine;
 	}
 
+    java.lang.foreign.MemorySegment generationRegistryOwner() { return this.holders.requestOwner(); }
+
 	@Nullable
 	public ChunkHolder getUpdatingChunkIfPresent(long l) {
 		return this.holders.updating(l);
@@ -252,7 +253,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	/** Verification only: the state a constructor would create, for a ChunkMap built without one. */
 	private void initializeVerification() {
 		this.holders = new NativeChunkHolders(ChunkLevel.MAX_LEVEL);
-		this.visibleChunkMap = new Long2ObjectLinkedOpenHashMap<>();
+		this.visibleChunkMap = this.holders.visible();
 		this.levelRecords = new long[512];
 	}
 
@@ -598,7 +599,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	protected boolean promoteChunkMap() {
-		Long2ObjectLinkedOpenHashMap<ChunkHolder> promoted = this.holders.promote();
+		NativeChunkHolders.Visible promoted = this.holders.promote();
 		if (promoted == null) {
 			return false;
 		} else {

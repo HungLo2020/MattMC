@@ -5,7 +5,7 @@
 //!
 //! Negative results are faults: -3 allocation, -14 illegal state; exports
 //! return the negated pair count needed when the buffer is too small.
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::{Applied, Apply, Registry, Scheduled};
 use crate::world::level::chunk_distance::ticket_ffi;
@@ -40,7 +40,7 @@ unsafe fn export(pairs: &[(i64, u32)], buffer: *mut i64, capacity: i32) -> i32 {
 #[no_mangle]
 pub extern "C" fn mattmc_chunk_holders_create(max_level: i32) -> u64 {
     match Registry::new(max_level) {
-        Ok(registry) => Box::into_raw(Box::new(Mutex::new(registry))).expose_provenance() as u64,
+        Ok(registry) => Arc::into_raw(Arc::new(Mutex::new(registry))).expose_provenance() as u64,
         Err(_) => 0,
     }
 }
@@ -48,7 +48,7 @@ pub extern "C" fn mattmc_chunk_holders_create(max_level: i32) -> u64 {
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_chunk_holders_release(id: u64) {
     if id != 0 {
-        drop(Box::from_raw(std::ptr::with_exposed_provenance_mut::<Mutex<Registry>>(id as usize)));
+        drop(Arc::from_raw(std::ptr::with_exposed_provenance::<Mutex<Registry>>(id as usize)));
     }
 }
 
@@ -69,6 +69,15 @@ pub unsafe extern "C" fn mattmc_chunk_holders_schedule(id: u64, key: i64, level:
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_chunk_holders_commit_new(id: u64, key: i64, holder: i32) -> i64 {
     match registry(id).commit_new(key, holder as u32) {
+        Ok(()) => 0,
+        Err(error) => fault(error),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_attach_generation(id: u64, holder_id: i32, generation: u64) -> i64 {
+    let owner = crate::world::level::chunk_generation::ffi::retain_holder(generation);
+    match registry(id).attach_generation(holder_id as u32, owner) {
         Ok(()) => 0,
         Err(error) => fault(error),
     }
@@ -299,4 +308,67 @@ pub unsafe extern "C" fn mattmc_chunk_holders_begin_transition(id: u64, holder: 
         Ok(effects) => effects,
         Err(error) => fault(error),
     }
+}
+
+/// Every view/walk handle owns an actual Arc, independent of registry id reuse.
+unsafe fn visible<'a>(id: u64) -> &'a Mutex<super::Visible> {
+    &*std::ptr::with_exposed_provenance::<Mutex<super::Visible>>(id as usize)
+}
+pub(crate) unsafe fn retain_visible(id: u64) -> Arc<Mutex<super::Visible>> {
+    let pointer = std::ptr::with_exposed_provenance::<Mutex<super::Visible>>(id as usize);
+    Arc::increment_strong_count(pointer); Arc::from_raw(pointer)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_current(id: u64) -> u64 {
+    Arc::into_raw(registry(id).visible.clone()).expose_provenance() as u64
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_prepare(id: u64) -> u64 {
+    registry(id).prepare_visible().map_or(0, |view| Arc::into_raw(view).expose_provenance() as u64)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_commit(id: u64, prepared: u64) {
+    registry(id).commit_visible(retain_visible(prepared));
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_release(id: u64) {
+    if id != 0 { drop(Arc::from_raw(std::ptr::with_exposed_provenance::<Mutex<super::Visible>>(id as usize))); }
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_get(id: u64, key: i64) -> i32 {
+    visible(id).lock().unwrap_or_else(|p| p.into_inner()).entries.get(key).map_or(-1, |id| id as i32)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_size(id: u64) -> i32 {
+    visible(id).lock().unwrap_or_else(|p| p.into_inner()).entries.len() as i32
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_bindings(id: u64, output: *mut i32, capacity: i32) -> i32 {
+    let view = visible(id).lock().unwrap_or_else(|p| p.into_inner());
+    if (capacity.max(0) as usize) < view.entries.len() { return -(view.entries.len() as i32); }
+    for (index, (_, id)) in view.entries.entries().into_iter().enumerate() { output.add(index).write(id as i32); }
+    view.entries.len() as i32
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_walk(id: u64) -> u64 {
+    Box::into_raw(Box::new(super::VisibleWalk::new(retain_visible(id)))).expose_provenance() as u64
+}
+unsafe fn visible_walk<'a>(id: u64) -> &'a mut super::VisibleWalk {
+    &mut *std::ptr::with_exposed_provenance_mut::<super::VisibleWalk>(id as usize)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_walk_release(id: u64) {
+    if id != 0 { drop(Box::from_raw(std::ptr::with_exposed_provenance_mut::<super::VisibleWalk>(id as usize))); }
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_walk_has_next(id: u64) -> i32 { i32::from(visible_walk(id).next.is_some()) }
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_walk_next(id: u64) -> i32 { visible_walk(id).next().map_or(-13, |id| id as i32) }
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_holders_view_walk_remove(id: u64) -> i32 { visible_walk(id).remove().map_or(-14, |id| id as i32) }
+
+/// Retain the actual allocation, never a second storage or a borrowed raw owner.
+pub(crate) unsafe fn retain_registry(id: u64) -> Arc<Mutex<Registry>> {
+    let pointer = std::ptr::with_exposed_provenance::<Mutex<Registry>>(id as usize);
+    Arc::increment_strong_count(pointer); Arc::from_raw(pointer)
 }

@@ -51,6 +51,20 @@ public final class VerifyTicketStorage {
 		return (T)unsafe.getMethod("allocateInstance", Class.class).invoke(field(unsafe, "theUnsafe").get(null), type);
 	}
 
+    /** Fixture-only public readiness lookup; all TicketStorage calls are unchanged. */
+    static final class ReadinessMap extends ChunkMap {
+        Long2ObjectLinkedOpenHashMap<ChunkHolder> holders;
+        private ReadinessMap() { super(null, null, null, null, null, null, null, null, null, null, null, 0, false); }
+        @Override public ChunkHolder getUpdatingChunkIfPresent(long key) { return holders.get(key); }
+    }
+    static ChunkMap readinessMap(Long2ObjectLinkedOpenHashMap<ChunkHolder> holders) throws Exception {
+        ReadinessMap map = allocate(ReadinessMap.class); map.holders = holders; return map;
+    }
+    static void saveDependency(ChunkHolder holder, CompletableFuture<?> future) throws Exception {
+        var method = ChunkHolder.class.getDeclaredMethod("addSaveDependency", CompletableFuture.class);
+        method.setAccessible(true); method.invoke(holder, future);
+    }
+
 	/** Loaded after bootstrap (TicketType registers on class init). */
 	static final class Types {
 		static final TicketType[] ALL = {
@@ -64,18 +78,16 @@ public final class VerifyTicketStorage {
 		TicketStorage storage = new TicketStorage();
 		StringBuilder row = new StringBuilder();
 		// Stub ChunkMap: holders with controllable save futures.
-		ChunkMap chunkMap = allocate(ChunkMap.class);
 		Long2ObjectLinkedOpenHashMap<ChunkHolder> holders = new Long2ObjectLinkedOpenHashMap<>();
-		field(ChunkMap.class, "updatingChunkMap").set(chunkMap, holders);
-		Field saveSync = field(ChunkHolder.class, "saveSync");
+        ChunkMap chunkMap = readinessMap(holders);
 		Map<Long, CompletableFuture<?>> futures = new java.util.HashMap<>();
 		long[] keys = new long[24];
 		for (int i = 0; i < keys.length; i++) {
 			keys[i] = i == 0 ? 0L : ChunkPos.asLong(r.nextInt(64) - 32, r.nextInt(64) - 32);
 			if (r.nextInt(3) > 0) {
-				ChunkHolder holder = allocate(ChunkHolder.class);
+				ChunkHolder holder = new ChunkHolder(new ChunkPos(keys[i]), 33, Manager.HEIGHT, null, (pos, level, setter, next) -> {}, null);
 				CompletableFuture<?> future = r.nextBoolean() ? CompletableFuture.completedFuture(null) : new CompletableFuture<>();
-				saveSync.set(holder, future);
+				saveDependency(holder, future);
 				holders.put(keys[i], holder);
 				futures.put(keys[i], future);
 			}
@@ -447,8 +459,7 @@ public final class VerifyTicketStorage {
 			RandomSource r = RandomSource.create(round % 4);
 			TicketStorage storage = new TicketStorage();
 			Manager manager = new Manager(storage);
-			ChunkMap chunkMap = allocate(ChunkMap.class);
-			field(ChunkMap.class, "updatingChunkMap").set(chunkMap, manager.holders);
+            ChunkMap chunkMap = readinessMap(manager.holders);
 			Object loadingTracker = loadingField.get(manager);
 			var runLoading = loadingTracker.getClass().getDeclaredMethod("runDistanceUpdates", int.class);
 			runLoading.setAccessible(true);

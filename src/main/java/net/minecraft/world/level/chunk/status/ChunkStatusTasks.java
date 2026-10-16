@@ -207,25 +207,12 @@ public class ChunkStatusTasks {
 		return CompletableFuture.supplyAsync(() -> {
 			ProtoChunk protoChunk = (ProtoChunk)chunkAccess;
 			ServerLevel serverLevel = worldGenContext.level();
-			LevelChunk levelChunk;
-			if (protoChunk instanceof ImposterProtoChunk imposterProtoChunk) {
-				levelChunk = imposterProtoChunk.getWrapped();
-			} else {
-				levelChunk = new LevelChunk(serverLevel, protoChunk, levelChunkx -> {
+			return net.minecraft.server.level.NativeChunkGeneration.publishFull(worldGenContext, generationChunkHolder, protoChunk,
+				() -> new LevelChunk(serverLevel, protoChunk, levelChunkx -> {
 					try (ProblemReporter.ScopedCollector scopedCollector = new ProblemReporter.ScopedCollector(chunkAccess.problemPath(), LOGGER)) {
 						postLoadProtoChunk(serverLevel, TagValueInput.create(scopedCollector, serverLevel.registryAccess(), protoChunk.getEntities()));
 					}
-				});
-				generationChunkHolder.replaceProtoChunk(new ImposterProtoChunk(levelChunk, false));
-			}
-
-			levelChunk.setFullStatus(generationChunkHolder::getFullStatus);
-			levelChunk.runPostLoad();
-			levelChunk.setLoaded(true);
-			levelChunk.registerAllBlockEntitiesAfterLevelLoad();
-			levelChunk.registerTickContainerInLevel(serverLevel);
-			levelChunk.setUnsavedListener(worldGenContext.unsavedListener());
-			return levelChunk;
+				}));
 		}, worldGenContext.mainThreadExecutor());
 	}
 

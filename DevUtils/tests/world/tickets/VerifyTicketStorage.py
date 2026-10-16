@@ -13,10 +13,21 @@ ROOT = Path(__file__).resolve().parents[4]
 FROZEN = ROOT.parent / 'MattMC_JavaPerfTesting/MattMC'
 FROZEN_HEAD = '7a4d181717dc0c7da9086f1a17687dfd522ce417'
 DRIVER = ROOT / 'DevUtils/tests/world/tickets/VerifyTicketStorage.java'
-# Files the native ticket-storage slice replaces; the control side compiles their
-# pre-change sources over the candidate classpath.
-CONTROL_SOURCES = ['world/level/TicketStorage.java', 'server/level/Ticket.java', 'server/level/TicketChunkDistance.java',
-                   'server/level/LoadingChunkTracker.java', 'server/level/SimulationChunkTracker.java']
+# Original observer pin: fixture adaptation must match its Frozen trace.
+ORIGINAL_OBSERVER_REF = '5f9c0b3b819a72d374882418c0e7c08145096ac4'
+
+
+def verify_runtime(path):
+    manifest = json.loads((path / 'manifest.json').read_text())
+    if not manifest.get('complete_classpath'):
+        raise ValueError('A complete sealed pre-change runtime is required')
+    for name, expected in manifest['files'].items():
+        if sha(path / name) != expected:
+            raise ValueError('Pre-change runtime changed: ' + name)
+    for name, expected in manifest.get('dependency_jars', {}).items():
+        if sha(Path(name)) != expected:
+            raise ValueError('Pre-change dependency changed: ' + name)
+    return manifest
 
 
 def sha(path):
@@ -32,11 +43,25 @@ def candidate_patch_sha():
     return digest.hexdigest()
 
 
+def current_runtime_sha():
+    digest = hashlib.sha256()
+    for directory in ('build/classes/java/main', 'build/resources/main'):
+        for path in sorted((ROOT / directory).rglob('*')):
+            if path.is_file():
+                digest.update(path.relative_to(ROOT).as_posix().encode() + b'\0')
+                digest.update(bytes.fromhex(sha(path)))
+    return digest.hexdigest()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--control-ref', required=True, help='pre-change Current commit for the control side')
+    parser.add_argument('--pre-runtime', type=Path, required=True,
+                        help='complete sealed pre-change classes, resources, dependencies and native library')
+    parser.add_argument('--control-ref', help='optional expected pre-change source commit')
+    parser.add_argument('--frozen-native-dir', type=Path, required=True,
+                        help='explicit compatible native directory for the pinned Frozen runtime')
     parser.add_argument('--benchmark', action='store_true')
     parser.add_argument('--batch-capacities', default='1,256',
                         help='extra candidate runs with fixed Java-predicate batch sizes; all traces must match')
@@ -49,10 +74,21 @@ def main():
     frozen_head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=FROZEN, text=True).strip()
     assert frozen_head == FROZEN_HEAD, frozen_head
     assert not subprocess.check_output(['git', 'status', '--porcelain'], cwd=FROZEN)
-    control_ref = subprocess.check_output(['git', 'rev-parse', args.control_ref + '^{commit}'], cwd=ROOT, text=True).strip()
+    pre_runtime = args.pre_runtime.resolve()
+    pre_manifest = verify_runtime(pre_runtime)
+    control_ref = pre_manifest['source_head']
+    if args.control_ref:
+        expected = subprocess.check_output(['git', 'rev-parse', args.control_ref + '^{commit}'], cwd=ROOT, text=True).strip()
+        assert control_ref == expected, (control_ref, expected)
+    native_dirs = {'frozen': args.frozen_native_dir.resolve(), 'frozen-original': args.frozen_native_dir.resolve(),
+                   'control': pre_runtime / 'native', 'current': native.parent}
+    native_hashes = {side: sha(directory / native.name) for side, directory in native_dirs.items()}
     result = {'frozen_head': frozen_head, 'control_ref': control_ref, 'native': sha(native), 'driver': sha(DRIVER),
               'candidate_head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'candidate_diff_sha256': candidate_patch_sha(),
+              'candidate_runtime_sha256': current_runtime_sha(),
+              'pre_runtime_manifest_sha256': sha(pre_runtime / 'manifest.json'),
+              'native_images': native_hashes,
               'scope': 'Actual TicketStorage add/remove (new, shared-instance, same type/level re-add, radius), forced toggles, '
                        'purge against stub ChunkMap holders whose save futures complete mid-walk, close/reactivate, level replacement '
                        'and codec save/load; listener calls with notification-time level reads, ticket lists, ticksLeft, debug strings, '
@@ -77,24 +113,26 @@ def main():
     for side, repo in [('frozen', FROZEN), ('current', ROOT)]:
         data = run([str(repo / 'gradlew'), '-q', '-I', str(init), 'ticketsPrintClasspath'], side + '-classpath.log', repo)
         classpaths[side] = next(line.removeprefix('TICKETS_CP ') for line in data.splitlines() if line.startswith('TICKETS_CP '))
-    control_classes = output / 'control-classes'
-    control_classes.mkdir()
-    sources = []
-    for name in CONTROL_SOURCES:
-        destination = output / 'control-source' / name
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(subprocess.check_output(['git', 'show', f'{control_ref}:src/main/java/net/minecraft/{name}'], cwd=ROOT))
-        sources.append(str(destination))
-    run([str(jdk / 'javac'), '-nowarn', '-cp', classpaths['current'], '-d', str(control_classes)] + sources, 'compile-control.log')
-    classpaths['control'] = str(control_classes) + os.pathsep + classpaths['current']
-    for side in ('frozen', 'control', 'current'):
+    classpaths['control'] = (pre_runtime / 'classpath.txt').read_text().strip()
+    # No candidate classes or library may enter the sealed pre-change side.
+    assert all((ROOT / 'build/classes/java/main').as_posix() != entry for entry in classpaths['control'].split(os.pathsep))
+    classpaths['frozen-original'] = classpaths['frozen']
+    original_source = output / 'original-driver' / 'net/minecraft/world/level/VerifyTicketStorage.java'
+    original_source.parent.mkdir(parents=True)
+    original_source.write_bytes(subprocess.check_output(
+        ['git', 'show', ORIGINAL_OBSERVER_REF + ':DevUtils/tests/world/tickets/VerifyTicketStorage.java'], cwd=ROOT))
+    result['original_observer_ref'] = ORIGINAL_OBSERVER_REF
+    result['original_observer_sha256'] = sha(original_source)
+    for side in ('frozen-original', 'frozen', 'control', 'current'):
         target = output / 'driver' / side
         target.mkdir(parents=True)
-        run([str(jdk / 'javac'), '-nowarn', '-cp', classpaths[side], '-d', str(target), str(DRIVER)], f'compile-driver-{side}.log')
+        source = original_source if side == 'frozen-original' else DRIVER
+        run([str(jdk / 'javac'), '-g', '-cp', classpaths[side], '-d', str(target), str(source)], f'compile-driver-{side}.log')
         command = [str(jdk / 'java'), '-Xms1g', '-Xmx1g', '-XX:+UseG1GC', '--enable-native-access=ALL-UNNAMED',
-                   '-Dmattmc.rust.natives.dir=' + str(native.parent), '-cp', str(target) + os.pathsep + classpaths[side],
+                   '-Dmattmc.rust.natives.dir=' + str(native_dirs[side]), '-cp', str(target) + os.pathsep + classpaths[side],
                    'net.minecraft.world.level.VerifyTicketStorage', side, str(output / f'{side}-trace.txt')]
         commands[side] = command
+        (output / f'{side}-command.json').write_text(json.dumps(command, indent=2) + '\n')
         data = run(command, f'{side}-run.log')
         trace = re.search(r'TRACE (\w+) (\d+)', data)
         assert trace, f'{side}: no trace'
@@ -105,14 +143,14 @@ def main():
         command = list(commands['current'])
         command.insert(1, f'-Dmattmc.ticketStorage.batch={int(capacity)}')
         command[-1] = str(output / f'{side}-trace.txt')
+        (output / f'{side}-command.json').write_text(json.dumps(command, indent=2) + '\n')
         data = run(command, f'{side}-run.log')
         trace = re.search(r'TRACE (\w+) (\d+)', data)
         assert trace, f'{side}: no trace'
         result[side] = {'trace': trace.group(1), 'ticks': int(trace.group(2))}
-    # The control overlay must actually replace LevelChunkTicks.
-    # Informational until the candidate changes TicketStorage.
-    result['control_overlays_ticket_storage'] = result['control']['classes'].get('TicketStorage') != result['current']['classes'].get('TicketStorage')
-    sides = ['frozen', 'control', 'current'] + [side for side in result if side.startswith('current-batch')]
+    result['original_frozen_fixture_equivalence'] = result['frozen-original']['trace'] == result['frozen']['trace']
+    result['control_is_complete_runtime'] = True
+    sides = ['frozen-original', 'frozen', 'control', 'current'] + [side for side in result if side.startswith('current-batch')]
     result['traces_equal'] = len({result[side]['trace'] for side in sides}) == 1
     if not result['traces_equal']:
         for side in sides[1:]:
@@ -125,7 +163,7 @@ def main():
             timings = {side: [] for side in commands}
             checksums = {side: set() for side in commands}
             for round_index in range(3):
-                for side in ('frozen', 'control', 'current'):
+                for side in ('frozen-original', 'frozen', 'control', 'current'):
                     data = run(commands[side] + [mode, '15', '5'], f'{mode}-{round_index}-{side}.log')
                     timings[side] += [int(ns) for ns in re.findall(r'TIMING \d+ (\d+)', data)]
                     checksums[side].update(re.findall(r'CHECKSUM (-?\d+)', data))
@@ -137,7 +175,13 @@ def main():
         result['benchmark_workload'] = ('production-listener path: 1500 server-shaped ticks per run: 12 random portal/ender-pearl/spawn-search/forced/dragon/unknown '
                                         'tickets, untimed removals, purgeStaleTickets against holder readiness, both real trackers '
                                         'updated with production listeners; 5 warmup runs then 10 samples per JVM; 3 alternating rounds')
+    verify_runtime(pre_runtime)
+    assert candidate_patch_sha() == result['candidate_diff_sha256'], 'Production sources changed during verification'
+    assert current_runtime_sha() == result['candidate_runtime_sha256'], 'Production classes/resources changed during verification'
+    assert sha(DRIVER) == result['driver'], 'Observer changed during verification'
+    assert all(sha(native_dirs[side] / native.name) == expected for side, expected in native_hashes.items()), 'Native image changed during verification'
     result['passed'] = result['traces_equal']
+    result['performance_acceptance'] = False
     (output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps({key: value for key, value in result.items() if key not in ('frozen', 'control', 'current')}, indent=2))
     print('PASS' if result['passed'] else 'FAIL')

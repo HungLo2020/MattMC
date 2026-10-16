@@ -1,6 +1,5 @@
 package net.minecraft.server.level;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -8,9 +7,12 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.ref.Reference;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import net.minecraft.util.NativeLibraryLoader;
 import org.jetbrains.annotations.Nullable;
 
@@ -34,6 +36,7 @@ final class NativeChunkHolders {
 	private static final MethodHandle RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_holders_release", FunctionDescriptor.ofVoid(J));
 	private static final MethodHandle SCHEDULE = handle("schedule", FunctionDescriptor.of(J, J, J, I, I, I));
 	private static final MethodHandle COMMIT_NEW = handle("commit_new", FunctionDescriptor.of(J, J, J, I));
+	private static final MethodHandle ATTACH_GENERATION = handle("attach_generation", FunctionDescriptor.of(J, J, I, J));
 	private static final MethodHandle ABORT_NEW = handle("abort_new", FunctionDescriptor.ofVoid(J, I));
 	private static final MethodHandle UPDATING = handle("updating", FunctionDescriptor.of(I, J, J));
 	private static final MethodHandle DROPPING = handle("dropping", FunctionDescriptor.of(I, J, J));
@@ -80,23 +83,28 @@ final class NativeChunkHolders {
 	private final int[] done = new int[1];
 
 	NativeChunkHolders(int maxLevel) {
+		Arena arena = Arena.ofAuto();
 		long created;
 		try { created = (long)CREATE.invokeExact(maxLevel); }
 		catch (Throwable t) { throw failure(t); }
 		if (created == 0) throw new OutOfMemoryError("Native chunk holder registry allocation failed");
-		MemorySegment pointer = MemorySegment.ofAddress(created);
+		this.id = created;
+		NativeRelease cleanup;
+		try { cleanup = new NativeRelease(created, RELEASE); }
+		catch (Throwable t) { release(created); throw failure(t); }
 		try {
-			this.id = created;
-			this.owner = pointer.reinterpret(1, Arena.ofAuto(), NativeChunkHolders::release);
+			this.owner = MemorySegment.ofAddress(created).reinterpret(1, arena, cleanup);
 		} catch (Throwable t) {
-			release(pointer);
-			throw t;
+			cleanup.run();
+			throw failure(t);
 		}
 		this.ids.defaultReturnValue(-1);
 		try { STATUS_LEVELS.invokeExact(this.id, FULL_LEVEL, BLOCK_TICKING_LEVEL, ENTITY_TICKING_LEVEL); }
 		catch (Throwable t) { throw failure(t); }
 		finally { Reference.reachabilityFence(this.owner); }
 	}
+
+    MemorySegment requestOwner() { return this.owner; }
 
 	/** {@code updateFutures}' effects between two levels, for a holder without a registry. */
 	static long transition(int oldLevel, int level) {
@@ -159,8 +167,29 @@ final class NativeChunkHolders {
 		finally { Reference.reachabilityFence(this.owner); }
 	}
 
-	private static void release(MemorySegment pointer) {
-		try { RELEASE.invokeExact(pointer.address()); }
+	/** JDK25 can register cleanup before allocating reinterpret's result.
+	 * Rollback and arena cleanup must consume the same handle exactly once. */
+	private static final class NativeRelease implements Consumer<MemorySegment>, Runnable {
+		private static final VarHandle HANDLE;
+		static {
+			try { HANDLE = MethodHandles.lookup().findVarHandle(NativeRelease.class, "handle", long.class); }
+			catch (ReflectiveOperationException e) { throw new ExceptionInInitializerError(e); }
+		}
+		private volatile long handle;
+		private final MethodHandle function;
+		NativeRelease(long handle, MethodHandle function) { this.handle = handle; this.function = function; }
+		public void accept(MemorySegment ignored) { run(); }
+		public void run() {
+			long owned = (long)HANDLE.getAndSet(this, 0L);
+			if (owned != 0) {
+				try { function.invokeExact(owned); }
+				catch (Throwable t) { throw new IllegalStateException("Cannot release native chunk holders", t); }
+			}
+		}
+	}
+
+	private static void release(long handle) {
+		try { RELEASE.invokeExact(handle); }
 		catch (Throwable t) { throw new IllegalStateException("Cannot release native chunk holders", t); }
 	}
 
@@ -199,6 +228,10 @@ final class NativeChunkHolders {
 		try { check((long)COMMIT_NEW.invokeExact(this.id, key, holderId)); }
 		catch (Throwable t) { throw failure(t); }
 		finally { Reference.reachabilityFence(this.owner); }
+		NativeChunkGeneration.Holder generation = holder.generationOwner();
+		try { check((long)ATTACH_GENERATION.invokeExact(this.id, holderId, generation.handleId())); }
+		catch (Throwable t) { throw failure(t); }
+		finally { generation.fence(); Reference.reachabilityFence(this.owner); }
 	}
 
 	void abortNew(int holderId) {
@@ -228,28 +261,125 @@ final class NativeChunkHolders {
 		finally { Reference.reachabilityFence(this.owner); }
 	}
 
-	/** The promoted visible map, or null when nothing changed since the last promote. */
-	@Nullable
-	Long2ObjectLinkedOpenHashMap<ChunkHolder> promote() {
-		int n;
-		try {
-			n = (int)PROMOTE.invokeExact(this.id, MemorySegment.ofArray(this.buffer), this.buffer.length / 2);
-			if (n < 0) {
-				this.buffer = new long[Math.max(-n * 2, this.buffer.length * 2)];
-				n = (int)PROMOTE.invokeExact(this.id, MemorySegment.ofArray(this.buffer), this.buffer.length / 2);
-			}
-		}
-		catch (Throwable t) { throw failure(t); }
-		finally { Reference.reachabilityFence(this.owner); }
-		if (n == 0) return null;
-		return this.map(this.buffer, n - 1);
-	}
+    /** Native snapshot and stable opaque bindings; a retained view survives id reuse. */
+    synchronized Visible visible() { return snapshot(false); }
+    @Nullable synchronized Visible promote() { return snapshot(true); }
+    @Nullable private Visible snapshot(boolean promote) {
+        Arena arena = Arena.ofAuto();
+        long view;
+        try { view = (long)(promote ? ViewBindings.PROMOTE : ViewBindings.CURRENT).invokeExact(this.id); }
+        catch (Throwable t) { throw failure(t); }
+        finally { Reference.reachabilityFence(this.owner); }
+        if (view == 0) return null;
+        Visible prepared = new Visible(view, arena, this.holders);
+        if (promote) {
+            try { ViewBindings.COMMIT.invokeExact(this.id, view); }
+            catch (Throwable t) { throw failure(t); }
+            finally { Reference.reachabilityFence(this.owner); Reference.reachabilityFence(prepared); }
+        }
+        return prepared;
+    }
 
-	private Long2ObjectLinkedOpenHashMap<ChunkHolder> map(long[] pairs, int count) {
-		Long2ObjectLinkedOpenHashMap<ChunkHolder> map = new Long2ObjectLinkedOpenHashMap<>(count);
-		for (int i = 0; i < count; i++) map.put(pairs[i * 2], this.holder((int)pairs[i * 2 + 1]));
-		return map;
-	}
+    private static final class ViewBindings {
+        static final MethodHandle CURRENT = handle("view_current", FunctionDescriptor.of(J, J));
+        static final MethodHandle PROMOTE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_holders_view_prepare", FunctionDescriptor.of(J, J));
+        static final MethodHandle COMMIT = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_holders_view_commit", FunctionDescriptor.ofVoid(J, J));
+        static final MethodHandle RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_holders_view_release", FunctionDescriptor.ofVoid(J));
+        static final MethodHandle GET = handle("view_get", FunctionDescriptor.of(I, J, J));
+        static final MethodHandle SIZE = handle("view_size", FunctionDescriptor.of(I, J));
+        static final MethodHandle BINDINGS = heap("view_bindings", FunctionDescriptor.of(I, J, ValueLayout.ADDRESS, I));
+        static final MethodHandle WALK = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_holders_view_walk", FunctionDescriptor.of(J, J));
+        static final MethodHandle WALK_RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_chunk_holders_view_walk_release", FunctionDescriptor.ofVoid(J));
+        static final MethodHandle HAS_NEXT = handle("view_walk_has_next", FunctionDescriptor.of(I, J));
+        static final MethodHandle NEXT = handle("view_walk_next", FunctionDescriptor.of(I, J));
+        static final MethodHandle REMOVE = handle("view_walk_remove", FunctionDescriptor.of(I, J));
+    }
+
+    static final class Visible {
+        private final MemorySegment owner;
+        private final long id;
+        private final ChunkHolder[] bindings;
+        private final java.util.Collection<ChunkHolder> values = new java.util.AbstractCollection<>() {
+            public int size() { return Visible.this.size(); }
+            public java.util.Iterator<ChunkHolder> iterator() { return new Cursor(); }
+            public java.util.Spliterator<ChunkHolder> spliterator() {
+                return java.util.Spliterators.spliterator(iterator(), size(), java.util.Spliterator.ORDERED | java.util.Spliterator.NONNULL);
+            }
+        };
+        Visible(long id, Arena arena, ChunkHolder[] source) {
+            this.id = id;
+            this.owner = NativeChunkGeneration.adopt(id, 1, arena, ViewBindings.RELEASE);
+            this.bindings = new ChunkHolder[source.length];
+            int[] ids = new int[size()];
+            try {
+                int count = (int)ViewBindings.BINDINGS.invokeExact(id, MemorySegment.ofArray(ids), ids.length);
+                if (count != ids.length) throw new IllegalStateException("Native visible snapshot changed during adoption");
+                for (int binding : ids) this.bindings[binding] = source[binding];
+            } catch (Throwable t) { throw failure(t); }
+            finally { Reference.reachabilityFence(this); }
+        }
+        long handleId() { return id; }
+        void fence() { Reference.reachabilityFence(this); }
+        @Nullable public ChunkHolder get(long key) {
+            try { int binding = (int)ViewBindings.GET.invokeExact(id, key); return binding < 0 ? null : bindings[binding]; }
+            catch (Throwable t) { throw failure(t); }
+            finally { Reference.reachabilityFence(this); }
+        }
+        public int size() {
+            try { return (int)ViewBindings.SIZE.invokeExact(id); }
+            catch (Throwable t) { throw failure(t); }
+            finally { Reference.reachabilityFence(this); }
+        }
+        public java.util.Collection<ChunkHolder> values() { return values; }
+        public Iterable<it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry<ChunkHolder>> long2ObjectEntrySet() {
+            return () -> new java.util.Iterator<>() {
+                final Cursor cursor = new Cursor();
+                public boolean hasNext() { return cursor.hasNext(); }
+                public it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry<ChunkHolder> next() {
+                    ChunkHolder holder = cursor.next();
+                    return new it.unimi.dsi.fastutil.longs.AbstractLong2ObjectMap.BasicEntry<>(cursor.key(), holder);
+                }
+                public void remove() { cursor.remove(); }
+            };
+        }
+        private final class Cursor implements java.util.Iterator<ChunkHolder> {
+            final MemorySegment owner;
+            final long walk;
+            Cursor() {
+                Arena arena = Arena.ofAuto();
+                try { walk = (long)ViewBindings.WALK.invokeExact(id); }
+                catch (Throwable t) { throw failure(t); }
+                finally { Reference.reachabilityFence(Visible.this); }
+                if (walk == 0) throw new OutOfMemoryError("Native visible iterator allocation failed");
+                owner = NativeChunkGeneration.adopt(walk, Long.BYTES, arena, ViewBindings.WALK_RELEASE);
+            }
+            public boolean hasNext() {
+                try { return (int)ViewBindings.HAS_NEXT.invokeExact(walk) != 0; }
+                catch (Throwable t) { throw failure(t); }
+                finally { Reference.reachabilityFence(this); }
+            }
+            public ChunkHolder next() {
+                try {
+                    int binding = (int)ViewBindings.NEXT.invokeExact(walk);
+                    if (binding == -13) throw new java.util.NoSuchElementException();
+                    return bindings[binding];
+                } catch (Throwable t) { throw failure(t); }
+                finally { Reference.reachabilityFence(this); }
+            }
+            long key() {
+                try { return (long)ValueLayout.JAVA_LONG.varHandle().getVolatile(owner, 0L); }
+                finally { Reference.reachabilityFence(this); }
+            }
+            public void remove() {
+                try {
+                    int binding = (int)ViewBindings.REMOVE.invokeExact(walk);
+                    if (binding == -14) throw new IllegalStateException();
+                    bindings[binding] = null;
+                } catch (Throwable t) { throw failure(t); }
+                finally { Reference.reachabilityFence(this); }
+            }
+        }
+    }
 
 	/** Mode 0 updating, 1 visible: (key, holder) in iteration order. */
 	void forEach(int mode, BiConsumer<Long, ChunkHolder> consumer) {

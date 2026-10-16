@@ -417,3 +417,272 @@ impl DistanceField {
         Ok(budget)
     }
 }
+
+/// Per-invocation control for ticket graphs whose actual source/level effects
+/// are VM resources. No graph borrow or lock survives a returned command.
+#[repr(C)]
+pub(crate) struct TicketOperation {
+    command: std::sync::atomic::AtomicI64,
+    position: std::sync::atomic::AtomicI64,
+    argument: std::sync::atomic::AtomicI64,
+    graph: std::sync::Arc<super::ticket::SharedTicketDistance>,
+    stack: Vec<TicketFrame>,
+    value: i32,
+}
+
+enum TicketFrame {
+    Update { position: i64, level: i32, decrease: bool },
+    UpdateCurrent { position: i64, level: i32, decrease: bool },
+    Run { budget: i32 },
+    RunCurrent { position: i64, budget: i32 },
+    Set { position: i64, level: i32 },
+    Requeue { position: i64, top: i32, computed: i32 },
+    Neighbors { position: i64, level: i32, decrease: bool, cells: [i64; 27], count: usize, index: usize },
+    StartNeighbors { position: i64, level: i32, decrease: bool },
+    CheckNeighbor { from: i64, to: i64, level: i32, decrease: bool },
+    NeighborCurrent { from: i64, to: i64, candidate: i32, computed: i32, decrease: bool },
+    NeighborPending { from: i64, to: i64, candidate: i32, computed: i32 },
+    Edge { from: i64, to: i64, level: i32, current: i32, computed: i32, decrease: bool },
+    FinishEdge { to: i64, current: i32, computed: i32, absent: bool },
+    Compute { position: i64, excluded: i64, best: i32, cells: [i64; 27], count: usize, index: usize },
+    ComputedLevel { position: i64, excluded: i64, best: i32, cells: [i64; 27], count: usize, index: usize, neighbor: i64 },
+    ComputedSource { position: i64, excluded: i64, best: i32, cells: [i64; 27], count: usize, index: usize },
+}
+
+struct TicketEffect { kind: i64, position: i64, argument: i32 }
+
+impl TicketOperation {
+    pub(crate) fn new(graph: std::sync::Arc<super::ticket::SharedTicketDistance>, run: bool,
+        position: i64, level: i32, decrease: bool, budget: i32) -> Result<Self, Error> {
+        let mut stack = Vec::new();
+        stack.try_reserve(16).map_err(|_| Error::Allocation)?;
+        stack.push(if run { TicketFrame::Run { budget } } else { TicketFrame::Update { position, level, decrease } });
+        Ok(Self { command: std::sync::atomic::AtomicI64::new(0), position: std::sync::atomic::AtomicI64::new(0),
+            argument: std::sync::atomic::AtomicI64::new(0), graph, stack, value: 0 })
+    }
+    pub(crate) fn step(&mut self, answer: i32) {
+        use std::sync::atomic::Ordering;
+        self.value = answer;
+        loop {
+            let Some(frame) = self.stack.pop() else {
+                self.position.store(0, Ordering::Release);
+                self.argument.store(self.value as i64, Ordering::Release);
+                self.command.store(4, Ordering::Release);
+                return;
+            };
+            let outcome = {
+                let mut graph = self.graph.lock();
+                Self::advance(frame, graph.field_mut(), &mut self.stack, &mut self.value)
+            };
+            match outcome {
+                Ok(Some(effect)) => {
+                    self.position.store(effect.position, Ordering::Release);
+                    self.argument.store(effect.argument as i64, Ordering::Release);
+                    self.command.store(effect.kind, Ordering::Release);
+                    return;
+                }
+                Ok(None) => {},
+                Err(error) => {
+                    self.argument.store(match error { Error::Allocation => 3, Error::Queue => 6 }, Ordering::Release);
+                    self.command.store(5, Ordering::Release);
+                    return;
+                }
+            }
+        }
+    }
+    fn advance(frame: TicketFrame, field: &mut DistanceField, stack: &mut Vec<TicketFrame>, value: &mut i32)
+        -> Result<Option<TicketEffect>, Error> {
+        use TicketFrame::*;
+        macro_rules! push { ($frame:expr) => {{ stack.try_reserve(1).map_err(|_| Error::Allocation)?; stack.push($frame); }}; }
+        macro_rules! level { ($position:expr) => { return Ok(Some(TicketEffect { kind: 1, position: $position, argument: 0 })) }; }
+        let top = field.level_count - 1;
+        match frame {
+            Update { position, level, decrease } => {
+                push!(UpdateCurrent { position, level, decrease }); level!(position);
+            }
+            UpdateCurrent { position, level, decrease } => {
+                push!(Edge { from: field.topology.source(), to: position, level, current: *value,
+                    computed: field.computed_level(position), decrease });
+            }
+            Run { budget } => {
+                if field.has_work() && budget > 0 {
+                    let position = field.queue.pop()? as i64;
+                    push!(RunCurrent { position, budget: budget - 1 }); level!(position);
+                }
+                *value = budget;
+            }
+            RunCurrent { position, budget } => {
+                let current = clamp(*value, 0, top);
+                let computed = field.computed.remove(position).map_or(NO_COMPUTED_LEVEL, i32::from);
+                push!(Run { budget });
+                if computed < current {
+                    push!(StartNeighbors { position, level: computed, decrease: true });
+                    push!(Set { position, level: computed });
+                } else if computed > current {
+                    push!(StartNeighbors { position, level: current, decrease: false });
+                    if computed != top { push!(Requeue { position, top, computed }); }
+                    push!(Set { position, level: top });
+                }
+            }
+            Set { position, level } => return Ok(Some(TicketEffect { kind: 3, position, argument: level })),
+            Requeue { position, top, computed } => {
+                field.queue.enqueue_computed(position as u64, top, computed)?;
+                field.computed.insert(position, computed as u8)?;
+            }
+            StartNeighbors { position, level, decrease } => {
+                if !decrease || level < field.level_count - 2 {
+                    let mut cells = [0; 27]; let count = field.topology.neighbourhood(position, &mut cells);
+                    push!(Neighbors { position, level, decrease, cells, count, index: 0 });
+                }
+            }
+            Neighbors { position, level, decrease, cells, count, mut index } => {
+                while index < count && cells[index] == position { index += 1; }
+                if index < count {
+                    let to = cells[index];
+                    push!(Neighbors { position, level, decrease, cells, count, index: index + 1 });
+                    push!(CheckNeighbor { from: position, to, level, decrease });
+                }
+            }
+            CheckNeighbor { from, to, level, decrease } => {
+                let computed = field.computed_level(to);
+                let candidate = clamp(level.wrapping_add(1), 0, top);
+                if decrease {
+                    push!(NeighborCurrent { from, to, candidate, computed, decrease }); level!(to);
+                } else if computed == NO_COMPUTED_LEVEL {
+                    push!(NeighborPending { from, to, candidate, computed }); level!(to);
+                } else if candidate == computed {
+                    push!(NeighborCurrent { from, to, candidate: top, computed, decrease }); level!(to);
+                }
+            }
+            NeighborPending { from, to, candidate, computed } => {
+                let pending = clamp(*value, 0, top);
+                if candidate == pending { push!(Edge { from, to, level: top, current: pending, computed, decrease: false }); }
+            }
+            NeighborCurrent { from, to, candidate, computed, decrease } => {
+                push!(Edge { from, to, level: candidate, current: *value, computed, decrease });
+            }
+            Edge { from, to, level, current, computed, decrease } => {
+                if to != field.topology.source() {
+                    let level = clamp(level, 0, top); let current = clamp(current, 0, top);
+                    let absent = computed == NO_COMPUTED_LEVEL;
+                    let computed = if absent { current } else { computed };
+                    push!(FinishEdge { to, current, computed, absent });
+                    if decrease { *value = computed.min(level); }
+                    else {
+                        let mut cells = [0; 27]; let count = field.topology.neighbourhood(to, &mut cells);
+                        push!(Compute { position: to, excluded: from, best: level, cells, count, index: 0 });
+                    }
+                }
+            }
+            FinishEdge { to, current, computed, absent } => {
+                let next = clamp(*value, 0, top);
+                if current != next {
+                    let previous = if absent { NO_COMPUTED_LEVEL } else { computed };
+                    field.queue.reschedule(to as u64, current, previous, next)?;
+                    field.computed.insert(to, next as u8)?;
+                } else if !absent {
+                    field.queue.cancel_computed(to as u64, current, computed)?;
+                    field.computed.remove(to);
+                }
+            }
+            Compute { position, excluded, best, cells, count, mut index } => {
+                while index < count {
+                    let neighbor = if cells[index] == position { field.topology.source() } else { cells[index] };
+                    index += 1;
+                    if neighbor != excluded {
+                        push!(ComputedLevel { position, excluded, best, cells, count, index, neighbor }); level!(neighbor);
+                    }
+                }
+                *value = best;
+            }
+            ComputedLevel { position, excluded, best, cells, count, index, neighbor } => {
+                if neighbor == field.topology.source() {
+                    push!(ComputedSource { position, excluded, best, cells, count, index });
+                    return Ok(Some(TicketEffect { kind: 2, position, argument: 0 }));
+                }
+                let best = best.min(value.wrapping_add(1));
+                if best == 0 { *value = best; }
+                else { push!(Compute { position, excluded, best, cells, count, index }); }
+            }
+            ComputedSource { position, excluded, best, cells, count, index } => {
+                let best = best.min(*value);
+                if best == 0 { *value = best; }
+                else { push!(Compute { position, excluded, best, cells, count, index }); }
+            }
+        }
+        Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod ticket_operation_tests {
+    use super::*;
+    use std::collections::BTreeMap;
+    use std::cell::RefCell;
+    use std::sync::Arc;
+    use std::sync::atomic::Ordering;
+    struct Sources { values: BTreeMap<i64, i32>, calls: RefCell<Vec<i64>> }
+    impl SourceLevels for Sources {
+        fn level_from_source(&self, position: i64) -> i32 {
+            self.calls.borrow_mut().push(position);
+            self.values.get(&position).copied().unwrap_or(44)
+        }
+    }
+    fn invoke(mut op: TicketOperation, levels: &mut BTreeMap<i64, i32>, source: &Sources) -> (i32, Vec<(i64, i32)>) {
+        let mut answer = 0; let mut changes = Vec::new();
+        loop {
+            op.step(answer);
+            let position = op.position.load(Ordering::Acquire);
+            let argument = op.argument.load(Ordering::Acquire) as i32;
+            answer = match op.command.load(Ordering::Acquire) {
+                1 => levels.get(&position).copied().unwrap_or(33),
+                2 => source.level_from_source(position),
+                3 => {
+                    if argument >= 33 { levels.remove(&position); } else { levels.insert(position, argument); }
+                    changes.push((position, argument)); 0
+                }
+                4 => return (argument, changes),
+                code => panic!("ticket graph operation fault {code}/{argument}"),
+            };
+        }
+    }
+    #[test]
+    fn suspended_source_graph_preserves_queue_effect_and_source_order() {
+        assert_eq!(std::mem::offset_of!(TicketOperation, command), 0);
+        assert_eq!(std::mem::offset_of!(TicketOperation, position), 8);
+        assert_eq!(std::mem::offset_of!(TicketOperation, argument), 16);
+        let mut reference = DistanceField::simulation().unwrap();
+        let graph = Arc::new(super::super::ticket::SharedTicketDistance::new(
+            super::super::ticket::TicketDistance::new(44, DistanceField::simulation().unwrap()).unwrap()));
+        let mut view = BTreeMap::new();
+        let mut a = Sources { values: BTreeMap::new(), calls: RefCell::new(Vec::new()) };
+        let mut b = Sources { values: BTreeMap::new(), calls: RefCell::new(Vec::new()) };
+        let mut random = 19u64;
+        for index in 0..400 {
+            random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let position = as_long((random as i32 & 7) - 3, ((random >> 8) as i32 & 7) - 3);
+            let value = if index % 4 == 0 { 44 } else { 30 + ((random >> 16) % 5) as i32 };
+            let previous = a.values.get(&position).copied().unwrap_or(44);
+            if value == 44 { a.values.remove(&position); b.values.remove(&position); }
+            else { a.values.insert(position, value); b.values.insert(position, value); }
+            a.calls.borrow_mut().clear(); b.calls.borrow_mut().clear();
+            reference.clear_changes();
+            reference.update(&a, position, value, value < previous).unwrap();
+            let (_, changes) = invoke(TicketOperation::new(graph.clone(), false, position, value, value < previous, 0).unwrap(), &mut view, &b);
+            assert!(changes.is_empty());
+            assert_eq!(*a.calls.borrow(), *b.calls.borrow());
+            let budget = if index % 3 == 0 { 2 } else { 80 };
+            a.calls.borrow_mut().clear(); b.calls.borrow_mut().clear();
+            let remaining = reference.run_updates(&a, budget).unwrap();
+            let (actual, changes) = invoke(TicketOperation::new(graph.clone(), true, 0, 0, false, budget).unwrap(), &mut view, &b);
+            assert_eq!(actual, remaining);
+            assert_eq!(changes, reference.changes());
+            assert_eq!(*a.calls.borrow(), *b.calls.borrow());
+            for x in -7..=7 { for z in -7..=7 {
+                let key = as_long(x,z);
+                assert_eq!(view.get(&key).copied().unwrap_or(33), reference.level(key), "step {index} at {x},{z}");
+            }}
+            assert!(graph.lock().field().levels.len() == 0, "ticket operation copied its actual published view");
+        }
+    }
+}

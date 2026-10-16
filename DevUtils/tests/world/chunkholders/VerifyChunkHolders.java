@@ -78,6 +78,58 @@ public final class VerifyChunkHolders {
 		return field(type, name).get(target);
 	}
 
+	/** Setup adapter only: original reflective writes on Frozen/pre, equivalent
+	 * native owner operations on Current. Public observations below are unchanged. */
+	static final class FullFixtureState {
+		final Field futures = field(GenerationChunkHolder.class, "futures");
+		final Field startedWork = field(GenerationChunkHolder.class, "startedWork");
+		final Field generation = futures == null ? field(GenerationChunkHolder.class, "generation") : null;
+
+		@SuppressWarnings("unchecked")
+		CompletableFuture<ChunkResult<ChunkAccess>> put(GenerationChunkHolder holder, LevelChunk chunk) throws Exception {
+			var future = CompletableFuture.<ChunkResult<ChunkAccess>>completedFuture(ChunkResult.of(chunk));
+			if (futures != null) {
+				var array = (AtomicReferenceArray<CompletableFuture<ChunkResult<ChunkAccess>>>)futures.get(holder);
+				array.set(ChunkStatus.FULL.getIndex(), future);
+				((AtomicReference<ChunkStatus>)startedWork.get(holder)).set(ChunkStatus.FULL);
+			} else {
+				Object owner = generation.get(holder);
+				Method exchange = owner.getClass().getDeclaredMethod("compareFuture", int.class, CompletableFuture.class, CompletableFuture.class);
+				Method bump = owner.getClass().getDeclaredMethod("bump", ChunkStatus.class, ChunkStatus.class);
+				exchange.setAccessible(true);
+				bump.setAccessible(true);
+				var previous = holder.getAllFutures().getLast().getSecond();
+				if (exchange.invoke(owner, ChunkStatus.FULL.getIndex(), previous, future) != previous)
+					throw new AssertionError("fixture future changed concurrently");
+				// Only raise to FULL. Existing lower slots and their identities stay
+				// untouched, exactly as the original single FULL-slot write above.
+				for (ChunkStatus status : ChunkStatus.getStatusList()) bump.invoke(owner, status == ChunkStatus.EMPTY ? null : status.getParent(), status);
+			}
+			return future;
+		}
+	}
+
+	static void verifyFixtureSetup() throws Exception {
+		GenerationChunkHolder holder = new GenerationChunkHolder(new ChunkPos(1, 2)) {
+			public int getTicketLevel() { return 33; }
+			public int getQueueLevel() { return 33; }
+			protected void addSaveDependency(CompletableFuture<?> future) {}
+		};
+		if (holder.getLatestStatus() != null || holder.getAllFutures().stream().anyMatch(pair -> pair.getSecond() != null))
+			throw new AssertionError("fixture initial state differs");
+		FullFixtureState setup = new FullFixtureState();
+		for (int pass = 0; pass < 2; pass++) {
+			LevelChunk chunk = chunk(holder.getPos().toLong());
+			var future = setup.put(holder, chunk);
+			var slots = holder.getAllFutures();
+			if (slots.getLast().getSecond() != future || holder.getLatestChunk() != chunk || holder.getLatestStatus() != ChunkStatus.FULL)
+				throw new AssertionError("fixture FULL injection differs");
+			for (int i = 0; i < slots.size() - 1; i++) if (slots.get(i).getSecond() != null)
+				throw new AssertionError("fixture changed a lower future slot");
+		}
+		System.out.println("SETUP_CONTROL passed adapter=" + (setup.futures == null ? "native-generation-owner" : "original-reflection"));
+	}
+
 	/** ChunkMap fields the constructor would create; a native implementation instead
 	 * provides {@code initializeVerification}. Missing fields are skipped. */
 	static void initialize(ChunkMap map) throws Exception {
@@ -96,6 +148,12 @@ public final class VerifyChunkHolders {
 			init.setAccessible(true);
 			init.invoke(map);
 		} catch (NoSuchMethodException ignored) {
+		}
+		Field pending = field(ChunkMap.class, "pendingGenerationTasks");
+		if (pending != null && pending.get(map) == null && pending.getType().getName().equals("net.minecraft.server.level.NativeChunkGeneration$Pending")) {
+			var constructor = pending.getType().getDeclaredConstructor();
+			constructor.setAccessible(true);
+			pending.set(map, constructor.newInstance());
 		}
 	}
 
@@ -539,8 +597,7 @@ public final class VerifyChunkHolders {
 		visible.setAccessible(true);
 		Method eager = ChunkMap.class.getDeclaredMethod("setChunkUnsaved", ChunkPos.class);
 		eager.setAccessible(true);
-		Field futures = field(GenerationChunkHolder.class, "futures");
-		Field startedWork = field(GenerationChunkHolder.class, "startedWork");
+		FullFixtureState fixtureState = new FullFixtureState();
 
 		long[] keys = new long[40];
 		for (int i = 0; i < keys.length; i++) keys[i] = ChunkPos.asLong(r.nextInt(16) - 8, r.nextInt(16) - 8);
@@ -660,10 +717,7 @@ public final class VerifyChunkHolders {
 							ChunkHolder holder = map.getUpdatingChunkIfPresent(key);
 							if (holder != null) {
 								LevelChunk chunk = chunk(key);
-								@SuppressWarnings("unchecked")
-								var array = (AtomicReferenceArray<CompletableFuture<ChunkResult<ChunkAccess>>>)futures.get(holder);
-								array.set(ChunkStatus.FULL.getIndex(), CompletableFuture.completedFuture(ChunkResult.of(chunk)));
-								((AtomicReference<ChunkStatus>)startedWork.get(holder)).set(ChunkStatus.FULL);
+								fixtureState.put(holder, chunk);
 								if (r.nextBoolean()) eager.invoke(map, holder.getPos());
 								row.append(" chunk").append(key);
 							}
@@ -794,6 +848,7 @@ public final class VerifyChunkHolders {
 	public static void main(String[] args) throws Exception {
 		SharedConstants.tryDetectVersion();
 		Bootstrap.bootStrap();
+		verifyFixtureSetup();
 		Path base = Files.createTempDirectory("chunk-holders");
 		if (args.length > 2 && args[2].equals("benchmark")) {
 			// Rounds of the same seeded churn; the first `warmups` are discarded.

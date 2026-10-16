@@ -7,6 +7,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -41,6 +43,9 @@ public class TicketStorage extends SavedData {
 	static final int ABSENT_LEVEL = ChunkLevel.MAX_LEVEL + 1;
 	/** Rust owns the ticket lists, their table order, expiry and deactivation. */
 	private final NativeTicketStorage tickets;
+    /** Actual VM destination passed through virtual removeTicketIf. Its contents
+     * have one backing source; native commands drive traversal and mutation. */
+    private final Long2ObjectOpenHashMap<List<Ticket>> deactivatedTickets;
 	private LongSet chunksWithForcedTickets = new LongOpenHashSet();
 	@Nullable
 	private TicketStorage.ChunkUpdated loadingChunkUpdatedListener;
@@ -50,47 +55,129 @@ public class TicketStorage extends SavedData {
 	/** Listener slots bound to a native tracker graph. */
 	private final boolean[] nativeListener = new boolean[2];
 
-	private TicketStorage(NativeTicketStorage nativeTicketStorage) {
+	private TicketStorage(NativeTicketStorage nativeTicketStorage, Long2ObjectOpenHashMap<List<Ticket>> deactivatedTickets) {
 		this.tickets = nativeTicketStorage;
+        this.deactivatedTickets = deactivatedTickets;
 		this.updateForcedChunks();
 	}
 
 	public TicketStorage() {
-		this(new NativeTicketStorage());
+		this(new NativeTicketStorage(), new Long2ObjectOpenHashMap<>());
 	}
 
 	private static TicketStorage fromPacked(List<Pair<ChunkPos, Ticket>> list) {
-		NativeTicketStorage nativeTicketStorage = new NativeTicketStorage();
-
-		for (Pair<ChunkPos, Ticket> pair : list) {
-			nativeTicketStorage.addDeactivated(pair.getFirst().toLong(), pair.getSecond());
-		}
-
-		return new TicketStorage(nativeTicketStorage);
-	}
+        Long2ObjectOpenHashMap<List<Ticket>> destination = new Long2ObjectOpenHashMap<>();
+        java.util.Iterator<Pair<ChunkPos, Ticket>> iterator = null;
+        Pair<ChunkPos, Ticket> pair = null;
+        ChunkPos position = null;
+        List<Ticket> tickets = null;
+        Ticket ticket = null;
+        long command = NativeTicketStorage.vmMapBegin(2);
+        while (true) {
+            int answer = 0;
+            switch ((int)command & 255) {
+                case 1: iterator = list.iterator(); break;
+                case 2: answer = iterator.hasNext() ? 1 : 0; break;
+                case 3: pair = iterator.next(); break;
+                case 4: position = pair.getFirst(); break;
+                case 5: tickets = destination.computeIfAbsent(position.toLong(),
+                    (Long2ObjectFunction<? extends List<Ticket>>)(key -> new ObjectArrayList<>(INITIAL_TICKET_LIST_CAPACITY))); break;
+                case 6: ticket = pair.getSecond(); break;
+                case 7: tickets.add(ticket); break;
+                case 10: return new TicketStorage(new NativeTicketStorage(), destination);
+                default: throw new IllegalStateException("Unknown native decoded ticket command");
+            }
+            command = NativeTicketStorage.vmMapNext(command, answer);
+        }
+    }
 
 	private List<Pair<ChunkPos, Ticket>> packTickets() {
-		long[] pairs = this.tickets.export(3, 0, this.count);
-		List<Pair<ChunkPos, Ticket>> list = new ArrayList(this.count[0] / 2);
-		ChunkPos chunkPos = null;
+        List<Pair<ChunkPos, Ticket>> pairs = new ArrayList<>();
+        this.consumeTickets(1, null, pairs, null, null);
+        this.consumeDeactivated(1, pairs);
+        return pairs;
+    }
 
-		for (int i = 0; i < this.count[0]; i += 2) {
-			if (chunkPos == null || chunkPos.toLong() != pairs[i]) {
-				chunkPos = new ChunkPos(pairs[i]);
-			}
-
-			list.add(new Pair<>(chunkPos, NativeTicketStorage.Cells.ticket((int)pairs[i + 1])));
-		}
-
-		return list;
-	}
+    /** VM leaves for the native-owned ordered consumer. Ticket and ChunkPos
+     * resources stay captured across queries that may reenter the storage. */
+    private boolean consumeTickets(int mode, TicketType type, List<Pair<ChunkPos, Ticket>> packed,
+                                   List<Pair<Ticket, Long>> replacements, LongSet forced) {
+        Ticket ticket = null;
+        ChunkPos position = null;
+        try (NativeTicketStorage.Consumer operation = this.tickets.consumer(mode)) {
+            int answer = 0;
+            while (true) {
+                operation.step(answer);
+                int command = operation.command();
+                long key = operation.key();
+                int argument = operation.argument();
+                answer = 0;
+                switch (command) {
+                    case 1: position = new ChunkPos(key); break;
+                    case 11: operation.captureList(); break;
+                    case 2: ticket = NativeTicketStorage.Cells.ticket(argument); answer = ticket.getType().shouldKeepDimensionActive() ? 1 : 0; break;
+                    case 3: ticket = NativeTicketStorage.Cells.ticket(argument); answer = ticket.getType().persist() ? 1 : 0; break;
+                    case 4: ticket = NativeTicketStorage.Cells.ticket(argument); answer = ticket.getType() == type ? 1 : 0; break;
+                    case 5: ticket = NativeTicketStorage.Cells.ticket(argument); answer = ticket.getType().equals(TicketType.FORCED) ? 1 : 0; break;
+                    case 6: packed.add(new Pair<>(position, ticket)); break;
+                    case 10: replacements.add(Pair.of(ticket, key)); break;
+                    case 7: forced.add(key); break;
+                    case 8: return argument != 0;
+                    case 9: NativeTicketStorage.check(argument); throw new IllegalStateException("Unknown native consumer failure");
+                    default: throw new IllegalStateException("Unknown native ticket consumer command");
+                }
+            }
+        }
+    }
 
 	public void activateAllDeactivatedTickets() {
-		// The original loops over the live deactivated map and lists; Rust iterates
-		// them positionally and returns each ticket for addTicket.
-		this.walk(NativeTicketStorage.ACTIVATE, null, null, null);
-		this.tickets.clearDeactivated();
-	}
+        this.consumeDeactivated(0, null);
+    }
+
+    /** The publicly observable destination is a VM resource, not a mirror.
+     * Rust drives both loops over its actual iterators and chooses each effect. */
+    private void consumeDeactivated(int mode, List<Pair<ChunkPos, Ticket>> packed) {
+        java.util.Iterator<Long2ObjectMap.Entry<List<Ticket>>> entries = null;
+        Long2ObjectMap.Entry<List<Ticket>> entry = null;
+        java.util.Iterator<Ticket> tickets = null;
+        Ticket ticket = null;
+        ChunkPos position = null;
+        long key = 0;
+        long command = NativeTicketStorage.vmMapBegin(mode);
+        while (true) {
+            int answer = 0;
+            if (mode == 0) {
+                switch ((int)command & 255) {
+                    case 1: entries = Long2ObjectMaps.fastIterable(this.deactivatedTickets).iterator(); break;
+                    case 2: answer = entries.hasNext() ? 1 : 0; break;
+                    case 3: entry = entries.next(); break;
+                    case 4: tickets = entry.getValue().iterator(); break;
+                    case 5: answer = tickets.hasNext() ? 1 : 0; break;
+                    case 6: ticket = tickets.next(); break;
+                    case 7: key = entry.getLongKey(); break;
+                    case 8: this.addTicket(key, ticket); break;
+                    case 9: this.deactivatedTickets.clear(); break;
+                    case 10: return;
+                    default: throw new IllegalStateException("Unknown native ticket activation command");
+                }
+            } else {
+                switch ((int)command & 255) {
+                    case 1: entries = Long2ObjectMaps.fastIterable(this.deactivatedTickets).iterator(); break;
+                    case 2: answer = entries.hasNext() ? 1 : 0; break;
+                    case 3: entry = entries.next(); break;
+                    case 4: position = new ChunkPos(entry.getLongKey()); break;
+                    case 5: tickets = entry.getValue().iterator(); break;
+                    case 6: answer = tickets.hasNext() ? 1 : 0; break;
+                    case 7: ticket = tickets.next(); break;
+                    case 8: answer = ticket.getType().persist() ? 1 : 0; break;
+                    case 9: packed.add(new Pair<>(position, ticket)); break;
+                    case 10: return;
+                    default: throw new IllegalStateException("Unknown native deactivated pack command");
+                }
+            }
+            command = NativeTicketStorage.vmMapNext(command, answer);
+        }
+    }
 
 	public void setLoadingChunkUpdatedListener(@Nullable TicketStorage.ChunkUpdated chunkUpdated) {
 		this.loadingChunkUpdatedListener = chunkUpdated;
@@ -131,7 +218,7 @@ public class TicketStorage extends SavedData {
 	}
 
 	public boolean shouldKeepDimensionActive() {
-		return (this.tickets.state() & 2) != 0;
+		return this.consumeTickets(0, null, null, null, null);
 	}
 
 	/** Chunks holding active tickets, so a listener attached after tickets exist can seed its state. */
@@ -153,8 +240,64 @@ public class TicketStorage extends SavedData {
 		this.addTicket(chunkPos.toLong(), ticket);
 	}
 
+    /** Internal generation binding: a strong lease on this actual native owner. */
+    public final java.lang.foreign.MemorySegment generationOwner() { return this.tickets.generationOwner(); }
+
+    /** Complete queued JVM unpins after a generation owner drops its store lease.
+     * Native release has returned; no native lock spans these VM root changes. */
+    public static void finishNativeTicketRelease() { NativeTicketStorage.finishNativeRelease(); }
+
+    public final long generationTypeDescriptor() { return this.tickets.generationTypeDescriptor(); }
+    public final void prepareGenerationRequest() { this.tickets.prepareGenerationRequest(); }
+    public final void completeGenerationRequest(long key, int level, Ticket ticket, long status) {
+        status = this.tickets.completeGenerationRequest(key, level, ticket, status);
+        this.finishTicketAdd(key, ticket, status);
+    }
+
 	public boolean addTicket(long l, Ticket ticket) {
-		long status = this.tickets.add(l, ticket);
+        List<Ticket> list = null;
+        Ticket stored = null;
+        try (NativeTicketStorage.LiveCursor operation = this.tickets.admission(l)) {
+            list = operation.list;
+            while (true) {
+                long answer = 0;
+                if (operation.captureNative()) stored = operation.ticket();
+                switch (operation.command()) {
+                    case 105: answer = stored.getType() == ticket.getType() ? 1 : 0; break;
+                    case 108: answer = NativeTicketStorage.levelPair(stored.getTicketLevel(), ticket.getTicketLevel()); break;
+                    case 110: stored.resetTicksLeft(); this.setDirty(); return false;
+                    case 200: answer = list.size(); break;
+                    case 201: stored = list.get(operation.index()); break;
+                    case 11: answer = getTicketLevelAt(list, true); break;
+                    case 12: answer = getTicketLevelAt(list, false); break;
+                    case 13: list.add(ticket); break;
+                    case 14:
+                        if (SharedConstants.DEBUG_VERBOSE_SERVER_EVENTS) LOGGER.debug("ATI {} {}", new ChunkPos(l), ticket);
+                        break;
+                    case 15: answer = ticket.getType().doesSimulate() ? 1 : 0; break;
+                    case 16: answer = ticket.getTicketLevel(); break;
+                    case 17: answer = this.simulationChunkUpdatedListener != null ? 1 : 0; break;
+                    case 18: this.simulationChunkUpdatedListener.update(l, ticket.getTicketLevel(), true); break;
+                    case 19: answer = ticket.getType().doesLoad() ? 1 : 0; break;
+                    case 20: answer = ticket.getTicketLevel(); break;
+                    case 21: answer = this.loadingChunkUpdatedListener != null ? 1 : 0; break;
+                    case 22: this.loadingChunkUpdatedListener.update(l, ticket.getTicketLevel(), true); break;
+                    case 23: answer = ticket.getType().equals(TicketType.FORCED) ? 1 : 0; break;
+                    case 24: this.chunksWithForcedTickets.add(l); break;
+                    case 30: case 31: this.setDirty(); break;
+                    case 32: return false;
+                    case 33: return true;
+                    default: throw new IllegalStateException("Unknown native ticket admission command");
+                }
+                operation.next(answer);
+            }
+        }
+    }
+    private static int getTicketLevelAt(List<Ticket> list, boolean simulation) {
+        Ticket ticket = getLowestTicket(list, simulation);
+        return ticket == null ? ChunkLevel.MAX_LEVEL + 1 : ticket.getTicketLevel();
+    }
+    private boolean finishTicketAdd(long l, Ticket ticket, long status) {
 		if ((status & NativeTicketStorage.RESULT) == 0) {
 			this.setDirty();
 			return false;
@@ -182,9 +325,57 @@ public class TicketStorage extends SavedData {
 		return true;
 	}
 
-	public int getTicketLevelAt(long l, boolean bl) {
-		return this.tickets.level(l, bl);
-	}
+    public int getTicketLevelAt(long l, boolean bl) {
+        Ticket ticket = getLowestTicket(this.getTickets(l), bl);
+        return ticket == null ? ChunkLevel.MAX_LEVEL + 1 : ticket.getTicketLevel();
+    }
+
+    /** Native controls selection; VM leaves retain the actual iterator/tickets. */
+    private static Ticket getLowestTicket(List<Ticket> list, boolean simulation) {
+        try (NativeTicketStorage.LiveCursor operation = NativeTicketStorage.query(list, simulation)) {
+            if (operation == null) return getLowestTicketVm(list, simulation);
+            Ticket best = null, current = null;
+            while (true) {
+                if (operation.selectPrevious()) best = current;
+                if (operation.captureNative()) current = operation.ticket();
+                long answer = 0;
+                switch (operation.command()) {
+                    case 6: answer = current.getType().doesSimulate() ? 1 : 0; break;
+                    case 7: answer = current.getType().doesLoad() ? 1 : 0; break;
+                    case 104: answer = NativeTicketStorage.levelPair(current.getTicketLevel(), best.getTicketLevel()); break;
+                    case 200: answer = list.size(); break;
+                    case 201: current = list.get(operation.index()); break;
+                    case 10: return best;
+                    default: throw new IllegalStateException("Unknown native source query command");
+                }
+                operation.next(answer);
+            }
+        }
+    }
+
+    /** Actual foreign VM list/iterator effects; native selection remains authoritative. */
+    private static Ticket getLowestTicketVm(List<Ticket> list, boolean simulation) {
+        java.util.Iterator<Ticket> iterator = null;
+        Ticket ticket = null;
+        Ticket ticket2 = null;
+        long command = NativeTicketStorage.queryBegin(simulation, list != null);
+        while (true) {
+            long answer = 0;
+            switch ((int)command & 255) {
+                case 1: iterator = list.iterator(); break;
+                case 2: answer = iterator.hasNext() ? 1 : 0; break;
+                case 3: ticket2 = iterator.next(); break;
+                case 4: answer = ticket2.getTicketLevel(); break;
+                case 5: answer = ticket.getTicketLevel(); break;
+                case 6: answer = ticket2.getType().doesSimulate() ? 1 : 0; break;
+                case 7: answer = ticket2.getType().doesLoad() ? 1 : 0; break;
+                case 8: ticket = ticket2; break;
+                case 10: return ticket;
+                default: throw new IllegalStateException("Unknown native ticket query command");
+            }
+            command = NativeTicketStorage.queryNext(command, answer);
+        }
+    }
 
 	public void removeTicketWithRadius(TicketType ticketType, ChunkPos chunkPos, int i) {
 		Ticket ticket = new Ticket(ticketType, ChunkLevel.byStatus(FullChunkStatus.FULL) - i);
@@ -196,57 +387,80 @@ public class TicketStorage extends SavedData {
 	}
 
 	public boolean removeTicket(long l, Ticket ticket) {
-		long status = this.tickets.remove(l, ticket);
-		if ((status & NativeTicketStorage.RESULT) == 0) {
-			return false;
-		} else {
-			long list = this.tickets.io[0];
-			if (SharedConstants.DEBUG_VERBOSE_SERVER_EVENTS) {
-				LOGGER.debug("RTI {} {}", new ChunkPos(l), ticket);
-			}
-
-			// Each level is read from the emptied-or-shrunk list when delivered, as before.
-			int resume = NativeTicketStorage.resume(status);
-			if (resume <= 0 && ticket.getType().doesSimulate() && this.simulationChunkUpdatedListener != null) {
-				this.deliver(NativeTicketStorage.SIMULATION, l, this.tickets.listLevel(list, true), false);
-			}
-
-			if (resume <= 1 && ticket.getType().doesLoad() && this.loadingChunkUpdatedListener != null) {
-				this.deliver(NativeTicketStorage.LOADING, l, this.tickets.listLevel(list, false), false);
-			}
-
-			if (ticket.getType().equals(TicketType.FORCED)) {
-				this.updateForcedChunks();
-			}
-
-			this.setDirty();
-			return true;
-		}
-	}
+        List<Ticket> list = null;
+        Ticket stored = null;
+        try (NativeTicketStorage.LiveCursor operation = this.tickets.removal(l)) {
+        list = operation.list;
+        while (true) {
+            long answer = 0;
+            if (operation.captureNative()) stored = operation.ticket();
+            switch (operation.command()) {
+                case 105: answer = stored.getType() == ticket.getType() ? 1 : 0; break;
+                case 108: answer = NativeTicketStorage.levelPair(stored.getTicketLevel(), ticket.getTicketLevel()); break;
+                case 10: list.remove(operation.index()); break;
+                case 200: answer = list.size(); break;
+                case 201: stored = list.get(operation.index()); break;
+                case 11:
+                    if (SharedConstants.DEBUG_VERBOSE_SERVER_EVENTS) LOGGER.debug("RTI {} {}", new ChunkPos(l), stored);
+                    break;
+                case 12: answer = list.isEmpty() ? 1 : 0; break;
+                case 13: this.tickets.unmap(l); break;
+                case 14: answer = ticket.getType().doesSimulate() ? 1 : 0; break;
+                case 15: answer = this.simulationChunkUpdatedListener != null ? 1 : 0; break;
+                case 16: this.simulationChunkUpdatedListener.update(l, getTicketLevelAt(list, true), false); break;
+                case 17: answer = ticket.getType().doesLoad() ? 1 : 0; break;
+                case 18: answer = this.loadingChunkUpdatedListener != null ? 1 : 0; break;
+                case 19: this.loadingChunkUpdatedListener.update(l, getTicketLevelAt(list, false), false); break;
+                case 20: answer = ticket.getType().equals(TicketType.FORCED) ? 1 : 0; break;
+                case 21: this.updateForcedChunks(); break;
+                case 22: this.setDirty(); break;
+                case 30: return false;
+                case 31: return true;
+                default: throw new IllegalStateException("Unknown native ticket removal command");
+            }
+            operation.next(answer);
+        }
+        }
+    }
 
 	private void updateForcedChunks() {
-		long[] keys = this.tickets.export(1, 0, this.count);
-		LongOpenHashSet longOpenHashSet = new LongOpenHashSet();
+        LongOpenHashSet forced = new LongOpenHashSet();
+        this.consumeTickets(3, null, null, null, forced);
+        this.chunksWithForcedTickets = forced;
+    }
 
-		for (int i = 0; i < this.count[0]; i++) {
-			longOpenHashSet.add(keys[i]);
-		}
-
-		this.chunksWithForcedTickets = longOpenHashSet;
-	}
-
-	public String getTicketDebugString(long l, boolean bl) {
-		int cell = this.tickets.lowest(l, bl);
-		return cell < 0 ? "no_ticket" : NativeTicketStorage.Cells.ticket(cell).toString();
-	}
+    public String getTicketDebugString(long l, boolean bl) {
+        Ticket ticket = getLowestTicket(this.getTickets(l), bl);
+        return ticket == null ? "no_ticket" : ticket.toString();
+    }
 
 	public void purgeStaleTickets(ChunkMap chunkMap) {
-		this.walk(NativeTicketStorage.PURGE, null, null, chunkMap);
+		this.removeTicketIf((ticket, key) -> this.expiryPredicate(chunkMap, ticket, key), null);
 		this.setDirty();
 	}
 
+    private boolean expiryPredicate(ChunkMap chunkMap, Ticket ticket, long key) {
+        ChunkHolder holder = null;
+        int command = NativeTicketStorage.expiryNext(0, 0);
+        while (true) {
+            int answer = 0;
+            switch (command) {
+                case 1: answer = ticket.getType().hasTimeout() ? 1 : 0; break;
+                case 2: answer = ticket.getType().canExpireIfUnloaded() ? 1 : 0; break;
+                case 3: holder = chunkMap.getUpdatingChunkIfPresent(key); answer = holder == null ? 1 : 0; break;
+                case 4: answer = holder.isReadyForSaving() ? 1 : 0; break;
+                case 5: ticket.decreaseTicksLeft(); break;
+                case 6: answer = ticket.isTimedOut() ? 1 : 0; break;
+                case -1: return false;
+                case -2: return true;
+                default: throw new IllegalStateException("Unknown native ticket expiry command");
+            }
+            command = NativeTicketStorage.expiryNext(command, answer);
+        }
+    }
+
 	public void deactivateTicketsOnClosing() {
-		this.walk(NativeTicketStorage.DEACTIVATE, null, null, null);
+		this.removeTicketIf((ticket, key) -> ticket.getType() != TicketType.UNKNOWN, this.deactivatedTickets);
 	}
 
 	public void removeTicketIf(TicketStorage.TicketPredicate ticketPredicate, @Nullable Long2ObjectOpenHashMap<List<Ticket>> long2ObjectOpenHashMap) {
@@ -265,11 +479,13 @@ public class TicketStorage extends SavedData {
 		@Nullable ChunkMap chunkMap
 	) {
 		long walk = this.tickets.walk(kind);
+        Object capturedList = null;
 		long[] io = this.tickets.io;
 		boolean released = false;
 
 		try {
 			int answer = 0;
+            Ticket removedTicket = null;
 
 			while (true) {
 				long status = this.tickets.step(walk, answer);
@@ -299,17 +515,18 @@ public class TicketStorage extends SavedData {
 						int n = (int)(status >>> 32);
 
 						for (int i = 0; i < n; i++) {
-							long l = batch[i * 2];
-							Ticket ticket = NativeTicketStorage.Cells.ticket((int)batch[i * 2 + 1]);
+							long l = batch[i * 3];
+                            capturedList = NativeTicketStorage.captureBatchList(batch[i * 3 + 2], capturedList);
+                            Ticket ticket = NativeTicketStorage.Cells.ticket((int)batch[i * 3 + 1]);
 							long modifications = this.tickets.modifications;
 							boolean matched = ticketPredicate.test(ticket, l);
+                            if (matched) removedTicket = ticket;
 							if (matched && long2ObjectOpenHashMap != null) {
 								long walkHandle = walk;
 								int index = i;
 								// The original sized a new list by entry.getValue(), read positionally here.
 								long2ObjectOpenHashMap.computeIfAbsent(l, (Long2ObjectFunction<? extends List<Ticket>>)(lx -> {
-									this.tickets.checkBatchValue(walkHandle, index);
-									return new ObjectArrayList<>(4);
+									return new ObjectArrayList<>(this.tickets.batchValueSize(walkHandle, index));
 								})).add(ticket);
 							}
 
@@ -321,6 +538,23 @@ public class TicketStorage extends SavedData {
 
 						this.tickets.consumed(answer < 0 ? n : (answer >> 1) + 1, n);
 						break;
+                    case NativeTicketStorage.REMOVED_QUERY:
+                        switch ((int)io[0]) {
+                            case 0: answer = removedTicket.getType().doesLoad() ? 1 : 0; break;
+                            case 1: answer = removedTicket.getType().doesSimulate() ? 1 : 0; break;
+                            case 2: answer = removedTicket.getType().equals(TicketType.FORCED) ? 1 : 0; break;
+                            default: throw new IllegalStateException("Unknown removed ticket query");
+                        }
+                        break;
+                    case NativeTicketStorage.LIVE_NOTIFY:
+                        long liveKey = io[0];
+                        int which = (int)io[2];
+                        TicketStorage.ChunkUpdated receiver = this.listener(which);
+                        if (receiver != null) receiver.update(liveKey, getTicketLevelAt(this.tickets.walkList(walk), which == NativeTicketStorage.SIMULATION), false);
+                        answer = 0;
+                        break;
+                    case NativeTicketStorage.DIRTY_EVENT:
+                        this.setDirty(); answer = 0; break;
 					case NativeTicketStorage.NOTIFY_EVENT:
 						long key = io[0];
 						int then = (int)io[3];
@@ -345,18 +579,14 @@ public class TicketStorage extends SavedData {
 				}
 			}
 		} finally {
-			NativeTicketStorage.endWalk(walk, released);
+			try { NativeTicketStorage.endWalk(walk, released); }
+            finally { java.lang.ref.Reference.reachabilityFence(capturedList); }
 		}
 	}
 
 	public void replaceTicketLevelOfType(int i, TicketType ticketType) {
-		long[] pairs = this.tickets.export(2, NativeTicketStorage.Types.id(ticketType), this.count).clone();
-		int n = this.count[0];
-		List<Pair<Ticket, Long>> list = new ArrayList(n / 2);
-
-		for (int j = 0; j < n; j += 2) {
-			list.add(Pair.of(NativeTicketStorage.Cells.ticket((int)pairs[j + 1]), pairs[j]));
-		}
+        List<Pair<Ticket, Long>> list = new ArrayList<>();
+        this.consumeTickets(2, ticketType, null, list, null);
 
 		for (Pair<Ticket, Long> pair : list) {
 			Long long_ = pair.getSecond();

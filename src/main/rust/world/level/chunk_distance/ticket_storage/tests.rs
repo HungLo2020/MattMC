@@ -309,3 +309,106 @@ fn drain_output_is_bounded_by_the_queue() {
         assert!(slab::free(slot));
     }
 }
+
+#[test]
+fn prepared_admission_publishes_only_after_resource_adoption() {
+    let mut storage = TicketStorage::new(34).unwrap();
+    let entry = ticket(7, 31, LOADING | SIMULATION, 300);
+    assert!(storage.prepare_add(5, entry).unwrap());
+    assert!(storage.entries(storage.tickets_at(5)).is_empty());
+    assert_eq!(storage.level_at(5, false), 34);
+    // Abandoned Java adoption: no entry or level change, retry remains possible.
+    assert!(storage.prepare_add(5, entry).unwrap());
+    let slot = slab::reserve(9).unwrap();
+    assert_eq!(slab::references(slot), 0);
+    let (added, _, wanted, _) = storage.add(5, Entry { slot, ..entry }, true, 0).unwrap();
+    assert!(added);
+    assert_eq!(wanted, [true, true]);
+    assert_eq!(slab::references(slot), 1);
+    assert_eq!(ticks(&storage, 5), vec![9]);
+    assert!(!storage.prepare_add(5, entry).unwrap());
+    assert_eq!(ticks(&storage, 5), vec![300]);
+    storage.remove(5, entry.type_id, entry.level, entry.flags).unwrap();
+    assert_eq!(slab::references(slot), 0);
+    assert!(slab::free(slot));
+}
+
+#[test]
+fn abandoned_unpublished_cell_reservation_is_reusable() {
+    let slot = slab::reserve(-7).unwrap();
+    assert_eq!(slab::references(slot), 0);
+    assert!(slab::free(slot));
+    let reused = slab::reserve(19).unwrap();
+    assert_eq!(reused, slot);
+    assert_eq!(slab::cell(reused).ticks_left.load(Ordering::Relaxed), 19);
+    assert!(slab::free(reused));
+}
+
+#[test]
+fn list_and_decoded_preparation_validate_before_publication() {
+    let mut storage = TicketStorage::new(34).unwrap();
+    let entry = ticket(7, 31, PERSIST | LOADING, 300);
+    storage.add(5, entry, false, 9).unwrap();
+    let list = storage.tickets_at(5);
+    assert!(matches!(storage.prepare_list_put(list, 1, true), Err(Fault::IndexOutOfBounds)));
+    assert!(matches!(storage.prepare_list_put(list, 2, false), Err(Fault::IndexOutOfBounds)));
+    assert_eq!(ticks(&storage, 5), vec![9]);
+    storage.prepare_list_put(list, 1, false).unwrap();
+    assert_eq!(ticks(&storage, 5), vec![9]);
+    storage.prepare_deactivated(9).unwrap();
+    assert!(storage.packed(true).is_empty());
+    let slot = slab::reserve(17).unwrap();
+    storage.add_deactivated(9, Entry { slot, ..entry }, true, 0).unwrap();
+    assert_eq!(storage.packed(true), vec![(9, slot)]);
+    storage.clear_deactivated();
+    assert_eq!(slab::references(slot), 0);
+    assert!(slab::free(slot));
+}
+
+#[test]
+fn virtual_minimum_commands_preserve_comparison_then_predicate_order() {
+    use super::ffi::{mattmc_ticket_query_begin as begin, mattmc_ticket_query_next as next};
+    let mut word = begin(1, 1);
+    let scripted = [(1, 0), (2, 1), (3, 0), (6, 1), (8, 0),
+        (2, 1), (3, 0), (4, -7), (5, 33), (6, 1), (8, 0), (2, 0)];
+    for (command, answer) in scripted { assert_eq!(word & 255, command); word = next(word, answer); }
+    assert_eq!(word & 255, 10);
+    let unrelated = begin(0, 1);
+    assert_eq!(next(next(next(unrelated, 0), 1), 0) & 255, 7);
+    assert_eq!(begin(1, 0) & 255, 10);
+}
+
+#[test]
+fn retained_physical_list_outlives_map_without_retaining_unrelated_entry_owners(){
+    let shared=slab::reserve_resource(7).unwrap();let other=slab::reserve_resource(9).unwrap();
+    let mut source=TicketStorage::new(45).unwrap();source.roots.enable(9001).unwrap();
+    let first=source.get_or_create(7).unwrap();let second=source.get_or_create(19).unwrap();
+    source.list_insert(first,0,Entry{slot:shared,..ticket(1,33,LOADING,0)},true,0).unwrap();
+    source.list_insert(second,0,Entry{slot:shared,..ticket(1,33,LOADING,0)},true,0).unwrap();
+    source.list_insert(second,1,Entry{slot:other,..ticket(2,31,LOADING,0)},true,0).unwrap();
+    let retained=source.list_owner(first).unwrap().clone();
+    drop(source);
+    assert_eq!(slab::references(shared),1);assert_eq!(slab::references(other),0);
+    assert_eq!(retained.lock().entries[0].slot,shared);
+    retained.lock().publish(1,false,Entry{slot:other,..ticket(2,31,LOADING,0)}).unwrap();
+    assert_eq!(slab::references(other),1);
+    drop(retained);
+    assert_eq!(slab::references(shared),0);assert_eq!(slab::references(other),0);
+    slab::release_resource(shared);slab::release_resource(other);
+    let mut retired=vec![0;100_000];let _=slab::drain(&mut retired);
+}
+
+#[test]
+fn removed_list_owner_keeps_its_identity_when_a_map_slot_is_reused(){
+    let mut source=TicketStorage::new(45).unwrap();
+    let old=source.get_or_create(7).unwrap();let retained=source.list_owner(old).unwrap().clone();
+    let index=source.tickets.remove(7).unwrap();source.retire(index);
+    let replacement=source.get_or_create(7).unwrap();assert_ne!(old,replacement);
+    let old_slot=slab::reserve_resource(7).unwrap();let new_slot=slab::reserve_resource(9).unwrap();
+    retained.lock().publish(0,false,Entry{slot:old_slot,..ticket(1,33,LOADING,0)}).unwrap();
+    source.list_insert(replacement,0,Entry{slot:new_slot,..ticket(2,31,LOADING,0)},true,0).unwrap();
+    assert_eq!(retained.lock().entries[0].slot,old_slot);assert_eq!(source.entries(replacement)[0].slot,new_slot);
+    drop(source);assert_eq!(slab::references(old_slot),1);assert_eq!(slab::references(new_slot),0);
+    drop(retained);slab::release_resource(old_slot);slab::release_resource(new_slot);
+    let mut retired=vec![0;100_000];let _=slab::drain(&mut retired);
+}

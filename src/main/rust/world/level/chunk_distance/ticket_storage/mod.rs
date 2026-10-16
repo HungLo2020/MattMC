@@ -8,8 +8,12 @@
 //! Java listener, a Java predicate or `isReadyForSaving`. It then returns an
 //! event; Java answers and resumes it. Iteration state is plain indices, as the
 //! Java iterators were, so a callback may mutate the storage between steps.
-//! Production trackers are notified directly under their graph lock.
-mod ffi;
+//! Production tracker operations yield actual VM effects after releasing graph locks.
+pub(crate) mod ffi;
+mod admission;
+mod consumer;
+mod vm_map;
+mod roots;
 pub(crate) mod map;
 pub(crate) mod slab;
 #[cfg(test)]
@@ -73,7 +77,7 @@ pub(crate) type ListRef = u64;
 
 struct List {
     generation: u32,
-    entries: Vec<Entry>,
+    owner: Option<ListOwner>,
 }
 
 pub(crate) const LOADING_LISTENER: usize = 0;
@@ -99,6 +103,9 @@ pub(crate) enum WalkKind {
     Deactivate,
     /// `removeTicketIf` with a Java predicate.
     Java,
+    /// Actual VM predicates and post-removal getter effects.
+    JavaEffects,
+    DeactivateEffects,
     /// `activateAllDeactivatedTickets`' loops over the live deactivated map;
     /// Java re-adds each ticket, then clears the map.
     Activate,
@@ -115,6 +122,11 @@ enum Phase {
     NotifyLoading,
     NotifySimulation,
     AfterNotify,
+    RemovedLoad,
+    RemovedSimulation,
+    RemovedForced,
+    RemovedFinish,
+    AfterDirty,
 }
 
 pub(crate) struct Walk {
@@ -124,6 +136,7 @@ pub(crate) struct Walk {
     index: i32,
     key: i64,
     list: ListRef,
+    owner: Option<ListOwner>,
     position: usize,
     last: i32,
     pending: Option<Entry>,
@@ -143,12 +156,13 @@ pub(crate) struct Walk {
 }
 
 /// A walk's entry state, without the cursor's wrapped-key list.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Start {
     mark: Mark,
     index: i32,
     key: i64,
     list: ListRef,
+    owner: Option<ListOwner>,
     loading: bool,
     simulating: bool,
 }
@@ -160,6 +174,7 @@ impl Walk {
             index: self.index,
             key: self.key,
             list: self.list,
+            owner: self.owner.clone(),
             loading: self.loading,
             simulating: self.simulating,
         }
@@ -168,11 +183,12 @@ impl Walk {
     /// Continues from just after batched ticket `index`.
     fn restore(&mut self, index: usize) -> Entry {
         let (start, position, entry) = self.batch[index];
-        let start = self.starts[start as usize];
+        let start = self.starts[start as usize].clone();
         self.cursor.reset(start.mark);
         self.index = start.index;
         self.key = start.key;
         self.list = start.list;
+        self.owner = start.owner;
         self.loading = start.loading;
         self.simulating = start.simulating;
         self.last = position as i32;
@@ -183,6 +199,13 @@ impl Walk {
     /// Batched ticket `index`'s entry slot, for its positional `getValue()`.
     pub(crate) fn batched_index(&self, index: usize) -> Option<i32> {
         self.batch.get(index).map(|&(start, _, _)| self.starts[start as usize].index)
+    }
+
+    /// Genuine VM root identity for the captured physical list, independent of
+    /// its former map slot. Prefetch holds native metadata only, never VM roots.
+    fn batched_source(&self, index: usize) -> u64 {
+        let start = self.batch[index].0 as usize;
+        self.starts[start].owner.as_ref().map_or(0, ListOwner::source)
     }
 
     /// The batched `(key, cell)` pairs, in order.
@@ -207,6 +230,9 @@ pub(crate) enum Event {
     Notify { listener: usize, key: i64, level: i32, then: Option<i32> },
     /// `addTicket(entry.getLongKey(), ticket)` for a deactivated ticket.
     Activate { key: i64, slot: u32 },
+    RemovedQuery { which: u8 },
+    LiveNotify { listener: usize, key: i64 },
+    Dirty,
 }
 
 /// Every list object, live or free for reuse.
@@ -216,15 +242,13 @@ struct Arena {
 }
 
 impl Arena {
-    fn create(&mut self) -> Result<u32, Fault> {
-        if let Some(index) = self.free.pop() {
-            return Ok(index);
-        }
-        self.lists.try_reserve(1).map_err(|_| Fault::Allocation)?;
-        // Room to free every list later without allocating.
-        self.free.try_reserve(self.lists.len() + 1).map_err(|_| Fault::Allocation)?;
-        self.lists.push(List { generation: 0, entries: Vec::new() });
-        Ok(self.lists.len() as u32 - 1)
+    fn create(&mut self, roots: &mut roots::MapRoots) -> Result<u32, Fault> {
+        let owner=ListOwner::new(roots.source()!=0)?;
+        roots.retain(owner.source())?;
+        if let Some(index)=self.free.pop(){self.lists[index as usize].owner=Some(owner);return Ok(index);}
+        if self.lists.try_reserve(1).is_err() || self.free.try_reserve(self.lists.len()+1).is_err(){roots.release(owner.source());return Err(Fault::Allocation);}
+        self.lists.push(List{generation:0,owner:Some(owner)});
+        Ok(self.lists.len() as u32-1)
     }
 }
 
@@ -232,6 +256,8 @@ pub(crate) struct TicketStorage {
     tickets: ListMap,
     deactivated: ListMap,
     arena: Arena,
+    roots: roots::MapRoots,
+    cursors: admission::CursorPool,
     listeners: [Listener; 2],
     /// `ChunkLevel.MAX_LEVEL + 1`: the level without a ticket of a kind.
     absent: i32,
@@ -245,6 +271,8 @@ impl TicketStorage {
             tickets: ListMap::with_expected(4)?,
             deactivated: ListMap::with_expected(16)?,
             arena: Arena { lists: Vec::new(), free: Vec::new() },
+            roots: roots::MapRoots::default(),
+            cursors: admission::CursorPool::default(),
             listeners: [Listener::None, Listener::None],
             absent,
         })
@@ -265,100 +293,73 @@ impl TicketStorage {
         (self.arena.lists[index as usize].generation as u64) << 32 | index as u64
     }
 
-    /// Drops a list that left its map, releasing its tickets' cells.
-    fn retire(&mut self, index: u32) {
-        if index == NONE {
-            return;
+    /// Removing map ownership does not invalidate an independently owned list.
+    fn retire(&mut self,index:u32){
+        if index==NONE{return;}
+        let list=&mut self.arena.lists[index as usize];
+        if let Some(owner)=list.owner.take(){
+            self.roots.release(owner.source());
         }
-        let list = &mut self.arena.lists[index as usize];
-        for entry in list.entries.drain(..) {
-            slab::release(entry.slot);
-        }
-        list.generation = list.generation.wrapping_add(1);
-        // Reserved when the list was created.
+        list.generation=list.generation.wrapping_add(1);
         self.arena.free.push(index);
     }
-
-    pub fn entries(&self, list: ListRef) -> &[Entry] {
-        let index = list as u32;
-        match self.arena.lists.get(index as usize) {
-            Some(l) if list != u64::MAX && l.generation == (list >> 32) as u32 => &l.entries,
-            _ => &[],
-        }
+    fn list_owner(&self,list:ListRef)->Option<&ListOwner>{
+        self.arena.lists.get(list as u32 as usize).filter(|l|list!=u64::MAX&&l.generation==(list>>32)as u32).and_then(|l|l.owner.as_ref())
     }
-
-    fn entries_mut(&mut self, list: ListRef) -> Option<&mut Vec<Entry>> {
-        let index = list as u32;
-        match self.arena.lists.get_mut(index as usize) {
-            Some(l) if list != u64::MAX && l.generation == (list >> 32) as u32 => Some(&mut l.entries),
-            _ => None,
-        }
-    }
-
-    pub fn is_live(&self, list: ListRef) -> bool {
-        let index = list as u32;
-        list != u64::MAX && self.arena.lists.get(index as usize).is_some_and(|l| l.generation == (list >> 32) as u32)
-    }
-
-    fn bound(ticket: Entry, bound: bool, ticks_left: i64) -> Result<(Entry, Option<u32>), Fault> {
+    pub fn entries(&self,list:ListRef)->Entries<'_>{Entries(self.list_owner(list).map(ListOwner::lock))}
+    fn list_data(&self,list:ListRef)->Result<std::sync::MutexGuard<'_,ListData>,Fault>{self.list_owner(list).map(ListOwner::lock).ok_or(Fault::IllegalState)}
+    pub fn is_live(&self,list:ListRef)->bool{self.list_owner(list).is_some()}
+    fn bound(roots: &mut roots::Roots, ticket: Entry, bound: bool, ticks_left: i64) -> Result<(Entry, Option<u32>), Fault> {
         if bound {
+            roots.retain(ticket.slot)?;
             slab::retain(ticket.slot);
             Ok((ticket, None))
         } else {
             let slot = slab::bind(ticks_left)?;
+            // Pure native callers need no JVM source. Bound VM admission has
+            // already prepared the cell and takes the fallible path above.
+            if let Err(fault) = roots.retain(slot) { slab::release(slot); slab::free(slot); return Err(fault); }
             Ok((Entry { slot, ..ticket }, Some(slot)))
         }
     }
 
-    /// `list.add(index, ticket)` on a live list, without listeners, as a
-    /// caller mutating the original `ObjectArrayList` did.
-    pub fn list_insert(&mut self, list: ListRef, index: i32, ticket: Entry, bound: bool, ticks_left: i64) -> Result<Option<u32>, Fault> {
-        let entries = self.entries_mut(list).ok_or(Fault::IllegalState)?;
-        if index < 0 || index as usize > entries.len() {
-            return Err(Fault::IndexOutOfBounds);
-        }
-        entries.try_reserve(1).map_err(|_| Fault::Allocation)?;
-        let (entry, new) = Self::bound(ticket, bound, ticks_left)?;
-        entries.insert(index as usize, entry);
-        Ok(new)
+    pub(crate) fn prepare_list_put(&mut self,list:ListRef,index:i32,replace:bool)->Result<(),Fault>{
+        let mut data=self.list_data(list)?;
+        if index<0||index as usize>data.entries.len()||(replace&&index as usize==data.entries.len()){return Err(Fault::IndexOutOfBounds);}
+        if !replace{data.entries.try_reserve(1).map_err(|_|Fault::Allocation)?;}
+        Ok(())
     }
-
-    /// `list.set(index, ticket)`: the replaced ticket's cell and the new binding.
-    pub fn list_set(&mut self, list: ListRef, index: i32, ticket: Entry, bound: bool, ticks_left: i64) -> Result<(u32, Option<u32>), Fault> {
-        let entries = self.entries_mut(list).ok_or(Fault::IllegalState)?;
-        if index < 0 || index as usize >= entries.len() {
-            return Err(Fault::IndexOutOfBounds);
-        }
-        let (entry, new) = Self::bound(ticket, bound, ticks_left)?;
-        let old = std::mem::replace(&mut entries[index as usize], entry);
-        slab::release(old.slot);
-        Ok((old.slot, new))
+    pub fn list_insert(&mut self,list:ListRef,index:i32,ticket:Entry,bound:bool,ticks_left:i64)->Result<Option<u32>,Fault>{
+        self.prepare_list_put(list,index,false)?;
+        let mut data=self.list_data(list)?;
+        let(entry,new)=Self::bound(&mut data.roots,ticket,bound,ticks_left)?;
+        data.entries.insert(index as usize,entry);Ok(new)
     }
-
-    /// `list.remove(index)`: the removed ticket's cell.
-    pub fn list_remove(&mut self, list: ListRef, index: i32) -> Result<u32, Fault> {
-        let entries = self.entries_mut(list).ok_or(Fault::IllegalState)?;
-        if index < 0 || index as usize >= entries.len() {
-            return Err(Fault::IndexOutOfBounds);
-        }
-        let old = entries.remove(index as usize);
-        slab::release(old.slot);
-        Ok(old.slot)
+    pub fn list_set(&mut self,list:ListRef,index:i32,ticket:Entry,bound:bool,ticks_left:i64)->Result<(u32,Option<u32>),Fault>{
+        self.prepare_list_put(list,index,true)?;
+        let mut data=self.list_data(list)?;
+        let(entry,new)=Self::bound(&mut data.roots,ticket,bound,ticks_left)?;
+        let old=std::mem::replace(&mut data.entries[index as usize],entry);
+        data.roots.release(old.slot);slab::release(old.slot);Ok((old.slot,new))
     }
-
+    pub fn list_remove(&mut self,list:ListRef,index:i32)->Result<u32,Fault>{
+        let mut data=self.list_data(list)?;
+        if index<0||index as usize>=data.entries.len(){return Err(Fault::IndexOutOfBounds);}
+        let old=data.entries.remove(index as usize);data.roots.release(old.slot);slab::release(old.slot);Ok(old.slot)
+    }
     /// `getLowestTicket(list, simulate)`: the first entry of the lowest level.
-    pub fn lowest(entries: &[Entry], simulate: bool) -> Option<&Entry> {
-        let mut lowest: Option<&Entry> = None;
+    pub fn lowest(entries: &[Entry], simulate: bool) -> Option<Entry> {
+        let mut lowest: Option<Entry> = None;
         for entry in entries {
             if lowest.is_none_or(|l| entry.level < l.level) && entry.kind(simulate) {
-                lowest = Some(entry);
+                lowest = Some(*entry);
             }
         }
         lowest
     }
 
     pub fn list_level(&self, list: ListRef, simulate: bool) -> i32 {
-        Self::lowest(self.entries(list), simulate).map_or(self.absent, |e| e.level)
+        Self::lowest(&self.entries(list), simulate).map_or(self.absent, |e| e.level)
     }
 
     pub fn tickets_at(&self, key: i64) -> ListRef {
@@ -395,16 +396,41 @@ impl TicketStorage {
         Ok(Delivered { resume: steps.len() })
     }
 
+    /// Reserve insertion capacity before Java allocates the actual weak root
+    /// and cleanup registration. Duplicate reset remains a complete operation.
+    /// No entry or listener effect is published for a new ticket here.
+    /// Original private getOrCreateTickets: retain its list identity before
+    /// executing any overridable Ticket query.
+    pub(crate) fn get_or_create(&mut self, key: i64) -> Result<ListRef, Fault> {
+        let (index, _) = self.tickets.compute_if_absent(key, || self.arena.create(&mut self.roots))?;
+        if index == NONE { return Err(Fault::NullPointer); }
+        Ok(self.reference(index))
+    }
+
+    pub(crate) fn prepare_add(&mut self, key: i64, ticket: Entry) -> Result<bool, Fault> {
+        let (index, _) = self.tickets.compute_if_absent(key, || self.arena.create(&mut self.roots))?;
+        if index == NONE { return Err(Fault::NullPointer); }
+        let mut data=self.arena.lists[index as usize].owner.as_ref().ok_or(Fault::IllegalState)?.lock();
+        let entries=&mut data.entries;
+        if let Some(existing) = entries.iter().find(|e| e.type_id == ticket.type_id && e.level == ticket.level) {
+            slab::cell(existing.slot).ticks_left.store(existing.timeout, std::sync::atomic::Ordering::Relaxed);
+            return Ok(false);
+        }
+        entries.try_reserve(1).map_err(|_| Fault::Allocation)?;
+        Ok(true)
+    }
+
     /// `addTicket(key, ticket)` through its listener calls. `slot` is the
     /// ticket's bound cell, or none to bind `ticks_left`. Returns whether it
     /// was added, the slot newly bound, the simulation/loading notification
     /// conditions and native delivery progress over [simulation, loading].
     pub fn add(&mut self, key: i64, ticket: Entry, bound: bool, ticks_left: i64) -> Result<(bool, Option<u32>, [bool; 2], Delivered), Fault> {
-        let (index, _) = self.tickets.compute_if_absent(key, || self.arena.create())?;
+        let (index, _) = self.tickets.compute_if_absent(key, || self.arena.create(&mut self.roots))?;
         if index == NONE {
             return Err(Fault::NullPointer);
         }
-        let entries = &mut self.arena.lists[index as usize].entries;
+        let mut data=self.arena.lists[index as usize].owner.as_ref().ok_or(Fault::IllegalState)?.lock();
+        let entries=&mut data.entries;
         if let Some(existing) = entries.iter().find(|e| e.type_id == ticket.type_id && e.level == ticket.level) {
             slab::cell(existing.slot).ticks_left.store(existing.timeout, std::sync::atomic::Ordering::Relaxed);
             return Ok((false, None, [false; 2], Delivered { resume: 2 }));
@@ -412,14 +438,10 @@ impl TicketStorage {
         let simulation = Self::lowest(entries, true).map_or(self.absent, |e| e.level);
         let loading = Self::lowest(entries, false).map_or(self.absent, |e| e.level);
         entries.try_reserve(1).map_err(|_| Fault::Allocation)?;
-        let (slot, new) = if bound {
-            slab::retain(ticket.slot);
-            (ticket.slot, None)
-        } else {
-            let slot = slab::bind(ticks_left)?;
-            (slot, Some(slot))
-        };
-        entries.push(Entry { slot, ..ticket });
+        let (entry, new) = Self::bound(&mut data.roots, ticket, bound, ticks_left)?;
+        let slot = entry.slot;
+        data.entries.push(Entry { slot, ..ticket });
+        drop(data);
         let wanted = [
             ticket.flags & SIMULATION != 0 && ticket.level < simulation,
             ticket.flags & LOADING != 0 && ticket.level < loading,
@@ -442,13 +464,17 @@ impl TicketStorage {
             return Ok(None);
         }
         let list = self.reference(index);
-        let entries = &mut self.arena.lists[index as usize].entries;
+        let mut data=self.arena.lists[index as usize].owner.as_ref().ok_or(Fault::IllegalState)?.lock();
+        let entries=&mut data.entries;
         let Some(position) = entries.iter().position(|e| e.type_id == type_id && e.level == level) else {
             return Ok(None);
         };
         let removed = entries.remove(position);
+        data.roots.release(removed.slot);
         slab::release(removed.slot);
-        if entries.is_empty() {
+        let empty=data.entries.is_empty();
+        drop(data);
+        if empty {
             let index = self.tickets.remove(key)?;
             self.retire(index);
         }
@@ -518,21 +544,23 @@ impl TicketStorage {
         out
     }
 
+    pub(crate) fn prepare_deactivated(&mut self, key: i64) -> Result<(), Fault> {
+        let (index, _) = self.deactivated.compute_if_absent(key, || self.arena.create(&mut self.roots))?;
+        if index == NONE { return Err(Fault::NullPointer); }
+        self.arena.lists[index as usize].owner.as_ref().ok_or(Fault::IllegalState)?.lock().entries.try_reserve(1).map_err(|_| Fault::Allocation)
+    }
+
     /// `fromPacked`: appends a decoded ticket to the deactivated lists.
     pub fn add_deactivated(&mut self, key: i64, ticket: Entry, bound: bool, ticks_left: i64) -> Result<Option<u32>, Fault> {
-        let (index, _) = self.deactivated.compute_if_absent(key, || self.arena.create())?;
+        let (index, _) = self.deactivated.compute_if_absent(key, || self.arena.create(&mut self.roots))?;
         if index == NONE {
             return Err(Fault::NullPointer);
         }
-        self.arena.lists[index as usize].entries.try_reserve(1).map_err(|_| Fault::Allocation)?;
-        let (slot, new) = if bound {
-            slab::retain(ticket.slot);
-            (ticket.slot, None)
-        } else {
-            let slot = slab::bind(ticks_left)?;
-            (slot, Some(slot))
-        };
-        self.arena.lists[index as usize].entries.push(Entry { slot, ..ticket });
+        self.arena.lists[index as usize].owner.as_ref().ok_or(Fault::IllegalState)?.lock().entries.try_reserve(1).map_err(|_| Fault::Allocation)?;
+        let mut data=self.arena.lists[index as usize].owner.as_ref().ok_or(Fault::IllegalState)?.lock();
+        let (entry, new) = Self::bound(&mut data.roots, ticket, bound, ticks_left)?;
+        let slot = entry.slot;
+        data.entries.push(Entry { slot, ..ticket });
         Ok(new)
     }
 
@@ -551,6 +579,7 @@ impl TicketStorage {
             index: 0,
             key: 0,
             list: u64::MAX,
+            owner: None,
             position: 0,
             last: -1,
             pending: None,
@@ -578,14 +607,15 @@ impl TicketStorage {
         }
         let mut start = walk.start();
         let mut position = walk.position;
-        walk.starts.push(start);
+        walk.starts.push(start.clone());
         while walk.batch.len() < capacity {
-            let entries = self.entries(start.list);
+            let entries = Entries(start.owner.as_ref().map(ListOwner::lock));
             if position < entries.len() {
                 walk.batch.push((walk.starts.len() as u32 - 1, position as u32, entries[position]));
                 position += 1;
                 continue;
             }
+            drop(entries);
             // Crossing to the next entry is side-effect free only when this one
             // removed nothing. Any fault is dropped here: the live walk raises it
             // in place, or never reaches it if an earlier mutation intervenes.
@@ -599,9 +629,10 @@ impl TicketStorage {
             }
             start.index = index;
             start.list = self.reference(value);
+            start.owner = self.list_owner(start.list).cloned();
             start.key = key;
             position = 0;
-            walk.starts.push(start);
+            walk.starts.push(start.clone());
         }
         Ok(walk.batch.len())
     }
@@ -649,6 +680,7 @@ impl TicketStorage {
                         return Err(Fault::NullPointer);
                     }
                     walk.list = self.reference(value);
+                    walk.owner = self.list_owner(walk.list).cloned();
                     if walk.kind != WalkKind::Activate {
                         walk.key = map.key_at(walk.index)?;
                     }
@@ -659,23 +691,24 @@ impl TicketStorage {
                     walk.phase = Phase::Tickets;
                 }
                 Phase::Tickets => {
-                    if walk.kind == WalkKind::Java && self.fill_batch(walk, capacity)? > 0 {
+                    if matches!(walk.kind, WalkKind::Java | WalkKind::JavaEffects | WalkKind::DeactivateEffects) && self.fill_batch(walk, capacity)? > 0 {
                         walk.phase = Phase::Batch;
                         return Ok(Event::Batch { count: walk.batch.len() });
                     }
-                    let entries = self.entries(walk.list);
+                    let entries = Entries(walk.owner.as_ref().map(ListOwner::lock));
                     if walk.position >= entries.len() {
                         walk.phase = if walk.loading || walk.simulating { Phase::NotifyLoading } else { Phase::NextEntry };
                         continue;
                     }
                     let entry = entries[walk.position];
+                    drop(entries);
                     walk.last = walk.position as i32;
                     walk.position += 1;
                     let matched = match walk.kind {
                         // The key is read from the entry's slot for every ticket.
                         WalkKind::Activate => return Ok(Event::Activate { key: self.deactivated.key_at(walk.index)?, slot: entry.slot }),
                         WalkKind::Deactivate => entry.flags & UNKNOWN == 0,
-                        WalkKind::Java => unreachable!("Java predicates are batched"),
+                        WalkKind::Java | WalkKind::JavaEffects | WalkKind::DeactivateEffects => unreachable!("Java predicates are batched"),
                         WalkKind::Purge => {
                             if entry.timeout == 0 {
                                 false
@@ -707,6 +740,9 @@ impl TicketStorage {
                 Phase::NotifyLoading => {
                     walk.phase = Phase::NotifySimulation;
                     if walk.loading {
+                        if matches!(walk.kind, WalkKind::JavaEffects | WalkKind::DeactivateEffects) {
+                            return Ok(Event::LiveNotify { listener: LOADING_LISTENER, key: walk.key });
+                        }
                         let list = self.reference(self.tickets.value_at(walk.index)?);
                         let level = self.list_level(list, false);
                         if !self.notify(LOADING_LISTENER, walk.key, level, false)? {
@@ -722,13 +758,38 @@ impl TicketStorage {
                     let delivered = answer && walk.paired;
                     walk.paired = false;
                     if walk.simulating && !delivered {
+                        if matches!(walk.kind, WalkKind::JavaEffects | WalkKind::DeactivateEffects) {
+                            return Ok(Event::LiveNotify { listener: SIMULATION_LISTENER, key: walk.key });
+                        }
                         let level = self.list_level(self.reference(self.tickets.value_at(walk.index)?), true);
                         if !self.notify(SIMULATION_LISTENER, walk.key, level, false)? {
                             return Ok(Event::Notify { listener: SIMULATION_LISTENER, key: walk.key, level, then: None });
                         }
                     }
                 }
+                Phase::RemovedLoad => {
+                    walk.phase = Phase::RemovedSimulation;
+                    return Ok(Event::RemovedQuery { which: 0 });
+                }
+                Phase::RemovedSimulation => {
+                    walk.loading |= answer;
+                    walk.phase = Phase::RemovedForced;
+                    return Ok(Event::RemovedQuery { which: 1 });
+                }
+                Phase::RemovedForced => {
+                    walk.simulating |= answer;
+                    walk.phase = Phase::RemovedFinish;
+                    return Ok(Event::RemovedQuery { which: 2 });
+                }
+                Phase::RemovedFinish => {
+                    walk.forced |= answer;
+                    walk.phase = Phase::Tickets;
+                }
                 Phase::AfterNotify => {
+                    if matches!(walk.kind, WalkKind::JavaEffects | WalkKind::DeactivateEffects) {
+                        walk.phase = Phase::AfterDirty;
+                        return Ok(Event::Dirty);
+                    }
                     walk.dirty = true;
                     walk.phase = Phase::NextEntry;
                     let value = self.tickets.value_at(walk.index)?;
@@ -740,16 +801,26 @@ impl TicketStorage {
                         self.retire(removed);
                     }
                 }
+                Phase::AfterDirty => {
+                    walk.phase = Phase::NextEntry;
+                    let value = self.tickets.value_at(walk.index)?;
+                    if value == NONE { return Err(Fault::NullPointer); }
+                    if self.entries(self.reference(value)).is_empty() {
+                        let removed = walk.cursor.remove(&mut self.tickets)?;
+                        self.retire(removed);
+                    }
+                }
+
             }
         }
     }
 
     /// `entry.getValue()` of a walk entry, read now as the original's
     /// destination-list creator read it: a fault where that would throw.
-    pub fn entry_value(&self, index: i32) -> Result<(), Fault> {
+    pub fn entry_value_size(&self, index: i32) -> Result<i32, Fault> {
         match self.tickets.value_at(index)? {
             NONE => Err(Fault::NullPointer),
-            _ => Ok(()),
+            value => Ok(self.entries(self.reference(value)).len() as i32),
         }
     }
 
@@ -768,42 +839,128 @@ impl TicketStorage {
     /// The matched ticket: copied to the deactivated lists when deactivating
     /// (a Java destination map is Java's), then `iterator.remove()`.
     fn take(&mut self, walk: &mut Walk, entry: Entry) -> Result<(), Fault> {
-        if walk.kind == WalkKind::Deactivate {
-            let (index, _) = self.deactivated.compute_if_absent(walk.key, || self.arena.create())?;
+        if matches!(walk.kind, WalkKind::Deactivate | WalkKind::DeactivateEffects) {
+            let (index, _) = self.deactivated.compute_if_absent(walk.key, || self.arena.create(&mut self.roots))?;
             if index == NONE {
                 return Err(Fault::NullPointer);
             }
-            let destination = &mut self.arena.lists[index as usize].entries;
-            destination.try_reserve(1).map_err(|_| Fault::Allocation)?;
+            let mut destination=self.arena.lists[index as usize].owner.as_ref().ok_or(Fault::IllegalState)?.lock();
+            destination.entries.try_reserve(1).map_err(|_| Fault::Allocation)?;
+            destination.roots.retain(entry.slot)?;
             slab::retain(entry.slot);
-            destination.push(entry);
+            destination.entries.push(entry);
         }
         if walk.last == -1 {
             return Err(Fault::IllegalState);
         }
         let last = walk.last as usize;
-        let Some(entries) = self.entries_mut(walk.list).filter(|e| last < e.len()) else {
-            return Err(Fault::IndexOutOfBounds);
-        };
-        let removed = entries.remove(last);
-        slab::release(removed.slot);
+        let mut data=walk.owner.as_ref().ok_or(Fault::IllegalState)?.lock();
+        if last>=data.entries.len(){return Err(Fault::IndexOutOfBounds);}
+        let removed=data.entries.remove(last);
+        data.roots.release(removed.slot);slab::release(removed.slot);
+        drop(data);
         if (last) < walk.position {
             walk.position -= 1;
         }
         walk.last = -1;
-        walk.loading |= entry.flags & LOADING != 0;
-        walk.simulating |= entry.flags & SIMULATION != 0;
-        walk.forced |= entry.flags & FORCED != 0;
+        if matches!(walk.kind, WalkKind::JavaEffects | WalkKind::DeactivateEffects) {
+            walk.phase = Phase::RemovedLoad;
+        } else {
+            walk.loading |= entry.flags & LOADING != 0;
+            walk.simulating |= entry.flags & SIMULATION != 0;
+            walk.forced |= entry.flags & FORCED != 0;
+        }
         Ok(())
     }
 }
 
 impl Drop for TicketStorage {
+    fn drop(&mut self){for list in &self.arena.lists{if let Some(owner)=&list.owner{self.roots.release(owner.source());}}}
+}
+
+/// A list's physical entries and VM-root associations have the same native
+/// owner. Public views retain this owner, independently of the routing map.
+struct ListData {
+    entries: Vec<Entry>,
+    roots: roots::Roots,
+}
+impl Drop for ListData {
     fn drop(&mut self) {
-        for list in &mut self.arena.lists {
-            for entry in list.entries.drain(..) {
-                slab::release(entry.slot);
-            }
+        for entry in self.entries.drain(..) {
+            self.roots.release(entry.slot);
+            slab::release(entry.slot);
         }
+    }
+}
+#[repr(C)]
+struct SharedList {
+    references: std::sync::atomic::AtomicUsize,
+    source: u64,
+    data: std::sync::Mutex<ListData>,
+}
+struct ListOwner(std::ptr::NonNull<SharedList>);
+// Every data access takes SharedList::data; the handle owns one strong lease.
+unsafe impl Send for ListOwner {}
+unsafe impl Sync for ListOwner {}
+impl ListOwner {
+    fn new(enabled: bool) -> Result<Self, Fault> {
+        let source = if enabled { roots::allocate_source().ok_or(Fault::IllegalState)? } else { 0 };
+        let mut root = roots::Roots::default();
+        if enabled { root.enable(source)?; }
+        let pointer = unsafe { std::alloc::alloc(std::alloc::Layout::new::<SharedList>()).cast::<SharedList>() };
+        let pointer = std::ptr::NonNull::new(pointer).ok_or(Fault::Allocation)?;
+        unsafe { pointer.as_ptr().write(SharedList { references: std::sync::atomic::AtomicUsize::new(1), source,
+            data: std::sync::Mutex::new(ListData { entries: Vec::new(), roots: root }) }); }
+        Ok(Self(pointer))
+    }
+    fn source(&self) -> u64 { unsafe { self.0.as_ref().source } }
+    fn lock(&self) -> std::sync::MutexGuard<'_, ListData> { unsafe { self.0.as_ref() }.data.lock().unwrap_or_else(|p| p.into_inner()) }
+    fn into_raw(self) -> u64 { let value=self.0.as_ptr().expose_provenance() as u64;std::mem::forget(self);value }
+    unsafe fn from_raw(value:u64) -> Self { Self(std::ptr::NonNull::new_unchecked(std::ptr::with_exposed_provenance_mut(value as usize))) }
+}
+impl Clone for ListOwner {
+    fn clone(&self) -> Self {
+        let old=unsafe { self.0.as_ref() }.references.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
+        if old>=isize::MAX as usize { std::process::abort(); }
+        Self(self.0)
+    }
+}
+impl Drop for ListOwner {
+    fn drop(&mut self) {
+        if unsafe { self.0.as_ref() }.references.fetch_sub(1,std::sync::atomic::Ordering::Release)==1 {
+            std::sync::atomic::fence(std::sync::atomic::Ordering::Acquire);
+            unsafe { drop(Box::from_raw(self.0.as_ptr())); }
+        }
+    }
+}
+struct Entries<'a>(Option<std::sync::MutexGuard<'a,ListData>>);
+impl std::ops::Deref for Entries<'_> {
+    type Target=[Entry];
+    fn deref(&self)->&[Entry]{self.0.as_ref().map_or(&[],|data|data.entries.as_slice())}
+}
+struct OwnedEntryIterator<'a> { entries:Entries<'a>, position:usize }
+impl Iterator for OwnedEntryIterator<'_> {
+    type Item=Entry;
+    fn next(&mut self)->Option<Entry>{let value=self.entries.get(self.position).copied();if value.is_some(){self.position+=1;}value}
+}
+impl<'a> IntoIterator for Entries<'a>{type Item=Entry;type IntoIter=OwnedEntryIterator<'a>;fn into_iter(self)->Self::IntoIter{OwnedEntryIterator{entries:self,position:0}}}
+
+impl ListData {
+    fn prepare(&mut self,index:i32,replace:bool)->Result<(),Fault>{
+        if index<0||index as usize>self.entries.len()||(replace&&index as usize==self.entries.len()){return Err(Fault::IndexOutOfBounds);}
+        if !replace{self.entries.try_reserve(1).map_err(|_|Fault::Allocation)?;}
+        Ok(())
+    }
+    fn publish(&mut self,index:i32,replace:bool,entry:Entry)->Result<Option<u32>,Fault>{
+        self.prepare(index,replace)?;
+        let(entry,_)=TicketStorage::bound(&mut self.roots,entry,true,0)?;
+        if replace{
+            let old=std::mem::replace(&mut self.entries[index as usize],entry);
+            self.roots.release(old.slot);slab::release(old.slot);Ok(Some(old.slot))
+        }else{self.entries.insert(index as usize,entry);Ok(None)}
+    }
+    fn remove(&mut self,index:i32)->Result<u32,Fault>{
+        if index<0||index as usize>=self.entries.len(){return Err(Fault::IndexOutOfBounds);}
+        let entry=self.entries.remove(index as usize);self.roots.release(entry.slot);slab::release(entry.slot);Ok(entry.slot)
     }
 }

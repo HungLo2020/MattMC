@@ -44,7 +44,7 @@ public class ProtoChunk extends ChunkAccess {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	@Nullable
 	private volatile LevelLightEngine lightEngine;
-	private volatile ChunkStatus status = ChunkStatus.EMPTY;
+	private final net.minecraft.server.level.NativeChunkGeneration.Status status = new net.minecraft.server.level.NativeChunkGeneration.Status();
 	private final List<CompoundTag> entities = Lists.<CompoundTag>newArrayList();
 	@Nullable
 	private CarvingMask carvingMask;
@@ -153,7 +153,7 @@ public class ProtoChunk extends ChunkAccess {
 				int o = SectionPos.sectionRelative(k);
 				int p = SectionPos.sectionRelative(l);
 				BlockState blockState2 = levelChunkSection.setBlockState(n, o, p, blockState);
-				if (this.status.isOrAfter(ChunkStatus.INITIALIZE_LIGHT)) {
+				if (this.status.get().isOrAfter(ChunkStatus.INITIALIZE_LIGHT)) {
 					boolean bl2 = levelChunkSection.hasOnlyAir();
 					if (bl2 != bl) {
 						// Inside a FEATURES transaction the light task waits for its commit.
@@ -257,11 +257,11 @@ public class ProtoChunk extends ChunkAccess {
 
 	@Override
 	public ChunkStatus getPersistedStatus() {
-		return this.status;
+		return this.status.get();
 	}
 
 	public void setPersistedStatus(ChunkStatus chunkStatus) {
-		this.status = chunkStatus;
+		this.status.set(chunkStatus);
 		if (this.belowZeroRetrogen != null && chunkStatus.isOrAfter(this.belowZeroRetrogen.targetStatus())) {
 			this.setBelowZeroRetrogen(null);
 		}

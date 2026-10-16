@@ -12,6 +12,10 @@ owns that structure:
 - each holder's level state: its ticket level, the level its futures last
   reflected, and whether it was accessible since the last save.
 
+The unpublished [generation integration](RUST-CHUNK-GENERATION.md) extends this
+owner through request admission, stable visible snapshots and holder readiness.
+Its guide records the current validation limits.
+
 It also makes the scheduling and unload decisions, applies the loading graph's
 level changes to holders directly, and decides each holder's status
 transition.
@@ -20,16 +24,19 @@ is the bridge.
 
 Java keeps:
 
-- the `ChunkHolder` objects (by native id), their futures and status work;
+- the opaque `ChunkHolder` objects (by native id) and actual future objects;
 - the effects of each status transition: preparing and unloading futures,
   promotion and demotion listeners, save dependencies and the queue-level
   listeners;
 - `DistanceManager.chunksToUpdateFutures` and its two passes (see below);
-- a mirror of each holder's ticket level for fast reads;
 - save IO and the unload queue's runnables;
-- `visibleChunkMap`, a projection rebuilt from the native order at each promote.
+- opaque bindings for each native promoted visible snapshot; actual map membership
+  and order remain native.
 
-The holder's futures and `GenerationChunkHolder` are unchanged.
+Generation control is being integrated with the separate
+[retained chunk-generation owner](RUST-CHUNK-GENERATION.md). Actual future
+objects and engine effects remain Java; that guide distinguishes the current
+prototype from the remaining integration and verification work.
 
 ## Preserve these contracts
 
@@ -56,7 +63,7 @@ The holder's futures and `GenerationChunkHolder` are unchanged.
   loading graph, then `ChunkMap.applyLoadingLevels`. Rust takes the graph's
   changes and applies them in replay order: it compares each change with the
   holder's native level, schedules the holder and sets its level. Java receives
-  records: mirror a level, construct a holder, and add the holder to
+  records to construct holders and add each holder to
   `chunksToUpdateFutures`.
   - Records stop after each construction. If the constructor throws, the rest of
     that run's changes are discarded, as the original replay ended there.
@@ -68,8 +75,8 @@ The holder's futures and `GenerationChunkHolder` are unchanged.
   - Rust marks the holder accessible before the effects.
   - The old level is committed only after the effects and the level listener.
     If an effect throws, the next pass decides the same transition again.
-  - A standalone holder (no registry) keeps its state in Java but uses the same
-    native decision.
+  - Standalone and detached holders retain their own native incarnation, using
+    the same controller and actual future bindings as registered holders.
 - **`chunksToUpdateFutures` stays Java.** It is a `ReferenceOpenHashSet`, so its
   traversal follows identity hashes. It is kept as an explicit ordering
   adapter, with both passes: every `updateHighestAllowedStatus`, then every
@@ -82,28 +89,35 @@ The holder's futures and `GenerationChunkHolder` are unchanged.
     at its chunk (`finish_unload`, by identity). Rust then frees the id.
   - A completion left over from an earlier unload of a revived or freed holder
     finds no matching id.
-  - Freeing the id moves the holder's level state back into its Java fields. A
+  - Freeing the id leaves the holder's own native incarnation intact. A
     reference can outlive the unload, for example in a pending set that a
     throwing pass kept, and the id may already belong to another holder.
 - **Threads.**
   - The light engine, `hasChunk`/`isPositionTicking` and mods read
-    `visibleChunkMap` off the main thread. It stays a volatile, immutable
-    projection: an old snapshot keeps its holder objects alive.
+    `visibleChunkMap` off the main thread. Its volatile native view retains
+    exact holder bindings from promotion; old snapshots keep their original
+    holders alive across subsequent promotions and registry id reuse.
+    Native preparation does not consume the pending change. Java allocates and
+    adopts every binding before committing the native view, so allocation failure
+    retains the previous view and permits a retry.
   - Updating lookups go through Rust's lock. Java resolves the id to a holder
     under the same monitor that frees and reuses ids, so an off-thread reader
     (Distant Horizons' generator) never gets another chunk's holder.
   - Neither lock is held while Java runs. Taking the loading changes copies
     them under the graph's lock, then applies them under the registry's; the
     two locks never nest.
-  - `getTicketLevel` reads the Java mirror. It is written where the original
-    wrote the field.
-  - Off-thread readers (worldgen, light, debug, Distant Horizons) use only Java
-    fields: the level mirror, queue level and futures. Everything routed
-    through the registry runs on the main thread only: `updateFutures`,
-    `wasAccessibleSinceLastSave`, `refreshAccessibility` and `finishUnload`
-    with `detach`. That is the same thread that frees and reuses ids, so a
-    holder detaches before its id can be reused. Keep any new off-thread
-    caller off these methods.
+  - `getTicketLevel` and queue/accessibility reads use the holder's fenced native
+    incarnation. The registry updates that same state after attachment; its
+    constructor reservation ceases to be active state. Detaching only removes
+    registry membership. Actual ready/save/send CFs have native-selected opaque
+    bindings, with no Java level or future-membership mirror.
+- **Native lifetime.** Create the auto arena before allocating the registry.
+  Constructor rollback and arena cleanup share one handle-only action that
+  atomically releases once. JDK 25 can register `reinterpret` cleanup before
+  allocating the returned segment, so independent manual release is unsafe.
+  The cleanup action must not retain the registry, segment or arena. The focused
+  generation lifetime checks cover modeled failure ordering and a real
+  registry/holder cycle with the same attached native generation Arc.
 - **Saving.** `ChunkMap.save`, its failure handling and IOWorker recovery are
   unchanged Java. Only the throttle map (`nextChunkSaveTime`) moved.
 
@@ -188,5 +202,6 @@ recovery tests.
 - *Hash-mode oracle mismatch:* something other than the passes added to or
   iterated `chunksToUpdateFutures`, or the model no longer matches the fastutil
   version. Compare `TableModel` with `ReferenceOpenHashSet`.
-- *A holder's level reads wrong:* the mirror and the native level diverged.
-  Every native level change must be mirrored where the original set the field.
+- *A retained holder reads another chunk's state:* check that every consumer uses
+  its actual incarnation rather than looking up a reusable registry id. Loading
+  and direct level updates must reach that same native owner.

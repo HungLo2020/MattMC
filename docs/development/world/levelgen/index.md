@@ -7,6 +7,8 @@ Preserve seed compatibility, evaluation order, and Java/native ownership rules.
 - [Old-terrain Blending](blending/index.md): batched height grids and saved-world compatibility.
 - [Feature Generation](feature/index.md): native decoration of placed features, ore geometry, geode density fields.
 - [FULL-chunk Verification](RUST-FULL-GENERATION.md): Frozen/Current FULL-chunk parity, resume, failure-injection and timing drivers.
+- [Retained chunk generation](../chunk-loading/RUST-CHUNK-GENERATION.md):
+  in-progress task/holder ownership through stage execution and FULL publication.
 - [Heightmaps](heightmap/index.md): packed chunk-column reconstruction and parity checks.
 - [Noise Evaluation](RUST-NOISE.md): sampler behavior and parity checks.
 - [Density Evaluation](RUST-DENSITY.md): expression evaluation, batching, and verification.

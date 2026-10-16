@@ -19,15 +19,37 @@ pub(crate) mod ffi;
 mod tests;
 
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use super::chunk_generation::Holder as GenerationHolder;
 
 use super::chunk_distance::ticket_storage::map::{Cursor, ListMap};
 use super::chunk_distance::ticket_storage::Fault;
+
+/// Long coordinate keys need the original inexpensive integer mixing, not a
+/// generic keyed string hasher. Linked nodes still define every exposed order.
+#[derive(Default)]
+struct CoordinateHasher(u64);
+impl std::hash::Hasher for CoordinateHasher {
+    fn finish(&self) -> u64 { self.0 }
+    fn write_i64(&mut self, value: i64) {
+        let mixed = (value as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        let mixed = mixed ^ (mixed >> 32);
+        self.0 = mixed ^ (mixed >> 16);
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        // The map's only key type calls write_i64. Retain a total Hasher
+        // implementation for tooling without introducing a second map policy.
+        let mut value = 0u64;
+        for byte in bytes { value = value.rotate_left(8) ^ u64::from(*byte); }
+        self.write_i64(value as i64);
+    }
+}
 
 /// An insertion-ordered map, as fastutil's linked hash maps iterate: `put` of a
 /// present key keeps its place, `remove` unlinks, iteration follows insertion.
 #[derive(Clone, Default)]
 pub(crate) struct Ordered {
-    index: HashMap<i64, usize>,
+    index: HashMap<i64, usize, std::hash::BuildHasherDefault<CoordinateHasher>>,
     /// (key, value, previous, next); freed nodes are `None`.
     nodes: Vec<Option<(i64, u32, usize, usize)>>,
     free: Vec<usize>,
@@ -39,7 +61,7 @@ const END: usize = usize::MAX;
 
 impl Ordered {
     pub(crate) fn new() -> Self {
-        Self { index: HashMap::new(), nodes: Vec::new(), free: Vec::new(), head: END, tail: END }
+        Self { index: HashMap::default(), nodes: Vec::new(), free: Vec::new(), head: END, tail: END }
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -209,13 +231,15 @@ pub(crate) struct Registry {
     /// `ChunkLevel.byStatus` of FULL, BLOCK_TICKING and ENTITY_TICKING.
     status_levels: [i32; 3],
     /// Level state by holder id.
-    levels: Vec<Levels>,
+    levels: Vec<Option<Levels>>,
+    /// Shared generation incarnation, detached before a registry id is reused.
+    generation: Vec<Option<Arc<GenerationHolder>>>,
     /// The loading graph's drained `(chunk, level)` changes not yet applied.
     level_changes: Vec<(i64, i32)>,
     next_change: usize,
     pub(super) updating: Ordered,
     /// The last promoted `updating`.
-    visible: Ordered,
+    visible: Arc<Mutex<Visible>>,
     pending: Ordered,
     /// `LongOpenHashSet toDrop` (values unused).
     pub(super) to_drop: ListMap,
@@ -239,10 +263,11 @@ impl Registry {
             max_level,
             status_levels: [33, 32, 31],
             levels: Vec::new(),
+            generation: Vec::new(),
             level_changes: Vec::new(),
             next_change: 0,
             updating: Ordered::new(),
-            visible: Ordered::new(),
+            visible: Arc::new(Mutex::new(Visible::empty())),
             pending: Ordered::new(),
             to_drop: ListMap::with_expected(16)?,
             eager: Ordered::new(),
@@ -279,26 +304,45 @@ impl Registry {
             None => {
                 self.free_ids.try_reserve(self.next_id as usize + 1).map_err(|_| Fault::Allocation)?;
                 self.levels.try_reserve(1).map_err(|_| Fault::Allocation)?;
-                self.levels.push(Levels { level: 0, old_level: 0, accessible: false });
+                self.generation.try_reserve(1).map_err(|_| Fault::Allocation)?;
+                self.levels.push(None);
+                self.generation.push(None);
                 self.next_id += 1;
                 self.next_id - 1
             }
         };
-        self.levels[id as usize] = Levels { level, old_level: self.unloaded(), accessible: false };
+        self.levels[id as usize] = Some(Levels { level, old_level: self.unloaded(), accessible: false });
+        debug_assert!(self.generation[id as usize].is_none());
         Ok(id)
     }
 
+    /// Attach the already-constructed Java holder's native generation owner.
+    /// Allocation was reserved alongside the id, so attachment cannot allocate.
+    pub(crate) fn attach_generation(&mut self, id: u32, owner: Arc<GenerationHolder>) -> Result<(), Fault> {
+        let slot = self.generation.get_mut(id as usize).ok_or(Fault::IllegalState)?;
+        if let Some(previous) = slot {
+            if !Arc::ptr_eq(previous, &owner) { return Err(Fault::IllegalState); }
+        } else {
+            let state = self.levels.get_mut(id as usize).and_then(Option::take).ok_or(Fault::IllegalState)?;
+            owner.levels.restore(state);
+            *slot = Some(owner);
+        }
+        Ok(())
+    }
+
     pub(crate) fn levels(&self, id: u32) -> Result<Levels, Fault> {
-        self.levels.get(id as usize).copied().ok_or(Fault::IllegalState)
+        if let Some(Some(owner)) = self.generation.get(id as usize) { return Ok(owner.levels.snapshot()); }
+        self.levels.get(id as usize).copied().flatten().ok_or(Fault::IllegalState)
     }
 
     fn levels_mut(&mut self, id: u32) -> Result<&mut Levels, Fault> {
-        self.levels.get_mut(id as usize).ok_or(Fault::IllegalState)
+        self.levels.get_mut(id as usize).and_then(Option::as_mut).ok_or(Fault::IllegalState)
     }
 
     /// `setTicketLevel`.
     pub(crate) fn set_level(&mut self, id: u32, level: i32) -> Result<(), Fault> {
-        self.levels_mut(id)?.level = level;
+        if let Some(Some(owner)) = self.generation.get(id as usize) { owner.levels.level.store(level, std::sync::atomic::Ordering::SeqCst); }
+        else { self.levels_mut(id)?.level = level; }
         Ok(())
     }
 
@@ -310,7 +354,8 @@ impl Registry {
         let state = self.levels(id)?;
         let effects = self.transition(state.old_level, state.level);
         if self.full_status(state.level) >= 1 {
-            self.levels_mut(id)?.accessible = true;
+            if let Some(Some(owner)) = self.generation.get(id as usize) { owner.levels.accessible.store(1, std::sync::atomic::Ordering::SeqCst); }
+            else { self.levels_mut(id)?.accessible = true; }
         }
         Ok(effects)
     }
@@ -321,15 +366,16 @@ impl Registry {
 
     /// `oldTicketLevel = ticketLevel`, after the effects and the listener.
     pub(crate) fn commit_transition(&mut self, id: u32) -> Result<(), Fault> {
-        let state = self.levels_mut(id)?;
-        state.old_level = state.level;
+        if let Some(Some(owner)) = self.generation.get(id as usize) { owner.levels.commit(); }
+        else { let state = self.levels_mut(id)?; state.old_level = state.level; }
         Ok(())
     }
 
     /// `refreshAccessibility`.
     pub(crate) fn refresh_accessibility(&mut self, id: u32) -> Result<(), Fault> {
         let full = self.full_status(self.levels(id)?.level) >= 1;
-        self.levels_mut(id)?.accessible = full;
+        if let Some(Some(owner)) = self.generation.get(id as usize) { owner.levels.accessible.store(i32::from(full), std::sync::atomic::Ordering::SeqCst); }
+        else { self.levels_mut(id)?.accessible = full; }
         Ok(())
     }
 
@@ -421,6 +467,7 @@ impl Registry {
 
     /// Holder construction threw: release the reserved id.
     pub(crate) fn abort_new(&mut self, id: u32) {
+        self.generation[id as usize] = None;
         self.free_ids.push(id);
     }
 
@@ -432,18 +479,35 @@ impl Registry {
         self.to_drop.get(key) != super::chunk_distance::ticket_storage::map::NONE
     }
 
-    /// `promoteChunkMap`: the new visible entries, or `None` when unmodified.
-    pub(crate) fn promote(&mut self) -> Option<Vec<(i64, u32)>> {
+    /// Prepare without consuming the pending change. Java must first allocate
+    /// and bind the actual holder roots; a failed adoption can retry unchanged.
+    pub(crate) fn prepare_visible(&self) -> Option<Arc<Mutex<Visible>>> {
         if !self.modified {
             return None;
         }
-        self.visible = self.updating.clone();
+        let entries = self.updating.clone();
+        let mut incarnations = vec![None; self.generation.len()];
+        for (_, id) in entries.entries() { incarnations[id as usize] = self.generation[id as usize].clone(); }
+        Some(Arc::new(Mutex::new(Visible { entries, incarnations })))
+    }
+
+    /// No allocation or engine effect may occur between successful Java binding
+    /// and this commit. The registry monitor serializes the preparation/commit.
+    pub(crate) fn commit_visible(&mut self, prepared: Arc<Mutex<Visible>>) {
+        self.visible = prepared;
         self.modified = false;
-        Some(self.visible.entries())
+    }
+
+    /// Legacy pair-export consumer, which allocates its output before entry.
+    pub(crate) fn promote(&mut self) -> Option<Vec<(i64, u32)>> {
+        let prepared = self.prepare_visible()?;
+        let entries = prepared.lock().unwrap_or_else(|p| p.into_inner()).entries.entries();
+        self.commit_visible(prepared);
+        Some(entries)
     }
 
     pub(crate) fn visible(&self) -> Vec<(i64, u32)> {
-        self.visible.entries()
+        self.visible.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).entries.entries()
     }
 
     pub(crate) fn updating_entries(&self) -> Vec<(i64, u32)> {
@@ -476,6 +540,7 @@ impl Registry {
             return false;
         }
         self.pending.remove(key);
+        self.generation[id as usize] = None;
         self.free_ids.push(id);
         true
     }
@@ -526,5 +591,47 @@ impl Registry {
     /// Bit 0 pending unloads, 1 updating holders, 2 chunks to drop.
     pub(crate) fn work(&self) -> i32 {
         i32::from(self.pending.len() != 0) | i32::from(self.updating.len() != 0) << 1 | i32::from(self.to_drop.len() != 0) << 2
+    }
+}
+
+/// A promoted map owns stable holder incarnations and outlives later promotions.
+/// Java roots only its opaque holder bindings, indexed by these native ids.
+pub(crate) struct Visible {
+    entries: Ordered,
+    incarnations: Vec<Option<Arc<GenerationHolder>>>,
+}
+impl Visible {
+    fn empty() -> Self { Self { entries: Ordered::new(), incarnations: Vec::new() } }
+    fn remove(&mut self, key: i64) -> Option<u32> {
+        let id = self.entries.remove(key)?;
+        if let Some(binding) = self.incarnations.get_mut(id as usize) { *binding = None; }
+        Some(id)
+    }
+}
+
+#[repr(C)]
+pub(crate) struct VisibleWalk {
+    key: std::sync::atomic::AtomicI64,
+    view: Arc<Mutex<Visible>>,
+    next: Option<i64>,
+    current: Option<i64>,
+}
+impl VisibleWalk {
+    fn new(view: Arc<Mutex<Visible>>) -> Self {
+        let next = view.lock().unwrap_or_else(|p| p.into_inner()).entries.key_after(None);
+        Self { key: std::sync::atomic::AtomicI64::new(0), view, next, current: None }
+    }
+    fn next(&mut self) -> Option<u32> {
+        let key = self.next?;
+        let view = self.view.lock().unwrap_or_else(|p| p.into_inner());
+        let id = view.entries.get(key)?;
+        self.next = view.entries.key_after(Some(key));
+        self.current = Some(key);
+        self.key.store(key, std::sync::atomic::Ordering::Release);
+        Some(id)
+    }
+    fn remove(&mut self) -> Option<u32> {
+        let key = self.current.take()?;
+        self.view.lock().unwrap_or_else(|p| p.into_inner()).remove(key)
     }
 }

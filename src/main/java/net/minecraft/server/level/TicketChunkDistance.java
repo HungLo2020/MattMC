@@ -12,11 +12,10 @@ import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.TicketStorage;
 
-/** Lifetime and exception adapter for a native-owned ticket distance graph
- * (simulation or loading) and its mirror of each chunk's lowest ticket level of
- * that kind. The graph's native lock is its one synchronization domain: every
- * call here takes it, as does the ticket storage notifying the graph directly.
- * No lock is held while the sink runs. */
+/** Lifetime and exception adapter for native ticket propagation. Operations
+ * retain the graph and yield live queries and setters to Java without a native
+ * lock or borrowed graph state spanning those effects. Legacy mirror entry
+ * points remain available to native storage compatibility consumers. */
 final class TicketChunkDistance {
     private static final MethodHandle CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_ticket_distance_create",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
@@ -40,23 +39,83 @@ final class TicketChunkDistance {
     private long[] changes = new long[512];
 
     TicketChunkDistance(int kind, int absentTicketLevel) {
+        Arena arena = Arena.ofAuto();
+        Release cleanup = new Release(RELEASE);
         long id;
         try { id = (long)CREATE.invokeExact(kind, absentTicketLevel, ChunkLevel.MAX_LEVEL, ChunkPos.MAX_COORDINATE_VALUE); }
-        catch (Throwable error) { throw new IllegalStateException("Cannot create ticket chunk distance", error); }
+        catch (Throwable error) { throw failure(error); }
         if (id == 0) throw new OutOfMemoryError("Native ticket chunk distance allocation failed");
-        MemorySegment pointer = MemorySegment.ofAddress(id);
-        try {
-            this.handleId = id;
-            this.handle = pointer.reinterpret(1, Arena.ofAuto(), TicketChunkDistance::release);
-        } catch (Throwable error) {
-            release(pointer);
-            throw error;
+        cleanup.id.set(id);
+        this.handleId = id;
+        try { this.handle = MemorySegment.ofAddress(id).reinterpret(1, arena, cleanup).asReadOnly(); }
+        catch (Throwable error) { cleanup.run(); throw failure(error); }
+    }
+    private static RuntimeException failure(Throwable error) {
+        if (error instanceof RuntimeException r) return r;
+        if (error instanceof Error e) throw e;
+        return new IllegalStateException("Native ticket distance call failed", error);
+    }
+    private static final class Release implements java.util.function.Consumer<MemorySegment>, Runnable {
+        final java.util.concurrent.atomic.AtomicLong id = new java.util.concurrent.atomic.AtomicLong();
+        final MethodHandle function;
+        Release(MethodHandle function) { this.function = function; }
+        public void accept(MemorySegment ignored) { run(); }
+        public void run() {
+            long owned = id.getAndSet(0);
+            if (owned == 0) return;
+            try { function.invokeExact(owned); }
+            catch (Throwable error) { throw failure(error); }
         }
     }
 
-    private static void release(MemorySegment pointer) {
-        try { RELEASE.invokeExact(pointer.address()); }
-        catch (Throwable error) { throw new IllegalStateException("Cannot release ticket chunk distance", error); }
+    interface Effects {
+        int level(long position);
+        int source(long position);
+        void set(long position, int level);
+    }
+    private static final MethodHandle OP_CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_ticket_distance_operation_create",
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+    private static final MethodHandle OP_STEP = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_ticket_distance_operation_step",
+        FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+    private static final MethodHandle OP_RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_ticket_distance_operation_release",
+        FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+
+    void updateEffects(long position, int level, boolean decrease, Effects effects) {
+        invokeEffects(false, position, level, decrease, 0, effects);
+    }
+    int runEffects(int budget, Effects effects) { return invokeEffects(true, 0, 0, false, budget, effects); }
+    private int invokeEffects(boolean run, long position, int level, boolean decrease, int budget, Effects effects) {
+        Arena arena = Arena.ofConfined();
+        Release cleanup = new Release(OP_RELEASE);
+        long id;
+        try { id = (long)OP_CREATE.invokeExact(this.handleId, run ? 1 : 0, position, level, decrease ? 1 : 0, budget); }
+        catch (Throwable error) { arena.close(); throw failure(error); }
+        finally { Reference.reachabilityFence(this.handle); }
+        if (id == 0) { arena.close(); throw new OutOfMemoryError("Native ticket distance operation allocation failed"); }
+        cleanup.id.set(id);
+        MemorySegment owner;
+        try { owner = MemorySegment.ofAddress(id).reinterpret(24, arena, cleanup).asReadOnly(); }
+        catch (Throwable error) { cleanup.run(); arena.close(); throw failure(error); }
+        try (arena) {
+            int answer = 0;
+            while (true) {
+                try { OP_STEP.invokeExact(id, answer); }
+                catch (Throwable error) { throw failure(error); }
+                int command = (int)owner.get(ValueLayout.JAVA_LONG, 0);
+                long key = owner.get(ValueLayout.JAVA_LONG, 8);
+                int argument = (int)owner.get(ValueLayout.JAVA_LONG, 16);
+                answer = 0;
+                switch (command) {
+                    case 1: answer = effects.level(key); break;
+                    case 2: answer = effects.source(key); break;
+                    case 3: effects.set(key, argument); break;
+                    case 4: return argument;
+                    case 5: check(argument); throw new IllegalStateException("Unknown native ticket operation error");
+                    default: throw new IllegalStateException("Unknown native ticket operation command");
+                }
+            }
+        } finally { Reference.reachabilityFence(this.handle); Reference.reachabilityFence(effects); }
     }
 
     /** The listener a tracker binds to its storage: the storage notifies this graph natively. */

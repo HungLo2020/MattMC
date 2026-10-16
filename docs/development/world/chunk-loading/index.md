@@ -1,5 +1,7 @@
 # Chunk loading
 
+- [Retained chunk generation](RUST-CHUNK-GENERATION.md): in-progress native
+  task/holder ownership, callback and save-fence contracts, and focused probes.
 - [Rust server chunk tasks](RUST-CHUNK-TASKS.md): native priority/FIFO ownership,
   callable boundaries, failure prefixes and actual Frozen queue replay.
 - [Rust client chunk residency](RUST-CLIENT-RESIDENCY.md): native window and empty

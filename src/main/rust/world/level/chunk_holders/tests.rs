@@ -186,3 +186,53 @@ fn level_changes_apply_in_order_and_stop_at_construction() {
     registry.apply_level_changes(3, &mut out).unwrap();
     assert_eq!(out[2], Applied(1, a, Apply::Level(29)));
 }
+
+#[test]
+fn promoted_views_and_escaped_walkers_retain_exact_incarnations_across_id_reuse() {
+    unsafe fn owner() -> Arc<GenerationHolder> {
+        let id = super::super::chunk_generation::ffi::mattmc_chunk_generation_holder_create(12);
+        super::super::chunk_generation::ffi::mattmc_chunk_generation_holder_levels_init(id, 33, MAX + 1, 33, 32, 31);
+        let owner = super::super::chunk_generation::ffi::retain_holder(id);
+        super::super::chunk_generation::ffi::mattmc_chunk_generation_holder_release(id);
+        owner
+    }
+    let mut registry = Registry::new(MAX).unwrap();
+    let Scheduled::New(id) = registry.schedule(7, 33, false, MAX + 1).unwrap() else { panic!() };
+    let first = unsafe { owner() };
+    let weak = Arc::downgrade(&first);
+    registry.commit_new(7, id).unwrap(); registry.attach_generation(id, first.clone()).unwrap();
+    registry.promote(); let old = registry.visible.clone(); let mut walk = VisibleWalk::new(old.clone());
+    registry.schedule(7, MAX + 1, true, 33).unwrap(); registry.drop_pass().unwrap(); assert!(registry.finish_unload(7, id));
+    let Scheduled::New(reused) = registry.schedule(8, 31, false, MAX + 1).unwrap() else { panic!() };
+    assert_eq!(id, reused);
+    let second = unsafe { owner() };
+    registry.commit_new(8, reused).unwrap(); registry.attach_generation(reused, second.clone()).unwrap();
+    registry.promote();
+    assert_eq!(first.levels.snapshot().level, MAX + 1);
+    assert_eq!(second.levels.snapshot().level, 31);
+    assert_eq!(walk.next(), Some(id)); assert_eq!(walk.key.load(std::sync::atomic::Ordering::Acquire), 7);
+    assert!(Arc::ptr_eq(old.lock().unwrap().incarnations[id as usize].as_ref().unwrap(), &first));
+    drop(first); assert!(weak.upgrade().is_some());
+    assert_eq!(walk.remove(), Some(id)); assert!(weak.upgrade().is_none());
+    assert_eq!(walk.remove(), None); assert_eq!(walk.next(), None);
+    assert_eq!(registry.visible(), vec![(8, reused)]);
+}
+
+#[test]
+fn abandoned_visible_preparation_keeps_pending_change_and_original_view() {
+    let mut registry = Registry::new(MAX).unwrap();
+    let Scheduled::New(id) = registry.schedule(7, 33, false, MAX + 1).unwrap() else { panic!() };
+    registry.commit_new(7, id).unwrap();
+    let abandoned = registry.prepare_visible().unwrap();
+    assert_eq!(abandoned.lock().unwrap().entries.entries(), vec![(7, id)]);
+    assert!(registry.modified);
+    assert!(registry.visible().is_empty());
+    drop(abandoned); // Java failed to allocate its actual holder bindings.
+    let retry = registry.prepare_visible().unwrap();
+    assert!(registry.modified);
+    registry.commit_visible(retry.clone());
+    assert_eq!(registry.visible(), vec![(7, id)]);
+    assert!(Arc::ptr_eq(&registry.visible, &retry));
+    assert!(!registry.modified);
+    assert!(registry.prepare_visible().is_none());
+}
