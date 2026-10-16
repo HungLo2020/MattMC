@@ -31,6 +31,20 @@ investigate demonstrated regressions beyond the applicable allowance. Do not
 change workloads, discard inconvenient failures or combine unlike measurements
 to manufacture a pass. Missing or noisy comparisons remain unverified.
 
+The [owner's October 16 delegation](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18978065)
+allows dot to approve documented, bounded temporary migration-overhead exceptions
+case by case before publication, even when a candidate is slower than pre-change
+Current (`master`). Improvement versus prior master is not an eligibility
+condition. Exceeding the applicable 10%/25% allowance triggers review, not an
+automatic waiver; workers cannot self-approve an exception. Record matched
+measured workloads, exact candidate and baseline SHAs/builds/configurations,
+measured deltas, affected scope, retained Frozen conversion/ownership debt,
+a responsible owner and an ownership-based exit path with verifiable criteria.
+Unrelated slowdowns or broader scope require a new decision. Poor native
+implementations and unexplained regressions still require investigation.
+Correctness/parity, memory safety, save integrity and mandatory validation remain
+strict requirements; historical evidence and Frozen behavior remain unchanged.
+
 Resolve boundary debt by moving the actual producer, storage, consumers and
 lifetime into production Rust. Avoid spending the migration optimizing a
 transitional bridge while its Java owner remains. The allowances do not excuse
@@ -56,7 +70,8 @@ regressions when those accumulated checks reveal them. Lack of a historical
 client fixture is a stated coverage limit, not an automatic block on every
 unrelated migration slice.
 
-This does not waive local correctness checks or known over-limit regressions.
+This does not waive local correctness checks or automatically accept known
+over-limit regressions; those require dot's documented exception review above.
 Keep pending client, visual, streaming and long-session checks explicitly
 pending. Follow the [render verification protocols](../rendering/RENDER-VERIFICATION.md)
 when executing those checks; do not silently weaken their health or image

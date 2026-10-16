@@ -208,18 +208,22 @@ new assignment revision before changing shared interfaces or widening scope.
   improve performance versus Frozen or pre-change Current; pre-change Current
   remains diagnostic, not an additional acceptance floor. Preserve the policy's
   workload-specific comparisons, attribution and evidence requirements.
-  The over-budget exception is a separate route with its existing conditions:
-  for work beyond the applicable allowance, dot may record a bounded exception
-  under the user's delegated discretion. Only a candidate that demonstrably
-  improves current `master` under matched conditions while retaining measured
-  Frozen conversion/ownership debt is eligible. Only dot may approve this temporary
-  exception before publication; workers cannot self-approve it. Preserve
-  correctness/parity and the measured Frozen baseline. Record exact candidate
-  and baseline SHAs/builds, matched workload, measured deltas, affected scope,
+  Under the [owner's October 16 delegation](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18978065),
+  dot may approve a documented, bounded temporary migration-overhead exception
+  case by case for work beyond the applicable allowance, even when the candidate
+  is slower than pre-change Current (`master`). Improvement versus prior master
+  is not an eligibility condition; pre-change Current remains diagnostic.
+  Only dot may approve this exception before publication; workers cannot
+  self-approve it. Preserve measured Frozen conversion/ownership debt,
+  correctness/parity, memory safety, save integrity and the measured Frozen baseline.
+  Record exact candidate and baseline SHAs/builds, matched workload, measured
+  deltas, affected scope,
   responsible owner and an ownership-based exit path with verifiable criteria.
   Exceeding the applicable 10%/25% allowance triggers review, never a blanket exemption;
   unrelated slowdowns or broader scope need a new decision. This permission
   does not allow Frozen behavior/performance changes or waived correctness.
+  Poor native implementations and unexplained regressions still require
+  investigation; mandatory validation remains unchanged.
 - Headless/unit checks do not certify gameplay, rendering or hardware-specific
   performance. State missing GPU/display/fixtures honestly and request a
   capability-matched verification assignment. Mandatory missing checks block
