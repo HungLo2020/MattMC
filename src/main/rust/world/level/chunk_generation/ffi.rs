@@ -431,3 +431,10 @@ pub unsafe extern "C" fn mattmc_chunk_generation_request_cache_change(graph: u64
     let mut cache = graph.cache.lock().unwrap_or_else(|p| p.into_inner());
     if clear != 0 { *cache = super::request::RequestCache::default(); -1 } else { cache.insert(key) as i32 }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_statistics(output: *mut u64) {
+    for (index, value) in super::stage::statistics().into_iter().enumerate() {
+        output.add(index).write(value);
+    }
+}

@@ -44,24 +44,18 @@ public abstract class GenerationChunkHolder {
         return frame.returned;
     }
 
-	CompletableFuture<ChunkResult<ChunkAccess>> applyStep(
-		ChunkStep chunkStep, GeneratingChunkMap generatingChunkMap, StaticCache2D<GenerationChunkHolder> staticCache2D
-	) {
-		if (this.isStatusDisallowed(chunkStep.targetStatus())) {
-			return UNLOADED_CHUNK_FUTURE;
-		} else {
-			return this.acquireStatusBump(chunkStep.targetStatus()) ? generatingChunkMap.applyStep(this, chunkStep, staticCache2D).handle((chunkAccess, throwable) -> {
-				if (throwable != null) {
-					CrashReport crashReport = CrashReport.forThrowable(throwable, "Exception chunk generation/loading");
-					MinecraftServer.setFatalException(new ReportedException(crashReport));
-				} else {
-					this.completeFuture(chunkStep.targetStatus(), chunkAccess);
-				}
+    CompletableFuture<ChunkResult<ChunkAccess>> applyStep(
+            ChunkStep step, GeneratingChunkMap map, StaticCache2D<GenerationChunkHolder> cache) {
+        StageFrame frame = new StageFrame(step, map, cache, null, null);
+        this.generation.futureControl(8, frame);
+        return frame.returned;
+    }
 
-				return ChunkResult.of(chunkAccess);
-			}) : this.getOrCreateFuture(chunkStep.targetStatus());
-		}
-	}
+    private ChunkResult<ChunkAccess> completeStage(ChunkStep step, ChunkAccess chunk, Throwable failure) {
+        StageFrame frame = new StageFrame(step, null, null, chunk, failure);
+        this.generation.futureControl(9, frame);
+        return frame.returnedResult;
+    }
 
 	protected void updateHighestAllowedStatus(ChunkMap chunkMap) {
 		this.generation.futureControl(5, new FutureFrame(null, null, null, chunkMap));
@@ -88,21 +82,11 @@ public abstract class GenerationChunkHolder {
 		this.generation.removeTask(chunkGenerationTask);
 	}
 
-	private CompletableFuture<ChunkResult<ChunkAccess>> getOrCreateFuture(ChunkStatus chunkStatus) {
-		FutureFrame frame = new FutureFrame(chunkStatus, null, null);
-		this.generation.futureControl(0, frame);
-		return frame.returned;
-	}
-
-	private void completeFuture(ChunkStatus chunkStatus, ChunkAccess chunkAccess) {
-		this.generation.futureControl(1, new FutureFrame(chunkStatus, ChunkResult.of(chunkAccess), null));
-	}
-
     /** Actual future/status effects. The native invocation owns loops and choices;
      * nested callbacks receive separate frames and retain their captured objects. */
-    private final class FutureFrame implements NativeChunkGeneration.FutureEffect {
+    private class FutureFrame implements NativeChunkGeneration.FutureEffect {
         ChunkStatus requested, allowedBefore, started;
-        final ChunkResult<ChunkAccess> result;
+        ChunkResult<ChunkAccess> result;
         final ChunkMap map;
         CompletableFuture<ChunkResult<ChunkAccess>> current, candidate, returned;
         ChunkGenerationTask task, nextTask;
@@ -184,17 +168,60 @@ public abstract class GenerationChunkHolder {
         }
     }
 
-	private boolean acquireStatusBump(ChunkStatus chunkStatus) {
-		ChunkStatus chunkStatus2 = chunkStatus == ChunkStatus.EMPTY ? null : chunkStatus.getParent();
-		ChunkStatus chunkStatus3 = (ChunkStatus)this.generation.bump(chunkStatus2, chunkStatus);
-		if (chunkStatus3 == chunkStatus2) {
-			return true;
-		} else if (chunkStatus3 != null && !chunkStatus.isAfter(chunkStatus3)) {
-			return false;
-		} else {
-			throw new IllegalStateException("Unexpected last startedWork status: " + chunkStatus3 + " while trying to start: " + chunkStatus);
-		}
-	}
+    /** Opaque invocation resources. Native control selects every stage branch;
+     * the installed callback captures only its original holder and step. */
+    private final class StageFrame extends FutureFrame {
+        final ChunkStep step;
+        GeneratingChunkMap engineMap;
+        StaticCache2D<GenerationChunkHolder> cache;
+        ChunkStatus parent, previous;
+        CompletableFuture<ChunkAccess> engine;
+        final ChunkAccess chunk;
+        final Throwable failure;
+        ChunkResult<ChunkAccess> returnedResult;
+        StageFrame(ChunkStep step, GeneratingChunkMap map, StaticCache2D<GenerationChunkHolder> cache,
+                ChunkAccess chunk, Throwable failure) {
+            super(null, null, null);
+            this.step = step; this.engineMap = map; this.cache = cache;
+            this.chunk = chunk; this.failure = failure;
+        }
+        @Override public long apply(int operation, int slot) {
+            switch (operation) {
+                case 80: requested = step.targetStatus(); break;
+                case 81: return requested == ChunkStatus.EMPTY ? 1 : 0;
+                case 82: parent = null; break;
+                case 83: parent = requested.getParent(); break;
+                case 84:
+                    previous = generation.bump(parent, requested);
+                    return previous == parent ? 1 : previous == null ? 2 : 3;
+                case 85: return requested.isAfter(previous) ? 1 : 0;
+                case 86: throw new IllegalStateException("Unexpected last startedWork status: " + previous + " while trying to start: " + requested);
+                case 87:
+                    GeneratingChunkMap map = engineMap;
+                    StaticCache2D<GenerationChunkHolder> selectedCache = cache;
+                    engineMap = null; cache = null;
+                    requested = null; parent = null; previous = null;
+                    engine = map.applyStep(GenerationChunkHolder.this, step, selectedCache);
+                    break;
+                case 88:
+                    GenerationChunkHolder holder = GenerationChunkHolder.this;
+                    ChunkStep capturedStep = step;
+                    CompletableFuture<ChunkAccess> actual = engine;
+                    engine = null;
+                    returned = actual.handle((value, error) -> holder.completeStage(capturedStep, value, error));
+                    break;
+                case 90: return failure == null ? 0 : 1;
+                case 91:
+                    CrashReport report = CrashReport.forThrowable(failure, "Exception chunk generation/loading");
+                    MinecraftServer.setFatalException(new ReportedException(report));
+                    break;
+                case 92: result = ChunkResult.of(chunk); break;
+                case 93: returnedResult = ChunkResult.of(chunk); break;
+                default: return super.apply(operation, slot);
+            }
+            return 0;
+        }
+    }
 
 	private boolean isStatusDisallowed(ChunkStatus chunkStatus) {
 		ChunkStatus chunkStatus2 = this.generation.allowed();

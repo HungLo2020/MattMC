@@ -10,6 +10,7 @@
 pub(crate) mod ffi;
 mod request;
 mod readiness;
+mod stage;
 
 use std::sync::{atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU64, Ordering}, Arc, Mutex};
 

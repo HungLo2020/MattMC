@@ -325,6 +325,18 @@ public final class NativeChunkGeneration {
         return adapter;
     }
 
+    private static final class StageStatistics {
+        static final MethodHandle READ = handle("stage_statistics", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    }
+    /** Stage admission, engine-dispatch, completion and fatal-report attempts. */
+    static long[] stageStatistics() {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment output = arena.allocate(4L * Long.BYTES, Long.BYTES);
+            StageStatistics.READ.invokeExact(output);
+            return output.toArray(ValueLayout.JAVA_LONG);
+        } catch (Throwable throwable) { return raise(throwable); }
+    }
+
     /** Owner/vector payload counters, excluding Arc/allocator/VM/process overhead. */
     static long[] rangeStatistics() {
         try (Arena arena = Arena.ofConfined()) {

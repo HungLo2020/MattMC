@@ -48,6 +48,15 @@ public final class GenerationAudit {
         } catch (ClassNotFoundException exception) { return new long[0]; }
     }
 
+    // Optional on the immutable original references. Outside request/read timers.
+    static long[] nativeStageStats() throws Exception {
+        try {
+            var method = Class.forName("net.minecraft.server.level.NativeChunkGeneration").getDeclaredMethod("stageStatistics");
+            method.setAccessible(true);
+            return (long[])method.invoke(null);
+        } catch (ClassNotFoundException | NoSuchMethodException absentOnOriginal) { return new long[0]; }
+    }
+
     static void consume(ChunkAccess chunk, ChunkPos pos) {
         if (!(chunk instanceof LevelChunk) || chunk.getPersistedStatus() != ChunkStatus.FULL || !chunk.getPos().equals(pos))
             throw new AssertionError("request returned a partial or wrong FULL chunk");
@@ -77,6 +86,7 @@ public final class GenerationAudit {
         ChunkPos pos = new ChunkPos(64, -48);
         var source = level.getChunkSource();
         long[] before = nativeStats();
+        long[] stageBefore = nativeStageStats();
         long start = System.nanoTime();
         boolean orderedFeatures = Boolean.getBoolean("generation.orderedFeatures");
         if (orderedFeatures) FullGenAudit.decorateInOrder(server, level, List.of(pos));
@@ -157,6 +167,17 @@ public final class GenerationAudit {
         row.putAll(details);
         row.put("native_before", before);
         row.put("native_after", nativeStats());
+        long[] stageAfter = nativeStageStats();
+        row.put("native_stage_before", stageBefore);
+        row.put("native_stage_after", stageAfter);
+        if (Boolean.getBoolean("generation.requireNativeStageControl")) {
+            if (stageBefore.length != 4 || stageAfter.length != 4)
+                throw new AssertionError("actual server has no native stage controller");
+            if (!reopen && (stageAfter[0] - stageBefore[0] < 2 || stageAfter[1] - stageBefore[1] < 2
+                    || stageAfter[2] - stageBefore[2] < 2))
+                throw new AssertionError("actual FULL request did not traverse multiple native-controlled stages");
+            if (stageAfter[3] != stageBefore[3]) throw new AssertionError("successful FULL request reported fatal");
+        }
         row.put("identity", "same FULL future/chunk; fresh replacement shares one pre-FULL future; disk-loaded aliases recorded separately");
         System.out.println("GENERATION_PROBE " + row.get("dimension") + " " + row.get("phase") + " ns=" + freshNanos);
         return row;

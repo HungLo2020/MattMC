@@ -65,7 +65,7 @@ async fn fail_pending(effects: &mut impl TaskEffects, slot: i32) -> Result<(), (
     Ok(())
 }
 
-async fn get_or_create(effects: &mut impl TaskEffects) -> Result<(), ()> {
+pub(super) async fn get_or_create(effects: &mut impl TaskEffects) -> Result<(), ()> {
     if effects.call(1, 0, 0, 0, 0).await? != 0 {
         effects.call(8, 0, 0, 0, 0).await?;
         return Ok(());
@@ -82,6 +82,24 @@ async fn get_or_create(effects: &mut impl TaskEffects) -> Result<(), ()> {
         }
     }
     effects.call(6, 0, 0, 0, 0).await?;
+    Ok(())
+}
+
+pub(super) async fn complete_future(effects: &mut impl TaskEffects) -> Result<(), ()> {
+    let slot = effects.call(2, 0, 0, 0, 0).await? as i32;
+    loop {
+        if effects.call(3, slot, 0, 0, 0).await? == 0 {
+            effects.call(12, 0, 0, 0, 0).await?;
+            if effects.call(5, slot, 0, 0, 0).await? == 0 { break; }
+        } else {
+            if effects.call(13, 0, 0, 0, 0).await? != 0 { break; }
+            if effects.call(14, 0, 0, 0, 0).await? != 0 {
+                effects.call(15, 0, 0, 0, 0).await?;
+                return Err(());
+            }
+            effects.call(16, 0, 0, 0, 0).await?;
+        }
+    }
     Ok(())
 }
 
@@ -114,22 +132,7 @@ pub(super) fn holder(owner: Arc<Holder>, operation: i32) -> TaskDriver {
         let owner = owner;
         match operation {
             0 => get_or_create(&mut effects).await?,
-            1 => {
-                let slot = effects.call(2, 0, 0, 0, 0).await? as i32;
-                loop {
-                    if effects.call(3, slot, 0, 0, 0).await? == 0 {
-                        effects.call(12, 0, 0, 0, 0).await?;
-                        if effects.call(5, slot, 0, 0, 0).await? == 0 { break; }
-                    } else {
-                        if effects.call(13, 0, 0, 0, 0).await? != 0 { break; }
-                        if effects.call(14, 0, 0, 0, 0).await? != 0 {
-                            effects.call(15, 0, 0, 0, 0).await?;
-                            return Err(());
-                        }
-                        effects.call(16, 0, 0, 0, 0).await?;
-                    }
-                }
-            }
+            1 => complete_future(&mut effects).await?,
             4 => {
                 match effects.call(30, 0, 0, 0, 0).await? {
                     1 => { effects.call(8, 0, 0, 0, 0).await?; return Ok(false); }
@@ -189,6 +192,8 @@ pub(super) fn holder(owner: Arc<Holder>, operation: i32) -> TaskDriver {
                 if count == 0 { effects.call(44, 0, 0, 0, 0).await?; }
                 if count < 0 { effects.call(45, count, 0, 0, 0).await?; }
             }
+            8 => super::stage::admit(&mut effects).await?,
+            9 => super::stage::completed(&mut effects).await?,
             _ => return Err(()),
         }
         Ok(false)
