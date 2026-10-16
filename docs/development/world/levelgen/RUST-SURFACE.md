@@ -43,7 +43,7 @@ claim for shipped rules on ordinary chunks.
 ## Temperature
 
 `SurfaceRules.Temperature` stays a Java answer, on every route. Java's
-`Biome.getTemperature` keeps a per-thread cache (`Long2FloatLinkedOpenHashMap`
+`Biome.getTemperature` keeps a per-Biome, per-thread cache (`Long2FloatLinkedOpenHashMap`
 of 1024 entries, first-in eviction) keyed by position alone, although the
 value depends on the sea level passed in. A biome evaluated at one position
 under two sea levels on one thread therefore answers from cache history, and
@@ -51,9 +51,11 @@ every Java caller (surface rules, precipitation, freezing, structures, entities,
 rendering) shares that cache. A native temperature would neither read nor
 update it. The carvers' native top material calls `coldEnoughToSnow` back at
 the point Java's evaluation would; the SURFACE stage asks Java as before.
-`SnowAndFreezeFeature` (`decoration/freeze.rs`) computes temperatures natively
-and does not observe or update this cache: identical for biomes evaluated
-under one sea level, which shipped presets give every biome.
+`SnowAndFreezeFeature` also uses
+[Java's `warmEnoughToRain` callback](https://github.com/HungLo2020/MattMC/blob/006afac1779e9b5025f1c0cd778e53a16e754a9b/src/main/java/net/minecraft/world/level/levelgen/NativeDecoration.java#L1013-L1021),
+so native `freeze_top_layer` observes and updates that same cache on the calling
+thread. Preserve the [decoration call-order and cache-history contract](feature/RUST-DECORATION.md#what-runs-in-rust);
+a native feature loop does not imply native temperature ownership.
 
 ## Ordering and arithmetic
 
