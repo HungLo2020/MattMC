@@ -613,6 +613,15 @@ public final class ItemStack implements DataComponentHolder {
 		return copy;
 	}
 
+	/**
+	 * {@link #copyForNativeTransferWithCount} for a copy the native operation
+	 * already prepared (count and pop time set): the same facade construction and
+	 * {@code asItem} dispatch, without a second native copy.
+	 */
+	public ItemStack adoptPreparedCopy(long handle, long address, long adopted) {
+		return new ItemStack(NativeItemState.adoptPreparedCopy(this.state, handle, address, adopted));
+	}
+
 	private ItemStack(NativeItemState.Stack nativeStack) {
 		this.components = PatchedDataComponentMap.fromNativeStack(nativeStack);
 		// Preserve the original private copy constructor's single dispatch.

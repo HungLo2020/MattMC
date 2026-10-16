@@ -94,6 +94,8 @@ public final class NativeItemState {
             }finally{java.lang.ref.Reference.reachabilityFence(destination);java.lang.ref.Reference.reachabilityFence(effects);}
         }
         protected static void route(long out,int kind,int index){VIEW_LONG.set(SCALAR_RAW,out,kind);VIEW_LONG.set(SCALAR_RAW,out+8,index);}
+        /** The prepared copy's scalar address Rust wrote to {@code out}. */
+        protected static long preparedAddress(long out){return (long)VIEW_LONG.get(SCALAR_RAW,out);}
     }
     private static final ThreadLocal<MenuActionEffects> MENU_ACTION_EFFECTS=new ThreadLocal<>();
     private static long menuActionEffect(long action,long first,long second,long third,long pointer){
@@ -138,19 +140,27 @@ public final class NativeItemState {
             finally { java.lang.ref.Reference.reachabilityFence(captured); }
         }
         public abstract long effect(long action,int index);
+        /**
+         * Actions 33/34: the empty-slot resource or damaged copy the native add
+         * prepared ({@code handle}, scalar {@code address}); adopt it with
+         * {@link ItemStack#adoptPreparedCopy} or keep the original copy.
+         */
+        public long prepared(long action,int index,long handle,long address,long adopted) {
+            throw new IllegalStateException("Unknown inventory add effect: "+action);
+        }
     }
     private static final ThreadLocal<InventoryAddEffects> INVENTORY_ADD_EFFECTS = new ThreadLocal<>();
-    private static long inventoryAddEffect(long action,long index) {
+    private static long inventoryAddEffect(long action,long index,long handle,long address,long out) {
         InventoryAddEffects effects=INVENTORY_ADD_EFFECTS.get();if(effects==null)return Long.MIN_VALUE;
-        try {return effects.effect(action,Math.toIntExact(index));}
+        try {return handle!=0&&(action==33||action==34)?effects.prepared(action,Math.toIntExact(index),handle,address,out+8):effects.effect(action,Math.toIntExact(index));}
         catch(Throwable failure){effects.failure=failure;return Long.MIN_VALUE;}
     }
     private static final class InventoryAddCallback {
         static final MemorySegment STUB;
         static {
             try {
-                var method=java.lang.invoke.MethodHandles.lookup().findStatic(NativeItemState.class,"inventoryAddEffect",java.lang.invoke.MethodType.methodType(long.class,long.class,long.class));
-                STUB=java.lang.foreign.Linker.nativeLinker().upcallStub(method,FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG),Arena.global());
+                var method=java.lang.invoke.MethodHandles.lookup().findStatic(NativeItemState.class,"inventoryAddEffect",java.lang.invoke.MethodType.methodType(long.class,long.class,long.class,long.class,long.class,long.class));
+                STUB=java.lang.foreign.Linker.nativeLinker().upcallStub(method,FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG),Arena.global());
             } catch(ReflectiveOperationException failure){throw new ExceptionInInitializerError(failure);}
         }
     }
@@ -181,6 +191,18 @@ public final class NativeItemState {
         private Slots destination;
         protected final void destination(NativeItemSlots facade){this.destination=facade.actualOwner();}
         public abstract long effect(long action, long index, long phase, long amount, long changed);
+        /**
+         * An empty-destination insertion whose copy the native transfer already
+         * prepared: adopt it ({@link ItemStack#adoptPreparedCopy}), then publish
+         * and run the original insertion effects.
+         */
+        public long insertPrepared(long index, long amount, long handle, long address, long adopted) {
+            throw new IllegalStateException("No prepared native insertion for this transfer");
+        }
+    }
+    /** {@code source}'s copy prepared by a native operation, adopted as its owner. */
+    public static Stack adoptPreparedCopy(Stack source,long handle,long address,long adopted){
+        return net.minecraft.core.component.PatchedDataComponentMap.adoptPreparedStack(stackOwner(source),handle,address,adopted);
     }
     private static long transferEffect(long action, long index, long phase, long amount, long changed) {
         TransferEffects effects = TRANSFER_EFFECTS.get();
@@ -1430,6 +1452,22 @@ public final class NativeItemState {
                 }else{
                     this.acquired(c1(OVERLAY_COPY,source.handle));this.roots=source.roots;this.bindDefaults();
                 }
+            }}}
+            catch(Throwable failure){this.release.run();if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;throw failed(failure);}
+            finally{java.lang.ref.Reference.reachabilityFence(source);java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        /**
+         * Adopts a copy the native menu/inventory operation already prepared from
+         * {@code source} (its registered owner {@code handle} and scalar
+         * {@code address}). The release is registered before acquisition, as for
+         * an ordinary copy; {@code adopted} records the acquisition so the
+         * operation retires an unadopted copy itself.
+         */
+        protected Overlay(Overlay source,long handle,long address,long adopted) {
+            super();this.prototype=source.prototype;
+            try{synchronized(source){synchronized(source.roots){
+                this.acquired(handle);VIEW_LONG.set(SCALAR_RAW,adopted,1L);this.roots=source.roots;
+                this.bindAddress(source.itemAnchor,address);
             }}}
             catch(Throwable failure){this.release.run();if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;throw failed(failure);}
             finally{java.lang.ref.Reference.reachabilityFence(source);java.lang.ref.Reference.reachabilityFence(this);}

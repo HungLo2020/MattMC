@@ -244,6 +244,28 @@ public class Inventory implements Container, Nameable {
 		}
 	}
 
+	/** addResource with the empty-slot copy the native add already prepared (adopted only for a pure source). */
+	private int addResourcePrepared(int i, ItemStack itemStack, long handle, long address, long adopted) {
+		int j = itemStack.getCount();
+		ItemStack itemStack2 = this.getItem(i);
+		if (itemStack2.isEmpty()) {
+			itemStack2 = !itemStack.isEmpty() && itemStack.getItem() != null && itemStack.getItem().nativeTransferCopyIsPure()
+				? itemStack.adoptPreparedCopy(handle, address, adopted) : itemStack.copyWithCount(0);
+			this.setItem(i, itemStack2);
+		}
+
+		int k = this.getMaxStackSize(itemStack2) - itemStack2.getCount();
+		int l = Math.min(j, k);
+		if (l == 0) {
+			return j;
+		} else {
+			j -= l;
+			itemStack2.grow(l);
+			itemStack2.setPopTime(5);
+			return j;
+		}
+	}
+
 	private int scanMain(int mode,ItemStack source,Holder<Item> holder) {
 		return this.nativeItems.scanInventory(source,mode,new net.minecraft.world.item.NativeItemState.InventoryAddEffects() {
 			@Override public long effect(long action,int index) {
@@ -331,6 +353,14 @@ public class Inventory implements Container, Nameable {
 							case 5 -> Inventory.this.infiniteMaterials()?1:0;
 							default -> throw new IllegalStateException("Unknown inventory add effect: "+action);
 						};
+					}
+					@Override public long prepared(long action,int index,long handle,long address,long adopted) {
+						if(action==33)return Inventory.this.addResourcePrepared(index,itemStack,handle,address,adopted);
+						// Original copyAndClear order: the items field, the copy, clearing the source, set, pop time.
+						var items=Inventory.this.items;ItemStack copy;
+						if(!itemStack.isEmpty()&&itemStack.getItem()!=null&&itemStack.getItem().nativeTransferCopyIsPure()){copy=itemStack.adoptPreparedCopy(handle,address,adopted);itemStack.setCount(0);}
+						else copy=itemStack.copyAndClear();
+						items.set(index,copy);Inventory.this.items.get(index).setPopTime(5);return 1;
 					}
 				});
 				if (itemStack.isDamaged()) {

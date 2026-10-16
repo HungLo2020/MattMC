@@ -351,4 +351,98 @@ class NativeInventoryTest {
         assertSame(ItemStack.EMPTY,inv.getItem(0));assertSame(source,inv.getItem(1));inv.removeItem(ItemStack.EMPTY);
         assertSame(expected,assertThrows(AssertionError.class,()->inv.removeItem((ItemStack)null)));assertEquals(11,source.getCount());
     }
+
+    private static long transferCounter(long index) {
+        try {
+            var counter=net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_transfer_counter",
+                java.lang.foreign.FunctionDescriptor.of(java.lang.foreign.ValueLayout.JAVA_LONG,java.lang.foreign.ValueLayout.JAVA_LONG));
+            return (long)counter.invokeExact(index);
+        } catch (Throwable failure) { throw new AssertionError(failure); }
+    }
+    private static long preparedCopies() { return transferCounter(3L); }
+    private static long retiredUnadopted() { return transferCounter(4L); }
+    // The returned snapshot and an empty-destination insertion adopt copies the
+    // native operation prepared, in both stock directions: one each, a
+    // distinct published facade with the source's count/pop time/components,
+    // and later source component changes do not reach it (copy-on-write).
+    @Test void stockEmptyInsertionsPublishTheNativelyPreparedCopy() {
+        bootstrap();
+        for(boolean reverse:new boolean[]{false,true}) {
+            Inventory inv=new Inventory(null,new EntityEquipment());
+            var chest=new net.minecraft.world.level.block.entity.ChestBlockEntity(net.minecraft.core.BlockPos.ZERO,net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+            chest.setRemoved();var menu=net.minecraft.world.inventory.ChestMenu.threeRows(1,inv,chest);chest.clearRemoved();
+            ItemStack source=new ItemStack(Items.STICK,11);source.setPopTime(7);
+            source.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,net.minecraft.network.chat.Component.literal("a"));
+            if(reverse)chest.setItem(0,source);else inv.setItem(9,source);
+            long before=preparedCopies();
+            ItemStack returned=menu.quickMoveStack(null,reverse?0:27);
+            assertEquals(before+2,preparedCopies(),"the snapshot and the inserted copy are both prepared natively");
+            assertSame(Items.STICK,returned.getItem());assertEquals(11,returned.getCount());assertEquals(7,returned.getPopTime());assertNotSame(source,returned);
+            ItemStack inserted=reverse?inv.getItem(8):chest.getItem(0);
+            assertNotSame(source,inserted);assertNotSame(returned,inserted);
+            assertSame(Items.STICK,inserted.getItem());assertEquals(11,inserted.getCount());assertEquals(7,inserted.getPopTime());
+            assertEquals("a",inserted.getHoverName().getString());assertEquals(0,source.getCount());
+            source.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,net.minecraft.network.chat.Component.literal("b"));
+            assertEquals("a",inserted.getHoverName().getString());
+            assertSame(inserted,reverse?inv.getItem(8):chest.getItem(0));
+        }
+    }
+
+    // Inventory add's empty-slot resource copy and damaged copyAndClear adopt
+    // the copy the native add prepared: one each, published with the original
+    // count/pop-time results, the damaged source cleared.
+    @Test void inventoryAddAdoptsNativelyPreparedEmptyAndDamagedCopies() {
+        bootstrap();
+        Inventory inv=new Inventory(null,new EntityEquipment());
+        ItemStack stick=new ItemStack(Items.STICK,11);stick.setPopTime(3);
+        long before=preparedCopies();
+        assertTrue(inv.add(stick));
+        assertEquals(before+1,preparedCopies(),"one prepared copy for the empty-slot resource");
+        ItemStack added=inv.getItem(0);assertNotSame(stick,added);assertSame(Items.STICK,added.getItem());
+        assertEquals(11,added.getCount());assertEquals(5,added.getPopTime());assertEquals(0,stick.getCount());
+        ItemStack sword=new ItemStack(Items.DIAMOND_SWORD);sword.setDamageValue(1);sword.setPopTime(9);
+        before=preparedCopies();
+        assertTrue(inv.add(sword));
+        assertEquals(before+1,preparedCopies(),"one prepared copy for the damaged addition");
+        ItemStack damaged=inv.getItem(1);assertNotSame(sword,damaged);assertEquals(1,damaged.getDamageValue());
+        assertEquals(1,damaged.getCount());assertEquals(5,damaged.getPopTime());assertEquals(0,sword.getCount());
+        assertSame(added,inv.getItem(0));assertSame(damaged,inv.getItem(1));
+    }
+
+    private record PublishedCopies(WeakReference<ItemStack> returned,WeakReference<ItemStack> inserted,long returnedHandle,long insertedHandle) {}
+    private static PublishedCopies publishedCopies() {
+        Inventory inv=new Inventory(null,new EntityEquipment());
+        var chest=new net.minecraft.world.level.block.entity.ChestBlockEntity(net.minecraft.core.BlockPos.ZERO,net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+        chest.setRemoved();var menu=net.minecraft.world.inventory.ChestMenu.threeRows(1,inv,chest);chest.clearRemoved();
+        inv.setItem(9,new ItemStack(Items.STICK,11));long before=preparedCopies();
+        ItemStack returned=menu.quickMoveStack(null,27);ItemStack inserted=chest.getItem(0);
+        assertEquals(before+2,preparedCopies());
+        long returnedHandle=NativeItemState.handleForTest(returned.state),insertedHandle=NativeItemState.handleForTest(inserted.state);
+        assertTrue(NativeItemState.liveForTest(returnedHandle));assertTrue(NativeItemState.liveForTest(insertedHandle));
+        return new PublishedCopies(new WeakReference<>(returned),new WeakReference<>(inserted),returnedHandle,insertedHandle);
+    }
+    // Adopted prepared copies are ordinary facades: after their last Java use
+    // the Cleaner retires the native owners; nothing keeps them alive.
+    @Test void adoptedPreparedCopiesRetireAfterLastUse() throws Exception {
+        bootstrap();var held=publishedCopies();long until=System.nanoTime()+5_000_000_000L;
+        while((held.returned().get()!=null||held.inserted().get()!=null||NativeItemState.liveForTest(held.returnedHandle())||NativeItemState.liveForTest(held.insertedHandle()))&&System.nanoTime()<until){System.gc();Thread.sleep(10);}
+        assertNull(held.returned().get());assertNull(held.inserted().get());
+        assertFalse(NativeItemState.liveForTest(held.returnedHandle()));assertFalse(NativeItemState.liveForTest(held.insertedHandle()));
+    }
+
+    // When Java declines the prepared copy (an impure item keeps the original
+    // Java copy), the native operation retires it immediately.
+    @Test void declinedPreparedCopyIsRetiredNatively() throws Exception {
+        bootstrap();
+        var pure=Item.class.getDeclaredField("nativeTransferCopyPure");pure.setAccessible(true);
+        try {
+            pure.setBoolean(Items.STICK,false);
+            Inventory inv=new Inventory(null,new EntityEquipment());ItemStack stick=new ItemStack(Items.STICK,11);stick.setPopTime(3);
+            long prepared=preparedCopies(),retired=retiredUnadopted();
+            assertTrue(inv.add(stick));
+            assertEquals(prepared+1,preparedCopies(),"the native add still prepares the empty-slot copy");
+            assertEquals(retired+1,retiredUnadopted(),"the copy Java declined is retired natively");
+            ItemStack added=inv.getItem(0);assertNotSame(stick,added);assertEquals(11,added.getCount());assertEquals(5,added.getPopTime());assertEquals(0,stick.getCount());
+        } finally { pure.setBoolean(Items.STICK,true); }
+    }
 }

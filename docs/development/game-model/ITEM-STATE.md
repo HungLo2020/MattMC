@@ -103,7 +103,40 @@ crafting, take/drop and world dirty methods remain original Java effects.
   error prefixes. A query captures its old key array before hashing, but reads
   the mask and value array after callbacks. No native guard crosses these effects.
 
-## Allocation and callback lifetime
+## Natively prepared copies
+
+S0030: the native menu and inventory operations prepare the
+copies these paths make, instead of Java making a nested native copy. That
+covers:
+
+- the stock quick-move snapshot (menu effect op 1, then op 17);
+- the stock-chest empty-destination insertion in both directions (op 16);
+- inventory add's empty-slot resource and damaged copies (effects 33/34).
+
+Rust copies the source's components, count and pop time into a registered
+stack owner, then calls Java. Java builds the copy exactly as the original
+would, with the same facade construction and `asItem` dispatch
+(`ItemStack.adoptPreparedCopy`), and publishes it at the original point.
+
+- Only pure items are adopted, and for inventory add only when the target is
+  still empty in Java's view. Anything else takes the original copy path.
+- The Java owner registers its release before acquiring the handle, under
+  the original source and root-bag monitors, then sets an adoption flag.
+- Rust reads that flag even when Java throws. A copy Java acquired is
+  released only by its Java owner; one it never acquired is retired by the
+  operation, exactly once.
+- `mattmc_item_transfer_counter` 3 counts prepared copies and 4 counts
+  retired unadopted copies. `NativeInventoryTest` uses them to check that the
+  production paths really take this route: two per stock empty quick move,
+  one per empty-slot or damaged add.
+- `adoptedPreparedCopiesRetireAfterLastUse` checks that adopted copies are
+  ordinary facades, whose native owners retire after last use and GC.
+  `declinedPreparedCopyIsRetiredNatively` forces the impure-item path and
+  checks that the declined copy is counted as retired while the original
+  Java copy is published.
+
+Costs and their temporary-debt disposition are in the [cost review](ITEM-STATE-COSTS.md#s0030-natively-prepared-copies).
+
 
 A stack promotes its existing component owner without creating another Java
 stack lease or native registry handle. Unique unretained component storage can

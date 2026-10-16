@@ -768,7 +768,8 @@ fn access_overlay(handle: i64) -> Option<Arc<Mutex<super::patch::CanonicalOverla
     })
 }
 #[no_mangle] pub extern "C" fn mattmc_item_transfer_counter(which:i64)->i64 {
-    match which {0=>super::slots::TRANSFER_STEPS.load(Ordering::Relaxed) as i64,1=>super::slots::TRANSFER_NATIVE_DEFAULTS.load(Ordering::Relaxed) as i64,2=>super::slots::TRANSFER_NATIVE_SLOTS.load(Ordering::Relaxed) as i64,_=>BAD}
+    match which {0=>super::slots::TRANSFER_STEPS.load(Ordering::Relaxed) as i64,1=>super::slots::TRANSFER_NATIVE_DEFAULTS.load(Ordering::Relaxed) as i64,2=>super::slots::TRANSFER_NATIVE_SLOTS.load(Ordering::Relaxed) as i64,
+        3=>PREPARED_COPIES.load(Ordering::Relaxed) as i64,4=>PREPARED_RETIRED.load(Ordering::Relaxed) as i64,_=>BAD}
 }
 
 /// Copy actual scalar/overlay state as one owner. Java's scalar scope pins this
@@ -1115,16 +1116,60 @@ fn menu_destination(address:i64,kind:i64)->Option<SlotsLease>{unsafe{match kind 
 type MenuCallback=unsafe extern "C" fn(i64,i64,i64,i64,i64)->i64;
 struct MenuEffects {callback:MenuCallback,source:Option<Arc<super::stack::Stack>>,prepared:Option<(Arc<super::stack::Stack>,Arc<super::stack::Stack>)>,known_has:Option<bool>,air:u64}
 impl MenuEffects {
-    fn call(&mut self,action:i64,a:i64,b:i64,c:i64)->Result<(i64,[i64;2]),()> {
-        let mut out=[0i64;2];let result=unsafe{(self.callback)(action,a,b,c,out.as_mut_ptr() as i64)};
+    fn call(&mut self,action:i64,a:i64,b:i64,c:i64)->Result<(i64,[i64;2]),()> {self.call_with(action,a,b,c,[0;2])}
+    fn call_with(&mut self,action:i64,a:i64,b:i64,c:i64,mut out:[i64;2])->Result<(i64,[i64;2]),()> {
+        let result=unsafe{(self.callback)(action,a,b,c,out.as_mut_ptr() as i64)};
         if result==i64::MIN{Err(())}else{Ok((result,out))}
     }
+    /// An empty-destination insertion: the copy Java's original
+    /// `copyForNativeTransferWithCount` made (components copied, count and pop
+    /// time set) is prepared here and adopted by Java's insertion effects
+    /// (op 16), which then publish it. An unadopted copy is retired here.
+    fn insert_prepared(&mut self,source:&super::stack::Stack,index:i64,amount:i64)->i64 {
+        let Ok(count)=i32::try_from(amount) else{return i64::MIN};
+        let (handle,address,_)=prepare_copy(source,count);
+        // The adoption flag is read even when Java threw: an adopted copy belongs
+        // to its Java release, an unadopted one only to this operation.
+        let mut out=[address as i64,0];
+        let result=unsafe{(self.callback)(16,index,amount,handle,out.as_mut_ptr() as i64)};
+        if out[1]==0{retire_unadopted(handle);}
+        result
+    }
+    /// A prepared copy adopted by Java through `op` (handle in the third argument).
+    fn adopt_prepared(&mut self,op:i64,source:&super::stack::Stack,count:i32,a:i64,b:i64)->Result<Arc<super::stack::Stack>,()> {
+        let (handle,address,copy)=prepare_copy(source,count);
+        let mut out=[address as i64,0];
+        let result=unsafe{(self.callback)(op,a,b,handle,out.as_mut_ptr() as i64)};
+        if out[1]==0{retire_unadopted(handle);}
+        if result==i64::MIN{Err(())}else{Ok(copy)}
+    }
+}
+/// Production witnesses (`mattmc_item_transfer_counter` 3 and 4): copies a
+/// native operation prepared for Java to adopt, and unadopted ones it retired.
+static PREPARED_COPIES:std::sync::atomic::AtomicU64=std::sync::atomic::AtomicU64::new(0);
+static PREPARED_RETIRED:std::sync::atomic::AtomicU64=std::sync::atomic::AtomicU64::new(0);
+/// Retires a prepared copy Java never acquired (it threw first).
+fn retire_unadopted(handle:i64){if owners().lock().unwrap().remove(&handle).is_some(){PREPARED_RETIRED.fetch_add(1,Ordering::Relaxed);}}
+/// A registered copy of `source` with `count` and its pop time: the native
+/// half of `ItemStack.copyOwnedStack` followed by `setCount`.
+fn prepare_copy(source:&super::stack::Stack,count:i32)->(i64,usize,Arc<super::stack::Stack>) {
+    let copied={source.components.lock().unwrap().copy()};
+    let mut copied=super::stack::Stack::from_overlay(source.scalars.item,count,copied);copied.empty_identity=source.empty_identity;
+    copied.scalars.pop_time.store(source.scalars.pop_time.load(Ordering::Relaxed),Ordering::Relaxed);
+    let copied=Arc::new(copied);let address=copied.address();PREPARED_COPIES.fetch_add(1,Ordering::Relaxed);(keep(Owner::Stack(copied.clone())),address,copied)
 }
 impl super::menu::QuickMoveEffects for MenuEffects {
     fn select(&mut self,index:i32)->Result<super::menu::Selected,()>{
         self.prepared=None;self.known_has=None;
         let (result,out)=self.call(1,index as i64,0,0)?;
         if result==3{let source=menu_stack(out[0]).ok_or(())?;let snapshot=menu_stack(out[1]).ok_or(())?;self.source=Some(source.clone());self.prepared=Some((source,snapshot));self.known_has=Some(true);return Ok(super::menu::Selected{absent:false,link:None});}
+        if result==5{
+            // A pure stock source: its snapshot is the copy prepared here and
+            // adopted by op 17, in place of Java's nested copy.
+            let source=menu_stack(out[0]).ok_or(())?;let count=source.scalars.count.load(Ordering::Relaxed);
+            let snapshot=self.adopt_prepared(17,&source,count,0,0)?;
+            self.source=Some(source.clone());self.prepared=Some((source,snapshot));self.known_has=Some(true);return Ok(super::menu::Selected{absent:false,link:None});
+        }
         if result==4{self.known_has=Some(false);return Ok(super::menu::Selected{absent:false,link:None});}
         let link=if out[0]==0{None}else{Some(menu_link(out[0]).ok_or(())?)};Ok(super::menu::Selected{absent:result==0,link})
     }
@@ -1137,6 +1182,7 @@ impl super::menu::QuickMoveEffects for MenuEffects {
         let (result,out)=self.call(7,start as i64,end as i64,i64::from(reverse))?;if result!=2{return Ok(result!=0);}
         let destination=menu_destination(out[0],out[1]).ok_or(())?;let source=self.source.clone().ok_or(())?;
         let result=transfer_run_owned(&destination,&source,self.air,|action,index,phase,amount,changed|{
+            if action==2{return self.insert_prepared(&source,index,amount);}
             let packed=(((amount as u32 as u64)<<32)|((phase as u64)<<1)|changed as u64) as i64;
             self.call(15,action,index,packed).map_or(i64::MIN,|result|result.0)
         });if result<0{Err(())}else{Ok(result!=0)}
@@ -1297,13 +1343,28 @@ impl super::menu::QuickMoveEffects for MenuEffects {
 }
 /// Actual allocation leases enter once and remain owned across effects. Every
 /// row/default/equipment guard still ends before a Java callback.
-#[no_mangle] pub unsafe extern "C" fn mattmc_item_inventory_add_leased(owner:i64,source:i64,index:i64,air:i64,effect:Option<unsafe extern "C" fn(i64,i64)->i64>)->i64 {
+/// Inventory add/scan effects: `(action, index, handle, address, out)`. Only
+/// the prepared-copy actions (33/34, with a nonzero handle) use the last three.
+type InventoryEffect=unsafe extern "C" fn(i64,i64,i64,i64,i64)->i64;
+#[no_mangle] pub unsafe extern "C" fn mattmc_item_inventory_add_leased(owner:i64,source:i64,index:i64,air:i64,effect:Option<InventoryEffect>)->i64 {
     guard(||{
         let (Some(owner),Some(source),Ok(index),Some(effect))=(retain_vm_arc::<super::inventory::Inventory>(owner),menu_stack(source),i32::try_from(index),effect) else{return BAD};
-        match owner.add_run(&source,index,air as u64,|action,index|{let result=effect(action,index as i64);if result==i64::MIN{Err(())}else{i32::try_from(result).map_err(|_|())}}){Ok(value)=>i64::from(value),Err(())=>i64::MIN}
+        match owner.add_run(&source,index,air as u64,|action,index|{
+            let result=if action==3||action==4 {
+                // Empty-slot resource (`copyWithCount(0)`) and damaged
+                // (`copyAndClear`) copies are prepared here; Java adopts them
+                // through actions 33/34 (scan owns 6/7) or keeps its original path.
+                let count=if action==3{0}else{source.scalars.count.load(Ordering::Relaxed)};
+                let (handle,address,_)=prepare_copy(&source,count);
+                let mut out=[address as i64,0];
+                let result=effect(action+30,index as i64,handle,address as i64,out.as_mut_ptr() as i64);
+                if out[1]==0{retire_unadopted(handle);}result
+            } else {effect(action,index as i64,0,0,0)};
+            if result==i64::MIN{Err(())}else{i32::try_from(result).map_err(|_|())}
+        }){Ok(value)=>i64::from(value),Err(())=>i64::MIN}
     })
 }
-#[no_mangle] pub unsafe extern "C" fn mattmc_item_inventory_scan_leased(owner:i64,source:i64,mode:i64,air:i64,effect:Option<unsafe extern "C" fn(i64,i64)->i64>)->i64 {
+#[no_mangle] pub unsafe extern "C" fn mattmc_item_inventory_scan_leased(owner:i64,source:i64,mode:i64,air:i64,effect:Option<InventoryEffect>)->i64 {
     guard(||{
         let (Some(owner),Some(effect))=(retain_vm_arc::<super::inventory::Inventory>(owner),effect) else{return BAD};
         // Identity search deliberately consumes an opaque facade token, not an
@@ -1311,7 +1372,7 @@ impl super::menu::QuickMoveEffects for MenuEffects {
         if mode==5{return owner.first_facade(source) as i64;}
         let source=if source==0{None}else{let Some(source)=menu_stack(source) else{return BAD};Some(source)};
         let Ok(mode)=i32::try_from(mode) else{return BAD};
-        match owner.scan_run_effects(source.as_deref(),mode,air as u64,|action,index|{let result=effect(action,index as i64);if result==i64::MIN{Err(())}else if action==12{Ok(result)}else{i32::try_from(result).map(i64::from).map_err(|_|())}}){Ok(value)=>value as i64,Err(())=>i64::MIN}
+        match owner.scan_run_effects(source.as_deref(),mode,air as u64,|action,index|{let result=effect(action,index as i64,0,0,0);if result==i64::MIN{Err(())}else if action==12{Ok(result)}else{i32::try_from(result).map(i64::from).map_err(|_|())}}){Ok(value)=>value as i64,Err(())=>i64::MIN}
     })
 }
 #[no_mangle] pub unsafe extern "C" fn mattmc_item_inventory_visit_leased(owner:i64,source:i64,mode:i64,limit:i64,air:i64,effect:Option<unsafe extern "C" fn(i64,i64,i64)->i64>)->i64 {
@@ -1339,7 +1400,7 @@ impl super::menu::QuickMoveEffects for MenuEffects {
             assert_eq!(mattmc_item_slots_publish_leased(rows.address() as i64,1,inserted.address() as i64,9,9),0);
         }
     }
-    unsafe extern "C" fn add_effect(action:i64,index:i64)->i64 {match(action,index){(1,0)|(2,40)=>0,_=>i64::MIN}}
+    unsafe extern "C" fn add_effect(action:i64,index:i64,_:i64,_:i64,_:i64)->i64 {match(action,index){(1,0)|(2,40)=>0,_=>i64::MIN}}
     #[test] fn inventory_add_consumes_actual_owner_and_source_leases_without_registry_entries(){
         let defaults=defaults();let empty=value(0,&defaults);let inventory=Arc::new(Inventory::new(Entry{facade:1,stack:empty}));
         for index in 0..36{inventory.slots.lock().unwrap().set(index,Entry{facade:100+index as i64,stack:value(60,&defaults)});}
@@ -1357,5 +1418,32 @@ impl super::menu::QuickMoveEffects for MenuEffects {
             assert_eq!(mattmc_item_inventory_scan_leased(inventory.address() as i64,73,5,99,Some(add_effect)),-1);
             assert_eq!(mattmc_item_inventory_visit_leased(inventory.address() as i64,shared.address() as i64,3,2,99,Some(visit_effect)),0);
         }
+    }
+    // Java throwing between preparation and adoption (the effect returns
+    // i64::MIN without setting the adoption flag) leaves the copy to the native
+    // operation, which retires it; one Java adopted before throwing stays with
+    // its Java release. Covers the snapshot, stock insertion and inventory add.
+    static THROWN:std::sync::Mutex<Vec<i64>>=std::sync::Mutex::new(Vec::new());
+    unsafe extern "C" fn throw_before_adoption(_:i64,_:i64,_:i64,handle:i64,_:i64)->i64 {THROWN.lock().unwrap().push(handle);i64::MIN}
+    unsafe extern "C" fn throw_after_adoption(_:i64,_:i64,_:i64,handle:i64,out:i64)->i64 {*(out as *mut i64).add(1)=1;THROWN.lock().unwrap().push(handle);i64::MIN}
+    unsafe extern "C" fn add_throw_before_adoption(action:i64,index:i64,handle:i64,_:i64,_:i64)->i64 {match action{33|34=>{THROWN.lock().unwrap().push(handle);i64::MIN},_=>add_effect(action,index,0,0,0)}}
+    fn last_thrown()->i64{*THROWN.lock().unwrap().last().unwrap()}
+    #[test] fn java_throw_before_adoption_retires_the_prepared_copy_and_after_adoption_keeps_it(){
+        let defaults=defaults();let source=value(11,&defaults);
+        for (callback,adopted) in [(throw_before_adoption as MenuCallback,false),(throw_after_adoption as MenuCallback,true)] {
+            let mut effects=MenuEffects{callback,source:None,prepared:None,known_has:None,air:0};
+            assert!(effects.adopt_prepared(17,&source,11,0,0).is_err());
+            let snapshot=last_thrown();assert_eq!(owners().lock().unwrap().contains_key(&snapshot),adopted);
+            assert_eq!(effects.insert_prepared(&source,3,11),i64::MIN);
+            let inserted=last_thrown();assert_ne!(snapshot,inserted);assert_eq!(owners().lock().unwrap().contains_key(&inserted),adopted);
+            // Stand-in for the Java release of an adopted copy.
+            if adopted{owners().lock().unwrap().remove(&snapshot);owners().lock().unwrap().remove(&inserted);}
+        }
+        let inventory=Arc::new(Inventory::new(Entry{facade:1,stack:value(0,&defaults)}));
+        let added=value(11,&defaults);let thrown=THROWN.lock().unwrap().len();
+        assert_eq!(unsafe{mattmc_item_inventory_add_leased(inventory.address() as i64,added.address() as i64,-1,99,Some(add_throw_before_adoption))},i64::MIN);
+        assert_eq!(THROWN.lock().unwrap().len(),thrown+1,"the add offered one prepared copy");
+        let copy=last_thrown();assert_ne!(copy,0);assert!(!owners().lock().unwrap().contains_key(&copy));
+        assert_eq!(added.scalars.count.load(Ordering::Relaxed),11,"nothing committed before the Java throw");
     }
 }

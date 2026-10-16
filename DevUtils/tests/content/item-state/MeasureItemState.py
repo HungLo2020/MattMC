@@ -23,6 +23,8 @@ def main():
     parser.add_argument('--java-home', type=Path, required=True)
     parser.add_argument('--pre', type=Path, required=True)
     parser.add_argument('--pre-overlay', type=Path, action='append', default=[], help='immutable original upstream-family overlay; repeat as needed')
+    parser.add_argument('--complete-pre', action='store_true', help='--pre is a complete compiled image: skip the automatic historical menu/inventory/r5 overlays')
+    parser.add_argument('--origin-guard', action='store_true', help='after timing, rerun each side once untimed with class-load logging and record class/native origins')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--timeout', type=float, default=240)
     parser.add_argument('--workload', choices=['stock', 'generic-debt', 'stock-transfer', 'inventory', 'atomic-lower-bound', 'owner-access'], default='stock')
@@ -31,6 +33,8 @@ def main():
     out = args.output.resolve(); pre = args.pre.resolve()
     if not out.is_relative_to(ROOT / 'build') or out.exists():
         parser.error('--output must be a new directory under build/')
+    if args.complete_pre and args.pre_overlay:
+        parser.error('--complete-pre takes no --pre-overlay')
     manifest = json.loads((pre / 'manifest.json').read_text())
     assert sha(pre / 'classes.jar') == manifest['jar_sha256']
     with zipfile.ZipFile(pre / 'classes.jar') as jar:
@@ -43,13 +47,13 @@ def main():
           'current': (ROOT / 'build/item-state-current-classpath.txt').read_text().strip()}
     menu_pre = ROOT / 'build/item-state-pre-stock-menu'
     menu_manifest = None
-    if menu_pre.exists():
+    if not args.complete_pre and menu_pre.exists():
         menu_manifest = json.loads((menu_pre / 'manifest.json').read_text())
         assert sha(menu_pre / 'classes.jar') == menu_manifest['jar_sha256']
         cp['pre'] = str(menu_pre / 'classes.jar') + ':' + cp['pre']
     inventory_pre = ROOT / 'build/item-state-pre-inventory'
     inventory_manifest = None
-    if inventory_pre.exists():
+    if not args.complete_pre and inventory_pre.exists():
         inventory_manifest = json.loads((inventory_pre / 'manifest.json').read_text())
         assert sha(inventory_pre / 'classes.jar') == inventory_manifest['jar_sha256']
         with zipfile.ZipFile(inventory_pre / 'classes.jar') as jar:
@@ -58,7 +62,7 @@ def main():
         cp['pre'] = str(inventory_pre / 'classes.jar') + ':' + cp['pre']
     r5_pre = ROOT / 'build/item-state-pre-r5'
     r5_manifest = None
-    if r5_pre.exists():
+    if not args.complete_pre and r5_pre.exists():
         r5_manifest = json.loads((r5_pre / 'manifest.json').read_text())
         assert sha(r5_pre / 'classes.jar') == r5_manifest['jar_sha256']
         with zipfile.ZipFile(r5_pre / 'classes.jar') as jar:
@@ -88,7 +92,7 @@ def main():
                'head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True, cwd=ROOT).strip(),
                'status': subprocess.check_output(['git', 'status', '--porcelain'], text=True, cwd=ROOT),
                'reference_sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True, cwd=FROZEN).strip(),
-               'pre_manifest': manifest, 'menu_pre_manifest': menu_manifest, 'inventory_pre_manifest': inventory_manifest, 'r5_pre_manifest': r5_manifest, 'extra_pre_manifests': extra_pre_manifests, 'source_sha256': sha(source), 'driver_sha256': sha(Path(__file__)),
+               'pre_manifest': manifest, 'complete_pre': args.complete_pre, 'origin_guard_requested': args.origin_guard, 'menu_pre_manifest': menu_manifest, 'inventory_pre_manifest': inventory_manifest, 'r5_pre_manifest': r5_manifest, 'extra_pre_manifests': extra_pre_manifests, 'source_sha256': sha(source), 'driver_sha256': sha(Path(__file__)),
                'compiled_classes': before, 'native_files': libraries, 'runs': [], 'summary': {}, 'complete': False,
                'limitations': 'No direct retained serialization admission proof; no process-level repetitions, pressure gating or acceptance claim. Stock-transfer times complete quickMoveStack, including facade/native adoption; reset and complete output consumption are outside timing. World is null; Java thread allocation excludes Rust allocations.',
                'workload': args.workload, 'owner_shape': args.owner_shape if owner else None, 'adapter_sha256': sha(adapter) if adapter else None,
@@ -173,6 +177,45 @@ def main():
     assert class_seal() == before and sha(source) == receipt['source_sha256']
     assert {file.name: sha(file) for file in dependencies} == receipt['dependency_sources']
     if adapter: assert sha(adapter) == receipt['adapter_sha256']
+    if args.origin_guard:
+        receipt['origin_guard'] = origin_guard(receipt['runs'], out, native, cp, libraries)
+        assert class_seal() == before
     receipt['complete'] = True; save(); print(json.dumps(receipt['summary'], indent=2), flush=True)
+
+
+GUARDED = ['net.minecraft.world.item.ItemStack', 'net.minecraft.world.item.NativeItemState', 'net.minecraft.core.component.PatchedDataComponentMap',
+           'net.minecraft.world.entity.player.Inventory', 'net.minecraft.world.inventory.AbstractContainerMenu', 'net.minecraft.world.inventory.ChestMenu',
+           'net.minecraft.world.inventory.Slot']
+
+
+def origin_guard(runs, out, native, cp, libraries):
+    """Untimed separate processes with each timed side's exact command plus class/library logging."""
+    guard = {}
+    for run in runs:
+        side = run['side']; base_side = 'current' if side.startswith('current') else side
+        log = out / (side + '-origin.log'); csv_out = out / (side + '-origin.csv')
+        command = list(run['command']); command.insert(1, f'-Xlog:class+load=info,library=info:file={log}:uptime,tags')
+        command[command.index(str(out / (side + '.csv')))] = str(csv_out)
+        subprocess.run(command, cwd=out, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, check=True, timeout=600)
+        origins = {}; game = {}; loaded = set()
+        for line in log.read_text().splitlines():
+            if 'source:' in line and '[class,load' in line:
+                name = line.split(']', 2)[-1].split()[0]; origin = line.split('source: ', 1)[1].strip()
+                if name in GUARDED: origins[name] = origin
+                if (name.startswith('net.minecraft.') or name.startswith('com.mojang.')) and origin.startswith(('file:', 'jar:')): game[origin] = game.get(origin, 0) + 1
+            if 'mattmc_rust' in line and '[library' in line:
+                loaded.update(part for part in line.split() if 'mattmc_rust' in part)
+        entries = cp[base_side].split(':')
+        expected = native[base_side].resolve()
+        required = set(GUARDED) - ({'net.minecraft.world.item.NativeItemState'} if base_side == 'frozen' else set())
+        assert required <= set(origins), (side, sorted(required - set(origins)))
+        assert bool(loaded) == bool(libraries[base_side]), (side, loaded)
+        assert all(Path(part.strip('"\',')).resolve().parent == expected for part in loaded), (side, loaded)
+        if base_side == 'pre' and entries[0].endswith('classes.jar'):
+            live = str(ROOT / 'build/classes/java/main')
+            assert not any(live in origin for origin in game), (side, {o: n for o, n in game.items() if live in o})
+        guard[side] = {'command': command, 'guarded_class_origins': origins, 'game_class_origin_counts': game,
+                       'loaded_native': sorted(loaded), 'log_sha256': sha(log), 'output_sha256': sha(csv_out)}
+    return guard
 
 if __name__ == '__main__': main()

@@ -343,6 +343,19 @@ public abstract class AbstractContainerMenu {
 			Slot slot=this.slot;ItemStack itemStack2=slot.getItem();this.source=itemStack2;this.previous=this.returned;
 			ItemStack itemStack=itemStack2.copy();this.snapshot=itemStack;stacks(out,itemStack2,itemStack);
 		}
+		/**
+		 * captureCopy for a pure stock item: the source is captured here and Rust
+		 * prepares its copy, which op 17 adopts (ItemStack.copy's same facade
+		 * construction and asItem dispatch). Returns false for the original copy.
+		 */
+		private boolean captureSource(long out){
+			Slot slot=this.slot;ItemStack itemStack2=slot.getItem();
+			this.source=itemStack2;this.previous=this.returned;
+			if(itemStack2.isEmpty()||itemStack2.getItem()==null||!itemStack2.getItem().nativeTransferCopyIsPure()){
+				ItemStack itemStack=itemStack2.copy();this.snapshot=itemStack;stacks(out,itemStack2,itemStack);return false;
+			}
+			stacks(out,itemStack2,null);return true;
+		}
 		private void equipment(){Player player=this.player;this.equipmentSlot=player.getEquipmentSlotForItem(this.snapshot);}
 		private void equipmentRoute(long out){
 			net.minecraft.world.entity.EquipmentSlot equipmentSlot=this.equipmentSlot;
@@ -354,7 +367,7 @@ public abstract class AbstractContainerMenu {
 				case 1:{
 					java.lang.ref.Reference.reachabilityFence(this.against);this.against=null;this.index=first;this.slot=AbstractContainerMenu.this.slots.get(first);
 					var link=this.slot==null?null:this.slot.nativeLinkForMenu();
-					if(knownEndpoint(link)){if(!this.slot.hasItem())return 4;this.captureCopy(out);return 3;}
+					if(knownEndpoint(link)){if(!this.slot.hasItem())return 4;return this.captureSource(out)?5:3;}
 					endpoint(out,link);return this.slot==null?0:1;
 				}
 				case 2:{Slot slot=this.slot;return slot.hasItem()?1:0;}
@@ -367,6 +380,8 @@ public abstract class AbstractContainerMenu {
 					if(this.transfer!=null){transfer(out,this.transfer,this.source);return 2;}
 					return AbstractContainerMenu.this.moveItemStackTo(this.source,first,second,third!=0)?1:0;
 				case 15:return this.transfer.effect(first,second,(third>>>1)&3,(int)(third>>32),third&1);
+				case 16:return this.transfer.insertPrepared(first,second,third,preparedAddress(out),out+8);
+				case 17:this.snapshot=this.source.adoptPreparedCopy(third,preparedAddress(out),out+8);return 1;
 				case 8:this.slot.onQuickCraft(this.source,this.snapshot);return 1;
 				case 9:
 					if(first!=0){if(second!=0)this.slot.setByPlayer(ItemStack.EMPTY,this.snapshot);else this.slot.setByPlayer(ItemStack.EMPTY);}else this.slot.setChanged();return 1;
@@ -758,6 +773,14 @@ public abstract class AbstractContainerMenu {
 			this.inventory.nativeMainSetEffects(index,inserted);
 			slot.setChanged();slot.setChanged();return 1;
 		}
+		@Override public long insertPrepared(long selected,long amount,long handle,long address,long adopted) {
+			int menuIndex=62-Math.toIntExact(selected);
+			Slot slot=AbstractContainerMenu.this.slots.get(menuIndex);int index=slot.getContainerSlot();
+			ItemStack inserted=this.source.adoptPreparedCopy(handle,address,adopted);
+			this.backend.commitTransferInsert(this.source,index,inserted,(int)amount);
+			this.inventory.nativeMainSetEffects(index,inserted);
+			slot.setChanged();slot.setChanged();return 1;
+		}
 	}
 
 	private final class StockTransferEffects extends net.minecraft.world.item.NativeItemState.TransferEffects {
@@ -790,6 +813,14 @@ public abstract class AbstractContainerMenu {
 			}
 			if (action != 2) throw new IllegalStateException("Unknown native transfer effect: " + action);
 			ItemStack inserted = this.source.copyForNativeTransferWithCount((int)amount);
+			this.backend.commitTransferInsert(this.source, index, inserted, (int)amount);
+			this.chest.setChanged(); slot.setChanged(); slot.setChanged();
+			return 1;
+		}
+		@Override public long insertPrepared(long selected, long amount, long handle, long address, long adopted) {
+			int index = Math.toIntExact(selected);
+			Slot slot = AbstractContainerMenu.this.slots.get(index);
+			ItemStack inserted = this.source.adoptPreparedCopy(handle, address, adopted);
 			this.backend.commitTransferInsert(this.source, index, inserted, (int)amount);
 			this.chest.setChanged(); slot.setChanged(); slot.setChanged();
 			return 1;

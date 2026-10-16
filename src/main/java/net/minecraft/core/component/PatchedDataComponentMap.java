@@ -17,10 +17,13 @@ public final class PatchedDataComponentMap extends NativeItemState.Overlay imple
 	public PatchedDataComponentMap(DataComponentMap prototype) {super(prototype);}
 	private PatchedDataComponentMap(DataComponentMap prototype,NativeItemState.Patch patch) {super(prototype,patch);}
 	private PatchedDataComponentMap(NativeItemState.Overlay source,boolean stackCopy) {super(source,stackCopy);}
+	private PatchedDataComponentMap(NativeItemState.Overlay source,long handle,long address,long adopted) {super(source,handle,address,adopted);}
 	/** The public component facade is the actual shared stack/component lease. */
 	public static PatchedDataComponentMap fromNativeStack(NativeItemState.Stack stack) {return (PatchedDataComponentMap)stack.components();}
 	public static PatchedDataComponentMap fromNativePatch(DataComponentMap prototype,NativeItemState.Patch patch){return new PatchedDataComponentMap(prototype,patch);}
 	public static PatchedDataComponentMap copyNativeStack(NativeItemState.Overlay source){return new PatchedDataComponentMap(source,true);}
+	/** A copy of {@code source} a native operation already prepared, adopted as its owner. */
+	public static PatchedDataComponentMap adoptPreparedStack(NativeItemState.Overlay source,long handle,long address,long adopted){return new PatchedDataComponentMap(source,handle,address,adopted);}
 	public static PatchedDataComponentMap copyNativeComponents(NativeItemState.Overlay source){return new PatchedDataComponentMap(source,false);}
 	public NativeItemState.Overlay nativeState(){return this;}
 

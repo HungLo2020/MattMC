@@ -24,6 +24,123 @@ is `build/item-state-pre-646986043`, native `ae6ed8f6…`, with the preserved me
 inventory, r5, upstream-lighting and enchantment class overlays recorded in each
 receipt. References and original workload sources are unchanged.
 
+## S0030 natively prepared copies
+
+**S0030/r2, October 16, 2026: temporary cost exception accepted for publication.**
+[Decision 310](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18984260)
+accepts these costs as bounded temporary migration debt for this exact candidate.
+It is not a Frozen-budget pass, and not a claim that all added cost is explained.
+The debt stays with the item-state owner. The exit is native-owned container slot contents and
+transfer publication, which needs a separate assignment.
+
+- **Candidate:** published master `4199640e33c54a1b8408b25f7bb695446dbbabae`
+  plus the S0030 diff. Release native
+  `17be1be34bd5950c40fd6876d63c16dffc1e201866c4e38a3a83082e3b89f2cb`, compiled
+  classes aggregate `80a837e8…`.
+- **Pre-change Current:** the complete published `2b1835578c` image in
+  `build/item-state-pre-s30-2b18-complete`. Classes jar
+  `9abe40b5edc7f089bbcc43eab6afeffa95d8f4144cae53974fef5248f83def75`, native
+  `d49b361d5fd0971a148ad0e493ac91bcb2e0ba2988aec6ecb97ff47750bb44a3`. It runs with
+  `--complete-pre`, so no historical overlays are applied. Master moved from
+  `2b18` to `4199640e` through S28/S32 chunk generation and docs only, and no
+  item, inventory or menu path changed.
+- **Frozen:** unchanged `7a4d181717dc0c7da9086f1a17687dfd522ce417`.
+
+Each side ran three separate JVM processes, each with five nested dependent
+samples per workload. The 15 samples are not independent trials. Every output
+checksum matches across sides and runs.
+
+`--origin-guard` reran each side's exact timed command once, untimed, with class-load and library
+logging:
+
+- Frozen loaded all 4,364 game classes from its own checkout and no MattMC native.
+- Pre loaded all 4,489 game classes from the fixture `classes.jar` and its native
+  from the fixture, with none from the live build.
+- Current loaded 4,489 from `build/classes/java/main` and `build/rust/native`.
+
+The timed processes separately verify the mapped native path, inode and SHA-256.
+
+Under these measurements, the targeted latencies are approximately at pre-change
+level: the `*_empty` rows and `add_damaged` are 0.95–1.02× pre, with unchanged
+operation-thread Java bytes. This does not show that S0030 adds no debt:
+
+- Java bytes exclude native allocation and retention.
+- Facade/Cleaner allocation alone does not explain the latency.
+
+Every row remains far above Frozen, as pre-change Current already was (the
+S0024 debt above). The proposed exit is native-owned container slot contents,
+so that transfers publish without a Java facade per copy. That needs a later,
+non-overlapping assignment.
+
+Times are ns/op: per-run medians of the five samples, then C/F and C/pre from
+the median of all samples. `q` totals the compiler/GC-quiet samples.
+
+| Operation | Frozen r1/r2/r3 | Pre r1/r2/r3 | Current r1/r2/r3 | C/F | C/pre | q F/P/C | Java B/op F/P/C |
+|---|---|---|---|---:|---:|---|---|
+| quick_move_zero | 19/19/23 | 67/61/75 | 61/75/61 | 3.02 | 0.83 | 6/8/6 | 0/0/0 |
+| quick_move_full | 290/854/305 | 1332/1257/1312 | 1365/1291/1373 | 4.13 | 1.04 | 4/4/6 | 0/308/308 |
+| quick_move_one | 386/365/394 | 1766/1412/1379 | 1519/1673/1546 | 3.99 | 1.09 | 12/13/13 | 56/308/308 |
+| quick_move_late | 355/1109/371 | 1522/1597/1575 | 1519/3113/3861 | 7.97 | 1.90 | 11/10/3 | 56/308/304–308 |
+| quick_move_many | 496/518/676 | 4486/4526/4670 | 4773/4672/5282 | 9.16 | 1.06 | 15/15/13 | 56/308/308 |
+| quick_move_empty | 285/287/1375 | 1942/6834/1974 | 1863/2032/2082 | 6.80 | 0.99 | 13/10/13 | 112/464–468–472/472 |
+| reverse_zero | 27/25/25 | 82/81/78 | 114/83/83 | 3.32 | 1.06 | 7/6/6 | 0/0/0 |
+| reverse_full | 614/627/757 | 1613/1671/1631 | 1936/1832/1732 | 2.92 | 1.12 | 13/7/6 | 56/300/296–300 |
+| reverse_one | 630/655/742 | 1650/1765/1682 | 1874/1950/1713 | 2.78 | 1.12 | 9/8/7 | 56/300/300 |
+| reverse_late | 663/1141/727 | 1622/1844/1611 | 2039/1931/1675 | 2.66 | 1.16 | 12/10/9 | 56/296–300/300 |
+| reverse_many | 600/567/833 | 2674/2966/2463 | 2893/2803/2394 | 4.56 | 1.05 | 12/11/10 | 56/300/300 |
+| reverse_empty | 420/471/454 | 2679/2705/2146 | 2406/2483/2223 | 5.31 | 0.95 | 15/13/13 | 112/464/464 |
+| add_zero | 7/7/8 | 20/18/17 | 20/22/21 | 2.97 | 1.19 | 12/12/11 | 0/0/0 |
+| add_full | 4472/4633/4104 | 4955/4511/5058 | 5076/5349/5117 | 1.20 | 1.08 | 9/9/8 | 1832–1848/1912–2296/1912 |
+| add_partial | 4338/3848/4062 | 5895/5236/5153 | 5460/5906/5102 | 1.37 | 1.00 | 13/12/11 | 1832–1848–2240/1912–2296/1912 |
+| add_late | 4458/4092/4782 | 5940/4823/4929 | 5020/5448/5208 | 1.19 | 1.07 | 11/11/13 | 1832–1848–2240/1912–2296/1912 |
+| add_many | 9988/10902/11739 | 15530/16198/13471 | 13635/13857/12826 | 1.28 | 0.89 | 14/11/11 | 0/64/64 |
+| add_empty | 198/206/209 | 1202/1046/1085 | 1274/1035/1083 | 5.36 | 1.00 | 14/14/13 | 56/228/228 |
+| add_alias | 30/35/34 | 234/229/229 | 219/207/213 | 6.49 | 0.92 | 15/14/13 | 0/64/64 |
+| add_damaged | 65/58/61 | 914/860/977 | 920/1011/827 | 15.18 | 1.02 | 12/11/10 | 56/228/228 |
+| pick_empty | 17/92/18 | 230/236/234 | 260/265/230 | 14.17 | 1.09 | 12/14/14 | 0/64/64 |
+| pick_displace | 303/125/62 | 579/512/524 | 601/626/559 | 4.81 | 1.14 | 14/15/14 | 0/64/64 |
+| pick_full | 196/262/101 | 601/525/515 | 693/542/650 | 3.40 | 1.23 | 12/12/11 | 0/64/64 |
+| clicked_forward | 5604/4900/5295 | 11187/9753/11530 | 11609/10066/10907 | 2.04 | 1.00 | 13/12/14 | 2184–2224/3128–3152–3536/3152 |
+| clicked_reverse | 5909/5012/6218 | 12344/10938/11543 | 14496/12046/13725 | 2.25 | 1.13 | 11/13/11 | 2184–2224/3104–3116–3512/3088–3128 |
+
+Short rows are noisy. Per-run Current/pre ratios on sub-100 ns rows vary by
+up to ±40%. `quick_move_late` (1.00/1.95/2.45, only three quiet Current
+samples) and `pick_full` (1.15/1.03/1.26) are not explained, and those rows are
+not targeted by S0030. Host load averaged 1.4–2.7 with zram swap active.
+
+Follow-up for the two unexplained rows (dot review 307):
+
+- **Work counts.** `PreparedPathWorkCounts` instruments the four item callback
+  entry points on both images. Per operation, `quick_move_late` makes the same
+  native transfer steps, slot visits and callbacks as `quick_move_one`,
+  `quick_move_full` and `quick_move_many`. Current adds exactly one prepared
+  snapshot (callback 17) to each. The pick rows prepare nothing and make one
+  identical inventory callback, or two for `pick_displace`. Their only change is
+  the wider five-argument inventory callback. Receipt: `build/s30-workcounts1`.
+- **Narrow retiming.** `SelectedInventoryTiming` reran only `quick_move_one`,
+  `quick_move_late` and the three pick rows. It ran five alternating pre/Current
+  process pairs on the same release image, with unchanged fixtures and the
+  mapped native recorded. Current/pre: `pick_full` 0.99 (per pair 0.87–1.08),
+  `pick_empty` 1.05, `pick_displace` 1.02, `quick_move_one` 0.97.
+  `quick_move_late` is 1.16 (per pair 0.92–1.34). Receipt: `build/s30-narrow1`.
+
+The earlier `pick_full` increase did not reproduce. About +16% on
+`quick_move_late` remains unexplained: the control row doing identical counted
+work measures 0.97.
+
+Raw receipts and origin-guard logs are in `build/s30-recon-cost/cost-{1,2,3}`.
+The equivalent un-guarded runs on base `2b1835578c` are in `build/s30-final3`.
+Two guard attempts that failed on the guard itself are kept: Frozen has no
+`NativeItemState` class and no MattMC native. Their timings are not reused.
+
+The first fixture, `build/item-state-pre-s30-2b18`, omitted its own
+`classes.jar` from `classpath.txt`. Its pre side therefore ran
+`build/classes/java/main` against the old native, plus the automatic historical
+overlays. Those receipts (`build/s30-baseline-inventory1`, `build/s30-final1`,
+crashed `build/s30-final2`) are invalid as pre-change Current. They are kept
+as failed evidence, together with the earlier GC/warmup explanation, which is
+withdrawn.
+
 ## Complete operations
 
 One fresh JVM per side, five dependent samples per workload. Every one of the
@@ -192,7 +309,12 @@ python3 DevUtils/tests/content/item-state/MeasureItemState.py \
   --workload inventory --output build/item-complete-cost
 ```
 
-Use `--workload generic-debt` for the companion control. These commands emit
+Use `--workload generic-debt` for the companion control. When `--pre` is a
+complete compiled image whose `classpath.txt` starts with its own `classes.jar`,
+add `--complete-pre`. This skips the automatic historical menu, inventory and r5
+overlays. Add `--origin-guard` to record where each side loaded its classes and
+native library from, using untimed reruns of the exact timed commands. With a
+complete pre image, any game class loaded from the live build fails the run. These commands emit
 raw evidence and explicit limits, never an acceptance verdict. Preserve earlier
 failed and noisy results; the [owner's policy](../tooling/MIGRATION-ACCEPTANCE.md)
 requires a documented decision for out-of-budget work.
