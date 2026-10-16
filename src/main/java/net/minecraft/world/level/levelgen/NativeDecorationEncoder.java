@@ -107,7 +107,6 @@ public final class NativeDecorationEncoder {
 	/** Scratch for {@code simpleBlock}'s per-state rules. */
 	private List<Integer> ruleWords = List.of();
 	private static final ThreadLocal<String> DECLINE = new ThreadLocal<>();
-	private static final ThreadLocal<Tables> LAST_TABLES = new ThreadLocal<>();
 	private final List<JavaPredicate> javaPredicates = new ArrayList<>();
 	/** Noise objects whose native states the program's noise table points at, by identity. */
 	private final List<Object> noises = new ArrayList<>();
@@ -128,10 +127,9 @@ public final class NativeDecorationEncoder {
 	/** What a program needs from Java at run time: Java leaves, Java predicates and retained noise owners. */
 	public record Tables(List<ConfiguredFeature<?, ?>> javaFeatures, List<JavaPredicate> javaPredicates, List<JavaStep> javaSteps, List<Object> retained) {}
 
-	/** The Java feature table of this thread's last successful encoding. */
-	static Tables lastTables() {
-		return LAST_TABLES.get();
-	}
+	/** An invocation-owned handoff: tables cannot outlive the actual program
+	 * through a thread-local reference after success, decline or failure. */
+	record Encoded(int[] words, Tables tables) {}
 
 	/** Debugging: the class this thread's last declined encoding stopped at. */
 	static String lastDecline() {
@@ -160,7 +158,7 @@ public final class NativeDecorationEncoder {
 		new java.util.concurrent.ConcurrentHashMap<>();
 
 	@Nullable
-	static int[] encode(PlacedFeature placed, ChunkGenerator generator, List<Holder<Biome>> biomes, long seed) {
+	static Encoded encode(PlacedFeature placed, ChunkGenerator generator, List<Holder<Biome>> biomes, long seed) {
 		var encoder = new NativeDecorationEncoder(generator, seed, biomes);
 		encoder.words.add(3);
 		try {
@@ -170,8 +168,6 @@ public final class NativeDecorationEncoder {
 			return null;
 		}
 		var words = encoder.words;
-		LAST_TABLES.set(new Tables(List.copyOf(encoder.javaFeatures), List.copyOf(encoder.javaPredicates), List.copyOf(encoder.javaSteps),
-			List.copyOf(encoder.noises)));
 		words.add(encoder.sets.size());
 		for (int[] set : encoder.sets) {
 			words.add(set.length);
@@ -188,7 +184,9 @@ public final class NativeDecorationEncoder {
 			words.add((int)address);
 			words.add((int)(address >>> 32));
 		}
-		return words.stream().mapToInt(Integer::intValue).toArray();
+		return new Encoded(words.stream().mapToInt(Integer::intValue).toArray(),
+			new Tables(List.copyOf(encoder.javaFeatures), List.copyOf(encoder.javaPredicates),
+				List.copyOf(encoder.javaSteps), List.copyOf(encoder.noises)));
 	}
 
 	private static Object field(Object owner, Class<?> declaring, String name) throws ReflectiveOperationException {
@@ -1715,6 +1713,11 @@ public final class NativeDecorationEncoder {
             this.words.add(stateId(state));
             this.words.add(stateId(state.trySetValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,Direction.Axis.X)));
             this.words.add(stateId(state.trySetValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,Direction.Axis.Z)));
+        }
+        for(var decorators:List.of(config.stumpDecorators,config.logDecorators)){
+            var chain=NativeFallenTrees.compiledChain(decorators);
+            if(chain==null)this.words.add(-1);
+            else for(int word:chain)this.words.add(word);
         }
         return true;
     }

@@ -1426,7 +1426,8 @@ public final class NativeDecoration {
 				return program;
 			}
 			long encodeStart = System.nanoTime();
-			int[] words = NativeDecorationEncoder.encode(feature, generator, region.biomeValues(), seed);
+			var encoded = NativeDecorationEncoder.encode(feature, generator, region.biomeValues(), seed);
+			int[] words = encoded == null ? null : encoded.words();
 			setupTime("encode@" + generator.getBiomeSource().getClass().getSimpleName(), encodeStart);
 			long createStart = System.nanoTime();
 			Object compiled = UNSUPPORTED;
@@ -1436,7 +1437,17 @@ public final class NativeDecoration {
 					var segment = arena.allocate(words.length * 4L, 4);
 					MemorySegment.copy(words, 0, segment, ValueLayout.JAVA_INT, 0, words.length);
 					var pointer = (MemorySegment)CREATE.invokeExact(segment, words.length);
-					if (pointer.address() != 0) compiled = new Program(pointer, tags, region.biomeValues(), minGenY, genDepth, seed, NativeDecorationEncoder.lastTables());
+					if (pointer.address() != 0) {
+						try {
+							compiled = new Program(pointer, tags, region.biomeValues(), minGenY, genDepth, seed, encoded.tables());
+						} catch (Throwable failure) {
+							// The constructor registers its Cleaner last. Until that
+							// succeeds, this invocation still owns the raw Rust program.
+							try { RELEASE.invokeExact(pointer); }
+							catch (Throwable releaseFailure) { failure.addSuppressed(releaseFailure); }
+							throw failure;
+						}
+					}
 					else if (DEBUG) LOGGER.info("Native decoration: Rust rejected the words for {} ({} words)", feature, words.length);
 				} catch (Throwable failure) {
 					throw new IllegalStateException("Native decoration program creation failed", failure);

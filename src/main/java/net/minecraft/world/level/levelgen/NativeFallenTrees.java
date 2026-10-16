@@ -100,6 +100,41 @@ public final class NativeFallenTrees {
         return directions!=null&&(directions.getClass()==List.of(Direction.UP).getClass()
             ||directions.getClass()==List.of().getClass());
     }
+
+    private static final Set<Class<?>> IMMUTABLE_CHAINS=Set.of(
+        List.of().getClass(),List.of(0).getClass(),
+        com.google.common.collect.ImmutableList.of().getClass(),
+        com.google.common.collect.ImmutableList.of(0).getClass());
+
+    /** Compile only proven immutable resources. A custom/mutable list must not
+     * even be traversed during admission: its real forEach stays a VM effect. */
+    static int[] compiledChain(List<TreeDecorator> chain) {
+        if(chain==null||!IMMUTABLE_CHAINS.contains(chain.getClass())||chain.size()>4096)return null;
+        var words=new ArrayList<Integer>();words.add(chain.size());
+        for(var decorator:chain){
+            if(decorator!=null&&decorator.getClass()==TrunkVineDecorator.class){
+                words.add(1);
+                var vine=Blocks.VINE.defaultBlockState();
+                words.add(Block.getId(vine.setValue(VineBlock.EAST,true)));
+                words.add(Block.getId(vine.setValue(VineBlock.WEST,true)));
+                words.add(Block.getId(vine.setValue(VineBlock.SOUTH,true)));
+                words.add(Block.getId(vine.setValue(VineBlock.NORTH,true)));
+            }else if(decorator!=null&&decorator.getClass()==AttachedToLogsDecorator.class){
+                Object resource=Fields.DIRECTIONS.get(decorator);
+                if(!immutableDirections(resource))return null;
+                var directions=(List<?>)resource;
+                if(directions.isEmpty()||directions.size()>6)return null;
+                for(Object direction:directions)if(!(direction instanceof Direction))return null;
+                var provider=NativeDecorationEncoder.fallenProvider((BlockStateProvider)Fields.PROVIDER.get(decorator));
+                if(provider==null)return null;
+                words.add(0);words.add(Float.floatToRawIntBits((float)Fields.PROBABILITY.get(decorator)));
+                for(int word:provider)words.add(word);
+                words.add(directions.size());
+                for(Object direction:directions)words.add(((Direction)direction).ordinal());
+            }else return null;
+        }
+        return words.stream().mapToInt(Integer::intValue).toArray();
+    }
     private static int[] generationDescriptor(Call call,int kind) {
         var words=new ArrayList<Integer>();
         words.add(Float.floatToRawIntBits(kind==0?(float)Fields.PROBABILITY.get(call.decorator):0));

@@ -67,8 +67,11 @@ public final class FallenNativeCost {
         try{
             var controls=FallenAllocation.control();var rows=new ArrayList<Map<String,Object>>();
             for(String variant:List.of("oak","birch","super_birch","jungle","spruce"))for(String mode:List.of("configured","placed","native","selector")){
+                if(!(variant+"/"+mode).matches(System.getProperty("fallen.resourceCases",".*")))continue;
                 rows.add(one(server.overworld(),variant,mode));System.out.println("FALLEN_NATIVE_RESOURCE "+variant+" "+mode);
             }
+            int expected=Integer.getInteger("fallen.expectedResourceCases",20);
+            if(rows.size()!=expected)throw new AssertionError("Resource case count "+rows.size()+" != "+expected);
             Files.writeString(output.resolve("allocations.json"),new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(Map.of("scope","Tagged requested libc heap bytes; no Java heap, mmap/RSS or latency claim. Category1 is actual allocator return address in mattmc_rust; frees retain original tag across threads.","controls",controls,"cases",rows)));
             // A separate observer lets the real server ticks and Cleaner /
             // existing reclaimer run normally; no forced production drain.
@@ -87,7 +90,7 @@ public final class FallenNativeCost {
                     for(int i=0;i<120;i++){System.gc();Thread.sleep(250);after=retirement();if(after.stream().allMatch(r->Boolean.TRUE.equals(r.get("programsCollected"))&&Boolean.TRUE.equals(r.get("chunkCollected"))&&((Number)r.get("rustLiveRequestedBytes")).longValue()==0))break;}
                     Files.writeString(output.resolve("retirement-released.json"),new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(after));
                     if(!after.stream().allMatch(r->Boolean.TRUE.equals(r.get("programsCollected"))&&Boolean.TRUE.equals(r.get("chunkCollected"))&&((Number)r.get("rustLiveRequestedBytes")).longValue()==0))throw new AssertionError("Released native program did not retire");
-                    Files.writeString(output.resolve("complete.json"),new com.google.gson.Gson().toJson(Map.of("success",true,"cases",20,"retirementObservationNanos",System.nanoTime()-started)));
+                    Files.writeString(output.resolve("complete.json"),new com.google.gson.Gson().toJson(Map.of("success",true,"cases",expected,"retirementObservationNanos",System.nanoTime()-started)));
                 }catch(Throwable failure){failure.printStackTrace();try{Files.writeString(output.resolve("failed.txt"),failure.toString());}catch(Exception ignored){}}
                 finally{heldProgram=null;server.halt(false);}
             },"fallen-retirement-observer").start();

@@ -247,8 +247,9 @@ to 22,476 and maximum incremental peak remains 11,260. Cold maxima are
 Each maximum may come from a different row. These retain the observer's
 requested-heap and ownership limits above.
 
-The native configuration/context ownership redesign is reserved for the next
-assignment; keep this stable production candidate unchanged.
+The published S27 evidence above remains historical. S0029 now implements the
+next compiled decorator-chain ownership slice described below; its development
+checks do not inherit S27's cost exception.
 
 An observer mismatch or incomplete output fails. Inspect each fixture and the
 source/class/native guards; stock Java fallback must not pass native admission.
@@ -257,3 +258,95 @@ configured/placed/selector costs, and
 [FULL-chunk, resume and failure verification](../RUST-FULL-GENERATION.md).
 Preserve known reference differences and explicit host limitations. The earlier
 lighting exception does not apply to this family.
+
+
+## Decorator-chain ownership development (S0029)
+
+The S0029 development candidate retains admitted stump/log chains in the compiled
+fallen program. Exact immutable JDK/Guava lists containing supported stock
+attached-log and trunk-vine decorators use the existing native decision kernels,
+placement RNG and region. One stable Y-sorted position context feeds every
+successive decorator. Warm admitted chains create no Java Context, descriptor,
+child arena or nested decorator downcall.
+
+Mutable/custom chain lists stay behind their actual VM traversal and context;
+compilation must not query or iterate them. An immutable list containing a custom
+decorator, provider or direction resource also keeps that genuine context path.
+Exposed aliases remain authoritative. Sticky dynamic-shape/out-of-region VM
+continuation and the original RNG/error prefixes still apply.
+
+The encoder now returns its words and retained effect tables together to the
+program consumer. An inherited thread-local table kept the previous configuration
+alive after compilation; the original escaped-context GC failure and isolated
+root diagnostic are preserved. A separate original adoption failure leaves
+8,348 requested Rust bytes live. The corrected consumer releases a raw program
+when Java adoption fails, while successfully adopted programs keep their existing
+Cleaner ownership. Cache publication failure must preserve the old map and retry.
+No test-only root clearing is used for candidate acceptance.
+
+Focused controls live beside the existing observer in `FallenChainRisks.java`.
+The original twelve mutation/alias/reentry/error controls match Frozen and
+published S27. The corrected thirteen-case candidate also passes escaped-context
+GC and the ordinary multi-chain bridge marker. The marker deliberately fails on
+published S27. Native adoption/publication and in-flight replacement controls use
+`chain/VerifyFallenChainAllocation.py` with explicit `--classpath`, `--native`,
+`--reference` and `--output`; `--expect-adoption-leak` labels the original failing
+negative, not a successful lifetime check. These allocation probes make no
+latency or whole-process-memory claim.
+
+The distinct pre-change reference is published commit `2b18ec0d8`, native
+`5b51df24` and its immutable 13,881 selected classes. Frozen remains `7a4d1817`.
+The new native candidate is `925a27bf` with the Java2 overlay, sealed as 13,882
+selected classes. All 98 Frozen fixture comparisons, 15 native markers and 15
+original-Java-switch controls pass. Java tiers pass: 2,469 ordinary with ten
+existing skips, 193 parity and 11 slow. The actual Rust suite has 3,022 passes,
+57 failures and nine ignored; the 57 failure names/bodies match the historical
+headless rendering failures after normalizing only printed OS thread IDs. It
+remains non-green.
+
+Actual 150-biome FULL generation and own reopen match Frozen and the guarded
+published S27 run. Fresh pre/current CARVERS resume also matches all 150 Frozen
+outputs. On 125 dimension chunks, each side's own reopen and pre/current are
+exact; the inherited Primordial 119 state/11 postprocessing differences remain
+non-green. Both actual world write-failure routes restore nine chunks and keep
+the failed chunk CARVERS/absent on disk. Twenty family transaction cases and the
+missed-rollback negative pass. Cancellation matches 121 statuses with no
+below-FEATURES differences away from decorated neighbours; later and neighbouring
+differences remain explicit, not whole-chunk equality.
+
+The two-case oak/native+selector resource control matches Frozen/pre work and
+observes 8,588 held Rust bytes (published S27: 8,348). Releasing the real Program
+root clears all tagged Rust bytes and program/chunk weak owners. The three
+allocation/publication/replacement controls also retire all their tagged Rust
+bytes. These bounded scopes do not measure every variant or process memory;
+other-caller live requests remain unattributed. Median Rust requests in these
+two cases are 4,972 bytes per call, versus 14,060/14,004 pre. Maximum Rust
+incremental peak is 4,808; the all-caller oak/native peak of 19,696 includes an
+unattributed 15,048-byte other-caller peak. The two-case retirement window retains
+13,546 other-caller bytes on Current and 58,808 on pre. These are different
+scopes from S27's twenty-case values; do not infer a process-memory reduction.
+
+One matched 28-row campaign uses 1,024 warmups and 32 groups of 64 complete
+calls, one JVM per side. Every row preserves Frozen/pre/Current work and RNG,
+with 12–32 GC/compiler-quiet groups. Measured Current native/selector calls are
+15.802–18.099 microseconds for stock variants and 18.295–18.569 for the ordinary
+multi-chains. Their ratios to Frozen are 2.813–4.367 and 2.357–2.920 respectively;
+ratios to published S27 are 0.251–0.343 and 0.112–0.117. Configured/placed calls
+retain their VM effects and measure 2.175–5.245 times Frozen. These observed
+single-process results do not establish stable speedups or whole-generation
+performance. All normal Frozen budgets fail; the new case-specific
+[cost/resource request](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18981179)
+was accepted by [decision 292](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18981235)
+for the exact `925a27bf`/Java2 image and these measured scopes. This is a new
+temporary migration-overhead exception, not a normal-budget pass; S27's earlier
+exceptions remain historical.
+
+The single bounded Current multi-chain JFR diagnostic has only five selected
+Java execution samples and 59 allocation samples. It observes outer region
+refresh/adoption and FFM allocations; its sample weights are not actual bytes
+per operation, and it cannot apportion native CPU or establish a hard cost floor.
+Retiring the remaining outer placement/region adoption boundary needs a
+subsequent assigned ownership slice. No further bridge microtuning is proposed.
+`cost/VerifyFallenCost.py --chains` adds complete
+JDK/Guava four-decorator stump/log workloads to the original twenty route cases;
+compile/binding/close scopes stay separate from warm complete calls.

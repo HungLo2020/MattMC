@@ -33,7 +33,13 @@ public final class FallenAudit {
     static final Path OUTPUT=Path.of(System.getProperty("audit.output"));
     static final List<Map<String,Object>> ROWS=new ArrayList<>();
     static Tape tape;
-    static int programAdapterEntries,stockVmDecorationWrites,legacyFallenBodies,legacyAttachedBodies;
+    static int programAdapterEntries,stockVmDecorationWrites,legacyFallenBodies,legacyAttachedBodies,chainBridgeEntries;
+    public static void chainBridge(){
+        if(tape!=null&&tape.fixtureName.startsWith("parent-native-chain-")){
+            chainBridgeEntries++;
+            if(Boolean.getBoolean("fallen.chainMarker"))throw new AssertionError("Admitted chain materialized a Java context");
+        }
+    }
     static final class Tape {
         final List<String> events=new ArrayList<>();
         final Error failure=new AssertionError("Fallen effect sentinel");
@@ -45,6 +51,7 @@ public final class FallenAudit {
         Class<? extends Throwable> expectedError;
         BlockPos firstCursor;
         Runnable onWrite;
+        Runnable afterPrepare;
         Tape(WorldgenRandom random){this.random=random;}
         void event(String value){events.add(value+" rng="+randomState(random));}
     }
@@ -245,6 +252,7 @@ public final class FallenAudit {
                 parent=new PlacedFeature(Holder.direct(new ConfiguredFeature<>(Feature.RANDOM_BOOLEAN_SELECTOR,new RandomBooleanFeatureConfiguration(Holder.direct(leaf),Holder.direct(leaf)))),List.of());
                 if(Boolean.getBoolean("fallen.nativeParent"))f.prepare(parent);
             }
+            if(t.afterPrepare!=null)t.afterPrepare.run();
             tape=t;
             try{row.put("result",parent==null?Feature.FALLEN_TREE.place(config,f.region,f.generator,random,t.origin):
                 Boolean.getBoolean("fallen.nativeParent")?f.placeParent(parent,random,t.origin):parent.place(f.region,f.generator,random,t.origin));}
@@ -446,9 +454,10 @@ public final class FallenAudit {
                 });
                 fixture(level,"parent-edge-read-radius-attached",42,"flat",(f,t)->config(BlockStateProvider.simple(Blocks.OAK_LOG),16,List.of(),List.of(new AttachedToLogsDecorator(1,BlockStateProvider.simple(Blocks.RED_MUSHROOM),List.of(Direction.EAST)))));
             }
+            if(Boolean.getBoolean("fallen.chainRisks"))FallenChainRisks.run(level);
             var gson=new GsonBuilder().setPrettyPrinting().create();
             Files.writeString(OUTPUT.resolve("fixtures.json"),gson.toJson(ROWS));
-            Files.writeString(OUTPUT.resolve("complete.json"),gson.toJson(Map.of("success",true,"fixtures",ROWS.size(),"programAdapterEntries",programAdapterEntries,"stockVmDecorationWrites",stockVmDecorationWrites,"legacyFallenBodies",legacyFallenBodies,"legacyAttachedBodies",legacyAttachedBodies)));
+            Files.writeString(OUTPUT.resolve("complete.json"),gson.toJson(Map.of("success",true,"fixtures",ROWS.size(),"programAdapterEntries",programAdapterEntries,"stockVmDecorationWrites",stockVmDecorationWrites,"legacyFallenBodies",legacyFallenBodies,"legacyAttachedBodies",legacyAttachedBodies,"chainBridgeEntries",chainBridgeEntries)));
             System.out.println("FALLEN_COMPLETE "+ROWS.size());
         }catch(Throwable failure){
             failure.printStackTrace();try{Files.writeString(OUTPUT.resolve("failed.txt"),failure.toString());}catch(Exception ignored){}

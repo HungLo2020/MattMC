@@ -71,7 +71,7 @@ def main():
     source_images = {str(p): sha(p) for p in sorted(SOURCES.glob('*')) if p.is_file()}
     if args.frozen_observations:
         saved = args.frozen_observations.resolve().parent.parent / 'observer-source'
-        for name in ['FallenAudit.java', 'FallenAgent.java']:
+        for name in [source.name for source in sorted(SOURCES.glob('*.java'))]:
             assert sha(saved / name) == sha(SOURCES / name), ('Observer differs from preserved Frozen', name)
     sides = args.sides.split(',')
     classpaths = {'pre': (pre / 'classpath.txt').read_text().strip(),

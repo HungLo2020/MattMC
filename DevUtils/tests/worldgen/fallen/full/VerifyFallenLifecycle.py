@@ -8,7 +8,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True);p.add_argument('--inputs',type=Path,required=True);p.add_argument('--current-classpath',type=Path);p.add_argument('--current-native',type=Path);args=p.parse_args();args.inputs=args.inputs.resolve();out=args.output.resolve();assert out.is_relative_to(fallen.ROOT/'build');out.mkdir(parents=True,exist_ok=False)
     source=json.loads((args.inputs/'result.json').read_text());assert source['passed'] and source['guards_pass']
     original=json.loads((args.inputs/'current-fresh/command.json').read_text());cp=original[original.index('-cp')+1];native=next(s.split('=',1)[1]for s in original if s.startswith('-Dmattmc.rust.natives.dir='))
-    sources=[Path(__file__).parents[1]/'FallenAudit.java',Path(__file__).with_name('FallenLifecycle.java'),Path(__file__).with_name('FallenLifecycleAgent.java')]
+    sources=[Path(__file__).parents[1]/'FallenAudit.java',Path(__file__).parents[1]/'FallenChainRisks.java',Path(__file__).with_name('FallenLifecycle.java'),Path(__file__).with_name('FallenLifecycleAgent.java')]
     images={**source['class_images'],**source['native_images'],**{str(s):fallen.sha(s)for s in sources}}
     assert bool(args.current_classpath)==bool(args.current_native)
     if args.current_classpath:

@@ -156,7 +156,7 @@ pub unsafe extern "C" fn mattmc_fallen_vines_place(
 
 /// Decorator Context.isAir reads the WorldGenRegion, including its wider
 /// read cache. Region.is_air is BulkSectionAccess's bounded read instead.
-fn level_air(region: &super::region::Region<'_>, pos: [i32; 3]) -> super::region::Result<bool> {
+pub(crate) fn level_air(region: &super::region::Region<'_>, pos: [i32; 3]) -> super::region::Result<bool> {
     let state = region.level_block_state(pos[0], pos[1], pos[2])?;
     let registry = region.registry();
     if state as usize >= registry.state_count() {

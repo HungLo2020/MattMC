@@ -333,7 +333,7 @@ fn java_hash_set_tree_bins_match_java() {
 /// its retained VM configuration index is not mistaken for a native state set.
 #[test]
 fn fallen_program_admits_all_orientations_and_validates_sets() {
-    let payload = [1, 1, 1, 7, 1, 8, 0, 0, 1, 2, 1, 7, 8, 9];
+    let payload = [1, 1, 1, 7, 1, 8, 0, 0, 1, 2, 1, 7, 8, 9, -1, -1];
     let mut words = vec![3, 0, 61, payload.len() as i32];
     words.extend(payload);
     tail(&mut words, &[&[1], &[2]], &[]);
@@ -350,4 +350,24 @@ fn fallen_program_admits_all_orientations_and_validates_sets() {
     let mut missing_axis = words.clone();
     missing_axis[4 + 11] = 6;
     assert!(Program::decode(&missing_axis).is_none(), "provider state lacks an orientation entry");
+}
+
+#[test]
+fn fallen_chain_provider_and_vine_states_are_in_write_admission() {
+    let mut payload = vec![1, 1, 1, 7, 1, 8, 0, 0, 1, 2, 1, 7, 8, 9];
+    // One attached stump decorator; one vine log decorator. All states must
+    // participate in the existing region's whole-program write admission.
+    payload.extend([1, 0, 0.5f32.to_bits() as i32, 1, 1, 1, 10, 1, 1]);
+    payload.extend([1, 1, 11, 12, 13, 14]);
+    let mut words = vec![3, 0, 61, payload.len() as i32];
+    words.extend(payload);
+    tail(&mut words, &[&[1], &[2]], &[]);
+    let program = Program::decode(&words).expect("compiled ordered decorators");
+    assert_eq!(program.placed.feature.set_block_states(), vec![7, 8, 9, 10, 11, 12, 13, 14]);
+    for end in 0..words.len() {
+        assert!(Program::decode(&words[..end]).is_none(), "truncated chain at {end}");
+    }
+    let mut invalid_direction = words.clone();
+    invalid_direction[4 + 22] = 6;
+    assert!(Program::decode(&invalid_direction).is_none(), "direction outside actual enum");
 }

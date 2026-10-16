@@ -21,13 +21,14 @@ def main():
     parser.add_argument('--warmups',type=int,default=256)
     parser.add_argument('--groups',type=int,default=12)
     parser.add_argument('--batch',type=int,default=32)
+    parser.add_argument('--chains',action='store_true',help='Also measure complete JDK/Guava four-decorator stump/log chains on all four public routes')
     args=parser.parse_args();out=args.output.resolve();assert out.is_relative_to(ROOT/'build');out.mkdir(parents=True,exist_ok=False)
     frozen=ROOT.parent/'MattMC_JavaPerfTesting/MattMC'
     assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=frozen,text=True).strip()=='7a4d181717dc0c7da9086f1a17687dfd522ce417'
     assert not subprocess.check_output(['git','status','--porcelain','--','src','build.gradle'],cwd=frozen)
     cp={side:(path.read_text().strip()) for side,path in {'frozen':args.reference/'frozen-classpath.txt','pre':args.reference/'classpath.txt','current':args.current_classpath}.items()}
     native={'pre':(args.reference/'native').resolve(),'current':args.current_native.resolve()}
-    sources=[Path(__file__).parents[1]/'FallenAudit.java',*sorted(Path(__file__).parent.glob('*.java'))]
+    sources=[Path(__file__).parents[1]/'FallenAudit.java',Path(__file__).parents[1]/'FallenChainRisks.java',*sorted(Path(__file__).parent.glob('*.java'))]
     images={str(p):sha(p) for p in [*sources,Path(__file__).resolve()]}
     for value in cp.values():
         for entry in value.split(os.pathsep):
@@ -51,6 +52,7 @@ def main():
             run=out/side;run.mkdir();server=run/'server';server.mkdir();(server/'eula.txt').write_text('eula=true\n')
             (server/'server.properties').write_text('level-seed=42\nlevel-name=world\nserver-ip=127.0.0.1\nserver-port=0\nonline-mode=false\nview-distance=2\nsimulation-distance=2\nmax-tick-time=-1\npause-when-empty-seconds=-1\nsync-chunk-writes=false\n')
             command=['taskset','-c','2-7',str(JAVA/'java'),'-Xms2G','-Xmx4G','-XX:+UseZGC','-XX:+UseCompactObjectHeaders','-Dmax.bg.threads=1','--enable-native-access=ALL-UNNAMED',f'-Daudit.output={run}',f'-Dfallen.cost.side={side}',f'-Dfallen.cost.warmups={args.warmups}',f'-Dfallen.cost.groups={args.groups}',f'-Dfallen.cost.batch={args.batch}',f'-javaagent:{prepared[side]}']
+            command.append(f'-Dfallen.cost.chains={str(args.chains).lower()}')
             if side!='frozen':command.append(f'-Dmattmc.rust.natives.dir={native[side]}')
             command+=['-cp',str(prepared[side])+os.pathsep+cp[side],'net.minecraft.server.Main','--nogui','--port','0'];(run/'command.json').write_text(json.dumps(command,indent=2))
             print('START',side,flush=True);start=time.monotonic();mapped=set()
@@ -73,7 +75,7 @@ def main():
             result['runs'][side]={'exit':process.returncode,'elapsed_seconds':time.monotonic()-start,'mapped_native':{p:sha(p) for p in sorted(mapped)}};save()
             assert process.returncode==0 and (run/'complete.json').exists(),run/'server.log'
             assert (not mapped if side=='frozen' else mapped and {sha(p) for p in mapped}=={sha(native[side]/'mattmc_rust-linux-x64.so')})
-            rows=json.loads((run/'costs.json').read_text());assert len(rows)==20
+            rows=json.loads((run/'costs.json').read_text());assert len(rows)==(28 if args.chains else 20)
             data[side]={(r['variant'],r['mode']):r for r in rows};print('DONE',side,flush=True)
         for key,old in data['frozen'].items():
             current=data['current'][key];pre=data['pre'][key]

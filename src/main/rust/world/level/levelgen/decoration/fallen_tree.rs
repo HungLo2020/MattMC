@@ -464,6 +464,94 @@ pub(crate) mod vines {
     }
 }
 
+/// Immutable admitted decorators share the placement's existing random, region
+/// and sorted context positions. The decision kernels are also used by the
+/// genuine VM-effect and child-region consumers; this is no new algorithm.
+#[derive(Clone, Debug, PartialEq)]
+enum Decorator {
+    Attached { probability: f32, provider: super::tree::Provider, directions: Vec<usize> },
+    Vines([u32; 4]),
+}
+impl Decorator {
+    fn read_chain(reader: &mut super::program::Reader) -> Option<Option<Vec<Self>>> {
+        let count = reader.next()?;
+        if count == -1 { return Some(None); }
+        let count = usize::try_from(count).ok().filter(|&n| n <= 4096)?;
+        let mut chain = Vec::with_capacity(count);
+        for _ in 0..count {
+            chain.push(match reader.next()? {
+                0 => {
+                    let probability = reader.float()?;
+                    let provider = super::tree::Provider::read(reader)?;
+                    if !provider.is_plain() { return None; }
+                    let count = reader.count(6).filter(|&n| n > 0)?;
+                    let directions = (0..count).map(|_| reader.count(5)).collect::<Option<_>>()?;
+                    Self::Attached { probability, provider, directions }
+                }
+                1 => Self::Vines([reader.state()?, reader.state()?, reader.state()?, reader.state()?]),
+                _ => return None,
+            });
+        }
+        Some(Some(chain))
+    }
+    fn states(&self, out: &mut Vec<u32>) {
+        match self {
+            Self::Attached { provider, .. } => provider.states(out),
+            Self::Vines(states) => out.extend(states),
+        }
+    }
+    fn place(&self, placement: &mut super::placement::Placement, positions: &[[i32; 3]]) -> super::region::Result<()> {
+        use super::fallen_tree_ffi::level_air;
+        match self {
+            Self::Attached { probability, provider, directions } => {
+                const SIDES: [[i32; 3]; 6] = [[0,-1,0],[0,1,0],[0,0,-1],[0,0,1],[-1,0,0],[1,0,0]];
+                let mut frame = attached::Frame::new(*probability);
+                let (mut selected, mut direction, mut target, mut block) = (0, 0, [0; 3], 0);
+                let mut reply = 0;
+                loop {
+                    use attached::Effect as E;
+                    let effect = frame.next(&mut placement.random, reply);
+                    reply = 0;
+                    match effect {
+                        E::SnapshotLogs => reply = positions.len() as i32,
+                        E::SelectLog(index) => selected = index,
+                        E::DirectionSize => reply = directions.len() as i32,
+                        E::DirectionAt(index) => direction = directions[index as usize],
+                        E::Relative(_) => target = std::array::from_fn(|axis|
+                            positions[selected][axis].wrapping_add(SIDES[direction][axis])),
+                        E::IsAir => reply = i32::from(level_air(placement.region, target)?),
+                        E::Provider => block = provider.plain_state(&mut placement.random).unwrap(),
+                        E::Set => { placement.region.set_block(target[0], target[1], target[2], block, 19)?; }
+                        E::InvalidBound(_) => unreachable!("admitted nonempty directions"),
+                        E::Done => break,
+                    }
+                }
+            }
+            Self::Vines(states) => {
+                const SIDES: [[i32; 3]; 4] = [[-1,0,0],[1,0,0],[0,0,-1],[0,0,1]];
+                for log in positions {
+                    let mut frame = vines::Frame::new();
+                    let mut reply = false;
+                    loop {
+                        match frame.next(&mut placement.random, reply) {
+                            vines::Effect::Air(side) => {
+                                let target = std::array::from_fn::<_,3,_>(|axis|log[axis].wrapping_add(SIDES[side][axis]));
+                                reply = level_air(placement.region, target)?;
+                            }
+                            vines::Effect::Place(side) => {
+                                let target = std::array::from_fn::<_,3,_>(|axis|log[axis].wrapping_add(SIDES[side][axis]));
+                                placement.region.set_block(target[0], target[1], target[2], states[side], 19)?;
+                            }
+                            vines::Effect::Done => break,
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Immutable native provider/length program. The root index retains the actual
 /// configuration only for its live decorator lists and genuine VM effects.
 #[derive(Clone, Debug, PartialEq)]
@@ -474,6 +562,8 @@ pub(crate) struct Config {
     sturdy: usize,
     root: usize,
     axes: Vec<(u32, [u32; 2])>,
+    stump: Option<Vec<Decorator>>,
+    logs: Option<Vec<Decorator>>,
 }
 impl Config {
     pub(crate) fn read(reader: &mut super::program::Reader) -> Option<Self> {
@@ -497,6 +587,8 @@ impl Config {
         {
             return None;
         }
+        let stump = Decorator::read_chain(reader)?;
+        let logs = Decorator::read_chain(reader)?;
         Some(Self {
             provider,
             length,
@@ -504,12 +596,17 @@ impl Config {
             sturdy,
             root,
             axes,
+            stump,
+            logs,
         })
     }
     pub(crate) fn states(&self, out: &mut Vec<u32>) {
         self.provider.states(out);
         for (_, states) in &self.axes {
             out.extend(states);
+        }
+        for decorator in self.stump.iter().chain(self.logs.iter()).flatten() {
+            decorator.states(out);
         }
     }
     pub(crate) fn sets(&self, out: &mut Vec<usize>) {
@@ -566,6 +663,22 @@ pub(crate) fn place(
             } else {
                 reply.value = i32::from(placement.program.in_set(config.sturdy, below));
                 continue;
+            }
+        }
+        if let Effect::Decorate(stump) = effect {
+            if !vm_world {
+                let chain = if stump { &config.stump } else { &config.logs };
+                if let Some(chain) = chain {
+                    // One native context belongs to this whole ordered chain.
+                    // No Java aliases exist for an admitted chain; all other
+                    // chains retain their actual VM traversal/context below.
+                    let mut positions = frame.decorator_positions(stump);
+                    positions.sort_by_key(|pos| pos[1]);
+                    for decorator in chain {
+                        decorator.place(placement, &positions)?;
+                    }
+                    continue;
+                }
             }
         }
         if vm_world || matches!(effect, Effect::Decorate(_)) {

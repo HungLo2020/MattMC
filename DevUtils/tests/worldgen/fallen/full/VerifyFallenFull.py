@@ -29,8 +29,12 @@ def main():
     parser.add_argument('--reopen',action='store_true')
     parser.add_argument('--timeout',type=int,default=3600)
     parser.add_argument('--reuse-baselines',type=Path,help='Reuse guarded original Frozen/pre runs; launch Current only')
+    parser.add_argument('--reuse-pre-current',type=Path,help='Use this guarded actual earlier Current run as the explicitly pinned new pre; preserve its original side identity')
+    parser.add_argument('--fresh-pre',action='store_true',help='Reuse Frozen only and launch the explicitly pinned pre and Current')
     parser.add_argument('--known-dimensions-debt',action='store_true',help='Report inherited Frozen debt separately; still require exact pre/Current and own reopen')
     args=parser.parse_args();out=args.output.resolve()
+    assert not(args.reuse_pre_current and args.fresh_pre)
+    assert not(args.reuse_pre_current or args.fresh_pre)or args.reuse_baselines
     assert out.is_relative_to(ROOT/'build');out.mkdir(parents=True,exist_ok=False)
     assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=full.FROZEN,text=True).strip()==full.FROZEN_HEAD
     assert not subprocess.check_output(['git','status','--porcelain','--','src','build.gradle'],cwd=full.FROZEN)
@@ -57,6 +61,21 @@ def main():
             assert all(Path(p).exists()and sha(p)==h for images in(prior['class_images'],prior['native_images'],resources)for p,h in images.items())
             for path,digest in prior['sources'].items():assert sha(baseline/'observer-source'/Path(path).name)==digest
             for side in('frozen','pre'):
+                if side=='pre' and args.fresh_pre:continue
+                if side=='pre' and args.reuse_pre_current:
+                    pinned=args.reuse_pre_current.resolve();actual=json.loads((pinned/'result.json').read_text())
+                    assert actual['guards_pass'] and actual['stage']==args.stage and actual['radius']==args.radius and actual['resume']==args.resume and actual['reopen']==args.reopen
+                    assert all(Path(p).exists()and sha(p)==h for images in(actual['class_images'],actual['native_images'])for p,h in images.items())
+                    # Bind the archived actual Current to this new pre's complete
+                    # selected classes and actual mapped native launch argument.
+                    assert all(actual['class_images'].get(p)==h for p,h in resource_manifest['complete_classes'].items())
+                    command=json.loads((pinned/'current-fresh/command.json').read_text())
+                    library=next(Path(arg.split('=',1)[1])/'mattmc_rust-linux-x64.so' for arg in command if arg.startswith('-Dmattmc.rust.natives.dir='))
+                    assert sha(library)==sha(natives['pre']/'mattmc_rust-linux-x64.so')==resource_manifest['native_sha256']
+                    for path in sources:assert sha(path)==sha(pinned/'observer-source'/path.name)
+                    regions['pre']=json.loads((pinned/'current-fresh/regions.json').read_text())
+                    result['runs']['pre']={'reused_from':str(pinned),'original_side':'current','pinned_pre_commit':resource_manifest['pre_commit'],'receipt_sha256':sha(pinned/'result.json'),'original':actual['runs']['current']}
+                    continue
                 regions[side]=json.loads((baseline/(side+'-fresh/regions.json')).read_text());result['runs'][side]={'reused_from':str(baseline),'original':prior['runs'][side]}
             old=(baseline/'observer-source/FallenFullAgent.java').read_text();new=Path(__file__).with_name('FallenFullAgent.java').read_text()
             for path in sources:
@@ -72,18 +91,20 @@ def main():
                 stripped=new.replace(branch,'');a=stripped.index('    /** SerializableChunkData');b=stripped.index('    public static void awaitEntities',a);stripped=stripped[:a]+stripped[b:];assert stripped==old
                 import VerifyBlockEntityObserver as membership
                 for side in('frozen','pre'):
-                    dumps=membership.chunks(baseline/(side+'-fresh/chunks.txt.gz'));assert len(dumps)==sum(r['chunks']for r in regions[side]);assert all(not membership.entries(data[0])[0]for data in dumps.values())
+                    archived=json.loads((baseline/(side+'-fresh/regions.json')).read_text())
+                    dumps=membership.chunks(baseline/(side+'-fresh/chunks.txt.gz'));assert len(dumps)==sum(r['chunks']for r in archived);assert all(not membership.entries(data[0])[0]for data in dumps.values())
                 result['reference_observer_impact']='Only audit collection sorting differs; all125 original dimension block-entity lists are empty on each reference'
             result['reused_baseline_receipt_sha256']=sha(baseline/'result.json');save()
         prepared={}
-        for side in(('current',)if args.reuse_baselines else classpaths):
+        launch_sides=('pre','current')if args.fresh_pre else(('current',)if args.reuse_baselines else tuple(classpaths))
+        for side in launch_sides:
             cp=classpaths[side]
             target=out/(side+'-agent');target.mkdir()
             with(out/(side+'-compile.log')).open('w')as log:subprocess.run([str(JAVA/'javac'),'-g','-nowarn','-cp',cp,'-d',str(target),*map(str,sources)],stdout=log,stderr=subprocess.STDOUT,check=True)
             manifest=out/(side+'-MANIFEST.MF');manifest.write_text('Premain-Class: fullgeneration.FallenFullAgent\n\n')
             jar=out/(side+'-agent.jar');subprocess.run([str(JAVA/'jar'),'cfm',str(jar),str(manifest),'-C',str(target),'.'],check=True,capture_output=True)
             prepared[side]=(cp,jar)
-        for side in(('current',)if args.reuse_baselines else('frozen','pre','current')):
+        for side in launch_sides:
             selected=copy.copy(runtime);selected.jvm_arg=[f'-Dfallen.fullRequireNative={str(side=="current").lower()}','-Dfallen.fullAwaitEntities=true']
             launch_side='reference'if side=='pre'else side
             rows,process=full.launch(launch_side,side+'-fresh',*prepared[side],out,selected,env)

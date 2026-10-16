@@ -17,7 +17,8 @@ public final class FallenAgent {
                 boolean state=owner.equals("net/minecraft/world/level/block/state/BlockBehaviour$BlockStateBase");
                 boolean feature=owner.equals("net/minecraft/world/level/levelgen/feature/FallenTreeFeature");
                 boolean decorator=owner.equals("net/minecraft/world/level/levelgen/feature/treedecorators/AttachedToLogsDecorator");
-                if(!server&&!region&&!chunk&&!state&&!feature&&!decorator)return null;
+                boolean fallenNative=owner.equals("net/minecraft/world/level/levelgen/NativeFallenTrees");
+                if(!server&&!region&&!chunk&&!state&&!feature&&!decorator&&!fallenNative)return null;
                 var reader=new ClassReader(bytes);var writer=new ClassWriter(reader,ClassWriter.COMPUTE_MAXS);
                 reader.accept(new ClassVisitor(Opcodes.ASM9,writer){
                     public MethodVisitor visitMethod(int access,String name,String desc,String signature,String[] exceptions){
@@ -40,6 +41,7 @@ public final class FallenAgent {
                                 }
                                 if(feature&&name.equals("place")&&desc.equals("(Lnet/minecraft/world/level/levelgen/feature/FeaturePlaceContext;)Z"))call("legacyAdapter","()V");
                                 if(feature&&name.equals("placeFallenTree"))call("legacyBody","()V");
+                                if(fallenNative&&name.equals("decorate"))call("chainBridge","()V");
                             }
                             public void visitMethodInsn(int opcode,String owner,String name,String desc,boolean itf){
                                 if(decorator&&owner.equals("net/minecraft/Util")&&name.equals("shuffledCopy"))call("legacyDecorator","()V");

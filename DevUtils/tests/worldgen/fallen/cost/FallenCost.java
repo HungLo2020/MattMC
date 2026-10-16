@@ -61,7 +61,18 @@ public final class FallenCost {
     }
     static Map<String,Object> one(ServerLevel level,String variant,String mode)throws Throwable{
         var registry=level.registryAccess().lookupOrThrow(Registries.CONFIGURED_FEATURE);
-        var configured=registry.getValue(net.minecraft.resources.ResourceLocation.parse("minecraft:fallen_"+variant+"_tree"));
+        var configured=registry.getValue(net.minecraft.resources.ResourceLocation.parse("minecraft:fallen_"+(variant.startsWith("chain_")?"oak":variant)+"_tree"));
+        if(variant.startsWith("chain_")){
+            var original=(FallenTreeConfiguration)configured.config();
+            var stock=original.logDecorators.getFirst();
+            List<net.minecraft.world.level.levelgen.feature.treedecorators.TreeDecorator> chain=variant.equals("chain_guava")?
+                com.google.common.collect.ImmutableList.of(net.minecraft.world.level.levelgen.feature.treedecorators.TrunkVineDecorator.INSTANCE,stock,
+                    net.minecraft.world.level.levelgen.feature.treedecorators.TrunkVineDecorator.INSTANCE,stock):
+                List.of(net.minecraft.world.level.levelgen.feature.treedecorators.TrunkVineDecorator.INSTANCE,stock,
+                    net.minecraft.world.level.levelgen.feature.treedecorators.TrunkVineDecorator.INSTANCE,stock);
+            configured=new ConfiguredFeature<>(Feature.FALLEN_TREE,new FallenTreeConfiguration.FallenTreeConfigurationBuilder(
+                original.trunkProvider,original.logLength).stumpDecorators(chain).logDecorators(chain).build());
+        }
         var leaf=new PlacedFeature(Holder.direct(configured),List.of());
         var placed=mode.equals("selector")?new PlacedFeature(Holder.direct(new ConfiguredFeature<>(Feature.RANDOM_BOOLEAN_SELECTOR,new RandomBooleanFeatureConfiguration(Holder.direct(leaf),Holder.direct(leaf)))),List.of()):leaf;
         var f=new FallenAudit.Fixture(level);
@@ -97,10 +108,12 @@ public final class FallenCost {
     static void run(MinecraftServer server){
         try{
             THREADS.setThreadAllocatedMemoryEnabled(true);var rows=new ArrayList<Map<String,Object>>();
-            for(String variant:List.of("oak","birch","super_birch","jungle","spruce"))for(String mode:List.of("configured","placed","native","selector")){
+            var variants=new ArrayList<>(List.of("oak","birch","super_birch","jungle","spruce"));
+            if(Boolean.getBoolean("fallen.cost.chains"))variants.addAll(List.of("chain_jdk","chain_guava"));
+            for(String variant:variants)for(String mode:List.of("configured","placed","native","selector")){
                 rows.add(one(server.overworld(),variant,mode));System.out.println("FALLEN_COST "+variant+" "+mode);
             }
-            var output=Path.of(System.getProperty("audit.output"));Files.writeString(output.resolve("costs.json"),new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(rows));Files.writeString(output.resolve("complete.json"),"{\"success\":true,\"cases\":20}");
+            var output=Path.of(System.getProperty("audit.output"));Files.writeString(output.resolve("costs.json"),new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(rows));Files.writeString(output.resolve("complete.json"),new com.google.gson.Gson().toJson(Map.of("success",true,"cases",variants.size()*4)));
         }catch(Throwable failure){failure.printStackTrace();try{Files.writeString(Path.of(System.getProperty("audit.output"),"failed.txt"),failure.toString());}catch(Exception ignored){}}
         server.halt(false);
     }
