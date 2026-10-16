@@ -1,9 +1,9 @@
 # Per-engine lighting coordinator
 
-**S0026 candidate:** stock node checks, section lifecycle, queued reconciliation,
+**S0026/r4 landed** in [3f1d4307](https://github.com/HungLo2020/MattMC/commit/3f1d4307dd0ee33022f48d70761bf171e670db90) on October 16, 2026. Stock node checks, section lifecycle, queued reconciliation,
 COW, publication/notification and whole sky-source seeding now share native
 ownership. Seven complete workloads meet the general allowance; the exact
-retained-import workload has a bounded coordinator exception. Publication is pending.
+retained-import workload has a bounded coordinator exception.
 The approved S0026/r4 continuation connects saved/public producers, typed
 threaded commands and actual generation/root lifetime to those consumers.
 Primary owners, native propagation inputs and saved-light handoff have focused
@@ -12,11 +12,11 @@ the real level bindings and PRE/POST queue. Shared identity resources and repeat
 entry handoff, typed imports/retention, and the connected status frame have
 focused verification after correcting fallible binding timing. Connected
 enable/source commands now match the portable effects and larger engine/threaded
-observers. The guarded r4 Java31/native `fc1e557a` pair passes ordinary/parity/slow
-Java tiers; the full Rust suite retains the same 57 rendering-host failures.
-All six actual server fresh/reopen checks also pass for that exact image.
-Cost acceptance remains open. Java21/native `011e83c3` below
-is the preserved r3 reference, not validation of the new changes.
+observers. The historical r4 Java31/native `fc1e557a` pair passed ordinary/parity/slow
+Java tiers; its full Rust suite retained the same 57 rendering-host failures.
+All six actual server fresh/reopen checks also passed for that exact image.
+Cost acceptance was still open for that image. Java21/native `011e83c3` below
+is the preserved r3 reference, not validation of the later changes.
 
 The connected level pending/update and task-pass consumer now has a guarded
 Java33/native `7d49c5a0` image: 113 affected Rust tests, the full Java tiers,
@@ -327,13 +327,14 @@ The audit stores scalar counters rather than engine/world roots and claims no
 client, network or timing validation.
 
 Run ordinary, parity and slow Java tasks separately as described in
-[testing](../../tooling/TESTING.md), plus the full Rust suite. The candidate's final
-Java run is 2,211 ordinary tests (6 skipped), 193 parity and 11 slow, with no
+[testing](../../tooling/TESTING.md), plus the full Rust suite. For the preserved
+r3 Java21/native `011e83c3` image, the final Java run was 2,211 ordinary tests
+(6 skipped), 193 parity and 11 slow, with no
 failures. The full Rust run is **2,869 passed, 57 failed, 9 ignored**. All 57
 failure names and normalized failure bodies match the earlier host-renderer
 run; this is an explicit non-green full-suite result, not a claimed hardware pass.
 
-The latest actual pair uses native `011e83c3` and complete-scope Java21. All 13
+That r3 pair used native `011e83c3` and complete-scope Java21. All 13
 changed Java sources compile together. Only `SkyLightEngine.class` changed after
 the Java20 full-scope check; normal 27,534/threaded 50,144 observations and the
 536-row source gate pass. Eight actual omissions are killed. The protected
@@ -341,6 +342,10 @@ the Java20 full-scope check; normal 27,534/threaded 50,144 observations and the
 facade/adapter classes are unchanged by the last sky-only correction.
 
 ## Complete costs and open acceptance
+
+The r3 results and then-open decisions below are preserved historical evidence.
+The [landed r4 scope and exact retained-import exception](#per-engine-lighting-coordinator)
+are recorded above; these earlier failed costs remain historical evidence.
 
 `BenchmarkLightCoordinator.py` uses the standard capture arguments and supports
 `--modes direct-empty,direct-seed,queued-retained`. Source production includes COW,
