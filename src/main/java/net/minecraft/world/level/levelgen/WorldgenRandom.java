@@ -21,6 +21,16 @@ public class WorldgenRandom extends LegacyRandomSource {
 		return this.count;
 	}
 
+	/** Internal native invocation handoff of this wrapper's actual draw count. */
+	public int nativeCount() {
+		return this.count;
+	}
+
+	/** Native draws and genuine Java callbacks share the original physical field. */
+	public void nativeSetCount(int count) {
+		this.count = count;
+	}
+
 	@Override
 	public RandomSource fork() {
 		return this.randomSource.fork();

@@ -279,6 +279,8 @@ pub(crate) enum Feature {
     RandomBooleanSelector(Box<Placed>, Box<Placed>),
     /// `TreeFeature`.
     Tree(Box<TreeConfig>),
+    /// Complete fallen-tree cursor over the existing native region.
+    Fallen(Box<super::fallen_tree::Config>),
     /// `RandomPatchFeature`: tries, X/Z and Y spread, and the nested placement.
     RandomPatch { tries: i32, xz: i32, y: i32, placed: Box<Placed> },
     /// `SimpleBlockFeature` over a simple or weighted provider, with each
@@ -327,6 +329,7 @@ impl Feature {
             Feature::SimpleRandomSelector(_) => 6,
             Feature::RandomBooleanSelector(..) => 7,
             Feature::Tree(_) => 8,
+            Feature::Fallen(_) => 61,
             Feature::Java(_) => 9,
             Feature::RandomPatch { .. } => 10,
             Feature::SimpleBlock { .. } => 11,
@@ -351,6 +354,7 @@ impl Feature {
                 b.feature.collect_set_block_states(out);
             }
             Feature::Tree(tree) => tree.states(out),
+            Feature::Fallen(config) => config.states(out),
             Feature::Java(_) => {}
             Feature::RandomPatch { placed, .. } => placed.feature.collect_set_block_states(out),
             // Recorded by the reader while decoding.
@@ -383,6 +387,7 @@ impl Feature {
                 b.sets(out);
             }
             Feature::Tree(tree) => tree.sets(out),
+            Feature::Fallen(config) => config.sets(out),
             Feature::Java(_) | Feature::Vegetation(_) => {}
             Feature::Patch(patch) => patch.sets(out),
             Feature::RandomPatch { placed, .. } => placed.sets(out),
@@ -446,6 +451,7 @@ impl Feature {
                 Box::new(Placed::read(reader, depth + 1, false)?),
             ),
             8 => Feature::Tree(Box::new(TreeConfig::read(reader)?)),
+            61 => Feature::Fallen(Box::new(super::fallen_tree::Config::read(reader)?)),
             99 => Feature::Java(reader.next().filter(|&i| i >= 0)?),
             47 | 48 => Feature::Patch(Box::new(super::patch::Patch::read(reader, depth)?)),
             12..=46 | 49..=60 => Feature::Vegetation(Box::new(super::vegetation::Vegetation::read(kind, reader, depth)?)),

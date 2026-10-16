@@ -984,6 +984,10 @@ public final class NativeDecorationEncoder {
 		} else if (feature == Feature.TREE && feature.getClass() == TreeFeature.class && config.getClass() == TreeConfiguration.class) {
 			kind = 8;
 			if (!this.tree((TreeConfiguration)config)) return false;
+		} else if (feature == Feature.FALLEN_TREE && feature.getClass() == net.minecraft.world.level.levelgen.feature.FallenTreeFeature.class
+                && config.getClass() == net.minecraft.world.level.levelgen.feature.configurations.FallenTreeConfiguration.class) {
+            kind = 61;
+            if (!this.fallen(configured, (net.minecraft.world.level.levelgen.feature.configurations.FallenTreeConfiguration)config)) return this.javaLeaf(configured, header);
 		} else if ((feature == Feature.RANDOM_PATCH || feature == Feature.FLOWER || feature == Feature.NO_BONEMEAL_FLOWER) && feature.getClass() == RandomPatchFeature.class && config.getClass() == RandomPatchConfiguration.class) {
 			kind = 10;
 			var patch = (RandomPatchConfiguration)config;
@@ -1686,6 +1690,34 @@ public final class NativeDecorationEncoder {
 		}
 		return this.decline(provider.getClass());
 	}
+
+    /** One immutable provider program for an actual retained decorator call. */
+    static int[] fallenProvider(BlockStateProvider provider) {
+        if(provider==null||(provider.getClass()!=SimpleStateProvider.class&&provider.getClass()!=WeightedStateProvider.class))return null;
+        var encoder=new NativeDecorationEncoder(null,0,List.of());
+        try{if(!encoder.provider(provider))return null;}
+        catch(ReflectiveOperationException failure){return null;}
+        return encoder.words.stream().mapToInt(Integer::intValue).toArray();
+    }
+
+    /** Native geometry/provider program; retain original lists as effect resources. */
+    private boolean fallen(ConfiguredFeature<?,?> configured,
+            net.minecraft.world.level.levelgen.feature.configurations.FallenTreeConfiguration config) throws ReflectiveOperationException {
+        if(config.trunkProvider==null||config.logLength==null||config.stumpDecorators==null||config.logDecorators==null)return false;
+        var states=this.providerStates(config.trunkProvider);
+        if(states==null||states.size()>256||!this.provider(config.trunkProvider)||!this.intProvider(config.logLength))return false;
+        this.words.add(this.set("valid_tree",state->state.isAir()||state.is(BlockTags.REPLACEABLE_BY_TREES)));
+        this.words.add(this.set("fallen_sturdy_up",state->!state.getBlock().hasDynamicShape()
+            &&state.isFaceSturdy(net.minecraft.world.level.EmptyBlockGetter.INSTANCE,net.minecraft.core.BlockPos.ZERO,Direction.UP)));
+        this.words.add(this.javaFeatures.size());this.javaFeatures.add(configured);
+        this.words.add(states.size());
+        for(var state:states){
+            this.words.add(stateId(state));
+            this.words.add(stateId(state.trySetValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,Direction.Axis.X)));
+            this.words.add(stateId(state.trySetValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,Direction.Axis.Z)));
+        }
+        return true;
+    }
 
 	private boolean tree(TreeConfiguration tree) throws ReflectiveOperationException {
 		if (!this.provider(tree.trunkProvider) || !this.provider(tree.foliageProvider) || !this.provider(tree.dirtProvider)) return false;

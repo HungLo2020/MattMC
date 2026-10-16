@@ -107,6 +107,17 @@ public final class NativeDecoration {
 		return call.region.refresh(true, true) == NativeDecorationRegion.REFRESHED ? call.region : null;
 	}
 	static MemorySegment endCallback() { return UPCALL; }
+    static NativeDecorationRegion fallenRegion(WorldGenLevel level) { return endRegion(level); }
+    static MemorySegment fallenCallback() { return UPCALL; }
+    /** Publish a child consumer's complete effect prefix before the next VM effect. */
+    static void finishFallenRegion(NativeDecorationRegion region,int status) {
+        region.afterPlacement();replayEvents(region);region.resetAfterSync();
+        if(status==PLACED)return;
+        var call=CURRENT.get();
+        if(call!=null&&call.failure!=null)throw NativeFallenTrees.<RuntimeException>propagate(call.failure);
+        if(status==UNAVAILABLE_CHUNK)throw region.unavailableChunk();
+        throw new IllegalStateException("Native fallen decorator returned "+status);
+    }
 	private static final MemorySegment UPCALL;
 
 	static {
@@ -132,6 +143,7 @@ public final class NativeDecoration {
 		/** OP_WARM calls made for this placement: CURRENT is per thread and restored
 		 * after nested placements, so each placement counts only its own. */
 		long warmCalls;
+		NativeFallenTrees.Generation fallen;
 		/** Set for the native step loop: its plan's programs by slot, and Java's steps. */
 		@Nullable
 		Plan plan;
@@ -618,7 +630,10 @@ public final class NativeDecoration {
 	@Nullable
 	public static Boolean placeWithRandom(Programs programs, NativeDecorationRegion region, ChunkGenerator generator, WorldGenLevel level,
 										  WorldgenRandom random, PlacedFeature feature, BlockPos origin) {
-		if (!ENABLED || !(random.nativeSource() instanceof XoroshiroRandomSource source)) return null;
+		// Native placements project coordinate values. Preserve a caller-owned
+		// mutable/custom origin before any program lookup, draw or world effect.
+		if (!ENABLED || !nativeRandom(random) || origin == null || origin.getClass() != BlockPos.class) return null;
+		var source = (XoroshiroRandomSource)random.nativeSource();
 		var program = programs.program(feature, generator, region);
 		if (program == null || JAVA_KINDS.contains(program.kind)) {
 			javaWork(level, "FeaturePoolElement_unencoded_" + feature.feature().unwrapKey().map(k -> k.location().toString()).orElse(feature.feature().value().feature().toString()));
@@ -635,16 +650,11 @@ public final class NativeDecoration {
 		var generatorState = source.nativeGenerator();
 		int result;
 		try (var arena = Arena.ofConfined()) {
-			var state = arena.allocate(32, 8);
-			state.setAtIndex(ValueLayout.JAVA_LONG, 0, generatorState.nativeSeedLo());
-			state.setAtIndex(ValueLayout.JAVA_LONG, 1, generatorState.nativeSeedHi());
-			putGaussian(state, 2, random.nativeGaussian());
+			var state = arena.allocate(40, 8);
+			putInvocation(state, 0, random);
 			result = (int)PLACE_WITH_RANDOM.invokeExact(program.pointer, region.words(), (int)(region.words().byteSize() / 8),
 				region.out(), (int)(region.out().byteSize() / 8), origin.getX(), origin.getY(), origin.getZ(), UPCALL, state);
-			if (result == PLACED || result == NOT_PLACED || result == UNAVAILABLE_CHUNK) {
-				generatorState.nativeSetState(state.getAtIndex(ValueLayout.JAVA_LONG, 0), state.getAtIndex(ValueLayout.JAVA_LONG, 1));
-				takeGaussian(state, 2, random.nativeGaussian());
-			}
+			takeInvocation(state, 0, random);
 		} catch (RuntimeException | Error failure) {
 			throw failure;
 		} catch (Throwable failure) {
@@ -669,6 +679,7 @@ public final class NativeDecoration {
 				var failure = call.failure;
 				if (failure instanceof RuntimeException runtime) throw runtime;
 				if (failure instanceof Error error) throw error;
+                if (failure != null) throw NativeFallenTrees.<RuntimeException>propagate(failure);
 				throw new IllegalStateException("Native decoration upcall failed for " + feature, failure);
 			}
 			case UNAVAILABLE_CHUNK -> {
@@ -686,6 +697,7 @@ public final class NativeDecoration {
 	 */
 	public static boolean place(Programs programs, NativeDecorationRegion region, ChunkGenerator generator, WorldGenLevel level,
 								WorldgenRandom random, PlacedFeature feature, long seed, int index, int step, BlockPos origin) {
+		if (!nativeRandom(random)) return false;
 		var program = programs.program(feature, generator, region);
 		if (program == null || JAVA_KINDS.contains(program.kind)) {
 			JAVA.increment();
@@ -708,14 +720,16 @@ public final class NativeDecoration {
 		CURRENT.set(call);
 		int result;
 		var gaussian = random.nativeGaussian();
+		int countBefore = random.nativeCount();
 		boolean gaussianBefore = gaussian.nativeHas();
 		double gaussianValueBefore = gaussian.nativeValue();
 		try (var arena = Arena.ofConfined()) {
-			var cache = arena.allocate(16, 8);
+			var cache = arena.allocate(56, 8);
 			putGaussian(cache, 0, gaussian);
+			putInvocation(cache, 2, random);
 			result = (int)PLACE.invokeExact(program.pointer, region.words(), (int)(region.words().byteSize() / 8),
 				region.out(), (int)(region.out().byteSize() / 8), seed, index, step, origin.getX(), origin.getY(), origin.getZ(), UPCALL, cache);
-			takeGaussian(cache, 0, gaussian);
+			takeInvocation(cache, 2, random);
 		} catch (Throwable failure) {
 			throw new IllegalStateException("Native decoration failed", failure);
 		} finally {
@@ -734,6 +748,7 @@ public final class NativeDecoration {
 					boolean nativeHas = gaussian.nativeHas();
 					double nativeValue = gaussian.nativeValue();
 					gaussian.nativeSet(gaussianBefore, gaussianValueBefore);
+					random.nativeSetCount(countBefore);
 					if (freeze != null) freeze.afterNative(call.warmCalls);
 					verify(region, before, maps, level, generator, random, feature, origin, levelRandom, freeze);
 					if (gaussian.nativeHas() != nativeHas || nativeHas && Double.doubleToRawLongBits(gaussian.nativeValue()) != Double.doubleToRawLongBits(nativeValue)) {
@@ -747,6 +762,7 @@ public final class NativeDecoration {
 				var failure = call.failure;
 				if (failure instanceof RuntimeException runtime) throw runtime;
 				if (failure instanceof Error error) throw error;
+                if (failure != null) throw NativeFallenTrees.<RuntimeException>propagate(failure);
 				throw new IllegalStateException("Native decoration upcall failed for " + feature, failure);
 			}
 			case JAVA_ROUTE -> {
@@ -785,7 +801,7 @@ public final class NativeDecoration {
 								long seed, java.util.function.Supplier<? extends java.util.Collection<Holder<net.minecraft.world.level.biome.Biome>>> biomes,
 								long structures, BlockPos origin, List<net.minecraft.world.level.biome.FeatureSorter.StepFeatureData> steps, int stepCount,
 								Sequence sequence) {
-		if (!ENABLED || VERIFY || PROFILE || JAVA_SEQUENCE || stepCount > 64) return DECORATION_DECLINED;
+		if (!ENABLED || VERIFY || PROFILE || JAVA_SEQUENCE || stepCount > 64 || !nativeRandom(random)) return DECORATION_DECLINED;
 		Plan plan = programs.plan(generator, region, steps, stepCount);
 		int refresh = plan == null ? -1 : region.refresh(true, true);
 		if (refresh != NativeDecorationRegion.REFRESHED) {
@@ -804,8 +820,9 @@ public final class NativeDecoration {
 		int status;
 		long[] info;
 		try (var arena = Arena.ofConfined()) {
-			var infoSegment = arena.allocate((8 + NATIVE_BY_KIND.length) * 8L, 8);
+			var infoSegment = arena.allocate((8 + NATIVE_BY_KIND.length + 5) * 8L, 8);
 			putGaussian(infoSegment, 6, random.nativeGaussian());
+			putInvocation(infoSegment, 8 + NATIVE_BY_KIND.length, random);
 			var tableSegment = arena.allocateFrom(ValueLayout.JAVA_INT, table.length == 0 ? new int[1] : table);
 			status = (int)DECORATE_GATHERING.invokeExact(plan.pointer, region.words(), (int)(region.words().byteSize() / 8), region.out(),
 				(int)(region.out().byteSize() / 8), seed, tableSegment, table.length, structures, origin.getX(), origin.getY(), origin.getZ(), UPCALL, infoSegment);
@@ -827,11 +844,12 @@ public final class NativeDecoration {
 				var ids = arena.allocate(Math.max(1, biomeIds.length) * 4L, 4);
 				MemorySegment.copy(biomeIds, 0, ids, ValueLayout.JAVA_INT, 0, biomeIds.length);
 				putGaussian(infoSegment, 6, random.nativeGaussian());
+			putInvocation(infoSegment, 8 + NATIVE_BY_KIND.length, random);
 				status = (int)DECORATE.invokeExact(plan.pointer, region.words(), (int)(region.words().byteSize() / 8), region.out(),
 					(int)(region.out().byteSize() / 8), seed, ids, biomeIds.length, structures, origin.getX(), origin.getY(), origin.getZ(), UPCALL, infoSegment);
 			}
 			info = infoSegment.toArray(ValueLayout.JAVA_LONG);
-			takeGaussian(infoSegment, 6, random.nativeGaussian());
+			takeInvocation(infoSegment, 8 + NATIVE_BY_KIND.length, random);
 		} catch (RuntimeException | Error failure) {
 			throw failure;
 		} catch (Throwable failure) {
@@ -855,6 +873,7 @@ public final class NativeDecoration {
 				var failure = call.failure;
 				if (failure instanceof RuntimeException runtime) throw runtime;
 				if (failure instanceof Error error) throw error;
+                if (failure != null) throw NativeFallenTrees.<RuntimeException>propagate(failure);
 				throw new IllegalStateException("Native decoration upcall failed", failure);
 			}
 			case UNAVAILABLE_CHUNK -> {
@@ -963,7 +982,48 @@ public final class NativeDecoration {
 		return out.append('}').toString();
 	}
 
+	private static final int RNG_CALLBACK = 1 << 29;
+
+	static boolean nativeRandom(WorldgenRandom random) {
+		return random != null && random.getClass() == WorldgenRandom.class
+			&& random.nativeSource() != null && random.nativeSource().getClass() == XoroshiroRandomSource.class;
+	}
+
+	static void putInvocation(MemorySegment words, long at, WorldgenRandom random) {
+		var generator = ((XoroshiroRandomSource)random.nativeSource()).nativeGenerator();
+		words.setAtIndex(ValueLayout.JAVA_LONG, at, generator.nativeSeedLo());
+		words.setAtIndex(ValueLayout.JAVA_LONG, at + 1, generator.nativeSeedHi());
+		putGaussian(words, at + 2, random.nativeGaussian());
+		words.setAtIndex(ValueLayout.JAVA_LONG, at + 4, random.nativeCount());
+	}
+
+	static void takeInvocation(MemorySegment words, long at, WorldgenRandom random) {
+		// A callback can call setSeed, replacing the source's generator object.
+		((XoroshiroRandomSource)random.nativeSource()).nativeGenerator().nativeSetState(
+			words.getAtIndex(ValueLayout.JAVA_LONG, at), words.getAtIndex(ValueLayout.JAVA_LONG, at + 1));
+		takeGaussian(words, at + 2, random.nativeGaussian());
+		random.nativeSetCount((int)words.getAtIndex(ValueLayout.JAVA_LONG, at + 4));
+	}
+
 	private static int upcall(int op, MemorySegment args, int count) {
+		if ((op & RNG_CALLBACK) == 0) return upcallOriginal(op, args, count);
+		Call call = CURRENT.get();
+		if (call == null || count < 6) return -1;
+		var words = args.reinterpret(count * 8L);
+		int originalCount = count - 6;
+		long at = originalCount + 1L;
+		if (words.getAtIndex(ValueLayout.JAVA_LONG, originalCount) != 0) takeInvocation(words, at, call.random);
+		else call.random.nativeSetCount((int)words.getAtIndex(ValueLayout.JAVA_LONG, at + 4));
+		try {
+			return upcallOriginal(op & ~RNG_CALLBACK, words.asSlice(0, originalCount * 8L), originalCount);
+		} finally {
+			// Completed callback draws, including a throwing or nested callback,
+			// belong to the actual owner and must survive native error handling.
+			putInvocation(words, at, call.random);
+		}
+	}
+
+	private static int upcallOriginal(int op, MemorySegment args, int count) {
 		UPCALL_COUNTS[op & 63].increment();
 		if (op == OP_MATH_LOG || op == OP_MATH_POW || op == OP_MATH_SIN || op == OP_MATH_COS) {
 			// Pure: HotSpot's Math intrinsics, which Rust's libm need not match bit for bit.
@@ -1041,6 +1101,11 @@ public final class NativeDecoration {
 			region.resetAfterSync();
 			int result = switch (op) {
 				case 23 -> NativeEndFeatures.generationEffect(args, count);
+                case 24 -> {
+                    var features = a[2] >= 0 ? call.plan.programs[(int)a[2]].javaFeatures : call.javaFeatures;
+                    call.fallen = NativeFallenTrees.generationEffect(call.fallen, region, call.level, call.random, features.get((int)a[1]), args, count);
+                    yield 0;
+                }
 				case OP_UPDATE_SHAPE_AT_EDGE -> {
 					int xs = (int)a[4], ys = (int)a[5], zs = (int)a[6];
 					var shape = new net.minecraft.world.phys.shapes.BitSetDiscreteVoxelShape(xs, ys, zs);
@@ -1065,8 +1130,8 @@ public final class NativeDecoration {
 					takeGaussian(words, 7, call.random.nativeGaussian());
 					var features = a[6] >= 0 ? call.plan.programs[(int)a[6]].javaFeatures : call.javaFeatures;
 					boolean placed = features.get((int)a[0]).place(call.level, call.generator, call.random, new BlockPos((int)a[1], (int)a[2], (int)a[3]));
-					words.setAtIndex(ValueLayout.JAVA_LONG, 4, generator.nativeSeedLo());
-					words.setAtIndex(ValueLayout.JAVA_LONG, 5, generator.nativeSeedHi());
+					words.setAtIndex(ValueLayout.JAVA_LONG, 4, ((XoroshiroRandomSource)call.random.nativeSource()).nativeGenerator().nativeSeedLo());
+					words.setAtIndex(ValueLayout.JAVA_LONG, 5, ((XoroshiroRandomSource)call.random.nativeSource()).nativeGenerator().nativeSeedHi());
 					putGaussian(words, 7, call.random.nativeGaussian());
 					yield placed ? 1 : 0;
 				}
@@ -1079,8 +1144,8 @@ public final class NativeDecoration {
 					takeGaussian(words, 7, call.random.nativeGaussian());
 					(a[6] >= 0 ? call.plan.programs[(int)a[6]].javaSteps : call.javaSteps).get((int)a[0])
 						.run(call.level, call.random, new BlockPos((int)a[1], (int)a[2], (int)a[3]));
-					words.setAtIndex(ValueLayout.JAVA_LONG, 4, generator.nativeSeedLo());
-					words.setAtIndex(ValueLayout.JAVA_LONG, 5, generator.nativeSeedHi());
+					words.setAtIndex(ValueLayout.JAVA_LONG, 4, ((XoroshiroRandomSource)call.random.nativeSource()).nativeGenerator().nativeSeedLo());
+					words.setAtIndex(ValueLayout.JAVA_LONG, 5, ((XoroshiroRandomSource)call.random.nativeSource()).nativeGenerator().nativeSeedHi());
 					putGaussian(words, 7, call.random.nativeGaussian());
 					yield 0;
 				}

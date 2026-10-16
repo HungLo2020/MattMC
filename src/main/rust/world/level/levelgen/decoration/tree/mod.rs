@@ -66,7 +66,7 @@ impl Provider {
     /// `getState(random, pos)`: simple providers draw nothing; weighted lists
     /// draw `nextInt(totalWeight)` and walk the entries.
     pub(crate) fn state(&self, placement: &mut Placement) -> u32 {
-        let base = self.base_state(placement);
+        let base = self.base_state(&mut placement.random);
         let Some(randomized) = &self.randomized else {
             return base;
         };
@@ -80,11 +80,18 @@ impl Provider {
         }
     }
 
-    fn base_state(&self, placement: &mut Placement) -> u32 {
+    /// Pure provider programs need only the existing actual random owner.
+    pub(crate) fn is_plain(&self) -> bool { self.randomized.is_none() }
+
+    pub(crate) fn plain_state(&self, random: &mut super::random::WorldgenRandom) -> Option<u32> {
+        self.is_plain().then(|| self.base_state(random))
+    }
+
+    fn base_state(&self, random: &mut super::random::WorldgenRandom) -> u32 {
         if self.entries.len() == 1 && self.entries[0].0 == 0 {
             return self.entries[0].1;
         }
-        let mut pick = placement.random.next_int(self.total);
+        let mut pick = random.next_int(self.total);
         for &(weight, state) in &self.entries {
             pick -= weight;
             if pick < 0 {

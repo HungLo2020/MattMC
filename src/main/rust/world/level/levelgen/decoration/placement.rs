@@ -69,15 +69,19 @@ impl<'p, 'r, 'a> Placement<'p, 'r, 'a> {
     /// Returns whether any position placed the feature, the scratch for reuse
     /// and the random's gaussian cache for the next feature.
     pub(crate) fn run(mut self, origin: [i32; 3]) -> (Result<bool>, Scratch, Option<f64>) {
+        let active = super::random::ActiveRandom::enter(&mut self.random);
         let program = self.program;
         let result = self.place_placed(&program.placed, origin).and_then(|placed| self.region.check_deferred().map(|_| placed));
+        drop(active);
         (result, self.scratch, self.random.gaussian)
     }
 
     /// `run`, handing back the whole random (a caller-owned stream).
     pub(crate) fn run_keeping_random(mut self, origin: [i32; 3]) -> (Result<bool>, Scratch, WorldgenRandom) {
+        let active = super::random::ActiveRandom::enter(&mut self.random);
         let program = self.program;
         let result = self.place_placed(&program.placed, origin).and_then(|placed| self.region.check_deferred().map(|_| placed));
+        drop(active);
         (result, self.scratch, self.random)
     }
 
@@ -400,6 +404,7 @@ impl<'p, 'r, 'a> Placement<'p, 'r, 'a> {
                 self.place_placed(if choice { a } else { b }, origin)
             }
             Feature::Tree(tree) => super::tree::place(self, tree, origin),
+            Feature::Fallen(config) => super::fallen_tree::place(self, config, origin),
             Feature::RandomPatch { tries, xz, y, placed } => {
                 let (j, k) = (xz + 1, y + 1);
                 let mut any = 0;

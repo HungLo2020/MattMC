@@ -9,3 +9,5 @@ runs whole placed features; the older geometry kernels are shared by both routes
 - [Rust geode density fields](RUST-GEODE.md): batched numeric evaluation, seed compatibility and verification.
 
 - [End feature computations](RUST-END-FEATURES.md): shared geometry, Java effect boundaries and targeted Frozen verification.
+
+- [Fallen-tree development](RUST-FALLEN-TREES.md): native feature/decorator ownership, live contracts and verification limits.

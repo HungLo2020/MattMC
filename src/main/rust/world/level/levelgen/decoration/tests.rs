@@ -328,3 +328,26 @@ fn java_hash_set_tree_bins_match_java() {
         assert_eq!(fold, *expected, "round {round}");
     }
 }
+
+/// The fallen producer carries every oriented write state into admission, while
+/// its retained VM configuration index is not mistaken for a native state set.
+#[test]
+fn fallen_program_admits_all_orientations_and_validates_sets() {
+    let payload = [1, 1, 1, 7, 1, 8, 0, 0, 1, 2, 1, 7, 8, 9];
+    let mut words = vec![3, 0, 61, payload.len() as i32];
+    words.extend(payload);
+    tail(&mut words, &[&[1], &[2]], &[]);
+    let program = Program::decode(&words).expect("complete fallen program");
+    assert_eq!(program.placed.feature.kind(), 61);
+    assert!(program.placed.feature.uses_set_block());
+    assert_eq!(program.placed.feature.set_block_states(), vec![7, 8, 9]);
+    for end in 0..words.len() {
+        assert!(Program::decode(&words[..end]).is_none(), "truncated at {end}");
+    }
+    let mut missing_support = words.clone();
+    missing_support[4 + 8] = 5;
+    assert!(Program::decode(&missing_support).is_none());
+    let mut missing_axis = words.clone();
+    missing_axis[4 + 11] = 6;
+    assert!(Program::decode(&missing_axis).is_none(), "provider state lacks an orientation entry");
+}

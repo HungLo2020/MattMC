@@ -307,7 +307,9 @@ pub unsafe extern "C" fn mattmc_decoration_place(
     let (Some(program), false, false, false) = (program.as_ref(), region.is_null(), out.is_null(), gaussian.is_null()) else {
         return INVALID;
     };
-    let gaussian = std::slice::from_raw_parts_mut(gaussian, 2);
+    let gaussian_out = gaussian;
+    let mut gaussian = std::ptr::read(gaussian as *const [i64; 7]);
+    let invocation = super::random::InvocationScope::enter(callback, [gaussian[2], gaussian[3], gaussian[4], gaussian[5], gaussian[6]]);
     if region_length < 0 || out_length < 0 {
         return INVALID;
     }
@@ -317,10 +319,10 @@ pub unsafe extern "C" fn mattmc_decoration_place(
         let Some(mut region) = Region::bind(words, out) else {
             return INVALID;
         };
-        region.callback = callback;
+        region.callback = invocation.callback();
         let mut cache = super::random::gaussian_from(gaussian[0], gaussian[1]);
         let result = run_program(program, &mut region, decoration_seed, index, step, [x, y, z], &mut cache);
-        gaussian.copy_from_slice(&super::random::gaussian_words(cache));
+        gaussian[..2].copy_from_slice(&super::random::gaussian_words(cache));
         EVENTS.with(|e| *e.borrow_mut() = std::mem::take(&mut region.events));
         match result {
             Ok(PlaceOutcome::Placed(true)) => PLACED,
@@ -329,16 +331,18 @@ pub unsafe extern "C" fn mattmc_decoration_place(
             Err(failure) => failure_status(&mut region, failure),
         }
     }));
+    gaussian[2..7].copy_from_slice(&invocation.state());
+    std::ptr::write(gaussian_out as *mut [i64; 7], gaussian);
     result.unwrap_or(PANIC)
 }
 
 /// `PlacedFeature.place(level, generator, random, origin)` with the caller's
 /// random (`FeaturePoolElement`): no reseeding and no biome check, so a program
 /// with a `BiomeFilter` (which throws there in Java) takes Java's path.
-/// `random`: `[lo, hi, gaussian have, gaussian bits]`, updated in place.
+/// `random`: `[lo, hi, gaussian have, gaussian bits, wrapper count]`, updated in place.
 ///
 /// # Safety
-/// As `mattmc_decoration_place`; `random` is valid for 4 longs.
+/// As `mattmc_decoration_place`; `random` is valid for 5 longs.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_decoration_place_with_random(
     program: *const Program,
@@ -355,7 +359,8 @@ pub unsafe extern "C" fn mattmc_decoration_place_with_random(
     let (Some(program), false, false, false) = (program.as_ref(), region.is_null(), out.is_null(), random.is_null()) else {
         return INVALID;
     };
-    let state = std::slice::from_raw_parts_mut(random, 4);
+    let mut state = std::ptr::read(random as *const [i64; 5]);
+    let invocation = super::random::InvocationScope::enter(callback, state);
     if region_length < 0 || out_length < 0 {
         return INVALID;
     }
@@ -368,7 +373,7 @@ pub unsafe extern "C" fn mattmc_decoration_place_with_random(
         let Some(mut region) = Region::bind(words, out) else {
             return INVALID;
         };
-        region.callback = callback;
+        region.callback = invocation.callback();
         if !heights_resolve(program, region.min_gen_y, region.gen_depth)
             || program.placed.feature.uses_set_block() && !(region.write_path_ready() && super::facts::installed().is_some_and(|f| !f.any_unknown()))
         {
@@ -391,6 +396,8 @@ pub unsafe extern "C" fn mattmc_decoration_place_with_random(
             Err(failure) => failure_status(&mut region, failure),
         }
     }));
+    state = invocation.state();
+    std::ptr::write(random as *mut [i64; 5], state);
     result.unwrap_or(PANIC)
 }
 
@@ -426,7 +433,10 @@ pub unsafe extern "C" fn mattmc_decoration_decorate_gathering(
         return INVALID;
     }
     let table = std::slice::from_raw_parts(table, table_length as usize);
-    let info = std::slice::from_raw_parts_mut(info, INFO_HEAD + INFO_KINDS);
+    let info_out = info;
+    let mut info = std::ptr::read(info as *const [i64; INFO_HEAD + INFO_KINDS + 5]);
+    let at = INFO_HEAD + INFO_KINDS;
+    let invocation = super::random::InvocationScope::enter(callback, [info[at], info[at+1], info[at+2], info[at+3], info[at+4]]);
     let words = super::region::Shared::new(region as *mut i64, region_length as usize);
     let out = super::region::Shared::new(out, out_length as usize);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -443,10 +453,11 @@ pub unsafe extern "C" fn mattmc_decoration_decorate_gathering(
                 _ => return JAVA_ROUTE,
             }
         }
-        region.callback = callback;
+        region.callback = invocation.callback();
         let mut counts = [0i64; 3];
         let mut current = [0i32; 2];
-        let (head, kinds) = info.split_at_mut(INFO_HEAD);
+        let (head, tail) = info.split_at_mut(INFO_HEAD);
+        let (kinds, _) = tail.split_at_mut(INFO_KINDS);
         kinds.fill(0);
         let mut gaussian = super::random::gaussian_from(head[6], head[7]);
         let result = super::sequence::decorate(plan, &mut region, decoration_seed, &biomes, structures as u64, [x, y, z], &mut counts, &mut current, kinds, &mut gaussian);
@@ -467,6 +478,8 @@ pub unsafe extern "C" fn mattmc_decoration_decorate_gathering(
             Err(failure) => failure_status(&mut region, failure),
         }
     }));
+    info[INFO_HEAD + INFO_KINDS..].copy_from_slice(&invocation.state());
+    std::ptr::write(info_out as *mut [i64; INFO_HEAD + INFO_KINDS + 5], info);
     result.unwrap_or(PANIC)
 }
 
@@ -558,7 +571,7 @@ pub unsafe extern "C" fn mattmc_decoration_plan_release(plan: *mut super::sequen
 ///
 /// # Safety
 /// As `mattmc_decoration_place`, plus `plan` live, `biomes` valid for
-/// `biome_count` IDs and `info` for `INFO_HEAD + INFO_KINDS` longs.
+/// `biome_count` IDs and `info` for `INFO_HEAD + INFO_KINDS + 5` longs (final actual RNG state).
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_decoration_decorate(
     plan: *const super::sequence::Plan,
@@ -583,17 +596,21 @@ pub unsafe extern "C" fn mattmc_decoration_decorate(
         return INVALID;
     }
     let biomes = if biome_count == 0 { &[][..] } else { std::slice::from_raw_parts(biomes, biome_count as usize) };
-    let info = std::slice::from_raw_parts_mut(info, INFO_HEAD + INFO_KINDS);
+    let info_out = info;
+    let mut info = std::ptr::read(info as *const [i64; INFO_HEAD + INFO_KINDS + 5]);
+    let at = INFO_HEAD + INFO_KINDS;
+    let invocation = super::random::InvocationScope::enter(callback, [info[at], info[at+1], info[at+2], info[at+3], info[at+4]]);
     let words = super::region::Shared::new(region as *mut i64, region_length as usize);
     let out = super::region::Shared::new(out, out_length as usize);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let Some(mut region) = Region::bind(words, out) else {
             return INVALID;
         };
-        region.callback = callback;
+        region.callback = invocation.callback();
         let mut counts = [0i64; 3];
         let mut current = [0i32; 2];
-        let (head, kinds) = info.split_at_mut(INFO_HEAD);
+        let (head, tail) = info.split_at_mut(INFO_HEAD);
+        let (kinds, _) = tail.split_at_mut(INFO_KINDS);
         kinds.fill(0);
         let mut gaussian = super::random::gaussian_from(head[6], head[7]);
         let result = super::sequence::decorate(plan, &mut region, decoration_seed, biomes, structures as u64, [x, y, z], &mut counts, &mut current, kinds, &mut gaussian);
@@ -614,5 +631,7 @@ pub unsafe extern "C" fn mattmc_decoration_decorate(
             Err(failure) => failure_status(&mut region, failure),
         }
     }));
+    info[INFO_HEAD + INFO_KINDS..].copy_from_slice(&invocation.state());
+    std::ptr::write(info_out as *mut [i64; INFO_HEAD + INFO_KINDS + 5], info);
     result.unwrap_or(PANIC)
 }

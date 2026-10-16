@@ -76,12 +76,14 @@ impl Decorator {
         match self {
             Decorator::TrunkVine => {
                 for &pos in &context.logs {
-                    for (side, vine) in VINE_SIDES {
-                        if tree.placement.random.next_int(3) > 0 {
-                            let at = offset(pos, side);
-                            if tree.is_air(at)? {
-                                tree.set(Setter::Decoration, at, tree.config.vines[vine])?;
-                            }
+                    use super::super::fallen_tree::vines::{Effect, Frame};
+                    let mut frame = Frame::new();
+                    let mut answer = false;
+                    loop {
+                        match frame.next(&mut tree.placement.random, answer) {
+                            Effect::Air(side) => answer = tree.is_air(offset(pos, VINE_SIDES[side].0))?,
+                            Effect::Place(side) => tree.set(Setter::Decoration, offset(pos, VINE_SIDES[side].0), tree.config.vines[side])?,
+                            Effect::Done => break,
                         }
                     }
                 }

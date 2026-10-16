@@ -34,7 +34,7 @@ time.
 | Float providers | constant, uniform, clamped normal, trapezoid | `program.rs`, `simple.rs` |
 | State providers | simple, weighted, rule-based, randomized int | `tree/mod.rs`, `vegetation.rs` |
 | Predicates | true/all/any/not, matching blocks/tags/fluids, solid, replaceable, inside world bounds, has sturdy face, would-survive (saplings); anything else asks Java | `program.rs`, `placement.rs` |
-| Features | ore, replace blobs, glowstone, springs, the three selectors, trees (every vanilla trunk, foliage, root placer and decorator, pale moss), random patch and flower patches, simple block, block column, seagrass, sea pickle, kelp, disk, vines, forest rock, underwater magma, multiface growth (glow lichen, sculk vein), geode, monster room, delta, basalt columns, coral claw/tree/mushroom, lake, sculk patch, pointed and large dripstone, dripstone cluster, blue ice, ice spike, iceberg, `freeze_top_layer`, bamboo, huge mushrooms, huge fungi, weeping and twisting vines, basalt pillar, scattered ore, chorus plant, End island, End spikes/gateway/platform, vegetation patches (moss, pale moss, clay pools), desert well | `ore.rs`, `simple.rs`, `tree/`, `vegetation.rs`, `geode.rs`, `rooms.rs`, `nether.rs`, `coral.rs`, `lakes.rs`, `sculk.rs`, `dripstone.rs`, `ice.rs`, `freeze.rs`, `plants.rs`, `end.rs`, `patch.rs`, `rooms.rs` |
+| Features | ore, replace blobs, glowstone, springs, the three selectors, trees (supported trunk, foliage, root placer and decorator variants, pale moss), random patch and flower patches, simple block, block column, seagrass, sea pickle, kelp, disk, vines, forest rock, underwater magma, multiface growth (glow lichen, sculk vein), geode, monster room, delta, basalt columns, coral claw/tree/mushroom, lake, sculk patch, pointed and large dripstone, dripstone cluster, blue ice, ice spike, iceberg, `freeze_top_layer`, bamboo, huge mushrooms, huge fungi, weeping and twisting vines, basalt pillar, scattered ore, chorus plant, End island, End spikes/gateway/platform, vegetation patches (moss, pale moss, clay pools), desert well | `ore.rs`, `simple.rs`, `tree/`, `vegetation.rs`, `geode.rs`, `rooms.rs`, `nether.rs`, `coral.rs`, `lakes.rs`, `sculk.rs`, `dripstone.rs`, `ice.rs`, `freeze.rs`, `plants.rs`, `end.rs`, `patch.rs`, `rooms.rs` |
 | Templates | `StructureTemplate.placeInWorld` for structure pieces ([guide](../structure/RUST-STRUCTURE-TEMPLATES.md)) | `template.rs` |
 | Region | 3×3 proto chunks: live block/counter/biome owners, WG and final heightmaps, sky-light sources | `region.rs` |
 | `setBlock` | `WorldGenRegion.setBlock` → `ProtoChunk.setBlockState` | `write.rs`, `facts.rs` |
@@ -51,7 +51,11 @@ End spikes, gateways and the platform already have native geometry. Their
 [shared End executor](RUST-END-FEATURES.md) also serves direct feature calls;
 Java retains the descriptor cache/iterator, crystal effects and gateway exit
 mutation. Spike programs resolve the retained mutable descriptor list on each
-invocation through the configured-feature adapter. Still Java: fossils (their
+invocation through the configured-feature adapter. [Fallen trees and
+AttachedToLogs decorators](RUST-FALLEN-TREES.md) now have native invocation
+control and compiled fallen region writes; attached/vine region consumers are
+verified by focused real-server and FULL save/reopen controls. Their measured
+migration overhead requires the scoped exception documented there. Still Java: fossils (their
 two template placements run natively), planted huge fungi, and features
 without an encoder. Java retains structure-step dispatch in the original
 order and the piece objects, but supported starts and legacy pieces, including
