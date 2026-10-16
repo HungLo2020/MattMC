@@ -254,6 +254,47 @@ public final class PlayerLoadingServerAudit {
                     check(checks, "actual native stale admission rejected", NATIVE_REJECTED.get() > 0);
             }
             action(server, () -> server.saveEverything(false, true, false));
+            if (Boolean.getBoolean("playerLoading.shutdownPending")) {
+                if (Boolean.getBoolean("playerLoading.reopen")) {
+                    action(server, () -> {
+                        for (int z = 1000; z < 1003; z++) for (int x = 1000; x < 1003; x++)
+                            level.getChunkSource().addTicketWithRadius(TicketType.PLAYER_LOADING, new ChunkPos(x, z), 0);
+                    });
+                    for (int z = 1000; z < 1003; z++) for (int x = 1000; x < 1003; x++) {
+                        var chunk = level.getChunkSource().getChunkFuture(x, z,
+                            net.minecraft.world.level.chunk.status.ChunkStatus.FULL, true)
+                            .get(120, TimeUnit.SECONDS);
+                        check(checks, "pending-shutdown region reopens at FULL " + x + "," + z, chunk.isSuccess());
+                    }
+                    action(server, () -> {
+                        for (int z = 1000; z < 1003; z++) for (int x = 1000; x < 1003; x++)
+                            level.getChunkSource().removeTicketWithRadius(TicketType.PLAYER_LOADING, new ChunkPos(x, z), 0);
+                    });
+                } else {
+                    action(server, () -> {
+                        var futures = new ArrayList<java.util.concurrent.CompletableFuture<?>>();
+                        for (int z = 1000; z < 1009; z++) for (int x = 1000; x < 1009; x++)
+                            level.getChunkSource().addTicketWithRadius(TicketType.PLAYER_LOADING, new ChunkPos(x, z), 0);
+                        level.getChunkSource().runDistanceManagerUpdates();
+                        for (int z = 1000; z < 1009; z++) for (int x = 1000; x < 1009; x++) {
+                            ChunkHolder holder = level.getChunkSource().chunkMap.getUpdatingChunkIfPresent(ChunkPos.asLong(x, z));
+                            if (holder == null) throw new AssertionError("pending-shutdown holder missing");
+                            // The public cache request blocks when called on its
+                            // main thread. Schedule the genuine holder request
+                            // directly so shutdown can begin with work pending.
+                            futures.add(holder.scheduleChunkGenerationTask(
+                                net.minecraft.world.level.chunk.status.ChunkStatus.FULL, level.getChunkSource().chunkMap));
+                        }
+                        long pending = futures.stream().filter(future -> !future.isDone()).count();
+                        check(checks, "shutdown starts with real FULL requests pending", pending > 0);
+                        check(checks, "shutdown starts with real chunk-map work", level.getChunkSource().chunkMap.hasWork());
+                        result.put("shutdownPendingRequests", pending);
+                        // Halt while this main-thread action still owns the queue.
+                        // Ordinary stopServer drains/deactivates/saves the work.
+                        server.halt(false);
+                    });
+                }
+            }
             result.put("status", "passed");
         } catch (Throwable error) {
             error.printStackTrace();

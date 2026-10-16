@@ -12,6 +12,9 @@ public class ChunkGenerationTask {
 	public final ChunkStatus targetStatus;
 	private final NativeChunkGeneration.Task generation;
 
+    /** Actual task resource, captured without virtual engine dispatch. */
+    static NativeChunkGeneration.Task nativeOwner(ChunkGenerationTask task) { return task == null ? null : task.generation; }
+
 	private ChunkGenerationTask(
 		GeneratingChunkMap generatingChunkMap, ChunkStatus chunkStatus, ChunkPos chunkPos, StaticCache2D<GenerationChunkHolder> staticCache2D, int cacheRadius
 	) {

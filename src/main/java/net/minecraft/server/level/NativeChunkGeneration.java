@@ -11,10 +11,13 @@ import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.ref.Reference;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.function.Consumer;
 import net.minecraft.util.NativeLibraryLoader;
@@ -60,8 +63,14 @@ public final class NativeChunkGeneration {
     private static final MethodHandle DEPENDENCY_COMMAND = handle("holder_dependency_command", FunctionDescriptor.of(ValueLayout.JAVA_LONG,
         ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT), Linker.Option.critical(false));
     private static final MethodHandle LIFECYCLE = handle("holder_lifecycle", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+    private static final MethodHandle FUTURE_DRIVER = handle("holder_future_driver", FunctionDescriptor.of(ValueLayout.JAVA_LONG,
+        ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+    private static final MethodHandle PREPARE_CHUNK = handle("prepare_chunk", FunctionDescriptor.of(ValueLayout.JAVA_LONG,
+        ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final VarHandle INT = ValueLayout.JAVA_INT.varHandle();
     @FunctionalInterface interface LifecycleEffect { long apply(int op, int slot, int kind); }
+    @FunctionalInterface interface FutureEffect { long apply(int op, int slot); }
+    @FunctionalInterface interface DispatchEffect { long apply(int op); }
     private static final MethodHandle STATISTICS = handle("statistics", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final VarHandle LONG = ValueLayout.JAVA_LONG.varHandle();
     private static final List<ChunkStatus> STATUSES = ChunkStatus.getStatusList();
@@ -139,6 +148,234 @@ public final class NativeChunkGeneration {
         }
         try { return MemorySegment.ofAddress(handle).reinterpret(size, arena, cleanup); }
         catch (Throwable throwable) { cleanup.run(); throw failure(throwable); }
+    }
+
+    /** VM resources and effects for one native range dependency owner. */
+    private static final class RangeDependencies {
+        private static final MethodHandle CREATE = handle("range_create", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+        private static final MethodHandle RELEASE = handle("range_release", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+        private static final MethodHandle STATISTICS = handle("range_statistics", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+        private static final MethodHandle EVENT = handle("range_event", FunctionDescriptor.of(ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT), Linker.Option.critical(false));
+        private static final MethodHandle CLAIM = handle("range_claim", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG), Linker.Option.critical(false));
+        private static final MethodHandle INPUT = handle("range_input", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT), Linker.Option.critical(false));
+        private static final MethodHandle PREPARE = handle("range_prepare", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT), Linker.Option.critical(false));
+        private static final MethodHandle COMMIT = handle("range_commit", FunctionDescriptor.of(ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT), Linker.Option.critical(false));
+        private static final MethodHandle NEXT = handle("range_next", FunctionDescriptor.of(ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT), Linker.Option.critical(false));
+        private static final VarHandle ERROR = MethodHandles.arrayElementVarHandle(Throwable[].class);
+        final long id;
+        final MemorySegment owner;
+        volatile List<? extends CompletableFuture<?>> prerequisites;
+        final Throwable[] errors;
+        final CompletableFuture<Void> ready = newChunkFuture();
+
+        RangeDependencies(List<? extends CompletableFuture<?>> prerequisites, boolean fence) {
+            this.prerequisites = prerequisites;
+            errors = new Throwable[prerequisites.size()];
+            Arena arena = Arena.ofAuto();
+            long created;
+            try { created = (long)CREATE.invokeExact(prerequisites.size(), fence ? 1 : 0); }
+            catch (Throwable throwable) { throw failure(throwable); }
+            if (created == 0) throw new OutOfMemoryError("Native chunk range allocation failed");
+            id = created;
+            owner = adopt(created, 1, arena, RELEASE);
+        }
+
+        private void publish(long command) {
+            if (command == 0) return;
+            int operation = (int)(command >>> 32);
+            Throwable error = operation == 3 ? (Throwable)ERROR.getAcquire(errors, (int)command) : null;
+            if (operation == 2 || operation == 3) releaseBindings();
+            if (operation == 3) ready.completeExceptionally(error);
+            else ready.complete(null);
+        }
+
+        private void releaseBindings() {
+            prerequisites = List.of();
+            Arrays.fill(errors, null);
+        }
+
+        private Throwable error(int input) {
+            if (input >= 0) return (Throwable)ERROR.getAcquire(errors, input);
+            // Read the direct future's current completion without invoking any
+            // overridable leaf query/registration method. Internal nodes use
+            // their frozen VM error binding; direct leaves can still be obtruded.
+            return CompletableFuture.allOf(prerequisites.get(-input - 1)).handle((value, error) -> error).join();
+        }
+
+        void signal(int index) {
+            try {
+                publish((long)EVENT.invokeExact(id, index));
+                long claimed;
+                while ((claimed = (long)CLAIM.invokeExact(id)) != 0) {
+                    int node = (int)(claimed - 1);
+                    Throwable left = error((int)INPUT.invokeExact(id, node, 0));
+                    Throwable right = error((int)INPUT.invokeExact(id, node, 1));
+                    int selection = (int)PREPARE.invokeExact(id, node, left == null ? 0 : 1, right == null ? 0 : 1);
+                    if (selection < 0) throw new IllegalStateException("Native range node lost its publication claim");
+                    ERROR.setRelease(errors, node, selection == 1 ? left : selection == 2 ? right : null);
+                    left = null;
+                    right = null;
+                    publish((long)COMMIT.invokeExact(id, node));
+                }
+            } catch (Throwable throwable) { ready.completeExceptionally(throwable); }
+            finally { Reference.reachabilityFence(this); }
+        }
+
+        ChunkResult<ChunkAccess>[] join() {
+            ChunkResult<ChunkAccess>[] results = new ChunkResult[prerequisites.size()];
+            try {
+                while (true) {
+                    long command = (long)NEXT.invokeExact(id, 0);
+                    switch ((int)(command >>> 32)) {
+                        case 1: results[(int)command] = (ChunkResult<ChunkAccess>)prerequisites.get((int)command).join(); break;
+                        case 2: releaseBindings(); return results;
+                        default: throw new IllegalStateException("Invalid native range join command");
+                    }
+                }
+            } catch (Throwable throwable) { return raise(throwable); }
+            finally { Reference.reachabilityFence(this); }
+        }
+
+        ChunkResult<List<ChunkAccess>> collect(ChunkMap map, ChunkResult<List<ChunkAccess>> unloaded,
+                ChunkResult<ChunkAccess>[] results) {
+            List<ChunkAccess> chunks = new ArrayList<>(results.length);
+            int present = 0;
+            try {
+                while (true) {
+                    long command = (long)NEXT.invokeExact(id, present);
+                    int row = (int)command;
+                    switch ((int)(command >>> 32)) {
+                        case 3:
+                            ChunkResult<ChunkAccess> result = results[row];
+                            if (result == null) throw map.debugFuturesAndCreateReportedException(
+                                new IllegalStateException("At least one of the chunk futures were null"), "n/a");
+                            ChunkAccess chunk = result.orElse(null);
+                            present = chunk == null ? 0 : 1;
+                            if (chunk != null) chunks.add(chunk);
+                            break;
+                        case 4: return ChunkResult.of(chunks);
+                        case 5: return unloaded;
+                        default: throw new IllegalStateException("Invalid native range dependency command");
+                    }
+                }
+            } catch (Throwable throwable) { return raise(throwable); }
+            finally { Reference.reachabilityFence(this); }
+        }
+
+        void register() {
+            // One-leaf signals do not dispatch a prerequisite's overridable
+            // registration/query methods. Rust owns the dependency tree.
+            for (int index = 0; index < prerequisites.size(); index++) {
+                int row = index;
+                CompletableFuture.allOf(prerequisites.get(index)).whenComplete((value, error) -> signal(row));
+            }
+            signal(-1);
+        }
+    }
+
+    static CompletableFuture<ChunkResult<List<ChunkAccess>>> rangeDependencies(ChunkMap map,
+            List<CompletableFuture<ChunkResult<ChunkAccess>>> prerequisites, ChunkResult<List<ChunkAccess>> unloaded) {
+        RangeDependencies range = new RangeDependencies(prerequisites, false);
+        range.register();
+        // The public result can be externally completed before prerequisites.
+        // Keep the earlier join stage independent: the original sequence still
+        // joins its actual leaves even when the later result stage is skipped.
+        return range.ready.thenApply(value -> range.join()).thenApply(results -> range.collect(map, unloaded, results));
+    }
+
+    private static final BiFunction<Object, Object, Void> FENCE_COMBINER = (a, b) -> null;
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static <A, B> BiFunction<A, B, Void> fenceCombiner() { return (BiFunction)FENCE_COMBINER; }
+
+    /** Only the chunk engine's own fence operation uses native aggregation.
+     * Every public virtual call still occurs; arbitrary user combinators retain
+     * their existing CompletableFuture implementation and executor behavior. */
+    private static final class ChunkFuture<T> extends CompletableFuture<T> {
+        @Override public <U> CompletableFuture<U> newIncompleteFuture() { return newChunkFuture(); }
+        @Override public <U, V> CompletableFuture<V> thenCombine(CompletionStage<? extends U> other,
+                BiFunction<? super T, ? super U, ? extends V> action) {
+            if ((Object)action != FENCE_COMBINER || other == null) return super.thenCombine(other, action);
+            CompletableFuture<?> actual = other.toCompletableFuture();
+            if (actual == null) throw new NullPointerException();
+            return (CompletableFuture<V>)combineOwnedChunkDependencies(this, actual);
+        }
+    }
+
+    static <T> CompletableFuture<T> newChunkFuture() { return new ChunkFuture<>(); }
+    static <T> CompletableFuture<T> completedChunkFuture(T value) {
+        CompletableFuture<T> future = newChunkFuture();
+        future.complete(value);
+        return future;
+    }
+
+    private static CompletableFuture<Void> combineOwnedChunkDependencies(CompletableFuture<?> first, CompletableFuture<?> second) {
+        CompletableFuture<Void> adapter = newChunkFuture();
+        RangeDependencies dependencies = new RangeDependencies(List.of(first, second), true);
+        dependencies.register();
+        dependencies.ready.whenComplete((value, error) -> {
+            if (error == null) adapter.complete(null);
+            else adapter.completeExceptionally(error);
+        });
+        return adapter;
+    }
+
+    /** Owner/vector payload counters, excluding Arc/allocator/VM/process overhead. */
+    static long[] rangeStatistics() {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment output = arena.allocate(5L * Long.BYTES, Long.BYTES);
+            RangeDependencies.STATISTICS.invokeExact(output);
+            return output.toArray(ValueLayout.JAVA_LONG);
+        } catch (Throwable throwable) { return raise(throwable); }
+    }
+
+    static void dispatchTask(ChunkGenerationTask task, boolean run, DispatchEffect effect) {
+        Task resource = ChunkGenerationTask.nativeOwner(task);
+        long driver = 0;
+        try {
+            driver = (long)TaskBindings.DISPATCH.invokeExact(resource == null ? 0L : resource.id, run ? 1 : 0);
+            if (driver == 0) throw new OutOfMemoryError("Native chunk dispatch continuation allocation failed");
+            long response = 0;
+            while (true) {
+                int result = (int)TaskBindings.DRIVER_NEXT.invokeExact(driver, response);
+                if (result == 0) return;
+                if (result != 1) throw new IllegalStateException("Native chunk dispatch failed");
+                int operation = (int)readWord(driver, 24L, 0L);
+                response = effect.apply(operation);
+            }
+        } catch (Throwable throwable) { NativeChunkGeneration.<RuntimeException, Object>raise(throwable); }
+        finally {
+            if (driver != 0) releaseHandle(TaskBindings.DRIVER_RELEASE, driver);
+            Reference.reachabilityFence(resource);
+            Reference.reachabilityFence(task);
+        }
+    }
+
+    static void prepareChunk(ChunkHolder holder, int kind, int phase, FutureEffect effect) {
+        Holder resource = holder == null ? null : GenerationChunkHolder.generationOwner(holder);
+        long driver = 0;
+        try {
+            driver = (long)PREPARE_CHUNK.invokeExact(resource == null ? 0L : resource.id, kind, phase);
+            if (driver == 0) throw new OutOfMemoryError("Native chunk preparation continuation allocation failed");
+            long response = 0;
+            while (true) {
+                int result = (int)TaskBindings.DRIVER_NEXT.invokeExact(driver, response);
+                if (result == 0) return;
+                if (result != 1) throw new IllegalStateException("Native chunk preparation failed");
+                long command = readWord(driver, 24L, 0L);
+                response = effect.apply((int)command, (int)(command >>> 32));
+            }
+        } catch (Throwable throwable) { NativeChunkGeneration.<RuntimeException, Object>raise(throwable); }
+        finally {
+            if (driver != 0) releaseHandle(TaskBindings.DRIVER_RELEASE, driver);
+            Reference.reachabilityFence(resource);
+            Reference.reachabilityFence(holder);
+        }
     }
 
     /** Live/created holders/tasks, runs/layers, live/created statuses, FULL/stage successes; no memory-size claim. */
@@ -242,7 +479,7 @@ public final class NativeChunkGeneration {
                 // copied mutable slot state. The Arc owns both fixed regions.
                 headerAddress = ((MemorySegment)HEADER.invokeExact(id)).address();
                 fieldsAddress = ((MemorySegment)FIELDS.invokeExact(id)).address();
-                exchange(STATUSES.size() + 1, CompletableFuture.completedFuture(null));
+                exchange(STATUSES.size() + 1, completedChunkFuture(null));
             } catch (Throwable throwable) {
                 throw failure(throwable);
             }
@@ -255,7 +492,7 @@ public final class NativeChunkGeneration {
                     ChunkLevel.byStatus(FullChunkStatus.FULL), ChunkLevel.byStatus(FullChunkStatus.BLOCK_TICKING),
                     ChunkLevel.byStatus(FullChunkStatus.ENTITY_TICKING))).address();
                 for (int i = 0; i < 3; i++) binding(READY_BASE + i, unloadedFuture);
-                for (int i = 3; i < 6; i++) binding(READY_BASE + i, CompletableFuture.completedFuture(null));
+                for (int i = 3; i < 6; i++) binding(READY_BASE + i, completedChunkFuture(null));
             } catch (Throwable throwable) { throw failure(throwable); }
             finally { Reference.reachabilityFence(this); }
         }
@@ -290,6 +527,26 @@ public final class NativeChunkGeneration {
                     if (result != 1) throw new IllegalStateException("Native holder lifecycle failed");
                     long first = readWord(driver, 24L, 0L), second = readWord(driver, 24L, 8L);
                     response = effect.apply((int)first, (int)(first >>> 32), (int)second);
+                }
+            } catch (Throwable throwable) { NativeChunkGeneration.<RuntimeException, Object>raise(throwable); }
+            finally {
+                if (driver != 0) releaseHandle(TaskBindings.DRIVER_RELEASE, driver);
+                Reference.reachabilityFence(this);
+            }
+        }
+
+        void futureControl(int operation, FutureEffect effect) {
+            long driver = 0;
+            try {
+                driver = (long)FUTURE_DRIVER.invokeExact(id, operation);
+                if (driver == 0) throw new OutOfMemoryError("Native holder future continuation allocation failed");
+                long response = 0;
+                while (true) {
+                    int result = (int)TaskBindings.DRIVER_NEXT.invokeExact(driver, response);
+                    if (result == 0) return;
+                    if (result != 1) throw new IllegalStateException("Native holder future control failed");
+                    long command = readWord(driver, 24L, 0L);
+                    response = effect.apply((int)command, (int)(command >>> 32));
                 }
             } catch (Throwable throwable) { NativeChunkGeneration.<RuntimeException, Object>raise(throwable); }
             finally {
@@ -489,6 +746,7 @@ public final class NativeChunkGeneration {
     }
 
     private static final class TaskBindings {
+        static final MethodHandle DISPATCH = handle("task_dispatch", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
         static final MethodHandle CREATE = handle("task_create", FunctionDescriptor.of(ValueLayout.JAVA_LONG,
             ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.JAVA_INT));

@@ -322,24 +322,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 				}
 			}
 
-			return Util.sequence(list).thenApply(listx -> {
-				List<ChunkAccess> list2 = new ArrayList(listx.size());
-
-				for (ChunkResult<ChunkAccess> chunkResult : listx) {
-					if (chunkResult == null) {
-						throw this.debugFuturesAndCreateReportedException(new IllegalStateException("At least one of the chunk futures were null"), "n/a");
-					}
-
-					ChunkAccess chunkAccess = chunkResult.orElse(null);
-					if (chunkAccess == null) {
-						return UNLOADED_CHUNK_LIST_RESULT;
-					}
-
-					list2.add(chunkAccess);
-				}
-
-				return ChunkResult.of(list2);
-			});
+			return NativeChunkGeneration.rangeDependencies(this, list, UNLOADED_CHUNK_LIST_RESULT);
 		}
 	}
 
@@ -372,8 +355,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	public CompletableFuture<ChunkResult<LevelChunk>> prepareEntityTickingChunk(ChunkHolder chunkHolder) {
-		return this.getChunkRangeFuture(chunkHolder, 2, i -> ChunkStatus.FULL)
-			.thenApply(chunkResult -> chunkResult.map(list -> (LevelChunk)list.get(list.size() / 2)));
+		return this.prepareChunk(chunkHolder, 2);
 	}
 
 	@Nullable
@@ -716,14 +698,28 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	private void runGenerationTask(ChunkGenerationTask chunkGenerationTask) {
-		GenerationChunkHolder generationChunkHolder = chunkGenerationTask.getCenter();
-		this.worldgenTaskDispatcher.submit(() -> {
-			CompletableFuture<?> completableFuture = chunkGenerationTask.runUntilWait();
-			if (completableFuture != null) {
-				completableFuture.thenRun(() -> this.runGenerationTask(chunkGenerationTask));
-			}
-		}, generationChunkHolder.getPos().toLong(), generationChunkHolder::getQueueLevel);
+		this.dispatchGenerationTask(chunkGenerationTask, false);
 	}
+
+    private void dispatchGenerationTask(ChunkGenerationTask task, boolean run) {
+        NativeChunkGeneration.dispatchTask(task, run, new NativeChunkGeneration.DispatchEffect() {
+            GenerationChunkHolder center;
+            CompletableFuture<?> waiting;
+            public long apply(int operation) {
+                switch (operation) {
+                    case 1: center = task.getCenter(); break;
+                    case 2: worldgenTaskDispatcher.submit(() -> dispatchGenerationTask(task, true),
+                        center.getPos().toLong(), center::getQueueLevel); break;
+                    case 3:
+                        waiting = task.runUntilWait();
+                        return waiting == null ? 0 : 1;
+                    case 4: waiting.thenRun(() -> runGenerationTask(task)); break;
+                    default: throw new IllegalStateException("Invalid native task dispatch effect " + operation);
+                }
+                return 0;
+            }
+        });
+    }
 
 	@Override
 	public void runGenerationTasks() {
@@ -732,21 +728,94 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	public CompletableFuture<ChunkResult<LevelChunk>> prepareTickingChunk(ChunkHolder chunkHolder) {
-		CompletableFuture<ChunkResult<List<ChunkAccess>>> completableFuture = this.getChunkRangeFuture(chunkHolder, 1, i -> ChunkStatus.FULL);
-		return completableFuture.thenApplyAsync(chunkResult -> chunkResult.map(list -> {
-			LevelChunk levelChunk = (LevelChunk)list.get(list.size() / 2);
-			levelChunk.postProcessGeneration(this.level);
-			this.level.startTickingChunk(levelChunk);
-			CompletableFuture<?> completableFuturex = chunkHolder.getSendSyncFuture();
-			if (completableFuturex.isDone()) {
-				this.onChunkReadyToSend(chunkHolder, levelChunk);
-			} else {
-				completableFuturex.thenAcceptAsync(object -> this.onChunkReadyToSend(chunkHolder, levelChunk), this.mainThreadExecutor);
-			}
-
-			return levelChunk;
-		}), this.mainThreadExecutor);
+		return this.prepareChunk(chunkHolder, 1);
 	}
+
+    private CompletableFuture<ChunkResult<LevelChunk>> prepareChunk(ChunkHolder holder, int kind) {
+        ChunkPreparation preparation = new ChunkPreparation(holder, null);
+        NativeChunkGeneration.prepareChunk(holder, kind, 0, preparation);
+        return preparation.future;
+    }
+
+    /** Accessible/entity projection captures neither a map nor a holder. */
+    private static ChunkResult<LevelChunk> projectChunkRange(ChunkResult<List<ChunkAccess>> chunkResult) {
+        return chunkResult.map(list -> {
+            ChunkProjection projection = new ChunkProjection(list);
+            NativeChunkGeneration.prepareChunk(null, 0, 1, projection);
+            return projection.chunk;
+        });
+    }
+    private static final class ChunkProjection implements NativeChunkGeneration.FutureEffect {
+        List<ChunkAccess> chunks;
+        LevelChunk chunk;
+        ChunkProjection(List<ChunkAccess> chunks) { this.chunks = chunks; }
+        public long apply(int operation, int slot) {
+            switch (operation) {
+                case 50: return chunks.size();
+                case 51:
+                    List<ChunkAccess> list = chunks;
+                    chunks = null;
+                    chunk = (LevelChunk)list.get(slot);
+                    return 0;
+                default: throw new IllegalStateException("Invalid native chunk projection effect " + operation);
+            }
+        }
+    }
+
+    private LevelChunk prepareTickingRange(ChunkHolder holder, List<ChunkAccess> chunks) {
+        ChunkPreparation preparation = new ChunkPreparation(holder, chunks);
+        NativeChunkGeneration.prepareChunk(holder, 1, 1, preparation);
+        return preparation.chunk;
+    }
+    private void sendPreparedChunk(ChunkHolder holder, LevelChunk chunk) {
+        ChunkPreparation preparation = new ChunkPreparation(holder, null);
+        preparation.chunk = chunk;
+        NativeChunkGeneration.prepareChunk(holder, 1, 2, preparation);
+    }
+
+    /** VM effects only; callback closures retain just their original resources. */
+    private final class ChunkPreparation implements NativeChunkGeneration.FutureEffect {
+        final ChunkHolder holder;
+        List<ChunkAccess> chunks;
+        LevelChunk chunk;
+        CompletableFuture<?> send;
+        CompletableFuture<ChunkResult<List<ChunkAccess>>> range;
+        CompletableFuture<ChunkResult<LevelChunk>> future;
+        ChunkPreparation(ChunkHolder holder, List<ChunkAccess> chunks) { this.holder = holder; this.chunks = chunks; }
+        public long apply(int operation, int slot) {
+            switch (operation) {
+                case 12: range = getChunkRangeFuture(holder, slot, ignored -> ChunkStatus.FULL); break;
+                case 13: range = getChunkRangeFuture(holder, slot, ChunkLevel::getStatusAroundFullChunk); break;
+                case 2: future = range.thenApply(ChunkMap::projectChunkRange); break;
+                case 3:
+                    ChunkMap chunkMap = ChunkMap.this;
+                    ChunkHolder chunkHolder = holder;
+                    future = range.thenApplyAsync(chunkResult -> chunkResult.map(list -> chunkMap.prepareTickingRange(chunkHolder, list)), mainThreadExecutor);
+                    break;
+                case 50: return chunks.size();
+                case 51:
+                    List<ChunkAccess> list = chunks;
+                    chunks = null;
+                    chunk = (LevelChunk)list.get(slot);
+                    break;
+                case 52: chunk.postProcessGeneration(level); break;
+                case 53: level.startTickingChunk(chunk); break;
+                case 54:
+                    CompletableFuture<?> completableFuturex = holder.getSendSyncFuture();
+                    send = completableFuturex;
+                    return completableFuturex.isDone() ? 1 : 0;
+                case 56: onChunkReadyToSend(holder, chunk); break;
+                case 57:
+                    ChunkMap map = ChunkMap.this;
+                    ChunkHolder capturedHolder = holder;
+                    LevelChunk capturedChunk = chunk;
+                    send.thenAcceptAsync(ignored -> map.sendPreparedChunk(capturedHolder, capturedChunk), mainThreadExecutor);
+                    break;
+                default: throw new IllegalStateException("Invalid native chunk preparation effect " + operation);
+            }
+            return 0;
+        }
+    }
 
 	private void onChunkReadyToSend(ChunkHolder chunkHolder, LevelChunk levelChunk) {
 		ChunkPos chunkPos = levelChunk.getPos();
@@ -762,8 +831,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	public CompletableFuture<ChunkResult<LevelChunk>> prepareAccessibleChunk(ChunkHolder chunkHolder) {
-		return this.getChunkRangeFuture(chunkHolder, 1, ChunkLevel::getStatusAroundFullChunk)
-			.thenApply(chunkResult -> chunkResult.map(list -> (LevelChunk)list.get(list.size() / 2)));
+		return this.prepareChunk(chunkHolder, 0);
 	}
 
 	Stream<ChunkHolder> allChunksWithAtLeastStatus(ChunkStatus chunkStatus) {

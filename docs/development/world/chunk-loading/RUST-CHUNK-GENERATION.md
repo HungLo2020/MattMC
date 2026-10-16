@@ -304,6 +304,110 @@ These controls cover storage-owner adoption, separately from Ticket-cell binding
 
 ## Verification status
 
+### Native readiness and dependencies
+
+S28 moves prerequisite aggregation, wait/wakeup, completion/cancellation and
+accessible/ticking/entity readiness, including send/save fences, into Rust.
+It starts from `006afac17` and integrates the separately published S24/S27/S29
+changes through `2b183557`. Java retains genuine futures, resource bindings,
+virtual dispatch and world, light, network and save effects.
+
+Native `readiness.rs` now owns range dependency nodes, their publication barrier,
+error selection, ordered join/result passes, holder completion/downgrade/retry,
+request rescheduling and task wait/wake decisions. Direct futures remain mutable
+until their parent node publishes; a published child retains its frozen error
+resource. Java prepares that actual error binding before native commit. The
+original obtrusion-before/after-pair distinction is a required contract.
+Native parent links and a reserved ready queue advance eligible continuations
+directly; completion does not rescan the whole graph or allocate queue capacity.
+
+The private chunk future adapter routes only the engine's fence combiner into
+this native graph. All actual virtual `thenCombine` and stage-conversion calls
+still occur, including instrumented stock-class replacements. Arbitrary public
+CF combinators and executors keep their existing behavior. Actual generation
+fences, status futures and range adapters use this producer; public future aliases
+remain the same objects throughout callbacks and native publication.
+
+Keep the internal join stage separate from the public result stage. A caller
+can complete the public future early: joins still occur, while result callbacks
+are skipped. Preserve captured task incarnations and repeated custom wake
+callbacks; cancellation does not suppress their original outstanding probes.
+Retire input/error roots at their final engine use: fences and failures release
+before waking callers, and successful ranges release futures after joining but
+before result callbacks. Only the selected error and actual result payloads
+survive. A native-selected completion role determines this boundary.
+
+The original `e31df0e5` retirement repair passes 133 focused Java cases (four
+controlled cases skipped in that ordinary run). Original range10, wake5 and sync5 contracts pass on Frozen and the sealed
+complete published runtime. The initial merged-stage, per-leaf error snapshot
+and class-purity shortcuts each have preserved failing Current controls under
+`s28-*`; no earlier positive is relabeled as covering a subsequently added case.
+Two further original retirement cases pass on Frozen/pre and fail on the
+pre-repair Current image; they pass after native-selected root retirement.
+The GC fixture needs both Mockito harness roots released before judging cycles.
+
+Run the isolated allocation/publication/root/release controls with:
+
+```sh
+python3 DevUtils/tests/worldgen/chunk_generation/MutateChunkDependencies.py \
+  --classpath-file build/chunk-generation/<test-classpath-file> \
+  --output build/chunk-generation/<new-dependency-control>
+```
+
+The unchanged copy passes post-adoption failure/retry and real retirement.
+Early native publication, weak VM prerequisite bindings and missing native
+release are each detected. Production source/class/native input guards and actual
+mapped-image checks surround the controls. `rangeStatistics` counts live,
+created and retired owners plus live/peak requested owner/vector payload bytes;
+it excludes Arc control blocks, allocator overhead, VM resources and all other
+native/process allocations. It is not total native memory or RSS.
+
+Preparation and generation claims now use native continuation decisions.
+Accessible/entity projection callbacks capture no map or holder. Delayed send
+callbacks retain their actual map, holder and center chunk without retaining
+the old range or neighbors. Five preparation and two callback-lifetime cases
+match original Frozen/pre behavior. Final integrated native `53e7d890` passes
+2,512 ordinary Java cases (six expected skips), 193 parity, 11 slow and 3,085
+Rust cases (nine ignored). Isolated positives and intended mutation witnesses
+cover dependency publication/VM roots/native release, epoch publication and
+failed blocking creation. Two resource tests cover retained pending graphs and
+success, failure and external cancellation while the terminal output stays live;
+actual owner/payload counters return to their prior bound after last use.
+
+Actual player loading, movement, dimension transfer, lighting and save/reopen
+checks pass. Shutdown begins with 81 actual FULL futures pending; reopening
+completes nine requests in that region. The holder lifecycle passes 18 checks.
+Straight and interrupted/resumed generation each check 648 FULL chunks across
+four dimensions: all Current/pre fields match, three standard dimensions match
+Frozen, and known Primordial differences remain recorded. Injected native/Java
+failures restore all nine touched chunks; the failed target is CARVERS in
+memory and absent on disk, not a durability result. Cancellation drains all
+660 holders and preserves the below-FEATURES comparison away from decorated
+neighbors; later and neighboring scheduling differences remain explicit.
+
+Keep original assigned-pre `006afac17`/`f570cee4` and the separate clean integrated
+pre `2b18ec0d`/`967be670` fixtures distinct. The latter includes independently
+published item/generation work and isolates this slice's cost. Neither replaces
+Frozen or relabels earlier receipts. The original matched `e31df0e5` campaign
+uses 18 processes, three rotated rounds and fresh/reopened stock flat-air FULL
+requests. Current quiet medians are 1.834–2.026 ms fresh and 0.937–0.941 ms
+reopened, 386.6–390.6 ns loaded and 5.81–5.90 ns for holder reads. These exceed
+the normal Frozen allowance; they are measured migration debt, not a speedup.
+The [scoped temporary disposition](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18982157) records the exact images,
+S29 integration impact, responsible owner and ownership-based exit.
+
+The single four-process diagnostic identifies actual VM frame allocation,
+boxed native continuation/Arc-exchange work and native transitions alongside
+existing snapshot and wait work. Instrumentation can change JIT/escape analysis;
+its Java allocation/CPU and sampled weights are diagnostic, not uninstrumented
+production certification or causal shares. Native allocator/Arc/synchronization
+costs remain unpartitioned. No whole-process native-memory, server or FPS claim
+is made. Retain invocation state across native producers and consumers through
+genuine VM observation/publication boundaries to remove this temporary churn;
+recheck the same complete workloads and lifetime/save contracts for that exit.
+
+### Published S25 slice
+
 The `f570cee4` slice passes 2,376 ordinary Java tests (six skips), 193 parity,
 11 slow and all 3,017 Rust tests (nine ignored), with the ticket/holder/lifetime,
 straight/resumed FULL and failure/cancellation gates described in the

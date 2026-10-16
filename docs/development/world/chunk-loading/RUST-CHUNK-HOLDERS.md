@@ -12,9 +12,10 @@ owns that structure:
 - each holder's level state: its ticket level, the level its futures last
   reflected, and whether it was accessible since the last save.
 
-The unpublished [generation integration](RUST-CHUNK-GENERATION.md) extends this
+The [generation integration](RUST-CHUNK-GENERATION.md) extends this
 owner through request admission, stable visible snapshots and holder readiness.
-Its guide records the current validation limits.
+Its guide distinguishes the published S25 slice from ongoing readiness work
+and records their validation limits.
 
 It also makes the scheduling and unload decisions, applies the loading graph's
 level changes to holders directly, and decides each holder's status

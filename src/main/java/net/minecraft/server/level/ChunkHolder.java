@@ -124,7 +124,7 @@ public class ChunkHolder extends GenerationChunkHolder {
         switch ((int)(command & 255)) {
             case 31: owner.binding(target, dependency); break;
             case 32: owner.binding(target, this.sync(target,
-                "thenCombine(java.util.concurrent.CompletionStage, java.util.function.BiFunction)").thenCombine(dependency, (a, b) -> null)); break;
+                "thenCombine(java.util.concurrent.CompletionStage, java.util.function.BiFunction)").thenCombine(dependency, NativeChunkGeneration.fenceCombiner())); break;
             default: throw new IllegalStateException("Unknown native dependency command");
         }
     }
@@ -283,7 +283,8 @@ public class ChunkHolder extends GenerationChunkHolder {
             switch (op) {
                 case 30: return ChunkHolder.this.sync(slot, "isDone()").isDone() ? 1 : 0;
                 case 31: owner.binding(slot, dependency); break;
-                case 32: owner.binding(slot, ChunkHolder.this.sync(slot, "thenCombine(java.util.concurrent.CompletionStage, java.util.function.BiFunction)").thenCombine(dependency, (a, b) -> null)); break;
+                case 32: owner.binding(slot, ChunkHolder.this.sync(slot,
+                    "thenCombine(java.util.concurrent.CompletionStage, java.util.function.BiFunction)").thenCombine(dependency, NativeChunkGeneration.fenceCombiner())); break;
                 case 33:
                     owner.binding(slot, switch (kind) {
                         case 0 -> map.prepareAccessibleChunk(ChunkHolder.this);
@@ -295,7 +296,7 @@ public class ChunkHolder extends GenerationChunkHolder {
                 case 35: ChunkHolder.this.addSaveDependency(future(slot)); break;
                 case 36: future(slot).cancel(false); break;
                 case 37:
-                    CompletableFuture<Void> next = new CompletableFuture<>();
+                    CompletableFuture<Void> next = NativeChunkGeneration.newChunkFuture();
                     FullChunkStatus status = FullChunkStatus.values()[kind];
                     ChunkMap chunkMap = map;
                     ChunkHolder chunkHolder = ChunkHolder.this;

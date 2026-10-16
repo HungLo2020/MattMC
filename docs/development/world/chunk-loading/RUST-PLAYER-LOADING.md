@@ -104,6 +104,22 @@ queued disconnects, the admission cap, readiness, unload and saved block/light
 effects after reopening. It runs initial and reopen processes on every side.
 This is headless server evidence, not network, client or FPS coverage.
 
+Add `--shutdown-pending` to stop the initial server while 81 real FULL requests
+have unfinished futures and the chunk map still has work. The observer calls
+ordinary `halt` while its main-thread action still owns the queue; the normal
+shutdown deactivates tickets, drains work and saves. The reopened process checks
+the existing saved block/light effects and completes nine requests in the
+pending region. A pending-work assertion, process failure or reopen failure
+fails the run; this mode does not compare scheduling-dependent partial saves.
+
+For a later migration, use `--sides frozen,pre,current --pre-runtime <directory>`
+with a complete sealed pre-change runtime (classes, resources, native image,
+classpath and checksum manifest). Pass `--frozen-native-dir <directory>` for the
+image paired with the pinned Frozen classes. This avoids an old-class/new-library
+overlay. The runner verifies the complete Current image before/after, checks
+the sealed reference and records actual mapped libraries on Linux. Legacy
+`control` overlays compile only when that side is explicitly selected.
+
 After sealing a successful oracle result, run the deliberately failing controls
 with exclusive ownership of the checkout and build outputs:
 

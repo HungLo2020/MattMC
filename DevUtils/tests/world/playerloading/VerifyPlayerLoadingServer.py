@@ -12,8 +12,13 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+import sys
+import time
 
 from VerifyPlayerLoading import CONTROL_SOURCES, DRIVER, FROZEN, FROZEN_HEAD, ROOT, sha, source_identity
+
+sys.path.insert(0, str(ROOT / 'DevUtils/tests/worldgen/chunk_generation'))
+import VerifyChunkGeneration as generation
 
 SOURCES = [DRIVER.with_name(name) for name in ('PlayerLoadingServerAgent.java', 'PlayerLoadingServerAudit.java')]
 
@@ -26,6 +31,12 @@ def main():
     parser.add_argument('--control-ref', required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--sides', default='frozen,control,current')
+    parser.add_argument('--pre-runtime', type=Path,
+                        help='complete sealed pre-change classes/resources/native runtime; enables side pre')
+    parser.add_argument('--frozen-native-dir', type=Path,
+                        help='native image paired with the original Frozen classes')
+    parser.add_argument('--shutdown-pending', action='store_true',
+                        help='also stop with real FULL requests pending and exercise their saved region after reopen')
     parser.add_argument('--timeout', type=int, default=900)
     args = parser.parse_args()
     output = args.output.resolve()
@@ -47,6 +58,18 @@ def main():
     env.update(JAVA_HOME=str(jdk.parent), PATH=str(jdk) + os.pathsep + env.get('PATH', ''))
     classpaths = {'frozen': args.frozen_classpath_file.read_text().strip(),
                  'current': args.current_classpath_file.read_text().strip()}
+    natives = {'frozen': args.frozen_native_dir.resolve() if args.frozen_native_dir else native.parent,
+               'control': native.parent, 'current': native.parent}
+    if args.pre_runtime:
+        args.pre_runtime = args.pre_runtime.resolve()
+        pre = generation.verify_pre(args.pre_runtime)
+        classpaths['pre'] = (args.pre_runtime / 'classpath.txt').read_text().strip()
+        natives['pre'] = args.pre_runtime / 'native'
+        result['pre_head'] = pre['source_head']
+    result['runtime_native_images'] = {side: {'directory': str(path), 'sha256': sha(path / native.name)}
+                                      for side, path in natives.items()}
+    result['current_image_before'] = generation.end.inputs(ROOT)
+    result['driver_sha256'] = sha(Path(__file__).resolve())
 
     def run(command, log):
         with log.open('w') as stream:
@@ -55,16 +78,17 @@ def main():
             raise RuntimeError(f'{log}: exit {code}')
 
     try:
-        control = output / 'control-classes'
-        control.mkdir()
-        sources = []
-        for name in CONTROL_SOURCES:
-            target = output / 'control-source' / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(subprocess.check_output(['git', 'show', f'{base}:src/main/java/net/minecraft/{name}'], cwd=ROOT))
-            sources.append(str(target))
-        run([str(jdk / 'javac'), '-nowarn', '-cp', classpaths['current'], '-d', str(control), *sources], output / 'control-compile.log')
-        classpaths['control'] = str(control) + os.pathsep + classpaths['current']
+        if 'control' in args.sides.split(','):
+            control = output / 'control-classes'
+            control.mkdir()
+            sources = []
+            for name in CONTROL_SOURCES:
+                target = output / 'control-source' / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(subprocess.check_output(['git', 'show', f'{base}:src/main/java/net/minecraft/{name}'], cwd=ROOT))
+                sources.append(str(target))
+            run([str(jdk / 'javac'), '-nowarn', '-cp', classpaths['current'], '-d', str(control), *sources], output / 'control-compile.log')
+            classpaths['control'] = str(control) + os.pathsep + classpaths['current']
         for side in args.sides.split(','):
             assert side in classpaths, side
             classes = output / (side + '-agent-classes')
@@ -98,20 +122,33 @@ spawn-protection=0
                 target.mkdir()
                 command = [str(jdk / 'java'), '-Xms512m', '-Xmx3g', '-XX:+UseG1GC',
                            '--enable-native-access=ALL-UNNAMED', '-Dmax.bg.threads=2',
-                           '-Dmattmc.rust.natives.dir=' + str(native.parent),
+                           '-Dmattmc.rust.natives.dir=' + str(natives[side]),
                            '-DplayerLoading.output=' + str(target),
                            '-DplayerLoading.reopen=' + str(phase == 'reopen').lower(),
-                           '-DplayerLoading.expectNative=' + str(side == 'current').lower(),
+                           '-DplayerLoading.shutdownPending=' + str(args.shutdown_pending).lower(),
+                           '-DplayerLoading.expectNative=' + str(side in ('pre', 'current')).lower(),
                            '-javaagent:' + str(jar), '-cp', classpaths[side],
                            'net.minecraft.server.Main', '--nogui', '--port', '0']
                 (target / 'command.json').write_text(json.dumps(command, indent=2))
                 with (target / 'server.log').open('w') as log:
                     process = subprocess.Popen(command, cwd=world, env=env, stdout=log, stderr=subprocess.STDOUT,
                                                start_new_session=True)
+                    mappings = {}
                     try:
-                        code = process.wait(timeout=args.timeout)
-                    except subprocess.TimeoutExpired:
-                        raise RuntimeError(f'{side}/{phase}: owned server timeout; logs retained')
+                        deadline = time.monotonic() + args.timeout
+                        while process.poll() is None:
+                            try:
+                                for line in Path(f'/proc/{process.pid}/maps').read_text().splitlines():
+                                    if 'mattmc' in line and '.so' in line:
+                                        path = line.split()[-1]
+                                        if Path(path).is_file() and path not in mappings:
+                                            mappings[path] = sha(Path(path))
+                            except (FileNotFoundError, ProcessLookupError):
+                                pass
+                            if time.monotonic() > deadline:
+                                raise RuntimeError(f'{side}/{phase}: owned server timeout; logs retained')
+                            time.sleep(.1)
+                        code = process.returncode
                     finally:
                         # The server owns a separate process group. An interrupted
                         # observer must retire it too, not leave it after Ctrl-C.
@@ -129,11 +166,14 @@ spawn-protection=0
                                     pass
                                 process.wait()
                 audit = json.loads((target / 'result.json').read_text()) if (target / 'result.json').exists() else {}
-                result['runs'][side + '/' + phase] = {'exit': code, 'audit': audit}
+                expected = result['runtime_native_images'][side]['sha256']
+                result['runs'][side + '/' + phase] = {'exit': code, 'audit': audit, 'native_mappings': mappings}
                 (output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
                 print(side, phase, 'exit', code, 'status', audit.get('status'), 'checks', len(audit.get('checks', [])), flush=True)
                 if code or audit.get('status') != 'passed' or audit.get('cleanupError'):
                     raise RuntimeError(f'{side}/{phase} failed; see {target}')
+                if side != 'frozen' and expected not in mappings.values():
+                    raise RuntimeError(f'{side}/{phase}: expected complete runtime native image not observed')
         # Asynchronous server scheduling is not a byte-for-byte event oracle.
         # Compare actual common checks; candidate-only native route controls are
         # separately mandatory and all coverage details remain unnormalized.
@@ -148,6 +188,10 @@ spawn-protection=0
                 common[phase] = checks
         result['inputs_unchanged'] = source_identity() == result['candidate_source_sha256'] and sha(native) == result['native_sha256']
         assert result['inputs_unchanged'], 'Candidate inputs changed during lifecycle'
+        result['current_image_after'] = generation.end.inputs(ROOT)
+        assert result['current_image_before'] == result['current_image_after'], 'Complete Current source/classes/native changed during lifecycle'
+        if args.pre_runtime:
+            generation.verify_pre(args.pre_runtime)
         result['status'] = 'passed'
     except Exception as error:
         result['error'] = f'{type(error).__name__}: {error}'

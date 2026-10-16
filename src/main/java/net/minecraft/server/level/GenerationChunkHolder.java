@@ -39,21 +39,9 @@ public abstract class GenerationChunkHolder {
 	}
 
 	public CompletableFuture<ChunkResult<ChunkAccess>> scheduleChunkGenerationTask(ChunkStatus chunkStatus, ChunkMap chunkMap) {
-        Object request = chunkStatus == ChunkStatus.FULL ? this.generation.fullRequest() : NativeChunkGeneration.Holder.REQUEST_FALLBACK;
-        if (request == NativeChunkGeneration.Holder.REQUEST_DISALLOWED) return UNLOADED_CHUNK_FUTURE;
-        CompletableFuture<ChunkResult<ChunkAccess>> completableFuture;
-        if (request == NativeChunkGeneration.Holder.REQUEST_FALLBACK) {
-            if (this.isStatusDisallowed(chunkStatus)) return UNLOADED_CHUNK_FUTURE;
-            completableFuture = this.getOrCreateFuture(chunkStatus);
-        } else {
-            completableFuture = (CompletableFuture<ChunkResult<ChunkAccess>>)request;
-        }
-        if (completableFuture.isDone()) return completableFuture;
-        ChunkGenerationTask chunkGenerationTask = (ChunkGenerationTask)this.generation.task();
-        if (chunkGenerationTask == null || chunkStatus.isAfter(chunkGenerationTask.targetStatus)) {
-            this.rescheduleChunkTask(chunkMap, chunkStatus);
-        }
-        return completableFuture;
+        FutureFrame frame = new FutureFrame(chunkStatus, null, null, chunkMap);
+        this.generation.futureControl(4, frame);
+        return frame.returned;
     }
 
 	CompletableFuture<ChunkResult<ChunkAccess>> applyStep(
@@ -76,20 +64,11 @@ public abstract class GenerationChunkHolder {
 	}
 
 	protected void updateHighestAllowedStatus(ChunkMap chunkMap) {
-		ChunkStatus chunkStatus = this.generation.allowed();
-		ChunkStatus chunkStatus2 = ChunkLevel.generationStatus(this.getTicketLevel());
-		this.generation.allowed(chunkStatus2);
-		boolean bl = chunkStatus != null && (chunkStatus2 == null || chunkStatus2.isBefore(chunkStatus));
-		if (bl) {
-			this.failAndClearPendingFuturesBetween(chunkStatus2, chunkStatus);
-			if (this.generation.task() != null) {
-				this.rescheduleChunkTask(chunkMap, this.findHighestStatusWithPendingFuture(chunkStatus2));
-			}
-		}
+		this.generation.futureControl(5, new FutureFrame(null, null, null, chunkMap));
 	}
 
 	public void replaceProtoChunk(ImposterProtoChunk imposterProtoChunk) {
-		CompletableFuture<ChunkResult<ChunkAccess>> completableFuture = CompletableFuture.completedFuture(ChunkResult.of(imposterProtoChunk));
+		CompletableFuture<ChunkResult<ChunkAccess>> completableFuture = NativeChunkGeneration.completedChunkFuture(ChunkResult.of(imposterProtoChunk));
 
 		for (int i = 0; i < CHUNK_STATUSES.size() - 1; i++) {
 			CompletableFuture<ChunkResult<ChunkAccess>> completableFuture2 = (CompletableFuture<ChunkResult<ChunkAccess>>)this.generation.future(i);
@@ -109,109 +88,101 @@ public abstract class GenerationChunkHolder {
 		this.generation.removeTask(chunkGenerationTask);
 	}
 
-	private void rescheduleChunkTask(ChunkMap chunkMap, @Nullable ChunkStatus chunkStatus) {
-		ChunkGenerationTask chunkGenerationTask;
-		if (chunkStatus != null) {
-			chunkGenerationTask = chunkMap.scheduleGenerationTask(chunkStatus, this.getPos());
-		} else {
-			chunkGenerationTask = null;
-		}
-
-		ChunkGenerationTask chunkGenerationTask2 = (ChunkGenerationTask)this.generation.exchangeTask(chunkGenerationTask);
-		if (chunkGenerationTask2 != null) {
-			chunkGenerationTask2.markForCancellation();
-		}
-	}
-
 	private CompletableFuture<ChunkResult<ChunkAccess>> getOrCreateFuture(ChunkStatus chunkStatus) {
-		if (this.isStatusDisallowed(chunkStatus)) {
-			return UNLOADED_CHUNK_FUTURE;
-		} else {
-			int i = chunkStatus.getIndex();
-			CompletableFuture<ChunkResult<ChunkAccess>> completableFuture = (CompletableFuture<ChunkResult<ChunkAccess>>)this.generation.future(i);
-
-			while (completableFuture == null) {
-				CompletableFuture<ChunkResult<ChunkAccess>> completableFuture2 = new CompletableFuture();
-				completableFuture = (CompletableFuture<ChunkResult<ChunkAccess>>)this.generation.compareFuture(i, null, completableFuture2);
-				if (completableFuture == null) {
-					if (this.isStatusDisallowed(chunkStatus)) {
-						this.failAndClearPendingFuture(i, completableFuture2);
-						return UNLOADED_CHUNK_FUTURE;
-					}
-
-					return completableFuture2;
-				}
-			}
-
-			return completableFuture;
-		}
-	}
-
-	private void failAndClearPendingFuturesBetween(@Nullable ChunkStatus chunkStatus, ChunkStatus chunkStatus2) {
-		int i = chunkStatus == null ? 0 : chunkStatus.getIndex() + 1;
-		int j = chunkStatus2.getIndex();
-
-		for (int k = i; k <= j; k++) {
-			CompletableFuture<ChunkResult<ChunkAccess>> completableFuture = (CompletableFuture<ChunkResult<ChunkAccess>>)this.generation.future(k);
-			if (completableFuture != null) {
-				this.failAndClearPendingFuture(k, completableFuture);
-			}
-		}
-	}
-
-	private void failAndClearPendingFuture(int i, CompletableFuture<ChunkResult<ChunkAccess>> completableFuture) {
-		if (completableFuture.complete(UNLOADED_CHUNK) && this.generation.compareFuture(i, completableFuture, null) != completableFuture) {
-			throw new IllegalStateException("Nothing else should replace the future here");
-		}
+		FutureFrame frame = new FutureFrame(chunkStatus, null, null);
+		this.generation.futureControl(0, frame);
+		return frame.returned;
 	}
 
 	private void completeFuture(ChunkStatus chunkStatus, ChunkAccess chunkAccess) {
-		ChunkResult<ChunkAccess> chunkResult = ChunkResult.of(chunkAccess);
-		int i = chunkStatus.getIndex();
-
-		while (true) {
-			CompletableFuture<ChunkResult<ChunkAccess>> completableFuture = (CompletableFuture<ChunkResult<ChunkAccess>>)this.generation.future(i);
-			if (completableFuture == null) {
-				if (this.generation.compareFuture(i, null, CompletableFuture.completedFuture(chunkResult)) == null) {
-					return;
-				}
-			} else {
-				if (completableFuture.complete(chunkResult)) {
-					return;
-				}
-
-				if (((ChunkResult)completableFuture.getNow(NOT_DONE_YET)).isSuccess()) {
-					throw new IllegalStateException("Trying to complete a future but found it to be completed successfully already");
-				}
-
-				Thread.yield();
-			}
-		}
+		this.generation.futureControl(1, new FutureFrame(chunkStatus, ChunkResult.of(chunkAccess), null));
 	}
 
-	@Nullable
-	private ChunkStatus findHighestStatusWithPendingFuture(@Nullable ChunkStatus chunkStatus) {
-		if (chunkStatus == null) {
-			return null;
-		} else {
-			ChunkStatus chunkStatus2 = chunkStatus;
-
-			for (ChunkStatus chunkStatus3 = (ChunkStatus)this.generation.started();
-				chunkStatus3 == null || chunkStatus2.isAfter(chunkStatus3);
-				chunkStatus2 = chunkStatus2.getParent()
-			) {
-				if (this.generation.future(chunkStatus2.getIndex()) != null) {
-					return chunkStatus2;
-				}
-
-				if (chunkStatus2 == ChunkStatus.EMPTY) {
-					break;
-				}
-			}
-
-			return null;
-		}
-	}
+    /** Actual future/status effects. The native invocation owns loops and choices;
+     * nested callbacks receive separate frames and retain their captured objects. */
+    private final class FutureFrame implements NativeChunkGeneration.FutureEffect {
+        ChunkStatus requested, allowedBefore, started;
+        final ChunkResult<ChunkAccess> result;
+        final ChunkMap map;
+        CompletableFuture<ChunkResult<ChunkAccess>> current, candidate, returned;
+        ChunkGenerationTask task, nextTask;
+        CompletableFuture<Void> fence;
+        FutureFrame(ChunkStatus requested, ChunkResult<ChunkAccess> result,
+                CompletableFuture<ChunkResult<ChunkAccess>> candidate) {
+            this(requested, result, candidate, null);
+        }
+        FutureFrame(ChunkStatus requested, ChunkResult<ChunkAccess> result,
+                CompletableFuture<ChunkResult<ChunkAccess>> candidate, ChunkMap map) {
+            this.requested = requested; this.result = result; this.candidate = candidate; this.map = map;
+        }
+        public long apply(int operation, int slot) {
+            switch (operation) {
+                case 1: return GenerationChunkHolder.this.isStatusDisallowed(requested) ? 1 : 0;
+                case 2: return requested.getIndex();
+                case 3:
+                    current = (CompletableFuture<ChunkResult<ChunkAccess>>)generation.future(slot);
+                    return current == null ? 0 : 1;
+                case 4: candidate = NativeChunkGeneration.newChunkFuture(); break;
+                case 5:
+                    current = (CompletableFuture<ChunkResult<ChunkAccess>>)generation.compareFuture(slot, null, candidate);
+                    return current == null ? 0 : 1;
+                case 6: returned = current; break;
+                case 7: returned = candidate; break;
+                case 8: returned = UNLOADED_CHUNK_FUTURE; break;
+                case 9: return candidate.complete(UNLOADED_CHUNK) ? 1 : 0;
+                case 10: return generation.compareFuture(slot, candidate, null) == candidate ? 1 : 0;
+                case 11: throw new IllegalStateException("Nothing else should replace the future here");
+                case 12: candidate = NativeChunkGeneration.completedChunkFuture(result); break;
+                case 13: return current.complete(result) ? 1 : 0;
+                case 14: return current.getNow(NOT_DONE_YET).isSuccess() ? 1 : 0;
+                case 15: throw new IllegalStateException("Trying to complete a future but found it to be completed successfully already");
+                case 16: Thread.yield(); break;
+                case 17: candidate = current; break;
+                case 18: current = returned; break;
+                case 19: return current.isDone() ? 1 : 0;
+                case 20:
+                    task = (ChunkGenerationTask)generation.task();
+                    return task == null ? 0 : 1;
+                case 21: return requested.isAfter(task.targetStatus) ? 1 : 0;
+                case 22: nextTask = map.scheduleGenerationTask(requested, GenerationChunkHolder.this.getPos()); break;
+                case 23: nextTask = null; break;
+                case 24:
+                    task = generation.exchangeTask(nextTask);
+                    return task == null ? 0 : 1;
+                case 26: task.markForCancellation(); break;
+                case 30:
+                    Object request = requested == ChunkStatus.FULL ? generation.fullRequest() : NativeChunkGeneration.Holder.REQUEST_FALLBACK;
+                    if (request == NativeChunkGeneration.Holder.REQUEST_DISALLOWED) return 1;
+                    if (request == NativeChunkGeneration.Holder.REQUEST_FALLBACK) return 2;
+                    current = (CompletableFuture<ChunkResult<ChunkAccess>>)request;
+                    return 3;
+                case 31:
+                    allowedBefore = generation.allowed();
+                    return allowedBefore == null ? 0 : 1;
+                case 32:
+                    requested = ChunkLevel.generationStatus(GenerationChunkHolder.this.getTicketLevel());
+                    generation.allowed(requested);
+                    return requested == null ? 0 : 1;
+                case 33: return requested.isBefore(allowedBefore) ? 1 : 0;
+                case 34: return requested.getIndex();
+                case 35: return allowedBefore.getIndex();
+                case 36:
+                    started = generation.started();
+                    return started == null ? 0 : 1;
+                case 37: return requested.isAfter(started) ? 1 : 0;
+                case 38: return requested == ChunkStatus.EMPTY ? 1 : 0;
+                case 39: requested = requested.getParent(); break;
+                case 40: fence = NativeChunkGeneration.newChunkFuture(); break;
+                case 41: generation.saveFence(fence); break;
+                case 42: GenerationChunkHolder.this.addSaveDependency(generation.saveFence()); break;
+                case 43: fence = generation.saveFence(); break;
+                case 44: fence.complete(null); break;
+                case 45: throw new IllegalStateException("More releases than claims. Count: " + slot);
+                default: throw new IllegalStateException("Invalid native holder future effect " + operation);
+            }
+            return 0;
+        }
+    }
 
 	private boolean acquireStatusBump(ChunkStatus chunkStatus) {
 		ChunkStatus chunkStatus2 = chunkStatus == ChunkStatus.EMPTY ? null : chunkStatus.getParent();
@@ -233,23 +204,11 @@ public abstract class GenerationChunkHolder {
 	protected abstract void addSaveDependency(CompletableFuture<?> completableFuture);
 
 	public void increaseGenerationRefCount() {
-		if (this.generation.claim() == 0) {
-			CompletableFuture<Void> future = new CompletableFuture<>();
-			this.generation.saveFence(future);
-			this.addSaveDependency(this.generation.saveFence());
-		}
+		this.generation.futureControl(6, new FutureFrame(null, null, null));
 	}
 
 	public void decreaseGenerationRefCount() {
-		CompletableFuture<Void> completableFuture = this.generation.saveFence();
-		int i = this.generation.releaseClaim();
-		if (i == 0) {
-			completableFuture.complete(null);
-		}
-
-		if (i < 0) {
-			throw new IllegalStateException("More releases than claims. Count: " + i);
-		}
+		this.generation.futureControl(7, new FutureFrame(null, null, null));
 	}
 
 	@Nullable

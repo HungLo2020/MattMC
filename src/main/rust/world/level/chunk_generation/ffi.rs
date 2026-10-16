@@ -5,6 +5,72 @@ use std::sync::atomic::Ordering;
 use super::{Header, Holder, Pending, Status, Task, TaskEffects, TaskPolicy};
 use super::PublicationEffects;
 
+#[no_mangle]
+pub extern "C" fn mattmc_chunk_generation_range_create(count: i32, fence: i32) -> u64 {
+    if count < 0 || !(0..=1).contains(&fence) { return 0; }
+    super::readiness::Range::new_role(count as usize, fence != 0).map_or(0, |range| Arc::into_raw(Arc::new(range)).expose_provenance() as u64)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_range_release(id: u64) {
+    if id != 0 { drop(Arc::from_raw(std::ptr::with_exposed_provenance::<super::readiness::Range>(id as usize))); }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_range_event(id: u64, index: i32) -> u64 {
+    let range = &*std::ptr::with_exposed_provenance::<super::readiness::Range>(id as usize);
+    range.event(if index == -1 { None } else { Some(index as usize) })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_range_claim(id: u64) -> u64 {
+    (&*std::ptr::with_exposed_provenance::<super::readiness::Range>(id as usize)).claim()
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_range_input(id: u64, node: i32, right: i32) -> i32 {
+    (&*std::ptr::with_exposed_provenance::<super::readiness::Range>(id as usize)).input(node as usize, right != 0)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_range_prepare(id: u64, node: i32, left: i32, right: i32) -> i32 {
+    (&*std::ptr::with_exposed_provenance::<super::readiness::Range>(id as usize)).prepare(node as usize, left != 0, right != 0)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_range_commit(id: u64, node: i32) -> u64 {
+    (&*std::ptr::with_exposed_provenance::<super::readiness::Range>(id as usize)).commit(node as usize)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_range_statistics(output: *mut u64) {
+    for (index, value) in super::readiness::statistics().into_iter().enumerate() {
+        output.add(index).write(value);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_range_next(id: u64, present: i32) -> u64 {
+    (&*std::ptr::with_exposed_provenance::<super::readiness::Range>(id as usize)).next(present != 0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_holder_future_driver(id: u64, operation: i32) -> u64 {
+    Box::into_raw(Box::new(super::readiness::holder(retain_holder(id), operation))).expose_provenance() as u64
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_prepare_chunk(id: u64, kind: i32, phase: i32) -> u64 {
+    let owner = if id == 0 { None } else { Some(retain_holder(id)) };
+    Box::into_raw(Box::new(super::readiness::prepare_chunk(owner, kind, phase))).expose_provenance() as u64
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_task_dispatch(id: u64, run: i32) -> u64 {
+    let owner = if id == 0 { None } else {
+        let pointer = std::ptr::with_exposed_provenance::<super::Task>(id as usize);
+        Arc::increment_strong_count(pointer);
+        Some(Arc::from_raw(pointer))
+    };
+    Box::into_raw(Box::new(super::readiness::dispatch(owner, run != 0))).expose_provenance() as u64
+}
+
 pub(crate) unsafe fn holder<'a>(id: u64) -> &'a Holder {
     &*std::ptr::with_exposed_provenance::<Holder>(id as usize)
 }
