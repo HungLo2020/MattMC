@@ -7,6 +7,16 @@ integer defaults and allocated 2,048-byte nibble generations live in
 Java reads a leased CPU view; mutations, independent copies and sky-layer
 repetition run in Rust. This subsystem has no rendering or GPU dependencies.
 
+**S0026/r4 in progress:** the primary light owner now publishes its own current
+generation identity, raw default, allocation and validity metadata. Internal
+creation/copy/mutation and public byte export no longer require an eager Java
+generation-view lease. Actual Java readers acquire independent views lazily.
+An array escape ends native authority; a later fill revives that same primary
+identity. This work is part of the connected
+[producer/command/lifetime migration](RUST-LIGHT-COORDINATOR.md), with integrated
+runtime and cost acceptance pending. Historical results below certify their
+original images only.
+
 ## Handoffs
 
 [Saved chunk hydration](../chunk/RUST-DECODED-SECTIONS.md) now creates light
@@ -27,7 +37,8 @@ row repetition also keep canonical light bytes native. Client packet application
 payload directly instead of first allocating a Java clone. The public array
 constructor retains its existing alias contract.
 
-Java still owns light-engine orchestration and callbacks. Canonical
+The coordinator candidate owns per-engine orchestration; Java retains contextual
+and custom callbacks. Canonical
 [map publication](RUST-LIGHT-MAPS.md) now has a separate Rust owner; caller-supplied
 Java maps retain compatibility ownership. That migration has its own verification
 status and does not inherit the historical runtime results below.
@@ -53,8 +64,9 @@ before result installation, as described in [propagation](RUST-LIGHT-PROPAGATION
   array; it is an ownership escape, not a temporary read-only export.
   Later writes use that array until a fill or independent copy adopts
   native ownership again. Subclasses retain their original Java callbacks.
-- CPU owner and view leases are separate `NativeReclaimer` registrations
-  (kinds 9 and 10); every read fences its holder. A view retains its
+- CPU owners and genuinely acquired view leases use separate `NativeReclaimer`
+  registrations (kinds 9 and 10); every read fences its holder. An owner's
+  metadata contains no unpinned byte address. A view retains its
   generation after owner release. Synchronous callbacks pin their source until
   Rust finishes reading; no borrowed Java or owner pointer survives the pass.
 - Preserve original light-storage caller exclusion and map copy-on-write.

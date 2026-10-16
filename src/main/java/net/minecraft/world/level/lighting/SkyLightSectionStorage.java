@@ -10,6 +10,10 @@ import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 
 public class SkyLightSectionStorage extends LayerLightSectionStorage<SkyLightSectionStorage.SkyDataLayerStorageMap> {
+    SkyLightSectionStorage(LightChunkGetter getter, NativeLightBindings bindings) {
+        super(LightLayer.SKY, getter, new SkyDataLayerStorageMap(bindings.newMap()));
+    }
+
 	protected SkyLightSectionStorage(LightChunkGetter lightChunkGetter) {
 		super(
 			LightLayer.SKY,
@@ -110,7 +114,7 @@ public class SkyLightSectionStorage extends LayerLightSectionStorage<SkyLightSec
 		}
 	}
 
-	private static DataLayer repeatFirstLayer(DataLayer dataLayer) {
+	static DataLayer repeatFirstLayer(DataLayer dataLayer) {
         if (dataLayer.getClass() == DataLayer.class) {
             DataLayer nativeCopy = dataLayer.repeatNativeFirstLightLayer();
             if (nativeCopy != null) return nativeCopy;
@@ -152,7 +156,7 @@ public class SkyLightSectionStorage extends LayerLightSectionStorage<SkyLightSec
 		final Long2IntOpenHashMap topSections;
 
         SkyDataLayerStorageMap() { this(new NativeLightingMap()); }
-        private SkyDataLayerStorageMap(NativeLightingMap owner) {
+        SkyDataLayerStorageMap(NativeLightingMap owner) {
             super(owner); this.topSections = null;
         }
         int lowestY() { return nativeMap == null ? currentLowestY : nativeMap.lowestY(); }

@@ -46,6 +46,7 @@ def arguments(description):
     parser.add_argument('--control-ref', required=True)
     parser.add_argument('--control-classpath-file', type=Path)
     parser.add_argument('--control-native-dir', type=Path)
+    parser.add_argument('--frozen-native-dir', type=Path)
     parser.add_argument('--control-image-manifest', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     return parser
@@ -59,6 +60,7 @@ class Campaign:
         self.jdk = args.java_home.resolve() / 'bin'
         self.native = ROOT / 'build/rust/native/mattmc_rust-linux-x64.so'
         self.control_native_dir = (args.control_native_dir or self.native.parent).resolve()
+        self.frozen_native_dir = (args.frozen_native_dir or self.native.parent).resolve()
         self.result = {'passed': False, 'guards_pass': False, 'commands': {}}
         self.env = os.environ.copy()
         for key in ('JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS'):
@@ -71,6 +73,8 @@ class Campaign:
             candidate_head=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
             source_sha256=source_identity(), native_sha256=sha(self.native),
             control_native_sha256=sha(self.control_native_dir / self.native.name),
+            frozen_native_sha256=sha(self.frozen_native_dir / self.native.name),
+            frozen_native_dir=str(self.frozen_native_dir),
             driver_sha256={str(p.relative_to(ROOT)): sha(p) for p in HERE.iterdir() if p.suffix in ('.java', '.py')})
         self.classpaths = {'frozen': args.frozen_classpath_file.read_text().strip(),
                            'current': args.current_classpath_file.read_text().strip()}
@@ -128,7 +132,7 @@ class Campaign:
         return command
 
     def native_dir(self, side):
-        return self.control_native_dir if side == 'control' else self.native.parent
+        return self.control_native_dir if side == 'control' else self.frozen_native_dir if side == 'frozen' else self.native.parent
 
     def save(self):
         (self.output / 'result.json').write_text(json.dumps(self.result, indent=2) + '\n')
@@ -137,6 +141,7 @@ class Campaign:
         self.result['guards_pass'] = (source_identity() == self.result['source_sha256']
             and sha(self.native) == self.result['native_sha256']
             and sha(self.control_native_dir / self.native.name) == self.result['control_native_sha256']
+            and sha(self.frozen_native_dir / self.native.name) == self.result['frozen_native_sha256']
             and all(sha(Path(p)) == digest for p, digest in self.class_images.items())
             and all(sha(ROOT / p) == digest for p, digest in self.result['driver_sha256'].items())
             and subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=FROZEN, text=True).strip() == FROZEN_HEAD

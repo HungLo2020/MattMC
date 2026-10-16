@@ -1,6 +1,6 @@
 //! Retained world light-map snapshots, identities and sky metadata.
-mod ffi;
-mod registry;
+pub(crate) mod ffi;
+pub(super) mod registry;
 use super::layers::Layer;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -56,6 +56,9 @@ impl<T: Clone> Paged<T> {
 pub(super) struct Entry {
     // CPU identity pin and typed layer owner survive cache and map snapshots.
     pub(super) id: u32,
+    // Stable object identity is separate from a reusable reachability slot.
+    // The same Java DataLayer can occupy several slots in queued/updating maps.
+    pub(super) identity: u64,
     pub(super) layer: Option<Arc<Layer>>,
     pub(super) _pin: Option<registry::Pin>,
 }
@@ -178,6 +181,15 @@ impl LightMap {
             self.raw(key)
         })
     }
+    /// Conservative admission only; no cache reads/writes or Java effects.
+    /// Cached entries matter even when a raw key is absent (sentinel behavior).
+    pub(super) fn native_sky_compatible(&self,mut keys:impl Iterator<Item=i64>)->bool {
+        let compatible=|entry:&Arc<Entry>|entry.layer.as_ref().is_some_and(|layer|{
+            let view=layer.view();layer.is_valid() && (view.allocated() || (0..16).contains(&view.default_value()))
+        });
+        self.cached_layers.iter().flatten().all(compatible)
+            && keys.all(|key|self.raw(key).as_ref().is_none_or(compatible))
+    }
     pub(super) fn clear_cache(&mut self) {
         self.cached_keys = [i64::MAX; 2];
         self.cached_layers = [None, None];
@@ -285,6 +297,7 @@ mod tests {
                     .map(|(i, &value)| {
                         Arc::new(Entry {
                             id: i as u32 + 1,
+                            identity: (i as u32 + 1) as u64,
                             layer: Some(Arc::new(Layer::new(value))),
                             _pin: None,
                         })
@@ -332,6 +345,7 @@ mod tests {
                     if let Some(source) = maps[index].raw(key) {
                         let copy = Arc::new(Entry {
                             id: entries.len() as u32 + 1,
+                            identity: (entries.len() as u32 + 1) as u64,
                             layer: Some(Arc::new(source.layer.as_ref().unwrap().copy())),
                             _pin: None,
                         });
@@ -413,6 +427,7 @@ mod tests {
             };
             let entry = Arc::new(Entry {
                 id: 1,
+                identity: (1) as u64,
                 layer: Some(Arc::new(layer)),
                 _pin: None,
             });
@@ -470,6 +485,7 @@ mod tests {
             9,
             Some(Arc::new(Entry {
                 id: 1,
+                identity: (1) as u64,
                 layer: Some(Arc::new(Layer::new(7))),
                 _pin: None,
             })),
@@ -493,6 +509,7 @@ mod tests {
         let mut source = LightMap::new();
         let entry = Arc::new(Entry {
             id: 1,
+            identity: (1) as u64,
             layer: Some(Arc::new(Layer::new(4))),
             _pin: None,
         });

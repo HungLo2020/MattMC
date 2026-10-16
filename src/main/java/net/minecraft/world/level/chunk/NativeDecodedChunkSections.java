@@ -20,7 +20,7 @@ public final class NativeDecodedChunkSections implements AutoCloseable {
         ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     private static final MethodHandle RELEASE_ROWS = handle("hydrated_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle COUNT = handle("hydrated_count", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-    private static final MethodHandle ROW = handle("hydrated_row", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+    private static final MethodHandle ROW = handle("hydrated_row_primary", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE_ROW = handle("hydrated_row_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private final Arena scope;
     private final MemorySegment owner;

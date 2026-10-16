@@ -199,12 +199,20 @@ class NativeLightMapTest {
     @Test void directConsumerDeclinesCustomLayersAndMutableArrayEscapes() {
         var map = new BlockLightSectionStorage.BlockDataLayerStorageMap();
         var source = new DataLayer(-1); map.setLayer(0, source); map.disableCache();
+        long primaryIdentity = source.nativeLightOwnerForMap().address();
         long value = map.nativeMap.sample(0, false, false, true);
         assertNotEquals(0L, value); assertEquals(-1, (int)value);
         source.getData()[0] = 0x32;
         assertEquals(0L, map.nativeMap.sample(0, false, false, true));
         assertEquals(2, map.getLayer(0).get(0, 0, 0));
-        source.fill(7); assertEquals(0L, map.nativeMap.sample(0, false, false, true));
+        // Fill revives this same native primary identity. Its existing map
+        // consumer sees the new generation without a second binding/adoption.
+        source.fill(7);
+        assertEquals(primaryIdentity, source.nativeLightOwnerForMap().address());
+        long revived = map.nativeMap.sample(0, false, false, true);
+        assertNotEquals(0L, revived);
+        assertEquals(7, (int)revived);
+        assertEquals(7, map.getLayer(0).get(0, 0, 0));
         map.setLayer(0, source);
         assertEquals(7, (int)map.nativeMap.sample(0, false, false, true));
         class Custom extends DataLayer {

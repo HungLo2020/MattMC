@@ -4,9 +4,9 @@
 //! levels Rust wrote install once at the end, so an error leaves Java's
 //! storage untouched and Java reruns the pass from the same queues.
 pub(crate) mod ffi;
-mod seed;
+pub(super) mod seed;
 mod sources;
-mod work;
+pub(crate) mod work;
 mod work_ffi;
 #[cfg(test)]
 mod tests;

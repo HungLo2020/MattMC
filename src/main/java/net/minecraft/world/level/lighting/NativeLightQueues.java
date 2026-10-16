@@ -26,8 +26,7 @@ public final class NativeLightQueues {
         try {
             MemorySegment pointer = (MemorySegment) CREATE.invokeExact();
             if (pointer.address() == 0) throw new IllegalStateException("No light queue owner");
-            try { owner = pointer.asReadOnly().reinterpret(1, lifetime, NativeLightQueues::release); }
-            catch (RuntimeException | Error failure) { release(pointer); throw failure; }
+            owner = NativeLightingMap.adopt(pointer,1,RELEASE,lifetime);
             counts = ((MemorySegment) VIEW.invokeExact(owner)).asReadOnly().reinterpret(8, lifetime, null);
         } catch (Throwable failure) { throw rethrow(failure); }
     }

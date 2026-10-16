@@ -39,8 +39,10 @@ releases dead objects in batches of up to 1,024 per downcall.
   `NativeDhColumns` keeps its automatic arena, because column list views alias
   its point slices.
 - Chunk block and biome input bindings register their owner segment unless a
-  release scope is open. Light-storage maps register owner and view against
-  the map object through the public `registerLightMap`.
+  release scope is open. Earlier light-storage maps registered owner and view
+  through `registerLightMap`. The S0026/r4 candidate registers the actual map
+  root once, with its metadata borrowed from that root; the adapter uses the
+  existing kind and registration contract. The paired API remains unchanged.
 - A downcall that receives a raw address taken from a reclaimer-owned segment
   must keep the referent reachable until the call returns.
 - Adding a kind needs a code in both `NativeReclaimer` and `reclaim.rs`, and a

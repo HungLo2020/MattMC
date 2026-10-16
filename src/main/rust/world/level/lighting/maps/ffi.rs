@@ -2,7 +2,7 @@
 //! by the caller for the call; no GPU resources or game-object pointers occur.
 use super::super::layers::Layer;
 use super::{
-    registry::{Registry, Reservation},
+    registry::{Registry, Reservation, ReservationBatch, ReservationBatchMetadata},
     Entry, LightMap,
 };
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -14,8 +14,8 @@ pub struct MapMetadata {
     default: AtomicI32,
 }
 pub struct Owner {
-    registry: Arc<Registry>,
-    state: RwLock<LightMap>,
+    pub(super) registry: Arc<Registry>,
+    pub(super) state: RwLock<LightMap>,
     metadata: MapMetadata,
 }
 #[repr(C)]
@@ -44,9 +44,134 @@ fn owner(registry: Arc<Registry>, state: LightMap) -> Arc<Owner> {
         metadata,
     })
 }
+/// Typed sibling-owner operations. Every lock ends before the caller can
+/// return an effect to Java; snapshots retain both map roots and layer pins.
+impl Owner {
+    pub(in crate::world::level::lighting) fn snapshot(&self) -> Arc<Self> {
+        owner(Arc::clone(&self.registry), self.state.read().unwrap().snapshot())
+    }
+    pub(in crate::world::level::lighting) fn raw(&self, key: i64) -> Option<Arc<Entry>> {
+        self.state.read().unwrap().raw(key)
+    }
+    pub(in crate::world::level::lighting) fn get(&self, key: i64) -> Option<Arc<Entry>> {
+        self.state.write().unwrap().get(key)
+    }
+    /// A complete native-only reconciliation consumes the actual updating map
+    /// under one ownership guard. The caller must return before Java effects.
+    pub(in crate::world::level::lighting) fn reconcile<R>(&self,run:impl FnOnce(&mut LightMap)->R)->R {
+        run(&mut self.state.write().unwrap())
+    }
+    pub(in crate::world::level::lighting) fn set(&self, key: i64, entry: Option<Arc<Entry>>) {
+        self.state.write().unwrap().set(key, entry);
+    }
+    pub(in crate::world::level::lighting) fn remove(&self, key: i64) -> Option<Arc<Entry>> {
+        self.state.write().unwrap().remove(key)
+    }
+    pub(in crate::world::level::lighting) fn clear_cache(&self, disable: bool) {
+        let mut map = self.state.write().unwrap();
+        if disable { map.cache_enabled = false; } else { map.clear_cache(); }
+    }
+    pub(in crate::world::level::lighting) fn native_entry(&self, layer: Arc<Layer>) -> Option<Arc<Entry>> {
+        self.registry.native_layer(layer)
+    }
+    pub(in crate::world::level::lighting) fn top(&self, key: i64) -> i32 {
+        self.state.read().unwrap().top(key)
+    }
+    pub(in crate::world::level::lighting) fn lowest(&self) -> i32 {
+        self.metadata.lowest.load(Ordering::Acquire)
+    }
+    pub(in crate::world::level::lighting) fn set_lowest(&self, value: i32) {
+        let mut map = self.state.write().unwrap();
+        map.lowest_y = value; map.top_default = value;
+        self.metadata.lowest.store(value, Ordering::Release);
+        self.metadata.default.store(value, Ordering::Release);
+    }
+    pub(in crate::world::level::lighting) fn set_top(&self, key: i64, value: Option<i32>) {
+        let mut map = self.state.write().unwrap();
+        if let Some(value) = value { map.put_top(key, value); } else { map.remove_top(key); }
+    }
+    pub(in crate::world::level::lighting) fn owns_batch(&self,batch:&ReservationBatch)->bool{batch.belongs_to(&self.registry)}
+    pub(in crate::world::level::lighting) fn owns_reservation(&self, reservation: &Reservation) -> bool {
+        Arc::ptr_eq(&self.registry, &reservation.registry)
+    }
+    pub(in crate::world::level::lighting) fn entry(&self, reservation: Reservation, layer: Option<Arc<Layer>>, identity: u64) -> Option<Arc<Entry>> {
+        if !Arc::ptr_eq(&self.registry, &reservation.registry) { return None; }
+        let pin = reservation.install();
+        let entry=Arc::new(Entry { id: pin.slot, identity, layer, _pin: Some(pin) });
+        self.registry.bind_entry(&entry);Some(entry)
+    }
+    pub(in crate::world::level::lighting) fn existing_entry(&self, identity:u64, layer:*const Layer)->Option<Arc<Entry>> {
+        self.registry.existing_entry(identity,layer)
+    }
+    pub(in crate::world::level::lighting) fn owns_entry(&self,entry:&Entry)->bool {self.registry.owns_entry(entry)}
+    pub(in crate::world::level::lighting) fn binding_pending(&self)->bool {self.registry.metadata.retired.load(Ordering::Acquire)!=0}
+}
+
+/// Retain an existing actual VM identity entry, preserving its current primary
+/// layer capability. The caller's identity comes from its actual resource root.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_entry_existing(owner:*const Owner,identity:u64,layer:*const Layer)->*const Entry {
+    owner.as_ref().and_then(|owner|owner.existing_entry(identity,layer)).map_or(std::ptr::null(),Arc::into_raw)
+}
+
+/// Materialize a Java facade lazily for a native-created identity. Both returned
+/// leases are independent of map/registry lifetime and consumed by DataLayer.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_materialize(
+    pointer: *const Registry, slot: u32,
+    output: *mut u64,
+) -> *const Layer {
+    materialize(pointer, slot, output, true)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_materialize_primary(
+    pointer: *const Registry, slot: u32, output: *mut u64,
+) -> *const Layer {
+    materialize(pointer, slot, output, false)
+}
+
+unsafe fn materialize(pointer: *const Registry, slot: u32, output: *mut u64, view: bool) -> *const Layer {
+    if pointer.is_null() || output.is_null() { return std::ptr::null(); }
+    *output = 0; *output.add(1) = 0;
+    let Some((layer, identity)) = (*pointer).layer_for_slot(slot) else { return std::ptr::null(); };
+    if view { *output = super::super::layers::ffi::projection(&layer) as u64; }
+    *output.add(1) = identity;
+    Arc::into_raw(layer)
+}
+
+/// Metadata is part of the actual map root. A Java facade retaining that root
+/// needs no separate MapView allocation or independent cleanup registration.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_metadata(pointer: *const Owner) -> *const MapMetadata {
+    pointer.as_ref().map_or(std::ptr::null(), |owner| &owner.metadata)
+}
+
+/// A temporary typed entry lease used for a contextual/custom Java result.
+/// A valid successful call consumes the reservation; null return leaves it
+/// caller-owned. The coordinator clones the entry, then Java releases this lease.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_entry_create(
+    pointer: *const Owner, reservation: *mut Reservation, layer: *const Layer, identity: u64,
+) -> *const Entry {
+    if pointer.is_null() || reservation.is_null() || identity == 0 || !Arc::ptr_eq(&(*pointer).registry, &(*reservation).registry) {
+        return std::ptr::null();
+    }
+    let reservation = *Box::from_raw(reservation);
+    let entry = (*pointer).entry(reservation, if layer.is_null() { None } else { Some(retain(layer)) }, identity);
+    entry.map_or(std::ptr::null(), Arc::into_raw)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_entry_release(pointer: *const Entry) {
+    if !pointer.is_null() { drop(Arc::from_raw(pointer)); }
+}
 #[no_mangle]
 pub extern "C" fn mattmc_light_map_registry_create() -> *const Registry {
     Arc::into_raw(Registry::new())
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_identity_create(pointer: *const Registry) -> u64 {
+    pointer.as_ref().and_then(Registry::identity).unwrap_or(0)
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_light_map_registry_release(pointer: *const Registry) {
@@ -252,6 +377,14 @@ pub unsafe extern "C" fn mattmc_light_map_set(
     reservation: *mut Reservation,
     layer: *const Layer,
 ) -> i32 {
+    mattmc_light_map_set_identity(pointer, key, reservation, layer, 0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_set_identity(
+    pointer: *const Owner, key: i64, reservation: *mut Reservation,
+    layer: *const Layer, identity: u64,
+) -> i32 {
     if pointer.is_null() {
         return -1;
     }
@@ -263,21 +396,18 @@ pub unsafe extern "C" fn mattmc_light_map_set(
     if !Arc::ptr_eq(&source.registry, &(*reservation).registry) {
         return -1;
     }
-    let pin = Box::from_raw(reservation).install();
-    let id = pin.slot;
+    let identity = if identity == 0 {
+        let Some(identity) = source.registry.identity() else { return -1; };
+        identity
+    } else { identity };
+    let reservation = *Box::from_raw(reservation);
     let layer = if layer.is_null() {
         None
     } else {
         Some(retain(layer))
     };
-    source.state.write().unwrap().set(
-        key,
-        Some(Arc::new(Entry {
-            id,
-            layer,
-            _pin: Some(pin),
-        })),
-    );
+    let entry=source.entry(reservation,layer,identity).expect("validated registry owns its reservation");
+    source.state.write().unwrap().set(key,Some(entry));
     0
 }
 #[no_mangle]
@@ -485,4 +615,22 @@ mod tests {
             mattmc_light_map_registry_release(registry);
         }
     }
+}
+
+/// Private queued-input transport lease. Published individual-reservation ABI
+/// stays unchanged; unused cells return to the registry when this lease dies.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_reservation_batch_create(registry:*const Registry,limit:usize)->*const ReservationBatch{
+    if registry.is_null(){return std::ptr::null();}
+    ReservationBatch::new(&retain(registry),limit).map_or(std::ptr::null(),Arc::into_raw)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_reservation_batch_header(batch:*const ReservationBatch)->*const ReservationBatchMetadata{
+    batch.as_ref().map_or(std::ptr::null(),|batch|&batch.metadata)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_reservation_batch_release(batch:*const ReservationBatch){if !batch.is_null(){drop(Arc::from_raw(batch));}}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_map_reservation_batch_cancel(batch:*const ReservationBatch,index:i32)->i32{
+    if batch.is_null()||index<0{return -1;}if (*batch).cancel(index as usize){0}else{-1}
 }

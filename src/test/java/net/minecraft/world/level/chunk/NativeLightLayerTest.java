@@ -60,7 +60,12 @@ class NativeLightLayerTest {
             for (int i = 0; i < 2000; i++) {
                 var dropped = new DataLayer(i & 15);
                 dropped.set(i & 15, 0, 0, 5);
-                dropped.copy().fill(2);
+                // Views are now genuine reader leases, acquired lazily. Export
+                // both readers so this still exercises dropped view cleanup.
+                dropped.nativeLightView();
+                var copied = dropped.copy();
+                copied.nativeLightView();
+                copied.fill(2);
             }
             System.gc();
             Thread.sleep(50);

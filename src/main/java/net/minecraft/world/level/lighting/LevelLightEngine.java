@@ -17,21 +17,30 @@ public class LevelLightEngine implements LightEventListener {
 	private final LightEngine<?, ?> blockEngine;
 	@Nullable
 	private final LightEngine<?, ?> skyEngine;
+    @Nullable private final NativeLevelLighting nativeLevel;
 
 	public LevelLightEngine(LightChunkGetter lightChunkGetter, boolean bl, boolean bl2) {
 		this.levelHeightAccessor = lightChunkGetter.getLevel();
-		this.blockEngine = bl ? new BlockLightEngine(lightChunkGetter) : null;
-		this.skyEngine = bl2 ? new SkyLightEngine(lightChunkGetter) : null;
+        NativeLightBindings bindings = bl || bl2 ? new NativeLightBindings() : null;
+		this.blockEngine = bl ? BlockLightEngine.withBindings(lightChunkGetter, bindings) : null;
+		this.skyEngine = bl2 ? SkyLightEngine.withBindings(lightChunkGetter, bindings) : null;
+        this.nativeLevel = bl || bl2 ? NativeLevelLighting.create(this.blockEngine, this.skyEngine) : null;
 	}
 
 	private LevelLightEngine() {
 		this.levelHeightAccessor = LevelHeightAccessor.create(0, 0);
 		this.blockEngine = null;
 		this.skyEngine = null;
+        this.nativeLevel = null;
 	}
 
 	@Override
 	public void checkBlock(BlockPos blockPos) {
+        if (this.nativeLevel != null && getClass() == LevelLightEngine.class && blockPos != null
+                && blockPos.getClass() == BlockPos.class && this.nativeLevel.matches(this.blockEngine, this.skyEngine)) {
+            this.nativeLevel.check(blockPos.asLong());
+            return;
+        }
 		if (this.blockEngine != null) {
 			this.blockEngine.checkBlock(blockPos);
 		}
@@ -41,13 +50,23 @@ public class LevelLightEngine implements LightEventListener {
 		}
 	}
 
+    /** Borrowed actual allocation; typed task admission retains it immediately. */
+    protected final java.lang.foreign.MemorySegment nativeLevelOwnerForTasks() {
+        return this.nativeLevel != null && this.nativeLevel.matches(this.blockEngine, this.skyEngine)
+            ? this.nativeLevel.ownerForTasks() : java.lang.foreign.MemorySegment.NULL;
+    }
+    protected final void applyNativeLightImport(java.lang.foreign.MemorySegment tasks,long cursor,int target,DataLayer source) { this.nativeLevel.applyImport(tasks,cursor,target,source); }
+    protected final void resumeNativeLightContext(java.lang.foreign.MemorySegment tasks,long cursor){this.nativeLevel.resumeTask(tasks,cursor);}
+
 	@Override
 	public boolean hasLightWork() {
+        if(this.nativeLevel!=null&&this.nativeLevel.matches(this.blockEngine,this.skyEngine))return this.nativeLevel.hasWork();
 		return this.skyEngine != null && this.skyEngine.hasLightWork() ? true : this.blockEngine != null && this.blockEngine.hasLightWork();
 	}
 
 	@Override
 	public int runLightUpdates() {
+        if(this.nativeLevel!=null&&this.nativeLevel.matches(this.blockEngine,this.skyEngine))return this.nativeLevel.runUpdates();
 		int i = 0;
 		if (this.blockEngine != null) {
 			i += this.blockEngine.runLightUpdates();
@@ -62,6 +81,10 @@ public class LevelLightEngine implements LightEventListener {
 
 	@Override
 	public void updateSectionStatus(SectionPos sectionPos, boolean bl) {
+        if(this.nativeLevel!=null&&sectionPos!=null&&sectionPos.getClass()==SectionPos.class
+                &&this.nativeLevel.matches(this.blockEngine,this.skyEngine)){
+            this.nativeLevel.updateStatus(sectionPos.asLong(),bl);return;
+        }
 		if (this.blockEngine != null) {
 			this.blockEngine.updateSectionStatus(sectionPos, bl);
 		}
@@ -73,6 +96,10 @@ public class LevelLightEngine implements LightEventListener {
 
 	@Override
 	public void setLightEnabled(ChunkPos chunkPos, boolean bl) {
+        if(this.nativeLevel!=null&&chunkPos!=null&&chunkPos.getClass()==ChunkPos.class
+                &&this.nativeLevel.matches(this.blockEngine,this.skyEngine)){
+            this.nativeLevel.command(1,ChunkPos.asLong(chunkPos.x,chunkPos.z),bl);return;
+        }
 		if (this.blockEngine != null) {
 			this.blockEngine.setLightEnabled(chunkPos, bl);
 		}
@@ -84,6 +111,10 @@ public class LevelLightEngine implements LightEventListener {
 
 	@Override
 	public void propagateLightSources(ChunkPos chunkPos) {
+        if(this.nativeLevel!=null&&chunkPos!=null&&chunkPos.getClass()==ChunkPos.class
+                &&this.nativeLevel.matches(this.blockEngine,this.skyEngine)){
+            this.nativeLevel.command(2,ChunkPos.asLong(chunkPos.x,chunkPos.z),false);return;
+        }
 		if (this.blockEngine != null) {
 			this.blockEngine.propagateLightSources(chunkPos);
 		}

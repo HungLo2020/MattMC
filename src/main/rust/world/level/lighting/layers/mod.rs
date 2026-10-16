@@ -1,5 +1,5 @@
 //! Rust-owned live light generations and leased CPU reads. No rendering dependencies.
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU32, AtomicU64, AtomicI32, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub(crate) const BYTES: usize = 2048;
@@ -49,6 +49,10 @@ impl View {
     pub fn allocated(&self) -> bool {
         self.generation.bytes.is_some()
     }
+    pub(crate) fn is_empty(&self)->bool{
+        // DataLayer.isEmpty tests definite lazy homogeneity, not byte content.
+        self.generation.bytes.is_none() && self.generation.default==0
+    }
 
     pub fn get(&self, index: i32) -> Result<i32, InvalidByteIndex> {
         let Some(bytes) = &self.generation.bytes else {
@@ -79,32 +83,62 @@ impl View {
     }
 }
 
+/// Metadata belongs to the actual primary owner. It does not lease a generation
+/// or expose unpinned byte addresses. A Java reader acquires a View only when it
+/// needs that generation; the identity names the allocation that View retains.
+#[repr(C)]
+pub(crate) struct Header {
+    default: AtomicI32,
+    allocated: AtomicU32,
+    generation: AtomicU64,
+    valid: AtomicU32,
+}
+
 pub struct Layer {
-    valid: AtomicBool,
+    header: Header,
     generation: Mutex<Arc<Generation>>,
 }
 
 impl Layer {
     /// Mutable Java array escape ends authority; old generation leases stay valid.
     pub fn invalidate(&self) {
-        self.valid.store(false, Ordering::Release);
+        let mut generation = self.generation.lock().unwrap();
+        self.header.valid.store(0, Ordering::Release);
+        // The escaped Java array is now authoritative. Keep the primary
+        // identity, but do not retain a second native payload through it.
+        // Explicit old Views independently retain their original allocation.
+        if generation.bytes.is_some() {
+            *generation = Arc::new(Generation::lazy(generation.default));
+            self.publish_generation(&generation);
+        }
     }
     pub fn is_valid(&self) -> bool {
-        self.valid.load(Ordering::Acquire)
+        self.header.valid.load(Ordering::Acquire) != 0
+    }
+
+    fn from_generation(generation: Generation) -> Self {
+        let generation = Arc::new(generation);
+        let header = Header {
+            default: AtomicI32::new(generation.default),
+            allocated: AtomicU32::new(u32::from(generation.bytes.is_some())),
+            generation: AtomicU64::new(Arc::as_ptr(&generation) as u64),
+            valid: AtomicU32::new(1),
+        };
+        Self { header, generation: Mutex::new(generation) }
+    }
+
+    fn publish_generation(&self, generation: &Arc<Generation>) {
+        self.header.default.store(generation.default, Ordering::Relaxed);
+        self.header.allocated.store(u32::from(generation.bytes.is_some()), Ordering::Relaxed);
+        self.header.generation.store(Arc::as_ptr(generation) as u64, Ordering::Release);
     }
 
     pub fn new(default: i32) -> Self {
-        Self {
-            valid: AtomicBool::new(true),
-            generation: Mutex::new(Arc::new(Generation::lazy(default))),
-        }
+        Self::from_generation(Generation::lazy(default))
     }
 
     pub fn from_bytes(values: [u8; BYTES]) -> Self {
-        Self {
-            valid: AtomicBool::new(true),
-            generation: Mutex::new(Arc::new(Generation::allocated(0, values))),
-        }
+        Self::from_generation(Generation::allocated(0, values))
     }
 
     /// Propagation publication keeps this layer's raw default, exactly as
@@ -120,6 +154,7 @@ impl Layer {
             false
         } else {
             *generation = Arc::new(Generation::allocated(generation.default, values));
+            self.publish_generation(&generation);
             true
         }
     }
@@ -138,10 +173,7 @@ impl Layer {
             Some(bytes) => Generation::allocated(0, bytes),
             None => Generation::lazy(generation.default),
         };
-        Self {
-            valid: AtomicBool::new(true),
-            generation: Mutex::new(Arc::new(copy)),
-        }
+        Self::from_generation(copy)
     }
 
     pub fn repeat_first(&self) -> Self {
@@ -158,7 +190,11 @@ impl Layer {
     }
 
     pub fn fill(&self, default: i32) {
-        *self.generation.lock().unwrap() = Arc::new(Generation::lazy(default));
+        let mut generation = self.generation.lock().unwrap();
+        *generation = Arc::new(Generation::lazy(default));
+        self.publish_generation(&generation);
+        // A fill replaces the escaped array at the same stable light identity.
+        self.header.valid.store(1, Ordering::Release);
     }
 
     fn initialize(generation: &mut Arc<Generation>) -> bool {
@@ -173,7 +209,20 @@ impl Layer {
     }
 
     pub fn materialize(&self) -> bool {
-        Self::initialize(&mut self.generation.lock().unwrap())
+        let mut generation = self.generation.lock().unwrap();
+        let changed = Self::initialize(&mut generation);
+        if changed { self.publish_generation(&generation); }
+        changed
+    }
+
+    /// The public byte-array escape needs its bytes, not an intermediate Java
+    /// generation lease. Keep initialization and export in one native read.
+    pub(crate) fn export_materialized(&self, output: &mut [u8; BYTES]) {
+        let mut generation = self.generation.lock().unwrap();
+        if Self::initialize(&mut generation) { self.publish_generation(&generation); }
+        for (target, source) in output.iter_mut().zip(generation.bytes.as_ref().unwrap().iter()) {
+            *target = source.load(Ordering::Relaxed);
+        }
     }
 
     /// Caller exclusion follows the existing light-storage transaction. Atomic
@@ -181,6 +230,7 @@ impl Layer {
     pub fn set(&self, index: i32, value: i32) -> Result<bool, InvalidByteIndex> {
         let mut generation = self.generation.lock().unwrap();
         let changed_generation = Self::initialize(&mut generation);
+        if changed_generation { self.publish_generation(&generation); }
         let byte_index = index >> 1;
         let cell = usize::try_from(byte_index)
             .ok()

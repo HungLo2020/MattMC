@@ -12,6 +12,10 @@ public class BlockLightSectionStorage extends LayerLightSectionStorage<BlockLigh
 		super(LightLayer.BLOCK, lightChunkGetter, new BlockLightSectionStorage.BlockDataLayerStorageMap());
 	}
 
+    BlockLightSectionStorage(LightChunkGetter getter, NativeLightBindings bindings) {
+        super(LightLayer.BLOCK, getter, new BlockDataLayerStorageMap(bindings.newMap()));
+    }
+
 	@Override
 	protected int getLightValue(long l) {
         if (getClass() == BlockLightSectionStorage.class) {
@@ -30,7 +34,7 @@ public class BlockLightSectionStorage extends LayerLightSectionStorage<BlockLigh
 
 	protected static final class BlockDataLayerStorageMap extends DataLayerStorageMap<BlockLightSectionStorage.BlockDataLayerStorageMap> {
 		BlockDataLayerStorageMap() { super(new NativeLightingMap()); }
-        private BlockDataLayerStorageMap(NativeLightingMap owner) { super(owner); }
+        BlockDataLayerStorageMap(NativeLightingMap owner) { super(owner); }
 
 		public BlockDataLayerStorageMap(Long2ObjectOpenHashMap<DataLayer> long2ObjectOpenHashMap) {
 			super(long2ObjectOpenHashMap);

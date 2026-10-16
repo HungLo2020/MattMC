@@ -6,27 +6,33 @@ below remain scoped to the source versions they describe.
 
 [`propagation/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/lighting/propagation)
 runs the decrease and increase queues of `LightEngine.runLightUpdates()` for
-`BlockLightEngine` and `SkyLightEngine`. It also runs the per-section loop of
-`SkyLightEngine.propagateLightSources()`, which fills skylight above the
-lowest sources and seeds the increase queue. The bridge is
+`BlockLightEngine` and `SkyLightEngine`. Its sky-section kernel also fills skylight above the lowest sources and seeds
+the increase queue. The S0026 coordinator candidate consumes that kernel in a
+complete stock `SkyLightEngine.propagateLightSources()` operation. The bridge is
 `NativeLightPropagation` (lighting package) with `NativeLightBlocks` (chunk
 package, for palette data). Ordinary block palettes and packed words now come
 directly from their [Rust live owner](../chunk/RUST-LIVE-SECTIONS.md), without
-reconstructing a Java palette or word array for the light handoff. Java still owns
-the remaining light orchestration: section statuses,
-`checkNode`, queued layer entries, retained-column policy,
-`markNewInconsistencies` and publication scheduling through `swapSectionMap`.
+reconstructing a Java palette or word array for the light handoff. Before S0026,
+Java owns the surrounding section/node/queued-layer lifecycle, retention,
+reconciliation and publication policy.
 Canonical section maps and sky metadata now use
 [shared Rust snapshots](RUST-LIGHT-MAPS.md). Canonical live light bytes have a
 [Rust owner](RUST-LIVE-LAYERS.md); public mutable arrays and subclasses retain
 compatibility ownership.
 
+The in-development [per-engine coordinator](RUST-LIGHT-COORDINATOR.md) moves
+the remaining stock node/storage/publication policy and whole sky-source section
+loop into Rust, and accepts typed propagation results directly. Java still supplies contextual and custom-object
+effects. This candidate has focused correctness proof but unresolved complete
+costs; the published orchestration description and historical results here
+do not establish its acceptance.
+
 Canonical [block-light source production](RUST-BLOCK-LIGHT-SOURCES.md) now
-enumerates primary section owners and appends native work directly. Java keeps
-node checks and contextual chunk lookup; compatibility chunks retain callbacks.
+enumerates primary section owners and appends native work directly. Java supplies contextual chunk lookup and custom effects; compatibility chunks
+retain callbacks.
 Server PRE/propagation/POST batch policy and scheduled admission belong to the
-[native threaded coordinator](RUST-THREADED-LIGHTING.md); per-engine section and
-publication orchestration above remains Java.
+[native threaded coordinator](RUST-THREADED-LIGHTING.md); S0026's per-engine owner
+handles the connected stock section and publication policy.
 
 ## How a pass works
 
@@ -43,12 +49,12 @@ publication orchestration above remains Java.
    words, or one state ID per block for chunk kinds the bridge does not model;
    Rust maps state IDs to light types in place. A section needing both
    snapshots makes two callback invocations.
-3. Rust writes levels into its own pass copies. Java receives ordered section
-   keys and schedules the original first-write copy-on-write transaction:
-   the first write in a pass copies the layer. Canonical maps retain their
-   Rust roots; caller-supplied Java maps keep their compatibility path. Rust installs bytes directly into canonical target owners;
-   mutable-array targets use a bounded compatibility export. Java then adds
-   `sectionsAffectedByLightUpdates` entries.
+3. Rust writes levels into its own pass copies. S0026's canonical coordinator
+   consumes ordered results, selects COW targets and installs native bytes using
+   typed owners. Custom or mutable-array targets remain explicit Java effects.
+   The legacy bridge without a coordinator receives ordered keys, selects the
+   first-write COW target in Java and adds affected-section entries. In both
+   paths, earlier installation effects remain committed if a later effect fails.
 4. Unsupported input or a failed section callback returns before propagation
    writes are installed. Rust restores the original inputs after any new
    callback additions, matching the former Java refill order. Java runs the
@@ -59,16 +65,18 @@ publication orchestration above remains Java.
    [current bridge status handling](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java#L204-L259).
    An installation error does not roll back sections already installed.
 
-Canonical sky seeding runs one ordinary downcall per section and appends its
-entries directly to the retained native increase queue. Its column inputs and
-output metadata use native CPU scratch memory; the call can lock and allocate.
-Canonical native owners
-retain lazy allocation until the loop writes; allocated layers update in place.
-Compatibility arrays use the original bounded heap-access downcall. Neither
-route invokes callbacks during the downcall. Java keeps the section iteration,
-`getDataLayerToWrite` and column extraction. Compatibility seeding still exports
-bounded entry pairs for Java to enqueue. A rejected sky-seeding call
-throws; it does not use the propagation pass's Java replay path.
+The S0026 stock source producer captures bounded source inputs in an owned native
+frame. Rust admits the actual typed layers before mutation, then owns the whole
+descending section/COW/seed/increase-queue operation. Java still obtains the five
+chunk source objects and performs contextual input extraction. Every completed
+section publishes its queue prefix before later fallible work.
+
+Custom readers, custom storage and mixed or escaped layers use the original
+conditional Java loop. Do not replay a source matrix gathered before a custom
+`DataLayer.copy()` callback: that callback can change the live source heights.
+The native section kernels remain independently tested, but the old Java
+per-section adapter is no longer the production fallback. See the coordinator
+page for actual reader/copy witnesses, owned-input lifetime controls and costs.
 
 ## Constraints when changing this code
 

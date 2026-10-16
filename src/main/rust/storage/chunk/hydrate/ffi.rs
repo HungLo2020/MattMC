@@ -86,6 +86,19 @@ pub unsafe extern "C" fn mattmc_chunk_sections_hydrated_row(
     index: i32,
     output: *mut u64,
 ) -> i32 {
+    hydrated_row(owner, index, output, true)
+}
+
+/// Primary light identities remain the actual decoded allocations. Public
+/// SectionData facades need no eager independent light-generation projection.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_sections_hydrated_row_primary(
+    owner: *const Hydrated, index: i32, output: *mut u64,
+) -> i32 {
+    hydrated_row(owner, index, output, false)
+}
+
+unsafe fn hydrated_row(owner: *const Hydrated, index: i32, output: *mut u64, views: bool) -> i32 {
     if output.is_null() || output as usize % 8 != 0 {
         return -1;
     }
@@ -105,7 +118,7 @@ pub unsafe extern "C" fn mattmc_chunk_sections_hydrated_row(
     for (offset, layer) in [(3, &row.block_light), (5, &row.sky_light)] {
         if let Some(layer) = layer {
             *output.add(offset) = Arc::into_raw(layer.clone()) as u64;
-            *output.add(offset + 1) = projection(layer) as u64;
+            if views { *output.add(offset + 1) = projection(layer) as u64; }
         }
     }
     0

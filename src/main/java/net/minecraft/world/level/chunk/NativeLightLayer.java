@@ -2,24 +2,21 @@ package net.minecraft.world.level.chunk;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.VarHandle;
 import java.lang.ref.Reference;
 
 /** Rust-owned light generations with leased read-only CPU views. */
 final class NativeLightLayer {
-    private static final MethodHandle CREATE = handle("create", FunctionDescriptor.of(ValueLayout.ADDRESS,
-        ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-    private static final MethodHandle COPY = handle("copy", FunctionDescriptor.of(ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-    private static final MethodHandle REPEAT = handle("repeat", FunctionDescriptor.of(ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-    private static final MethodHandle IMPORT = handle("import", FunctionDescriptor.of(ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS), Linker.Option.critical(true));
-    private static final MethodHandle SET = handle("set", FunctionDescriptor.of(ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-    private static final MethodHandle FILL = handle("fill", FunctionDescriptor.of(ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-    private static final MethodHandle MATERIALIZE = handle("materialize", FunctionDescriptor.of(ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    private static final MethodHandle CREATE = handle("primary_create", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    private static final MethodHandle COPY = handle("primary_copy", FunctionDescriptor.of(ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    private static final MethodHandle IMPORT = handle("primary_import", FunctionDescriptor.of(ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT), Linker.Option.critical(true));
+    private static final MethodHandle HEADER = handle("primary_header", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    private static final MethodHandle CHANGE = handle("primary_change", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+    private static final MethodHandle EXPORT = handle("primary_export", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT), Linker.Option.critical(true));
     private static final MethodHandle INSTALL_RESULT = net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust",
         "mattmc_light_result_install", FunctionDescriptor.of(ValueLayout.JAVA_INT,
             ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
@@ -34,30 +31,38 @@ final class NativeLightLayer {
     private static final MethodHandle INVALIDATE = handle("invalidate", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE_VIEW = handle("view_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    private static final MethodHandle CURRENT_VIEW = handle("primary_view", FunctionDescriptor.of(ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    private static final VarHandle INT = ValueLayout.JAVA_INT.varHandle(), LONG = ValueLayout.JAVA_LONG.varHandle();
 
     private static MethodHandle handle(String suffix, FunctionDescriptor descriptor, Linker.Option... options) {
         return net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust",
             "mattmc_light_layer_" + suffix, descriptor, options);
     }
     private MemorySegment owner;
+    private MemorySegment header;
     /** Out-slot for a replaced view; read right after each call on the same thread. */
     private static final ThreadLocal<MemorySegment> CHANGED_VIEW = ThreadLocal.withInitial(() -> Arena.global().allocate(ValueLayout.ADDRESS));
     private Projection view;
 
     private NativeLightLayer() {}
     private NativeLightLayer adopt(MemorySegment owner, MemorySegment view) {
-        if (owner.address() == 0 || view.address() == 0) throw new IllegalStateException("No light owner/projection");
+        if (owner.address() == 0) throw new IllegalStateException("No light owner");
+        // Legacy decoder/materialization exports may still supply a view. The
+        // primary owner is sufficient; consume that redundant lease immediately.
+        boolean viewReleased = false;
         try {
+            if (view.address() != 0) { viewReleased = true; releaseView(view); }
             // Callers pin the layer by holding this segment (DataLayer -> NativeLightLayer -> owner),
             // so it is the batched reclaimer's referent; every call fences this layer.
             this.owner = owner.reinterpret(1).asReadOnly();
+            this.header = ((MemorySegment)HEADER.invokeExact(owner)).reinterpret(24).asReadOnly();
             NativeReclaimer.register(this.owner, owner, NativeReclaimer.LIGHT_LAYER);
-        } catch (RuntimeException | Error failure) {
+        } catch (Throwable failure) {
             releaseOwner(owner);
-            releaseView(view);
-            throw failure;
+            if (!viewReleased && view.address() != 0) releaseView(view);
+            throw rethrow(failure);
         }
-        this.view = Projection.adoptOwned(view);
         return this;
     }
     /** Consumes both unique leases, including on projection/allocation failure. */
@@ -69,28 +74,22 @@ final class NativeLightLayer {
     }
     static NativeLightLayer create(int value) {
         NativeLightLayer result = new NativeLightLayer();
-        try (Arena output = Arena.ofConfined()) {
-            MemorySegment view = output.allocate(ValueLayout.ADDRESS);
-            MemorySegment owner = (MemorySegment) CREATE.invokeExact(value, view);
-            return result.adopt(owner, view.get(ValueLayout.ADDRESS, 0));
+        try {
+            return result.adopt((MemorySegment)CREATE.invokeExact(value), MemorySegment.NULL);
         } catch (Throwable failure) { throw rethrow(failure); }
     }
     static NativeLightLayer importBytes(byte[] bytes) {
         NativeLightLayer result = new NativeLightLayer();
-        try (Arena output = Arena.ofConfined()) {
-            MemorySegment view = output.allocate(ValueLayout.ADDRESS);
-            MemorySegment owner = (MemorySegment) IMPORT.invokeExact(MemorySegment.ofArray(bytes), bytes.length, view);
-            return result.adopt(owner, view.get(ValueLayout.ADDRESS, 0));
+        try {
+            return result.adopt((MemorySegment)IMPORT.invokeExact(MemorySegment.ofArray(bytes), bytes.length), MemorySegment.NULL);
         } catch (Throwable failure) { throw rethrow(failure); }
     }
-    NativeLightLayer copy() { return duplicate(COPY); }
-    NativeLightLayer repeatFirst() { return duplicate(REPEAT); }
-    private NativeLightLayer duplicate(MethodHandle operation) {
+    NativeLightLayer copy() { return duplicate(0); }
+    NativeLightLayer repeatFirst() { return duplicate(1); }
+    private NativeLightLayer duplicate(int repeat) {
         NativeLightLayer resultLayer = new NativeLightLayer();
-        try (Arena output = Arena.ofConfined()) {
-            MemorySegment result = output.allocate(ValueLayout.ADDRESS);
-            MemorySegment copied = (MemorySegment) operation.invokeExact(owner, result);
-            return resultLayer.adopt(copied, result.get(ValueLayout.ADDRESS, 0));
+        try {
+            return resultLayer.adopt((MemorySegment)COPY.invokeExact(owner, repeat), MemorySegment.NULL);
         } catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }
@@ -103,20 +102,26 @@ final class NativeLightLayer {
     private void updateView(int status) {
         if (status != 0) throw new IllegalArgumentException("Invalid native light input");
         MemorySegment changed = CHANGED_VIEW.get().get(ValueLayout.ADDRESS, 0);
-        if (changed.address() != 0) view = Projection.adoptOwned(changed);
+        if (changed.address() != 0) releaseView(changed);
     }
-    void set(int index, int value) {
-        try { updateView((int) SET.invokeExact(owner, index, value, changedView())); }
+    private void change(int operation, int index, int value) {
+        try {
+            if ((int)CHANGE.invokeExact(owner, operation, index, value) != 0)
+                throw new IllegalArgumentException("Invalid native light input");
+        }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }
-    void fill(int value) {
-        try { updateView((int) FILL.invokeExact(owner, value, changedView())); }
-        catch (Throwable failure) { throw rethrow(failure); }
-        finally { Reference.reachabilityFence(this); }
-    }
-    void materialize() {
-        try { updateView((int) MATERIALIZE.invokeExact(owner, changedView())); }
+    void set(int index, int value) { change(0, index, value); }
+    void fill(int value) { change(1, 0, value); }
+    void materialize() { change(2, 0, 0); }
+    byte[] exportBytes() {
+        byte[] result = new byte[2048];
+        try {
+            if ((int)EXPORT.invokeExact(owner, MemorySegment.ofArray(result), result.length) != 0)
+                throw new IllegalArgumentException("Invalid native light input");
+            return result;
+        }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }
@@ -143,11 +148,44 @@ final class NativeLightLayer {
         finally { Reference.reachabilityFence(queues); Reference.reachabilityFence(this); }
     }
     void invalidate() {
-        try { INVALIDATE.invokeExact(owner); }
+        try { INVALIDATE.invokeExact(owner); view = null; }
         catch (Throwable failure) { throw rethrow(failure); }
         finally { Reference.reachabilityFence(this); }
     }
-    Projection view() { return view; }
+    boolean valid() {
+        try { return (int)INT.getAcquire(header, 16L) != 0; }
+        finally { Reference.reachabilityFence(this); }
+    }
+    int rawDefault() {
+        try { return (int)INT.getAcquire(header, 0L); }
+        finally { Reference.reachabilityFence(this); }
+    }
+    boolean allocated() {
+        try { return (int)INT.getAcquire(header, 4L) != 0; }
+        finally { Reference.reachabilityFence(this); }
+    }
+    Projection view() {
+        try {
+            long current = (long)LONG.getAcquire(header, 8L);
+            Projection observed = view;
+            if (observed == null || observed.identity != current) {
+                MemorySegment identity = changedView();
+                MemorySegment pointer = (MemorySegment)CURRENT_VIEW.invokeExact(owner, identity);
+                if (pointer.address() == 0) throw new IllegalStateException("No native light generation");
+                long pinnedIdentity = identity.get(ValueLayout.JAVA_LONG, 0);
+                Projection next = Projection.adoptOwned(pointer, pinnedIdentity);
+                view = next;
+                return next;
+            }
+            return observed;
+        } catch (Throwable failure) { throw rethrow(failure); }
+        finally { Reference.reachabilityFence(this); }
+    }
+    /** Native producers publish owner metadata before effects. Actual Java
+     * generation readers acquire their independent lease lazily in view(). */
+    void refreshView() {
+        Reference.reachabilityFence(this);
+    }
     MemorySegment ownerForNativeCall() { return owner; }
 
     private static void releaseOwner(MemorySegment owner) {
@@ -172,7 +210,8 @@ final class NativeLightLayer {
     static final class Projection {
         private final MemorySegment metadata;
         private final MemorySegment bytes;
-        static Projection adoptOwned(MemorySegment pointer) {
+        private final long identity;
+        static Projection adoptOwned(MemorySegment pointer, long identity) {
             MemorySegment metadata;
             try {
                 metadata = pointer.reinterpret(16).asReadOnly();
@@ -181,10 +220,11 @@ final class NativeLightLayer {
                 releaseView(pointer);
                 throw failure;
             }
-            return new Projection(metadata);
+            return new Projection(metadata, identity);
         }
-        private Projection(MemorySegment metadata) {
+        private Projection(MemorySegment metadata, long identity) {
             this.metadata = metadata;
+            this.identity = identity;
             MemorySegment address = metadata.get(ValueLayout.ADDRESS, 8);
             bytes = address.address() == 0 ? null : address.reinterpret(2048).asReadOnly();
         }

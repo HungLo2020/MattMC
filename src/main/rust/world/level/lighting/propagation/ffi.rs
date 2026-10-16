@@ -5,7 +5,8 @@ use super::{Blocks, Engine, Error, Source, Tables, LAYER};
 use crate::world::level::lighting::layers::{Layer, ffi::{Projection, projection}};
 
 /// Java's section callback: (mode, section, buffer). Mode 0 reports the
-/// stored layer (0 absent, 1 stored); mode 1 the block states (0). Negative
+/// stored layer (0 absent, 1 stored); mode 1 the block states (0); mode 2
+/// replaces a previous Java layer pin after a connected native read. Negative
 /// values report failures.
 pub(crate) type SectionCallback = unsafe extern "C" fn(i32, i64, *mut u8) -> i32;
 
@@ -26,12 +27,16 @@ pub(crate) struct Handle {
     engine: Engine,
     buffer: Vec<u64>,
     written_indices: Vec<usize>,
+    direct_layer_reads: u64,
 }
 
 struct Callback<'a> {
     call: SectionCallback,
     buffer: &'a mut [u64],
     tables: &'a Tables,
+    connected: Option<&'a super::super::coordinator::ffi::PropagationInput>,
+    direct_layer_reads: &'a mut u64,
+    java_layer_pinned: bool,
 }
 
 impl Callback<'_> {
@@ -42,11 +47,36 @@ impl Callback<'_> {
     fn header(&self, i: usize) -> i32 {
         unsafe { *(self.buffer.as_ptr() as *const i32).add(HEADER / 4 + i) }
     }
+
+    fn replace_java_layer(&mut self, section: i64) -> Result<(), Error> {
+        if self.java_layer_pinned {
+            if unsafe { (self.call)(2, section, self.bytes()) } != 0 { return Err(Error::Callback); }
+            self.java_layer_pinned = false;
+        }
+        Ok(())
+    }
 }
 
 impl Source for Callback<'_> {
     fn layer(&mut self, section: i64, layer: &mut [u8; LAYER]) -> Result<Option<bool>, Error> {
+        if let Some(input) = self.connected {
+            use super::super::coordinator::ffi::LayerInput;
+            match input.layer(section, layer)? {
+                LayerInput::Ready(enabled) => {
+                    self.replace_java_layer(section)?;
+                    *self.direct_layer_reads = self.direct_layer_reads.wrapping_add(1);
+                    return Ok(Some(enabled));
+                }
+                LayerInput::Missing => {
+                    self.replace_java_layer(section)?;
+                    *self.direct_layer_reads = self.direct_layer_reads.wrapping_add(1);
+                    return Ok(None);
+                }
+                LayerInput::Fallback => {}
+            }
+        }
         let status = unsafe { (self.call)(0, section, self.bytes()) };
+        self.java_layer_pinned = self.connected.is_some() && matches!(status, 1 | 2);
         match status {
             0 => Ok(None),
             1 => {
@@ -140,7 +170,13 @@ pub extern "C" fn mattmc_light_tables_create() -> u64 {
 
 #[no_mangle]
 pub extern "C" fn mattmc_light_engine_create(sky: i32) -> u64 {
-    Box::into_raw(Box::new(Handle { engine: Engine::new(sky != 0), buffer: vec![0; BUFFER / 8], written_indices: Vec::new() })) as u64
+    Box::into_raw(Box::new(Handle { engine: Engine::new(sky != 0), buffer: vec![0; BUFFER / 8], written_indices: Vec::new(), direct_layer_reads: 0 })) as u64
+}
+
+/// Diagnostic outside an excluded propagation invocation, not an input mirror.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_engine_direct_layer_reads(handle: u64) -> u64 {
+    if handle == 0 { 0 } else { (*(handle as *const Handle)).direct_layer_reads }
 }
 
 /// # Safety
@@ -171,7 +207,7 @@ pub unsafe extern "C" fn mattmc_light_run(handle: u64, tables: u64, decreases: *
     let handle = &mut *(handle as *mut Handle);
     let tables = &*(tables as *const Tables);
     let slice = |p: *const i64, n: i32| if n == 0 { &[][..] } else { std::slice::from_raw_parts(p, n as usize) };
-    let mut source = Callback { call, buffer: &mut handle.buffer, tables };
+    let mut source = Callback { call, buffer: &mut handle.buffer, tables, connected: None, direct_layer_reads: &mut handle.direct_layer_reads, java_layer_pinned: false };
     handle.written_indices.clear();
     match handle.engine.run(tables, &mut source, slice(decreases, decrease_len), slice(increases, increase_len), lowest) {
         Ok(outcome) => {
@@ -195,6 +231,22 @@ pub unsafe extern "C" fn mattmc_light_run(handle: u64, tables: u64, decreases: *
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_light_run_owned(handle: u64, tables: u64,
     owner: *const std::ffi::c_void, lowest: i32, callback: Option<SectionCallback>, out: *mut i64) -> i32 {
+    run_owned(handle, tables, owner, lowest, callback, out, None)
+}
+
+/// Connected per-engine input lease retains its actual storage and binding.
+/// No state/map/layer guard survives a contextual Java callback.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_run_connected(handle: u64, tables: u64,
+    owner: *const std::ffi::c_void, binding: *const std::ffi::c_void, lowest: i32,
+    callback: Option<SectionCallback>, out: *mut i64) -> i32 {
+    let Some(input) = super::super::coordinator::ffi::PropagationInput::retain(binding) else { return -1; };
+    run_owned(handle, tables, owner, lowest, callback, out, Some(&input))
+}
+
+unsafe fn run_owned(handle: u64, tables: u64,
+    owner: *const std::ffi::c_void, lowest: i32, callback: Option<SectionCallback>, out: *mut i64,
+    connected: Option<&super::super::coordinator::ffi::PropagationInput>) -> i32 {
     let Some(call) = callback else { return -1; };
     if handle == 0 || tables == 0 || owner.is_null() || out.is_null() { return -1; }
     let queues = super::work::retain(owner.cast());
@@ -204,7 +256,7 @@ pub unsafe extern "C" fn mattmc_light_run_owned(handle: u64, tables: u64,
     }
     let handle = &mut *(handle as *mut Handle);
     let tables = &*(tables as *const Tables);
-    let mut source = Callback { call, buffer: &mut handle.buffer, tables };
+    let mut source = Callback { call, buffer: &mut handle.buffer, tables, connected, direct_layer_reads: &mut handle.direct_layer_reads, java_layer_pinned: false };
     handle.written_indices.clear();
     let result = handle.engine.run_owned(tables, &mut source, inputs, lowest);
     let inputs = handle.engine.input_journal();
@@ -269,6 +321,21 @@ fn written_layer(handle: &Handle, index: i32) -> Option<&[u8; LAYER]> {
     if index < 0 { return None; }
     let section = handle.engine.sections.get(*handle.written_indices.get(index as usize)?)?;
     handle.engine.layers.get(section.layer)
+}
+
+/// The caller retains/excludes the existing propagation handle. These sibling
+/// reads end within the native coordinator step, before any Java effect.
+pub(in crate::world::level::lighting) unsafe fn result_shape(handle: u64) -> Option<(usize, usize)> {
+    let handle = (handle as *const Handle).as_ref()?;
+    Some((handle.written_indices.len(), handle.engine.affected().len()))
+}
+pub(in crate::world::level::lighting) unsafe fn result_layer(handle: u64, index: usize) -> Option<(i64, [u8; LAYER])> {
+    let handle = (handle as *const Handle).as_ref()?;
+    let section = handle.engine.sections.get(*handle.written_indices.get(index)?)?;
+    Some((section.key, *handle.engine.layers.get(section.layer)?))
+}
+pub(in crate::world::level::lighting) unsafe fn result_affected(handle: u64, index: usize) -> Option<i64> {
+    (handle as *const Handle).as_ref()?.engine.affected().get(index).copied()
 }
 
 /// Preserve the target layer's materialization/default and map COW semantics.
@@ -404,4 +471,51 @@ pub unsafe extern "C" fn mattmc_light_sky_queued(layer: *const Layer, columns: *
     *projection_out = if changed { projection(layer) } else { std::ptr::null_mut() };
     *out = pairs; *out.add(1) = wrote as i32; *out.add(2) = below as i32;
     0
+}
+
+#[cfg(test)]
+mod connected_pin_tests {
+    use super::*;
+    use crate::world::level::lighting::{maps::ffi as maps, coordinator::ffi as coordinator};
+    use std::{cell::RefCell, sync::{Arc, Weak}};
+    thread_local! { static PIN: RefCell<(Option<Arc<()>>, Weak<()>, usize)> = RefCell::new((None, Weak::new(), 0)); }
+    unsafe extern "C" fn callback(mode: i32, _: i64, buffer: *mut u8) -> i32 {
+        PIN.with(|state| {
+            let mut state = state.borrow_mut();
+            match mode {
+                0 => {
+                    let pin = Arc::new(()); state.1 = Arc::downgrade(&pin); state.0 = Some(pin);
+                    buffer.cast::<i32>().write(1); buffer.cast::<i32>().add(1).write(7); 1
+                }
+                2 => { state.0 = None; state.2 += 1; 0 }
+                _ => -2,
+            }
+        })
+    }
+    #[test]
+    fn connected_read_replaces_previous_callback_pin_at_next_layer_not_at_capture() {
+        unsafe {
+            let registry = maps::mattmc_light_map_registry_create();
+            let map = Arc::from_raw(maps::mattmc_light_map_create(registry));
+            maps::mattmc_light_map_registry_release(registry);
+            let escaped = Arc::new(Layer::new(1)); escaped.invalidate();
+            map.set(1, Some(map.native_entry(escaped).unwrap()));
+            map.set(2, Some(map.native_entry(Arc::new(Layer::new(4))).unwrap()));
+            let input = coordinator::connected_test_input(&map);
+            let tables = Tables { state_types: vec![], types: vec![], faces: 0, occludes: vec![], air: 0 };
+            let mut buffer = vec![0; BUFFER / 8]; let mut reads = 0;
+            let mut source = Callback { call: callback, buffer: &mut buffer, tables: &tables, connected: Some(&input), direct_layer_reads: &mut reads, java_layer_pinned: false };
+            let mut bytes = [0; LAYER];
+            assert!(matches!(source.layer(1, &mut bytes), Ok(Some(true))));
+            assert_eq!(bytes, [0x77; LAYER]);
+            PIN.with(|state| assert!(state.borrow().1.upgrade().is_some(), "original pin survives capture and intervening effects"));
+            assert!(matches!(source.layer(2, &mut bytes), Ok(Some(false))));
+            assert_eq!(bytes, [0x44; LAYER]);
+            PIN.with(|state| { let state = state.borrow(); assert!(state.1.upgrade().is_none()); assert_eq!(state.2, 1); });
+            assert!(matches!(source.layer(3, &mut bytes), Ok(None)));
+            PIN.with(|state| { let mut state = state.borrow_mut(); assert_eq!(state.2, 1); *state = (None, Weak::new(), 0); });
+            assert_eq!(reads, 2);
+            drop(input);
+        }
+    }
 }

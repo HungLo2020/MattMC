@@ -108,6 +108,8 @@ pub unsafe extern "C" fn mattmc_light_tasks_change(
                 Action::Done => 0,
                 Action::Propagate => 1,
                 Action::Callable(row) => (row + 1) as i64,
+                Action::Import(row,target) => ((1u64<<62)|((target as u64)<<61)|(row+1)) as i64,
+                Action::Context(row) => ((1u64<<60)|(1u64<<62)|(row+1)) as i64,
             }),
             3 => q.end(a).map(|()| 0),
             _ => Err(Error::Cursor),
@@ -126,7 +128,85 @@ pub unsafe extern "C" fn mattmc_light_tasks_change(
             Err(Error::RemoveEmpty) => -2,
             Err(Error::Row) => -3,
             Err(Error::Cursor) => -4,
+            Err(Error::Lighting(status)) => i64::from(status),
         }
     }))
     .unwrap_or(-5)
+}
+
+/// The actual native level token owns block/sky engine bindings. Java supplies
+/// only the original VM capture roots in this row, not a callable policy.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_append_check(
+    owner: *const Owner, level: *const super::LevelToken, pos: i64, row: u64,
+) -> i64 {
+    let Some(owner) = owner.as_ref() else { return -4; };
+    catch_unwind(AssertUnwindSafe(|| {
+        let queue = &mut *owner.queue.get();
+        queue.retired.clear();
+        let result = queue.append_check(row, level, pos);
+        owner.header.pending.store(queue.tasks.len() as i32, Ordering::Release);
+        owner.header.next_row.store(queue.next_row(), Ordering::Release);
+        owner.header.bytes.store(queue.allocation_bytes() as u64, Ordering::Release);
+        match result { Ok(run) => i64::from(run), Err(Error::Lighting(status)) => i64::from(status), Err(_) => -3 }
+    })).unwrap_or(-5)
+}
+
+unsafe fn append_command(owner:*const Owner,append:impl FnOnce(&mut Queue)->Result<bool,Error>)->i64{
+    let Some(owner)=owner.as_ref() else{return -4;};
+    catch_unwind(AssertUnwindSafe(||{
+        let queue=&mut *owner.queue.get();queue.retired.clear();let result=append(queue);
+        owner.header.pending.store(queue.tasks.len() as i32,Ordering::Release);
+        owner.header.next_row.store(queue.next_row(),Ordering::Release);
+        owner.header.bytes.store(queue.allocation_bytes() as u64,Ordering::Release);
+        match result{Ok(run)=>i64::from(run),Err(Error::Lighting(status))=>i64::from(status),Err(_)=>-3}
+    })).unwrap_or(-5)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_append_retain(owner:*const Owner,level:*const super::LevelToken,key:i64,value:i32,row:u64)->i64{
+    append_command(owner,|queue|queue.append_retain(row,level,key,value!=0))
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_append_import(owner:*const Owner,level:*const super::LevelToken,channel:i32,key:i64,row:u64)->i64{
+    append_command(owner,|queue|queue.append_import(row,level,channel,key))
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_append_status(owner:*const Owner,level:*const super::LevelToken,key:i64,empty:i32,row:u64)->i64{
+    append_command(owner,|queue|queue.append_status(row,level,key,empty!=0))
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_append_level(owner:*const Owner,level:*const super::LevelToken,kind:i32,key:i64,value:i32,row:u64)->i64{
+    append_command(owner,|queue|queue.append_level(row,level,kind,key,value!=0))
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_context(owner:*const Owner,cursor:u64,advance:i32,scalar:i64,entry:*const c_void,out:*mut i64)->i32{
+    let Some(owner)=owner.as_ref() else{return -27;};if out.is_null(){return -27;}
+    catch_unwind(AssertUnwindSafe(||(&mut *owner.queue.get()).context(cursor,advance!=0,scalar,entry,out))).unwrap_or(-99)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_context_abort(owner:*const Owner,cursor:u64){
+    if let Some(owner)=owner.as_ref(){(&mut *owner.queue.get()).abort_context(cursor);}
+}
+/// Called only after Java acquires the actual queued-section VM monitor.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_apply_import(owner:*const Owner,cursor:u64,entry:*const c_void)->i32{
+    let Some(owner)=owner.as_ref() else{return -4;};
+    catch_unwind(AssertUnwindSafe(||match (&*owner.queue.get()).apply_import(cursor,entry){
+        Ok(())=>0,Err(Error::Lighting(status))=>status,Err(_)=>-4,
+    })).unwrap_or(-5)
+}
+
+/// The actual level is retained only by this invocation cursor. A held empty
+/// task owner therefore adds no CPU engine/VM facade lifetime after POST.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_begin_level(owner:*const Owner,level:*const super::LevelToken)->i64{
+    let Some(owner)=owner.as_ref()else{return -4;};
+    catch_unwind(AssertUnwindSafe(||{
+        let Some(level)=super::LevelLease::retain(level)else{return -4;};
+        let queue=&mut *owner.queue.get();queue.begin_level(Some(level)) as i64
+    })).unwrap_or(-99)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_context_resource(owner:*const Owner,cursor:u64)->*const c_void{
+    owner.as_ref().map_or(std::ptr::null(),|owner|(&mut *owner.queue.get()).context_resource(cursor))
 }

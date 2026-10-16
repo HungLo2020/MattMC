@@ -47,6 +47,20 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 	@Override
 	public void checkBlock(BlockPos blockPos) {
 		BlockPos blockPos2 = blockPos.immutable();
+        if(!SharedConstants.DEBUG_NAMED_RUNNABLES&&getClass()==ThreadedLevelLightEngine.class
+                &&(blockPos.getClass()==BlockPos.class||blockPos.getClass()==BlockPos.MutableBlockPos.class)
+                &&blockPos2!=null&&blockPos2.getClass()==BlockPos.class){
+            java.lang.foreign.MemorySegment level=this.nativeLevelOwnerForTasks();
+            if(level.address()!=0){
+                int x=SectionPos.blockToSectionCoord(blockPos.getX()),z=SectionPos.blockToSectionCoord(blockPos.getZ());
+                long packed=blockPos2.asLong();
+                IntSupplier priority=this.chunkMap.getChunkQueueLevel(ChunkPos.asLong(x,z));
+                this.taskDispatcher.submit(()->{
+                    if(this.lightTasks.appendCheck(level,packed,this,blockPos2))this.runUpdate();
+                },ChunkPos.asLong(x,z),priority);
+                return;
+            }
+        }
 		this.addTask(
 			SectionPos.blockToSectionCoord(blockPos.getX()),
 			SectionPos.blockToSectionCoord(blockPos.getZ()),
@@ -73,6 +87,16 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 
 	@Override
 	public void updateSectionStatus(SectionPos sectionPos, boolean bl) {
+        if(!SharedConstants.DEBUG_NAMED_RUNNABLES&&getClass()==ThreadedLevelLightEngine.class
+                &&sectionPos!=null&&sectionPos.getClass()==SectionPos.class){
+            java.lang.foreign.MemorySegment level=this.nativeLevelOwnerForTasks();
+            if(level.address()!=0){
+                int x=sectionPos.x(),z=sectionPos.z();long key=sectionPos.asLong();
+                this.taskDispatcher.submit(()->{
+                    if(this.lightTasks.appendStatus(level,key,bl,this,sectionPos))this.runUpdate();
+                },ChunkPos.asLong(x,z),()->0);return;
+            }
+        }
 		this.addTask(
 			sectionPos.x(),
 			sectionPos.z(),
@@ -84,6 +108,7 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 
 	@Override
 	public void propagateLightSources(ChunkPos chunkPos) {
+        if(this.appendNativeLevelCommand(chunkPos,2,false))return;
 		this.addTask(
 			chunkPos.x,
 			chunkPos.z,
@@ -94,6 +119,7 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 
 	@Override
 	public void setLightEnabled(ChunkPos chunkPos, boolean bl) {
+        if(this.appendNativeLevelCommand(chunkPos,1,bl))return;
 		this.addTask(
 			chunkPos.x,
 			chunkPos.z,
@@ -102,8 +128,30 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 		);
 	}
 
+    private boolean appendNativeLevelCommand(ChunkPos position,int kind,boolean value){
+        if(SharedConstants.DEBUG_NAMED_RUNNABLES||getClass()!=ThreadedLevelLightEngine.class||position==null||position.getClass()!=ChunkPos.class)return false;
+        java.lang.foreign.MemorySegment level=this.nativeLevelOwnerForTasks();if(level.address()==0)return false;
+        long key=ChunkPos.asLong(position.x,position.z);
+        IntSupplier priority=this.chunkMap.getChunkQueueLevel(key);
+        this.taskDispatcher.submit(()->{if(this.lightTasks.appendLevel(level,kind,key,value,this,position))this.runUpdate();},key,priority);
+        return true;
+    }
+
 	@Override
 	public void queueSectionData(LightLayer lightLayer, SectionPos sectionPos, @Nullable DataLayer dataLayer) {
+        if(!SharedConstants.DEBUG_NAMED_RUNNABLES&&getClass()==ThreadedLevelLightEngine.class
+                &&sectionPos!=null&&sectionPos.getClass()==SectionPos.class
+                &&(dataLayer==null||dataLayer.getClass()==DataLayer.class)){
+            java.lang.foreign.MemorySegment level=this.nativeLevelOwnerForTasks();
+            if(level.address()!=0){
+                int x=sectionPos.x(),z=sectionPos.z(),channel=lightLayer==null?-1:lightLayer.ordinal();
+                long key=sectionPos.asLong();
+                this.taskDispatcher.submit(()->{
+                    if(this.lightTasks.appendImport(level,channel,key,this,sectionPos,dataLayer))this.runUpdate();
+                },ChunkPos.asLong(x,z),()->0);
+                return;
+            }
+        }
 		this.addTask(
 			sectionPos.x(),
 			sectionPos.z(),
@@ -127,6 +175,17 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 
 	@Override
 	public void retainData(ChunkPos chunkPos, boolean bl) {
+        if(!SharedConstants.DEBUG_NAMED_RUNNABLES&&getClass()==ThreadedLevelLightEngine.class
+                &&chunkPos!=null&&chunkPos.getClass()==ChunkPos.class){
+            java.lang.foreign.MemorySegment level=this.nativeLevelOwnerForTasks();
+            if(level.address()!=0){
+                long column=SectionPos.getZeroNode(chunkPos.x,chunkPos.z);
+                this.taskDispatcher.submit(()->{
+                    if(this.lightTasks.appendRetain(level,column,bl,this,chunkPos))this.runUpdate();
+                },ChunkPos.asLong(chunkPos.x,chunkPos.z),()->0);
+                return;
+            }
+        }
 		this.addTask(
 			chunkPos.x,
 			chunkPos.z,
@@ -135,6 +194,9 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 			Util.name((Runnable)(() -> super.retainData(chunkPos, bl)), () -> "retainData " + chunkPos)
 		);
 	}
+
+    void applyNativeImport(java.lang.foreign.MemorySegment owner,long cursor,int target,DataLayer source){this.applyNativeLightImport(owner,cursor,target,source);}
+    void resumeNativeContext(java.lang.foreign.MemorySegment owner,long cursor){this.resumeNativeLightContext(owner,cursor);}
 
 	public CompletableFuture<ChunkAccess> initializeLight(ChunkAccess chunkAccess, boolean bl) {
 		ChunkPos chunkPos = chunkAccess.getPos();
@@ -184,7 +246,8 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 	}
 
 	private void runUpdate() {
-		this.lightTasks.runUpdate(this.propagation);
+        java.lang.foreign.MemorySegment level=getClass()==ThreadedLevelLightEngine.class?this.nativeLevelOwnerForTasks():java.lang.foreign.MemorySegment.NULL;
+        this.lightTasks.runUpdate(this.propagation,level,level.address()==0?null:this);
 	}
 
 	public CompletableFuture<?> waitForPendingTasks(int i, int j) {

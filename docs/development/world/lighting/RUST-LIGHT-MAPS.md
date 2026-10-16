@@ -5,11 +5,20 @@ Canonical block/sky storage now uses the Rust owner in
 Publication retains a shared 64-shard root. A subsequent update detaches the
 root and only its modified shard, instead of cloning the complete Java section
 map. Sky column tops and their defaults use the same ownership policy. Java
-still orchestrates the light engine and section callbacks.
+retains contextual/custom effects; the S0026 candidate moves the connected stock
+engine/storage policy into Rust.
+
+The in-development [per-engine coordinator](RUST-LIGHT-COORDINATOR.md) also
+owns stock storage lifecycle, queued reconciliation and COW/publication policy
+in Rust. Java retains contextual/custom effects and wrapper adoption. Its
+focused correctness results and unresolved complete-path costs are separate
+from the historical accepted map results below.
 
 The temporary Java bridge holds sparse CPU object-identity slots, preserving
 `DataLayer` identity across snapshots and cache hits. Rust retains the typed
-light owners. Slots become reusable only after their last native map/cache pin
+light owners. Each slot's reservation, active binding, retirement and
+acknowledgement share one native record; prepared binding descriptors carry
+immutable slot/identity metadata. Slots become reusable only after their last native map/cache pin
 retires and Java clears the corresponding object reference. Removal resolves its returned identity
 under the shared retirement lock; another snapshot cannot clear or reuse that
 slot during the return handoff. Normal snapshots
@@ -21,10 +30,21 @@ including idle scalar reads. Visible-map reads share a native read lock; updatin
 cache reads retain the original caller exclusion. Package-private
 verification projections are separate from gameplay.
 
+The S0026/r4 continuation gives a stock level's block and sky engines one
+actual identity-resource context. Repeated queued imports can retain the same
+native entry across these producers. This connected handoff is under development;
+the historical map verification below does not certify it.
+
 ## Contracts
 
 - Public constructors supplied with Java maps retain their original aliases,
   custom map behavior and Java copies. Only owned canonical factories migrate.
+- Reuse entries by actual VM object identity, never by shared layer payload
+  address. A registry lookup is weak and must disappear on final entry retirement.
+  Opaque-to-native promotion may require a new entry while older maps retain
+  their original entry. Retiring that older slot must not erase the newer lookup.
+  Rejected lookup upgrades must drop outside the registry guard, because final
+  entry release takes that same guard to retire its pin.
 - Snapshot copies reset the two-entry cache and enable it, including copies of
   a disabled cache. Preserve Frozen's `Long.MAX_VALUE` empty-cache sentinel.
   Set/remove do not clear cached identities. Explicit layer copying uses a raw
@@ -33,13 +53,17 @@ verification projections are separate from gameplay.
   explicit layer copies detach. Do not replace these rules with byte snapshots.
 - Sky copies reset the top map's default to the current lowest Y, even if the
   source's default was customized independently.
-- Mutable light-array escape invalidates the old typed owner. Previously leased
+- Mutable light-array escape invalidates native authority. Previously leased
   generations remain alive; subsequent Java reads observe the escaped array.
-  Re-adoption creates a fresh owner. Retained map entries containing an invalid
-  owner must decline direct native reads until replaced.
-- Each map snapshot's owner and metadata view are `NativeReclaimer`
-  registrations (kinds 16 and 17) against the `NativeLightingMap` object, which
-  every call fences. The shared identity registry keeps its automatic arena.
+  The S0026/r4 candidate retains the actual primary identity and revives it on
+  fill. Existing native map consumers then see the new generation without a
+  second binding. They must still decline while the array is authoritative.
+- The r4 candidate registers the actual snapshot root once (existing reclaimer
+  kind 16), against the `NativeLightingMap` object every call fences. Metadata
+  is borrowed from that retained root, with no separately adopted map view.
+  Earlier images registered owner and view (kinds 16 and 17). The original paired
+  registration API and its atomicity remain unchanged. The shared identity
+  registry keeps its automatic arena.
 - Queued light still precedes visible storage. Terrain rebuild captures retain
   the original layer references, then the existing
   [bulk consumer](../../rendering/RUST-TERRAIN-LIGHTING.md) leases their current

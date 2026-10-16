@@ -9,9 +9,26 @@ feeds this coordinator; the existing [propagation owners](RUST-LIGHT-WORK.md)
 consume the resulting work. These are distinct stages, with no copied task list.
 
 Java retains callable references, chunks, futures, executors and effectful light
-methods. `LightEngine` still owns node checks, section admission,
-inconsistency/publication policy and compatibility propagation. This slice does
-not complete native world orchestration.
+methods. The [S0026 coordinator](RUST-LIGHT-COORDINATOR.md) moves stock node,
+section, publication and propagation decisions into native owners.
+
+**S0026/r4 development:** exact stock `checkBlock`, retention and queued imports enter native
+task rows with retained actual block/sky engine bindings. PRE inserts into the
+real node sets; POST retires the original engine/position capture roots. Custom
+positions, derived engines and named-debug tasks retain callable dispatch.
+Typed imports keep their original section/source captures and bind the current
+primary entry only at PRE, under the selected storage's original VM monitor.
+The connected typed check/import/retention/status/enable/source pair matches
+portable behavior, callback/error/reentry and weak-lifetime references, plus the
+full engine/threaded observers. Java ordinary/parity/slow tiers pass for the
+guarded Java31/native `fc1e557a` candidate. The connected native level update consumer is verified separately on
+Java33/native `7d49c5a0`: the invocation cursor holds the actual level through
+PRE/update/POST, and genuine context/publication effects return to Java. The
+old propagation runnable remains the fallback for ordinary callable owners.
+All Java tiers and nine omission controls pass; the full Rust run retains its
+57 known rendering-host failures. All six actual server fresh/reopen runs pass;
+the adapted actual-consumer audit retains baseline equivalence and original
+coverage thresholds. New cost acceptance remains pending; historical verification below does not certify performance.
 
 ## Contracts when editing
 
@@ -33,6 +50,16 @@ not complete native world orchestration.
   when a nested pass removes its row. Queued engine closures retain the owner;
   the automatic CPU arena releases it after it becomes unreachable.
   `ThreadedLevelLightEngine.close()` remains a no-op.
+- Typed commands retain their original VM capture roots through POST, even
+  though PRE needs no Java runnable. Holding the task owner after retirement
+  must not keep the retired engine or position alive. The separate
+  `VerifyCoordinatorTaskLifetimes.java` observer in
+  `DevUtils/tests/lighting/coordinator/` checks these weak-reference boundaries
+  through the actual public producer and original controlled transport.
+- Import binding can fail. Keep its adoption after acquiring the original
+  queued-section monitor at PRE; preparing it during transport changes error
+  timing and loses the original pending-task retry. A missing sky engine skips
+  this binding while retaining the original argument captures until POST.
 
 ## Verification
 

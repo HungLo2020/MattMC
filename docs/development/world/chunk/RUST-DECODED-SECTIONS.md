@@ -12,6 +12,12 @@ parses the remaining root tag. This is an intermediate ownership boundary;
 and section consumer without full-tape Java copies. Java scheduling and the rest
 of chunk construction still need migration.
 
+The S0026/r4 lighting candidate exports the same primary light owners without
+eager generation-view leases. Public `SectionData` facades and record contracts
+remain unchanged. This connected producer/lifetime work has its own
+[verification status](../lighting/RUST-LIGHT-COORDINATOR.md); the historical
+results below do not certify its current implementation.
+
 ## Admission and lifetime
 
 - Only stock factories created by `PalettedContainerFactory.create` with an

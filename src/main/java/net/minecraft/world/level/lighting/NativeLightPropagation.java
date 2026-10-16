@@ -34,6 +34,11 @@ final class NativeLightPropagation {
     private static final MethodHandle RUN = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_run_owned",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
             ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    private static final MethodHandle RUN_CONNECTED = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_run_connected",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    private static final MethodHandle DIRECT_LAYER_READS = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_engine_direct_layer_reads",
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
     private static final MethodHandle RESULTS = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_result_keys",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.JAVA_INT), Linker.Option.critical(true));
@@ -101,6 +106,8 @@ final class NativeLightPropagation {
         private final MemorySegment nativeColumns = arena.allocate(1280 * 4L, 4);
         private final MemorySegment nativeOut = arena.allocate(3 * 4L, 4);
 
+        MemorySegment columnsForCoordinator(){return this.nativeColumns;}
+
         /** One section: writes the layer like the original's {@code set} calls
          * and enqueues the same increases in the same order. Returns whether a
          * source lies below the section (the original's loop condition). */
@@ -138,7 +145,11 @@ final class NativeLightPropagation {
     @Nullable
     static SkySeed skySeed(ChunkSkyLightSources center, ChunkSkyLightSources north, ChunkSkyLightSources south, ChunkSkyLightSources west,
                            ChunkSkyLightSources east) {
-        if (!enabled) return null;
+        // Custom readers have observable conditional calls in the original
+        // section loop. Eagerly gathering a matrix changes calls and failures.
+        if (!enabled || center.getClass() != ChunkSkyLightSources.class
+                || north.getClass() != ChunkSkyLightSources.class || south.getClass() != ChunkSkyLightSources.class
+                || west.getClass() != ChunkSkyLightSources.class || east.getClass() != ChunkSkyLightSources.class) return null;
         SkySeed seed = SEEDS.get();
         int[] columns = seed.columns;
         for (int r = 0; r < 16; r++) {
@@ -228,7 +239,15 @@ final class NativeLightPropagation {
         int lowest = this.sky ? ((SkyLightSectionStorage)storage).getBottomSectionY() : Integer.MAX_VALUE;
         int status;
         try {
-            status = (int)RUN.invokeExact(this.handle, Tables.HANDLE, queues.ownerForNativeCall(), lowest, SECTION, this.out);
+            NativeLightCoordinator coordinator = this.engine.lightCoordinator;
+            if (coordinator != null) {
+                try {
+                    status = (int)RUN_CONNECTED.invokeExact(this.handle, Tables.HANDLE, queues.ownerForNativeCall(),
+                        coordinator.bindingForPropagation(), lowest, SECTION, this.out);
+                } finally { Reference.reachabilityFence(coordinator); }
+            } else {
+                status = (int)RUN.invokeExact(this.handle, Tables.HANDLE, queues.ownerForNativeCall(), lowest, SECTION, this.out);
+            }
         } catch (RuntimeException | Error error) {
             throw error;
         } catch (Throwable error) {
@@ -243,6 +262,11 @@ final class NativeLightPropagation {
         long processed = this.out.getAtIndex(ValueLayout.JAVA_LONG, 0);
         int written = (int)this.out.getAtIndex(ValueLayout.JAVA_LONG, 1);
         int affected = (int)this.out.getAtIndex(ValueLayout.JAVA_LONG, 2);
+        if(storage.coordinator!=null){
+            storage.coordinator.installResults(this,this.handle,written,affected);
+            PASSES.incrementAndGet();
+            return(int)processed;
+        }
         long[] keys = new long[written];
         long[] sections = new long[affected];
         try {
@@ -271,13 +295,35 @@ final class NativeLightPropagation {
         return (int)processed;
     }
 
+    long directLayerReadsForVerification() {
+        try { return (long)DIRECT_LAYER_READS.invokeExact(this.handle); }
+        catch (Throwable failure) { throw new IllegalStateException("Native light input diagnostic failed", failure); }
+        finally { Reference.reachabilityFence(this); }
+    }
+
+    /** Contextual compatibility leaf used after the native COW decision. */
+    void installCompatibilityResult(int index, DataLayer layer) {
+        if (layer.getClass() == DataLayer.class && layer.installNativeLightResult(this.handle, index)) return;
+        if (this.compatibilityResult == null) this.compatibilityResult = new byte[2048];
+        int status;
+        try { status = (int)COPY_RESULT.invokeExact(this.handle, index, MemorySegment.ofArray(this.compatibilityResult), 2048); }
+        catch (Throwable error) { throw new IllegalStateException("Native light compatibility export failed", error); }
+        if (status != 0) throw new IllegalStateException("Native light compatibility export rejected: " + status);
+        System.arraycopy(this.compatibilityResult, 0, layer.getData(), 0, 2048);
+    }
+
     /** Rust's section callback. Mode 0: the stored layer of {@code section}
-     * (0 absent, 1 stored); mode 1: its block states (0). Negative values
+     * (0 absent, 1 stored); mode 1: its block states (0); mode 2: replace a
+     * previous Java layer pin after a connected native read (0). Negative values
      * reject (-1) or report a failure (-2); the Java rerun meets it again. */
     private static int section(int mode, long section, MemorySegment buffer) {
         NativeLightPropagation current = CURRENT.get();
         if (current == null) return -2;
         try {
+            if (mode == 2) {
+                current.borrowedLayer = null;
+                return 0;
+            }
             buffer = buffer.reinterpret(NativeLightBlocks.BUFFER);
             LayerLightSectionStorage<?> storage = current.engine.storage;
             if (mode == 0) {

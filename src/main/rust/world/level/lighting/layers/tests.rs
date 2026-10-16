@@ -100,3 +100,23 @@ fn invalid_set_materializes_before_error_while_lazy_get_ignores_bounds() {
     assert_eq!(view.get(0), Ok(0));
     assert_eq!(view.get(1), Ok(1));
 }
+
+#[test]
+fn escaped_identity_releases_payload_but_an_actual_reader_keeps_its_generation() {
+    let layer = Layer::from_bytes([0x23; BYTES]);
+    let old = Arc::downgrade(&layer.generation.lock().unwrap());
+    layer.invalidate();
+    assert!(!layer.is_valid());
+    assert!(old.upgrade().is_none(), "the escaped array must not retain duplicate native bytes");
+    layer.fill(7);
+    layer.set(0, 5).unwrap();
+    let reader = layer.view();
+    let retained = Arc::downgrade(&layer.generation.lock().unwrap());
+    layer.invalidate();
+    assert_eq!(reader.get(0), Ok(5));
+    assert!(retained.upgrade().is_some());
+    layer.fill(2);
+    assert_eq!(reader.get(0), Ok(5));
+    drop(reader);
+    assert!(retained.upgrade().is_none());
+}

@@ -10,12 +10,12 @@ import java.lang.foreign.StructLayout;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.ref.PhantomReference;
+import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.LongAdder;
 import net.logging.LogUtils;
 import net.minecraft.util.NativeLibraryLoader;
 import org.slf4j.Logger;
@@ -64,26 +64,45 @@ public final class NativeReclaimer {
     private static final Set<Owner> LIVE = ConcurrentHashMap.newKeySet();
     private static final AtomicLong RELEASED = new AtomicLong();
     private static final AtomicLong REGISTRATIONS = new AtomicLong();
-    private static final LongAdder[] REGISTERED_BY_KIND = new LongAdder[KINDS];
+    // Allocation-free increments inside the ownership commit boundary.
+    private static final AtomicLong[] REGISTERED_BY_KIND = new AtomicLong[KINDS];
     /** Unreleased registrations (each holds roughly 1.5 KB of native memory) allowed to accumulate between pressure collections. */
     private static final int GC_STEP = Math.max(1024, Integer.getInteger("mattmc.nativeReclaimer.gcStep", 262_144));
     private static final long MIN_GC_INTERVAL_MS = 1000;
     private static final Semaphore GC_REQUEST = new Semaphore(0);
     private static volatile int gcMark = GC_STEP;
 
-    private static final class Owner extends PhantomReference<Object> {
+    static final class Owner extends PhantomReference<Object> {
         final long address;
         final byte kind;
+        final Owner leader;
+        // Guarded by leader. A pair commits/cancels as one transaction, while
+        // each individual record can be claimed only once by the drainer.
+        boolean committed, cancelled, claimed;
 
         Owner(Object referent, long address, byte kind) {
+            this(referent,address,kind,null);
+        }
+        Owner(Object referent, long address, byte kind, Owner leader) {
             super(referent, QUEUE);
             this.address = address;
             this.kind = kind;
+            this.leader = leader == null ? this : leader;
+        }
+        boolean claim() {
+            synchronized (leader) {
+                if (!leader.committed || cancelled || claimed) return false;
+                claimed = true;
+                LIVE.remove(this);
+                return true;
+            }
         }
     }
+    /** Package-private modeled failure ordering seam; absent in production. */
+    interface RegistrationProbe { void at(int stage, Owner first, Owner second); }
 
     static {
-        for (int i = 0; i < KINDS; i++) REGISTERED_BY_KIND[i] = new LongAdder();
+        for (int i = 0; i < KINDS; i++) REGISTERED_BY_KIND[i] = new AtomicLong();
         start(NativeReclaimer::drain, "MattMC-Native-Reclaimer");
         start(NativeReclaimer::collectUnderPressure, "MattMC-Native-Reclaimer-GC");
         if (Boolean.getBoolean("mattmc.dev.nativeReclaimerStats")) start(NativeReclaimer::logStats, "MattMC-Native-Reclaimer-Stats");
@@ -100,25 +119,81 @@ public final class NativeReclaimer {
 
     /** Releases {@code pointer} (a reference of {@code kind}) once {@code referent} is unreachable. */
     static void register(Object referent, MemorySegment pointer, byte kind) {
-        if (referent == null || pointer.address() == 0) throw new IllegalArgumentException("Missing native owner");
-        LIVE.add(new Owner(referent, pointer.address(), kind));
-        REGISTERED_BY_KIND[kind].increment();
-        if ((REGISTRATIONS.incrementAndGet() & 1023) == 0 && LIVE.size() >= gcMark && GC_REQUEST.availablePermits() == 0) GC_REQUEST.release();
+        try {
+            validate(referent,pointer,kind);
+            registerRecords(new Owner(referent,pointer.address(),kind),null,null);
+        } finally { Reference.reachabilityFence(referent); Reference.reachabilityFence(pointer); }
+    }
+    private static void validate(Object referent, MemorySegment pointer, byte kind) {
+        if (referent == null || pointer.address() == 0 || kind < 0 || kind >= KINDS)
+            throw new IllegalArgumentException("Missing native owner or invalid kind");
+    }
+    private static void cancel(Owner record, Throwable original) {
+        if (record == null) return;
+        record.cancelled = true;
+        try { LIVE.remove(record); }
+        catch (RuntimeException | Error cleanup) {
+            // Cancellation already prevents a native claim even if removing a
+            // hash-table entry itself fails. Keep the original adoption error.
+            try { original.addSuppressed(cleanup); } catch (RuntimeException | Error ignored) {}
+        }
+    }
+    private static void registerRecords(Owner first, Owner second, RegistrationProbe probe) {
+        long previous;
+        synchronized (first) {
+            try {
+                if (probe != null) probe.at(0,first,second);
+                LIVE.add(first);
+                if (probe != null) probe.at(1,first,second);
+                if (second != null) {
+                    if (probe != null) probe.at(2,first,second);
+                    LIVE.add(second);
+                    if (probe != null) probe.at(3,first,second);
+                }
+                if (probe != null) probe.at(4,first,second);
+                REGISTERED_BY_KIND[first.kind].incrementAndGet();
+                if (second != null) REGISTERED_BY_KIND[second.kind].incrementAndGet();
+                previous = REGISTRATIONS.getAndAdd(second == null ? 1 : 2);
+                first.committed = true;
+            } catch (RuntimeException | Error failure) {
+                cancel(first,failure); cancel(second,failure);
+                throw failure;
+            }
+        }
+        // Ownership has transferred. Optional pressure work cannot escape as
+        // a failed registration and cause the caller to release it again.
+        try {
+            if (probe != null) probe.at(5,first,second);
+            long added = second == null ? 1 : 2;
+            if ((previous >>> 10) != ((previous + added) >>> 10)
+                && LIVE.size() >= gcMark && GC_REQUEST.availablePermits() == 0) GC_REQUEST.release();
+        } catch (RuntimeException | Error ignored) {}
     }
 
     /**
      * Releases a light-storage map owner and its metadata view once {@code map}
      * (the Java object every call fences) is unreachable.
+     * Successful registration transfers both leases; a thrown registration
+     * transfers neither, so the caller releases both during rollback.
      */
     public static void registerLightMap(Object map, MemorySegment owner, MemorySegment view) {
-        register(map, owner, LIGHT_MAP);
-        register(map, view, LIGHT_MAP_VIEW);
+        registerLightMap(map,owner,view,null);
+    }
+    static void registerLightMap(Object map, MemorySegment owner, MemorySegment view, RegistrationProbe probe) {
+        try {
+            validate(map,owner,LIGHT_MAP); validate(map,view,LIGHT_MAP_VIEW);
+            Owner first = new Owner(map,owner.address(),LIGHT_MAP);
+            Owner second = new Owner(map,view.address(),LIGHT_MAP_VIEW,first);
+            registerRecords(first,second,probe);
+        } finally {
+            Reference.reachabilityFence(map); Reference.reachabilityFence(owner); Reference.reachabilityFence(view);
+        }
     }
 
     /** Registrations not yet released, and releases so far (diagnostics and tests). */
     static int pending() { return LIVE.size(); }
     static long released() { return RELEASED.get(); }
-    static long registered(byte kind) { return REGISTERED_BY_KIND[kind].sum(); }
+    static long registered(byte kind) { return REGISTERED_BY_KIND[kind].get(); }
 
     private static void drain() {
         // Thread-confined scratch, allocated once for the process.
@@ -129,12 +204,14 @@ public final class NativeReclaimer {
                 int count = 0;
                 Owner owner = (Owner)QUEUE.remove();
                 while (owner != null) {
-                    LIVE.remove(owner);
-                    kinds.set(ValueLayout.JAVA_BYTE, count, owner.kind);
-                    pointers.setAtIndex(ValueLayout.JAVA_LONG, count, owner.address);
-                    if (++count == BATCH) break;
+                    if (owner.claim()) {
+                        kinds.set(ValueLayout.JAVA_BYTE, count, owner.kind);
+                        pointers.setAtIndex(ValueLayout.JAVA_LONG, count, owner.address);
+                        if (++count == BATCH) break;
+                    }
                     owner = (Owner)QUEUE.poll();
                 }
+                if (count == 0) continue;
                 int released = (int)RELEASE_BATCH.invokeExact(kinds, pointers, count);
                 RELEASED.addAndGet(released);
                 if (released != count) {
@@ -198,7 +275,7 @@ public final class NativeReclaimer {
             try {
                 Thread.sleep(5000);
                 StringBuilder kinds = new StringBuilder();
-                for (int i = 1; i < KINDS; i++) kinds.append(i == 1 ? "" : ",").append(REGISTERED_BY_KIND[i].sum());
+                for (int i = 1; i < KINDS; i++) kinds.append(i == 1 ? "" : ",").append(REGISTERED_BY_KIND[i].get());
                 LOGGER.info("Native reclaimer stats pending={} released={} registered={}", LIVE.size(), RELEASED.get(), kinds);
                 if (info != null) {
                     var result = (MemorySegment)info.invokeExact(into);
