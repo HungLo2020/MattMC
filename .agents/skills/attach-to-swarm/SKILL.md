@@ -155,6 +155,18 @@ new assignment revision before changing shared interfaces or widening scope.
   than getter-by-getter ports that preserve repeated call overhead. dot sets
   non-overlapping ownership and interface boundaries; workers choose the
   implementation within them. A larger slice does not authorize scope overlap.
+- Stop polishing a temporary bridge when repeated representative complete-cost
+  measurements show bridge/lifetime churn with no credible route to the applicable
+  budget. Finish the attribution needed to identify the ownership gap, then
+  promptly propose one broader, coherent, non-overlapping producer/state/consumer
+  assignment to dot instead of repeated representation or accessor microtuning.
+  Let evidence drive this decision, not an arbitrary experiment count. dot sets
+  the revised boundaries; workers remain autonomous within their active scope
+  and keep independent safe work moving while coordination is pending.
+  Preserve per-workload costs and retained ownership debt. This heuristic changes
+  what to migrate next, not acceptance: correctness stays strict, the existing
+  10%/25% allowances and bounded-exception conditions below remain unchanged,
+  and unexplained slowdowns or poor native algorithms receive no blanket waiver.
 - Exercise risky contracts in the first working slice, before broad happy-path
   migration: callbacks, reentry, aliases, custom dispatch and error-prefix
   behavior where applicable. Preserve their observable semantics and add
