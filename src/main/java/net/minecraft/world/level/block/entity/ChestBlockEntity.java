@@ -16,6 +16,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.NativeItemSlots;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -28,7 +29,10 @@ import net.minecraft.world.level.storage.ValueOutput;
 public class ChestBlockEntity extends RandomizableContainerBlockEntity implements LidBlockEntity {
 	private static final int EVENT_SET_OPEN_COUNT = 1;
 	private static final Component DEFAULT_NAME = Component.translatable("container.chest");
-	private NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
+	private static final class LegacyItems {NonNullList<ItemStack> items;LegacyItems(NonNullList<ItemStack> items){this.items=items;}}
+	private final net.minecraft.world.item.NativeItemState.ContainerCell nativeContainer = this.getClass()==ChestBlockEntity.class
+		? net.minecraft.world.item.NativeItemState.ContainerCell.create(NativeItemSlots.withSize(27)):null;
+	private final LegacyItems legacyItems = this.nativeContainer==null?new LegacyItems(NonNullList.withSize(27,ItemStack.EMPTY)):null;
 	private final ContainerOpenersCounter openersCounter = new ContainerOpenersCounter() {
 		@Override
 		protected void onOpen(Level level, BlockPos blockPos, BlockState blockState) {
@@ -69,6 +73,10 @@ public class ChestBlockEntity extends RandomizableContainerBlockEntity implement
 		this(BlockEntityType.CHEST, blockPos, blockState);
 	}
 
+	private NonNullList<ItemStack> createItems(int size) {
+		return this.getClass() == ChestBlockEntity.class ? NativeItemSlots.withSize(size) : NonNullList.withSize(size, ItemStack.EMPTY);
+	}
+
 	@Override
 	public int getContainerSize() {
 		return 27;
@@ -82,9 +90,9 @@ public class ChestBlockEntity extends RandomizableContainerBlockEntity implement
 	@Override
 	protected void loadAdditional(ValueInput valueInput) {
 		super.loadAdditional(valueInput);
-		this.items = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
+		this.replaceItems(this.createItems(this.getContainerSize()));
 		if (!this.tryLoadLootTable(valueInput)) {
-			ContainerHelper.loadAllItems(valueInput, this.items);
+			ContainerHelper.loadAllItems(valueInput, this.currentItems());
 		}
 	}
 
@@ -92,7 +100,7 @@ public class ChestBlockEntity extends RandomizableContainerBlockEntity implement
 	protected void saveAdditional(ValueOutput valueOutput) {
 		super.saveAdditional(valueOutput);
 		if (!this.trySaveLootTable(valueOutput)) {
-			ContainerHelper.saveAllItems(valueOutput, this.items);
+			ContainerHelper.saveAllItems(valueOutput, this.currentItems());
 		}
 	}
 
@@ -146,14 +154,25 @@ public class ChestBlockEntity extends RandomizableContainerBlockEntity implement
 		return this.openersCounter.getEntitiesWithContainerOpen(this.getLevel(), this.getBlockPos());
 	}
 
-	@Override
-	protected NonNullList<ItemStack> getItems() {
-		return this.items;
+	/** Bounded exact-stock admission; pending loot must execute its original Java effects. */
+	@org.jetbrains.annotations.Nullable
+	public NativeItemSlots nativeSlotsForTransfer() {
+		return this.getClass() == ChestBlockEntity.class && this.lootTable == null && this.currentItems() instanceof NativeItemSlots nativeSlots
+			? nativeSlots : null;
 	}
 
 	@Override
+	protected NonNullList<ItemStack> getItems() {
+		return this.currentItems();
+	}
+
+	/** Actual replaceable stock owner; custom chest subclasses retain virtual behavior. */
+	public final net.minecraft.world.item.NativeItemState.ContainerCell nativeContainerForSlots() {return this.nativeContainer;}
+	private NonNullList<ItemStack> currentItems(){return this.nativeContainer==null?this.legacyItems.items:this.nativeContainer.facade();}
+	private void replaceItems(NonNullList<ItemStack> items){if(this.nativeContainer==null)this.legacyItems.items=items;else this.nativeContainer.replace(items);}
+	@Override
 	protected void setItems(NonNullList<ItemStack> nonNullList) {
-		this.items = nonNullList;
+		this.replaceItems(nonNullList);
 	}
 
 	@Override

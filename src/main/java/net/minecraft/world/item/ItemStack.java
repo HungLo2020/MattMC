@@ -145,11 +145,7 @@ public final class ItemStack implements DataComponentHolder {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final ItemStack EMPTY = new ItemStack((Void)null);
 	private static final Component DISABLED_ITEM_TOOLTIP = Component.translatable("item.disabled").withStyle(ChatFormatting.RED);
-	private int count;
-	private int popTime;
-	@Deprecated
-	@Nullable
-	private final Item item;
+	final NativeItemState.Stack state;
 	final PatchedDataComponentMap components;
 	@Nullable
 	private Entity entityRepresentation;
@@ -254,14 +250,14 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	private ItemStack(ItemLike itemLike, int i, PatchedDataComponentMap patchedDataComponentMap) {
-		this.item = itemLike.asItem();
-		this.count = i;
+		Item item = itemLike.asItem();
 		this.components = patchedDataComponentMap;
+		this.state = NativeItemState.Stack.create(item, i, patchedDataComponentMap.nativeState());
 	}
 
 	private ItemStack(@Nullable Void void_) {
-		this.item = null;
 		this.components = new PatchedDataComponentMap(DataComponentMap.EMPTY);
+		this.state = NativeItemState.Stack.createEmpty(this.components.nativeState());
 	}
 
 	public static DataResult<Unit> validateComponents(DataComponentMap dataComponentMap) {
@@ -283,7 +279,7 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public boolean isEmpty() {
-		return this == EMPTY || this.item == Items.AIR || this.count <= 0;
+		return this == EMPTY || this.state.item() == Items.AIR || this.state.count() <= 0;
 	}
 
 	public boolean isItemEnabled(FeatureFlagSet featureFlagSet) {
@@ -308,7 +304,7 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public Item getItem() {
-		return this.isEmpty() ? Items.AIR : this.item;
+		return this.isEmpty() ? Items.AIR : this.state.item();
 	}
 
 	public Holder<Item> getItemHolder() {
@@ -596,10 +592,39 @@ public final class ItemStack implements DataComponentHolder {
 		if (this.isEmpty()) {
 			return EMPTY;
 		} else {
-			ItemStack itemStack = new ItemStack(this.getItem(), this.count, this.components.copy());
+			Item item = this.getItem();
+			if (item != null && item.nativeTransferCopyIsPure()) return this.copyOwnedStack();
+			ItemStack itemStack = new ItemStack(this.getItem(), this.state.count(), this.components.copy());
 			itemStack.setPopTime(this.getPopTime());
 			return itemStack;
 		}
+	}
+
+	/** Complete stock-chest consumer copy with one retained stack/overlay adoption. */
+	public ItemStack copyForNativeTransfer() {
+		if (this.isEmpty()) return EMPTY;
+		if (this.getItem() == null || !this.getItem().nativeTransferCopyIsPure()) return this.copy();
+		return this.copyOwnedStack();
+	}
+
+	private ItemStack copyOwnedStack() {
+		ItemStack copy = new ItemStack(this.state.copyStack());
+		copy.setPopTime(this.getPopTime());
+		return copy;
+	}
+
+	private ItemStack(NativeItemState.Stack nativeStack) {
+		this.components = PatchedDataComponentMap.fromNativeStack(nativeStack);
+		// Preserve the original private copy constructor's single dispatch.
+		nativeStack.item().asItem();
+		this.state = nativeStack;
+	}
+
+	public ItemStack copyForNativeTransferWithCount(int count) {
+		if (this.isEmpty()) return EMPTY;
+		ItemStack copy = this.copyForNativeTransfer();
+		copy.setCount(count);
+		return copy;
 	}
 
 	public ItemStack copyWithCount(int i) {
@@ -689,8 +714,8 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public void inventoryTick(Level level, Entity entity, @Nullable EquipmentSlot equipmentSlot) {
-		if (this.popTime > 0) {
-			this.popTime--;
+		if (this.state.popTime() > 0) {
+			this.state.popTime(this.state.popTime() - 1);
 		}
 
 		if (level instanceof ServerLevel serverLevel) {
@@ -1032,19 +1057,21 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public int getPopTime() {
-		return this.popTime;
+		return this.state.popTime();
 	}
 
 	public void setPopTime(int i) {
-		this.popTime = i;
+		this.state.popTime(i);
 	}
 
 	public int getCount() {
-		return this.isEmpty() ? 0 : this.count;
+		if (this == EMPTY || this.state.item() == Items.AIR) return 0;
+		int count = this.state.count();
+		return count <= 0 ? 0 : count;
 	}
 
 	public void setCount(int i) {
-		this.count = i;
+		this.state.count(i);
 	}
 
 	public void limitSize(int i) {

@@ -6,6 +6,7 @@
 //! declares only behavior factories. See docs/development/game-model/ITEM-DEFINITIONS.md.
 mod catalog;
 pub mod snbt;
+pub mod runtime;
 #[cfg(test)]
 mod tests;
 

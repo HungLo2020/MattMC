@@ -8,7 +8,9 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 public class Slot {
-	private final int slot;
+	private static final class LegacyIndex {final int value;LegacyIndex(int value){this.value=value;}}
+	private final LegacyIndex legacyIndex;
+	private final net.minecraft.world.item.NativeItemState.SlotLink nativeLink;
 	public final Container container;
 	public int index;
 	public final int x;
@@ -16,7 +18,9 @@ public class Slot {
 
 	public Slot(Container container, int i, int j, int k) {
 		this.container = container;
-		this.slot = i;
+		this.nativeLink = container!=null&&(container.getClass()==net.minecraft.world.entity.player.Inventory.class||container.getClass()==net.minecraft.world.level.block.entity.ChestBlockEntity.class)
+			?net.minecraft.world.item.NativeItemState.bindStockSlot(container,i):null;
+		this.legacyIndex = this.nativeLink==null?new LegacyIndex(i):null;
 		this.x = j;
 		this.y = k;
 	}
@@ -46,10 +50,11 @@ public class Slot {
 	}
 
 	public ItemStack getItem() {
-		return this.container.getItem(this.slot);
+		return this.nativeLink==null?this.container.getItem(this.containerIndex()):this.nativeLink.stack();
 	}
 
 	public boolean hasItem() {
+		if(this.getClass()==Slot.class&&this.nativeLink!=null){int present=this.nativeLink.presence();if(present>=0)return present!=0;}
 		return !this.getItem().isEmpty();
 	}
 
@@ -62,7 +67,7 @@ public class Slot {
 	}
 
 	public void set(ItemStack itemStack) {
-		this.container.setItem(this.slot, itemStack);
+		this.container.setItem(this.containerIndex(), itemStack);
 		this.setChanged();
 	}
 
@@ -84,7 +89,7 @@ public class Slot {
 	}
 
 	public ItemStack remove(int i) {
-		return this.container.removeItem(this.slot, i);
+		return this.container.removeItem(this.containerIndex(), i);
 	}
 
 	public boolean mayPickup(Player player) {
@@ -151,9 +156,12 @@ public class Slot {
 		return this.mayPickup(player) && this.mayPlace(this.getItem());
 	}
 
+	/** Actual plain-slot endpoint; specialized/custom methods remain effect boundaries. */
+	public final net.minecraft.world.item.NativeItemState.SlotLink nativeLinkForMenu(){return this.getClass()==Slot.class?this.nativeLink:null;}
 	public int getContainerSlot() {
-		return this.slot;
+		return this.containerIndex();
 	}
+	private int containerIndex(){return this.nativeLink==null?this.legacyIndex.value:this.nativeLink.index();}
 
 	public boolean isHighlightable() {
 		return true;

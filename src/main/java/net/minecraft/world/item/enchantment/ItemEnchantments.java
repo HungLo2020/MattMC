@@ -2,6 +2,7 @@ package net.minecraft.world.item.enchantment;
 
 import com.mojang.serialization.Codec;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap.Entry;
 import java.util.Collections;
 import java.util.Optional;
@@ -22,23 +23,28 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.EnchantmentTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.NativeItemState;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.TooltipProvider;
 import org.jetbrains.annotations.Nullable;
 
 public class ItemEnchantments implements TooltipProvider {
-	public static final ItemEnchantments EMPTY = new ItemEnchantments(new Object2IntOpenHashMap<>());
+	public static final ItemEnchantments EMPTY = new ItemEnchantments(NativeItemState.newEnchantmentMap(16));
 	private static final Codec<Integer> LEVEL_CODEC = Codec.intRange(1, 255);
 	public static final Codec<ItemEnchantments> CODEC = Codec.unboundedMap(Enchantment.CODEC, LEVEL_CODEC)
-		.xmap(map -> new ItemEnchantments(new Object2IntOpenHashMap<>(map)), itemEnchantments -> itemEnchantments.enchantments);
+		.xmap(map -> new ItemEnchantments(NativeItemState.copyEnchantmentMap(map)), itemEnchantments -> itemEnchantments.enchantments);
 	public static final StreamCodec<RegistryFriendlyByteBuf, ItemEnchantments> STREAM_CODEC = StreamCodec.composite(
-		ByteBufCodecs.map(Object2IntOpenHashMap::new, Enchantment.STREAM_CODEC, ByteBufCodecs.VAR_INT),
+		ByteBufCodecs.map(NativeItemState::<Holder<Enchantment>>newEnchantmentMap, Enchantment.STREAM_CODEC, ByteBufCodecs.VAR_INT),
 		itemEnchantments -> itemEnchantments.enchantments,
 		ItemEnchantments::new
 	);
-	final Object2IntOpenHashMap<Holder<Enchantment>> enchantments;
+	final Object2IntMap<Holder<Enchantment>> enchantments;
 
 	ItemEnchantments(Object2IntOpenHashMap<Holder<Enchantment>> object2IntOpenHashMap) {
+		this((Object2IntMap<Holder<Enchantment>>)object2IntOpenHashMap);
+	}
+
+	private ItemEnchantments(Object2IntMap<Holder<Enchantment>> object2IntOpenHashMap) {
 		this.enchantments = object2IntOpenHashMap;
 
 		for (Entry<Holder<Enchantment>> entry : object2IntOpenHashMap.object2IntEntrySet()) {
@@ -51,6 +57,11 @@ public class ItemEnchantments implements TooltipProvider {
 
 	public int getLevel(Holder<Enchantment> holder) {
 		return this.enchantments.getInt(holder);
+	}
+
+	/** Item-private bridge: actual native allocation, or zero for physical Java backing. */
+	public final long nativePayloadAddress() {
+		return NativeItemState.enchantmentPayloadAddress(this.enchantments);
 	}
 
 	@Override
@@ -117,7 +128,7 @@ public class ItemEnchantments implements TooltipProvider {
 	}
 
 	public static class Mutable {
-		private final Object2IntOpenHashMap<Holder<Enchantment>> enchantments = new Object2IntOpenHashMap<>();
+		private final Object2IntMap<Holder<Enchantment>> enchantments = NativeItemState.newEnchantmentMap(16);
 
 		public Mutable(ItemEnchantments itemEnchantments) {
 			this.enchantments.putAll(itemEnchantments.enchantments);
@@ -133,7 +144,9 @@ public class ItemEnchantments implements TooltipProvider {
 
 		public void upgrade(Holder<Enchantment> holder, int i) {
 			if (i > 0) {
-				this.enchantments.merge(holder, Math.min(i, 255), Integer::max);
+				if (!NativeItemState.upgradeEnchantment(this.enchantments, holder, Math.min(i, 255))) {
+					this.enchantments.merge(holder, Math.min(i, 255), Integer::max);
+				}
 			}
 		}
 

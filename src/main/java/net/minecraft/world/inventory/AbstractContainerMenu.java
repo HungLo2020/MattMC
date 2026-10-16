@@ -49,9 +49,11 @@ public abstract class AbstractContainerMenu {
 	public static final int SLOTS_PER_ROW = 9;
 	public static final int SLOT_SIZE = 18;
 	private final NonNullList<ItemStack> lastSlots = NonNullList.create();
-	public final NonNullList<Slot> slots = NonNullList.create();
+	private final net.minecraft.world.item.NativeItemState.Menu nativeMenu = this.getClass()==ChestMenu.class||this.getClass()==InventoryMenu.class?net.minecraft.world.item.NativeItemState.Menu.create(this.getClass()==InventoryMenu.class?2:1):null;
+	public final NonNullList<Slot> slots = this.nativeMenu!=null?new TransferSlots(this.nativeMenu):NonNullList.create();
 	private final List<DataSlot> dataSlots = Lists.<DataSlot>newArrayList();
-	private ItemStack carried = ItemStack.EMPTY;
+	private static final class LegacyCarried {ItemStack value=ItemStack.EMPTY;}
+	private final LegacyCarried legacyCarried=this.nativeMenu==null?new LegacyCarried():null;
 	private final NonNullList<RemoteSlot> remoteSlots = NonNullList.create();
 	private final IntList remoteDataSlots = new IntArrayList();
 	private RemoteSlot remoteCarried = RemoteSlot.PLACEHOLDER;
@@ -66,6 +68,17 @@ public abstract class AbstractContainerMenu {
 	@Nullable
 	private ContainerSynchronizer synchronizer;
 	private boolean suppressRemoteUpdates;
+
+	/** The native roster owns endpoints; this wrapper preserves NonNullList dispatch. */
+	private static final class TransferSlots extends NonNullList<Slot> {
+		private final net.minecraft.world.item.NativeItemState.Menu owner;
+		TransferSlots(net.minecraft.world.item.NativeItemState.Menu owner) {super(owner,null);this.owner=owner;}
+		private void changed(){this.owner.changed();}
+		private long version(){return this.owner.version();}
+		@Override public Slot set(int index,Slot slot){try{return super.set(index,slot);}finally{this.changed();}}
+		@Override public void add(int index,Slot slot){try{super.add(index,slot);}finally{this.changed();}}
+		@Override public Slot remove(int index){try{return super.remove(index);}finally{this.changed();}}
+	}
 
 	protected AbstractContainerMenu(@Nullable MenuType<?> menuType, int i) {
 		this.menuType = menuType;
@@ -311,6 +324,64 @@ public abstract class AbstractContainerMenu {
 
 	public abstract ItemStack quickMoveStack(Player player, int i);
 
+	protected final net.minecraft.world.item.NativeItemState.Menu nativeMenuForAction(){return this.nativeMenu;}
+	protected boolean emptyOwnedSource(int index){return this.nativeMenu.emptySource(index,null);}
+	protected final ItemStack quickMoveOwned(Player player,int index){
+		if(this.emptyOwnedSource(index))return ItemStack.EMPTY;
+		var effects=new NativeMenuEffects(player);boolean moved=this.nativeMenu.action(index,false,effects);return moved?effects.returned:ItemStack.EMPTY;
+	}
+	protected net.minecraft.world.item.NativeItemState.TransferEffects prepareOwnedTransfer(Slot slot,ItemStack source,int index){return null;}
+	private final class NativeMenuEffects extends net.minecraft.world.item.NativeItemState.MenuActionEffects {
+		private final Player player;
+		private Slot initial,slot;
+		private ItemStack source,snapshot,returned=ItemStack.EMPTY,against,previous;
+		private net.minecraft.world.entity.EquipmentSlot equipmentSlot;
+		private int index;
+		private net.minecraft.world.item.NativeItemState.TransferEffects transfer;
+		NativeMenuEffects(Player player){this.player=player;}
+		private void captureCopy(long out){
+			Slot slot=this.slot;ItemStack itemStack2=slot.getItem();this.source=itemStack2;this.previous=this.returned;
+			ItemStack itemStack=itemStack2.copy();this.snapshot=itemStack;stacks(out,itemStack2,itemStack);
+		}
+		private void equipment(){Player player=this.player;this.equipmentSlot=player.getEquipmentSlotForItem(this.snapshot);}
+		private void equipmentRoute(long out){
+			net.minecraft.world.entity.EquipmentSlot equipmentSlot=this.equipmentSlot;
+			boolean armor=equipmentSlot.getType()==net.minecraft.world.entity.EquipmentSlot.Type.HUMANOID_ARMOR;
+			route(out,armor?1:equipmentSlot==net.minecraft.world.entity.EquipmentSlot.OFFHAND?2:0,armor?equipmentSlot.getIndex():0);
+		}
+		@Override public long effect(int operation,int first,int second,long third,long out){
+			switch(operation){
+				case 1:{
+					java.lang.ref.Reference.reachabilityFence(this.against);this.against=null;this.index=first;this.slot=AbstractContainerMenu.this.slots.get(first);
+					var link=this.slot==null?null:this.slot.nativeLinkForMenu();
+					if(knownEndpoint(link)){if(!this.slot.hasItem())return 4;this.captureCopy(out);return 3;}
+					endpoint(out,link);return this.slot==null?0:1;
+				}
+				case 2:{Slot slot=this.slot;return slot.hasItem()?1:0;}
+				case 3:this.captureCopy(out);return 1;
+				case 4:this.equipment();return 1;
+				case 5:this.equipmentRoute(out);return 1;
+				case 6:return AbstractContainerMenu.this.slots.get(first).hasItem()?1:0;
+				case 7:
+					this.transfer=AbstractContainerMenu.this.prepareOwnedTransfer(this.slot,this.source,this.index);
+					if(this.transfer!=null){transfer(out,this.transfer,this.source);return 2;}
+					return AbstractContainerMenu.this.moveItemStackTo(this.source,first,second,third!=0)?1:0;
+				case 15:return this.transfer.effect(first,second,(third>>>1)&3,(int)(third>>32),third&1);
+				case 8:this.slot.onQuickCraft(this.source,this.snapshot);return 1;
+				case 9:
+					if(first!=0){if(second!=0)this.slot.setByPlayer(ItemStack.EMPTY,this.snapshot);else this.slot.setByPlayer(ItemStack.EMPTY);}else this.slot.setChanged();return 1;
+				case 10:this.slot.onTake(this.player,this.source);return 1;
+				case 11:this.player.drop(this.source,false);return 1;
+				case 12:
+					this.returned=first!=0?this.snapshot:ItemStack.EMPTY;java.lang.ref.Reference.reachabilityFence(this.previous);this.source=null;this.snapshot=null;this.previous=null;this.slot=null;this.transfer=null;return 1;
+				case 13:{Slot slot=AbstractContainerMenu.this.slots.get(first);this.initial=slot;return slot.mayPickup(this.player)?1:0;}
+				case 14:{ItemStack itemStack=this.initial.getItem();this.against=itemStack;if(itemStack==null)ItemStack.isSameItem(itemStack,this.returned);stacks(out,itemStack,null);return 1;}
+				default:throw new IllegalStateException("Unknown native menu effect: "+operation);
+			}
+		}
+	}
+
+
 	public void setSelectedBundleItemIndex(int i, int j) {
 		if (i >= 0 && i < this.slots.size()) {
 			ItemStack itemStack = this.slots.get(i).getItem();
@@ -420,6 +491,7 @@ public abstract class AbstractContainerMenu {
 					return;
 				}
 
+				if(this.nativeMenu!=null){this.nativeMenu.action(i,true,new NativeMenuEffects(player));return;}
 				Slot slot = this.slots.get(i);
 				if (!slot.mayPickup(player)) {
 					return;
@@ -626,7 +698,7 @@ public abstract class AbstractContainerMenu {
 			this.getSlot(j).set((ItemStack)list.get(j));
 		}
 
-		this.carried = itemStack;
+		this.assignCarried(itemStack);
 		this.stateId = i;
 	}
 
@@ -637,13 +709,96 @@ public abstract class AbstractContainerMenu {
 	public abstract boolean stillValid(Player player);
 
 	protected boolean moveItemStackTo(ItemStack itemStack, int i, int j, boolean bl) {
-		boolean bl2 = false;
-		int k = i;
-		if (bl) {
-			k = j - 1;
-		}
+		return this.moveItemStackToRemaining(itemStack, i, j, bl, false, 0, bl ? j - 1 : i);
+	}
 
-		if (itemStack.isStackable()) {
+	protected final net.minecraft.world.item.NativeItemState.TransferEffects prepareStockChestTransfer(ItemStack source,net.minecraft.world.level.block.entity.ChestBlockEntity chest){
+		var effects=new StockTransferEffects(source,chest);return effects.admit()?effects:null;
+	}
+	protected final net.minecraft.world.item.NativeItemState.TransferEffects prepareStockInventoryTransfer(ItemStack source,net.minecraft.world.level.block.entity.ChestBlockEntity chest,Inventory inventory){
+		var effects=new StockInventoryTransferEffects(source,chest,inventory);return effects.admit()?effects:null;
+	}
+	/** One native operation owns the scan and continuation across external Java effects. */
+	protected final boolean moveItemStackToStockChest(ItemStack source, net.minecraft.world.level.block.entity.ChestBlockEntity chest) {
+		StockTransferEffects effects = new StockTransferEffects(source, chest);
+		if (!effects.admit()) return this.moveItemStackToRemaining(source, 0, 27, false, false, 0, 0);
+		return effects.backend.runTransfer(source, effects);
+	}
+
+	/** Reverse stock transfer owns pure destination mutations and their native change counter. */
+	protected final boolean moveItemStackToStockInventory(ItemStack source, net.minecraft.world.level.block.entity.ChestBlockEntity chest, Inventory inventory) {
+		int end = this.slots.size();
+		StockInventoryTransferEffects effects = new StockInventoryTransferEffects(source,chest,inventory);
+		if (!effects.admit()) return this.moveItemStackToRemaining(source,27,end,true,false,0,end-1);
+		return effects.backend.runTransfer(source,effects);
+	}
+
+	private final class StockInventoryTransferEffects extends net.minecraft.world.item.NativeItemState.TransferEffects {
+		private final ItemStack source;
+		private final net.minecraft.world.level.block.entity.ChestBlockEntity chest;
+		private final Inventory inventory;
+		private net.minecraft.world.item.NativeItemSlots backend;
+		StockInventoryTransferEffects(ItemStack source,net.minecraft.world.level.block.entity.ChestBlockEntity chest,Inventory inventory) {
+			this.source=source;this.chest=chest;this.inventory=inventory;
+		}
+		boolean admit() {
+			this.backend=this.inventory.nativeMainSlotsForTransfer();
+			if (this.backend==null || this.chest.nativeSlotsForTransfer()==null || this.source.getItem()==null || !this.source.getItem().nativeTransferCopyIsPure()
+				|| !(AbstractContainerMenu.this.slots instanceof TransferSlots metadata) || metadata.size()!=63) return false;
+			if(!metadata.owner.matchesStock(this.chest.nativeContainerForSlots(),this.backend,true))return false;
+			this.destination(this.backend);return true;
+		}
+		@Override public long effect(long action,long selected,long phase,long amount,long changed) {
+			int menuIndex=62-Math.toIntExact(selected);
+			if(action==3) return AbstractContainerMenu.this.moveItemStackToRemaining(this.source,27,63,true,changed!=0,(int)phase,menuIndex)?1:0;
+			if(action!=2)throw new IllegalStateException("Unknown native inventory transfer effect: "+action);
+			Slot slot=AbstractContainerMenu.this.slots.get(menuIndex);int index=slot.getContainerSlot();
+			ItemStack inserted=this.source.copyForNativeTransferWithCount((int)amount);
+			this.backend.commitTransferInsert(this.source,index,inserted,(int)amount);
+			this.inventory.nativeMainSetEffects(index,inserted);
+			slot.setChanged();slot.setChanged();return 1;
+		}
+	}
+
+	private final class StockTransferEffects extends net.minecraft.world.item.NativeItemState.TransferEffects {
+		private final ItemStack source;
+		private final net.minecraft.world.level.block.entity.ChestBlockEntity chest;
+		private net.minecraft.world.item.NativeItemSlots backend;
+		private long admittedVersion = -1;
+		private final boolean pureCopy;
+		StockTransferEffects(ItemStack source, net.minecraft.world.level.block.entity.ChestBlockEntity chest) {
+			this.source = source; this.chest = chest;
+			var item = source.getItem(); this.pureCopy = item != null && item.nativeTransferCopyIsPure();
+		}
+		boolean admit() {
+			var current = this.chest.nativeSlotsForTransfer();
+			if (current == null || current.size() != 27 || !(AbstractContainerMenu.this.slots instanceof TransferSlots metadata)
+				|| metadata.size() < 27 || !this.pureCopy) return false;
+			if (this.backend != null && this.backend != current) return false;
+			if (this.backend == current && this.admittedVersion == metadata.version() && metadata.version() != Long.MAX_VALUE) return true;
+			if(!metadata.owner.matchesStock(this.chest.nativeContainerForSlots(),null,false))return false;
+			this.backend=current;this.destination(current);this.admittedVersion=metadata.version();return true;
+		}
+		@Override public long effect(long action, long selected, long phase, long amount, long changed) {
+			int index = Math.toIntExact(selected);
+			if (action == 3) return AbstractContainerMenu.this.moveItemStackToRemaining(this.source, 0, 27, false, changed != 0, (int)phase, index) ? 1 : 0;
+			Slot slot = AbstractContainerMenu.this.slots.get(index);
+			if (action == 1) {
+				slot.setChanged();
+				if (this.admit()) return 2;
+				return AbstractContainerMenu.this.moveItemStackToRemaining(this.source, 0, 27, false, true, (int)phase, index + 1) ? 1 : 0;
+			}
+			if (action != 2) throw new IllegalStateException("Unknown native transfer effect: " + action);
+			ItemStack inserted = this.source.copyForNativeTransferWithCount((int)amount);
+			this.backend.commitTransferInsert(this.source, index, inserted, (int)amount);
+			this.chest.setChanged(); slot.setChanged(); slot.setChanged();
+			return 1;
+		}
+	}
+
+	private boolean moveItemStackToRemaining(ItemStack itemStack, int i, int j, boolean bl, boolean bl2, int phase, int k) {
+		if (phase == 0) phase = itemStack.isStackable() ? 1 : 2;
+		if (phase == 1) {
 			while (!itemStack.isEmpty() && (bl ? k >= i : k < j)) {
 				Slot slot = this.slots.get(k);
 				ItemStack itemStack2 = slot.getItem();
@@ -672,11 +827,7 @@ public abstract class AbstractContainerMenu {
 		}
 
 		if (!itemStack.isEmpty()) {
-			if (bl) {
-				k = j - 1;
-			} else {
-				k = i;
-			}
+			if (phase != 2) k = bl ? j - 1 : i;
 
 			while (bl ? k >= i : k < j) {
 				Slot slotx = this.slots.get(k);
@@ -767,12 +918,13 @@ public abstract class AbstractContainerMenu {
 		}
 	}
 
+	private void assignCarried(ItemStack value){if(this.nativeMenu==null)this.legacyCarried.value=value;else this.nativeMenu.carried(value);}
 	public void setCarried(ItemStack itemStack) {
-		this.carried = itemStack;
+		this.assignCarried(itemStack);
 	}
 
 	public ItemStack getCarried() {
-		return this.carried;
+		return this.nativeMenu==null?this.legacyCarried.value:this.nativeMenu.carried();
 	}
 
 	public void suppressRemoteUpdates() {

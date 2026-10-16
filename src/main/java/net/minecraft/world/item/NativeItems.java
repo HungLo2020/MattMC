@@ -239,6 +239,7 @@ public final class NativeItems {
 	 */
 	public static void bindComponents() {
 		BuiltInRegistries.bindValuesBeforeFreeze();
+		NativeItemState.bindDefaultRoles();
 		List<NativeItems.Definition> definitions = Tables.DEFINITIONS;
 		if (BuiltInRegistries.ITEM.size() != definitions.size()) {
 			throw new IllegalStateException(BuiltInRegistries.ITEM.size() + " items registered, but the Rust catalog defines " + definitions.size());

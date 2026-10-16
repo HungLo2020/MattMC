@@ -108,6 +108,11 @@ public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.Iris
 		return this.builtInRegistryHolder;
 	}
 
+	private boolean nativeTransferCopyPure;
+
+	/** Bootstrap dispatch metadata, never a default-component or count cache. */
+	public final boolean nativeTransferCopyIsPure() { return this.nativeTransferCopyPure; }
+
 	public DataComponentMap components() {
 		DataComponentMap components = this.components;
 		if (components == null) {
@@ -129,6 +134,8 @@ public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.Iris
 			throw new IllegalStateException("Default components of " + this.descriptionId + " are already bound");
 		}
 		this.components = components;
+		try { this.nativeTransferCopyPure = this.getClass().getMethod("asItem").getDeclaringClass() == Item.class; }
+		catch (ReflectiveOperationException | SecurityException unavailable) { this.nativeTransferCopyPure = false; }
 	}
 
 	public int getDefaultMaxStackSize() {

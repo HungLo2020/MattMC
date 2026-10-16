@@ -13,19 +13,23 @@ public class EntityEquipment {
 		enumMap.putAll(map);
 		return new EntityEquipment(enumMap);
 	}, entityEquipment -> {
-		Map<EquipmentSlot, ItemStack> map = new EnumMap(entityEquipment.items);
+		Map<EquipmentSlot, ItemStack> map = new EnumMap<>(EquipmentSlot.class);
+		map.putAll(entityEquipment.items);
 		map.values().removeIf(ItemStack::isEmpty);
 		return map;
 	});
-	private final EnumMap<EquipmentSlot, ItemStack> items;
+	private final Map<EquipmentSlot, ItemStack> items;
 
 	private EntityEquipment(EnumMap<EquipmentSlot, ItemStack> enumMap) {
-		this.items = enumMap;
+		this.items = net.minecraft.world.item.NativeItemState.newEquipmentMap(enumMap);
 	}
 
 	public EntityEquipment() {
 		this(new EnumMap(EquipmentSlot.class));
 	}
+
+	/** Exact actual store only; equipment subclasses keep their original virtual calls. */
+	public final net.minecraft.world.item.NativeItemState.EquipmentMap nativeEquipmentForInventory(){return this.getClass()==EntityEquipment.class?(net.minecraft.world.item.NativeItemState.EquipmentMap)this.items:null;}
 
 	public ItemStack set(EquipmentSlot equipmentSlot, ItemStack itemStack) {
 		return (ItemStack)Objects.requireNonNullElse((ItemStack)this.items.put(equipmentSlot, itemStack), ItemStack.EMPTY);
@@ -68,6 +72,7 @@ public class EntityEquipment {
 	}
 
 	public void clear() {
-		this.items.replaceAll((equipmentSlot, itemStack) -> ItemStack.EMPTY);
+		if (this.items instanceof net.minecraft.world.item.NativeItemState.EquipmentMap nativeItems) nativeItems.clearValues();
+		else this.items.replaceAll((equipmentSlot, itemStack) -> ItemStack.EMPTY);
 	}
 }

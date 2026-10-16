@@ -102,3 +102,12 @@ JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyContent.py --sect
   all round-tripping) sections match Frozen and pre-change Current in
   alternating JVMs.
 - Bootstrap timing and shared [verification limits](DATA-DEFINITIONS.md#verification-2026-10-13) are in the data-definition owner. The documentation review did not rerun these suites or inspect unbundled runtime captures; definition/stack equality is not complete item-use or rendered-feature acceptance.
+
+## Retained defaults prototype
+
+S0024's [runtime-state migration](ITEM-STATE.md#complete-stock-chest-ownership)
+retains decoded default membership and selected immutable integer values in the
+native runtime owner. Original codecs, bootstrap ordering, shared decoded object
+identities and unresolved registry-key policy still apply. Its connected consumer, correctness and bounded resource results, plus the
+temporary cost exception, are recorded in the [runtime cost review](ITEM-STATE-COSTS.md).
+The historical definition checks above do not certify that newer implementation.

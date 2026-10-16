@@ -3,7 +3,6 @@ package net.minecraft.core.component;
 import com.google.common.collect.Sets;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMaps;
 import java.util.Map;
@@ -49,8 +48,9 @@ public final class DataComponentPatch {
 				if (i == 0 && j == 0) {
 					return DataComponentPatch.EMPTY;
 				} else {
-					int k = i + j;
-					Reference2ObjectMap<DataComponentType<?>, Optional<?>> reference2ObjectMap = new Reference2ObjectArrayMap<>(Math.min(k, 65536));
+					int capacity = Math.min(i + j, 65536);
+					if (capacity < 0) throw new NegativeArraySizeException(Integer.toString(capacity));
+					Reference2ObjectMap<DataComponentType<?>, Optional<?>> reference2ObjectMap = net.minecraft.world.item.NativeItemState.newPatchMap();
 
 					for (int l = 0; l < i; l++) {
 						DataComponentType<?> dataComponentType = DataComponentType.STREAM_CODEC.decode(registryFriendlyByteBuf);
@@ -141,7 +141,7 @@ public final class DataComponentPatch {
 		if (this.isEmpty()) {
 			return EMPTY;
 		} else {
-			Reference2ObjectMap<DataComponentType<?>, Optional<?>> reference2ObjectMap = new Reference2ObjectArrayMap<>(this.map);
+			Reference2ObjectMap<DataComponentType<?>, Optional<?>> reference2ObjectMap = net.minecraft.world.item.NativeItemState.copyPatchMap(this.map);
 			reference2ObjectMap.keySet().removeIf(predicate);
 			return reference2ObjectMap.isEmpty() ? EMPTY : new DataComponentPatch(reference2ObjectMap);
 		}
@@ -208,7 +208,7 @@ public final class DataComponentPatch {
 	}
 
 	public static class Builder {
-		private final Reference2ObjectMap<DataComponentType<?>, Optional<?>> map = new Reference2ObjectArrayMap<>();
+		private final Reference2ObjectMap<DataComponentType<?>, Optional<?>> map = net.minecraft.world.item.NativeItemState.newPatchMap();
 
 		Builder() {
 		}

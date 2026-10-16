@@ -107,6 +107,9 @@ one set of systems.
   entity data serializers and synchronized entity data IDs.
 - [Item definitions](ITEM-DEFINITIONS.md) (current): the Rust item catalog,
   default components as SNBT and the two-step Java projection.
+- [Retained item runtime cost review](ITEM-STATE-COSTS.md) (S0024/r6 accepted temporary cost exception and bounded resource evidence): exact costs, confidence limits, attribution and ownership debt.
+- [Retained item runtime state](ITEM-STATE.md) (in progress): connected
+  stack/component/chest ownership, alias and callback contracts, and focused probes.
 - [Data-driven definitions](DATA-DEFINITIONS.md) (current): biomes and the
   data-driven entity and item registries, parsed, stored and encoded by Rust.
 - [Native value types](NATIVE-VALUES.md) (current): int and float providers,
