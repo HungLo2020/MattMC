@@ -1,0 +1,336 @@
+# Retained render scene
+
+**Status: shader-route retained terrain and the Rust visibility search are
+implemented in part; the full scene target remains open (October 2026).**
+ABI 70 introduced compact terrain. Ordinary frames now select camera layers
+and shadow candidates in the Rust section graph and, at ABI 79, pass immutable
+native selections through CPU owner/frame identities. Native
+publication rows and vertex staging, plus the DH ledger/ABI 72 generic groups
+and ABI 74 visibility frames, retain CPU input data. These are their layout
+introduction versions; the [current whole-frame ABI](JAVA-BRIDGE.md#how-the-abi-stays-in-sync)
+is 79.
+Reduced-color DH geometry also uses shared GPU pages, with the separate
+ownership limits below. Diagnostic and
+other routes retain their documented producer and expansion paths. The phase list separates remaining targets
+from the current implementation; it is not a declaration of parity completion.
+
+## Why
+
+At the initial retained-scene checkpoint, the moving shader benchmark ran at ~119 FPS against Frozen's
+~316. The GPU (~3.4 ms) is close to Frozen; the CPU is not. Both the Java render
+thread (~5.2 ms of work) and the Rust frame worker (~6.0 ms busy) individually
+exceed Frozen's whole 3.2 ms frame, and neither has a dominant hotspot.
+
+*Historical starting point, before ABI 70:* every frame Java re-sent one record per visible section layer
+(~6,800, ~1 MB), each carrying a camera-relative transform. Rust then
+re-validates every record, rebuilds batch plans keyed by the full instance list
+and the camera-dependent facing masks, re-selects shadow casters, rebuilds a
+~1,600-op command list and re-validates it. Section geometry is already
+persistent on the GPU; the description of what to draw is not. Caches miss
+whenever the camera moves because their keys contain camera-dependent data.
+The [current compact/scene route](#current-scene-terrain-on-the-shader-route)
+below supersedes this per-section-record description; the original workload
+figures are retained as motivation, not current performance acceptance.
+
+Frozen (Sodium + Iris) keeps draw lists per region and per frame only walks
+visibility and issues a few multi-draws. Parity needs the same shape: the
+per-frame cost must scale with *visible sections*, through one tight loop, not
+with every record through several generic layers.
+
+## Target architecture
+
+```
+ingestion API  ──►  RenderScene (Rust)  ──►  per-frame draw generation  ──►  passes
+(Java today,        persistent objects,      visible set + camera →          vanilla, shader
+ Rust later)        validated on entry       indirect command runs           camera, shadow
+```
+
+- **`RenderScene`** owns persistent render objects. Terrain first: one
+  `TerrainSection` per section position, with per-layer residency (geometry
+  page, index base), per-facing draw commands for each material run, and its
+  integer world origin. Entities and block entities follow the same pattern
+  later.
+- **The ingestion API is the renderer's permanent interface**, not a migration
+  shim: add or replace a section mesh, remove a section, set the visible set,
+  set the camera. Java is its first caller; Rust world, meshing and visibility
+  code call the same API as they migrate. Validation, range derivation and
+  material classification happen here, once per change.
+- **Per-frame draw generation** walks only the visible set: pick facings from
+  the camera cell, append the precomputed commands into per-pass runs grouped
+  by (material mode, page), and write each visible section's camera-relative
+  instance record. No generic batch plans, no per-record validation.
+- **Passes consume scene runs.** Vanilla opaque/cutout/translucent, the shader
+  camera passes and the shadow pass all read the same section records; the
+  shadow pass uses its own visible set.
+- **Rust owns everything on the GPU side**; callers only describe the scene.
+
+### Rules
+
+- Visibility and culling stay identical to Frozen (Sodium portal search for
+  the camera; Iris' shadow traversal for the shadow pass) until the user
+  decides otherwise. Faster culling is a later, separate, measured change.
+- Validate at ingestion, never per frame. Per-frame code may assume scene
+  invariants.
+- Memory stays bounded and reported; persistent GPU buffers are allowed.
+- Vulkan only (newest stable, RTX 2070 minimum). The OpenGL backend is out of
+  scope for new scene features.
+- Replace system by system. Each phase deletes the code it replaces; there is
+  no parallel renderer.
+
+## Current: scene terrain on the shader route
+
+Static chunk sections whose meshes are resident are drawn by
+[`scene_terrain.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/source/frames/scene_terrain.rs):
+
+- When the general path first draws a resident mesh, its retained record gets
+  `SceneTerrainGroup`s: one per facing group, with its absolute page index
+  range, material kind, cull and winding (`scene_terrain_groups`).
+- Each frame, `partition_scene_terrain_instances` takes the described camera
+  sections and shadow-only casters out of batching. `prepare_scene_terrain_draws`
+  writes one instance block for them and appends each section's
+  facing-selected groups to runs keyed by (kind, cull, winding, page); a run
+  is one indirect draw (`TerrainIndexedIndirect::draw_count`).
+- Camera runs carry shadow twins; the camera sections' unselected faces and
+  the light-frustum casters become shadow-only runs. Translucent runs keep
+  frame order and split on any state change.
+- Shadow candidates come from sections the camera traversal has built, with
+  no shadow-only builds. Ordinary frames select them from graph mesh rows
+  synchronized directly from Rust's publication registry; diagnostic and other
+  ineligible frames retain the Java producer.
+  Every section, camera visible or not, casts only if it passes Sodium's
+  shadow-tree leaf test (`source_shadow_origin_intersects`: centre ±8, no
+  distance cylinder).
+- Undescribed sections (first frame after upload, changed material ids, a
+  pending upload) and camera-sorted translucent sections keep the batch path.
+- Terrain coverage receipts subtract the scene's indices
+  (`SourceTerrainDrawCoverage::without_scene`); the scene covers its own by
+  construction (`scene_terrain` and `indexed_indirect_runs_*` tests).
+
+ABI 70 introduced compact visible-layer/caster entries (see [Java Bridge](JAVA-BRIDGE.md)).
+Ordinary frames form the selection in
+[`chunk/terrain_selection.rs`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/render/chunk/terrain_selection.rs)
+and publish immutable arrays through
+[`chunk/terrain_frames.rs`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/render/chunk/terrain_frames.rs).
+ABI 79 passes CPU owner/frame identities and the exact camera directly to decode;
+caller-side decoding acquires shared ownership before queueing. Legacy compact
+encoding retains Java frame/request copies. This is CPU input ownership, separate
+from persistent GPU meshes and the scene drawing path. See
+[native terrain selection frames](JAVA-BRIDGE.md#native-terrain-selection-frames)
+for expiry, reload, bounds and compatibility rules. Final runtime/performance
+verification is pending. At the
+[`20e157ca` checkpoint](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/chunk/terrain_selection.rs),
+solid/cutout layers preserve graph visit order while translucent layers remain
+back to front; this supersedes the earlier key-order equality report. The section
+graph owns readiness/build bookkeeping, visible-slot stamps and selected animated
+sprite IDs; Java marks the corresponding sprite objects. At `4740f8fa`, native
+[intake](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/worldrender/terrain/intake.rs) also assembles section layers: sorter-order normalization, unsupported-fluid
+omission, water/material classification, range splitting and mesh identity
+([`terrain/assembly.rs`](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/worldrender/terrain/assembly.rs)).
+Java supplies build/sort/atlas inputs, dispatches meshing workers, publishes the
+returned assets and runs the ineligible-frame producer. The native
+[publication registry](JAVA-BRIDGE.md#terrain-publication-registry) now owns
+section-layer identities and their graph-sync queue; Java still registers those
+rows and coordinates upload acknowledgement and resource-reload swaps. The
+prior Java water/index assembly boundary is historical. Since `1d609f12`, ordinary assembly keeps
+vertices in a native staging map until asset acceptance or discard; Java gets
+identity/count metadata plus copied indices, ranges and receipts. Asset decode
+clones the exact staged generation for retry safety. Diagnostic vertex readers
+and staging-capacity misses use copied vertex output. See
+[terrain intake](JAVA-BRIDGE.md#terrain-layer-intake) for bounds and fallback.
+Native record selection and retained GPU scene drawing
+are separate steps. When the shader route is armed, admission
+(`frame/static_terrain.rs`) keeps them compact: `take_scene_terrain` turns
+described sections and casters into scene entries and expands only the rest
+into instances. A frame that leaves the shader route, and every other route,
+calls `expand_static_terrain` first, so they still see ordinary instances.
+Coverage validation and voxel occupancy read the compact and scene terrain
+directly. A retained record is dropped whenever its key acknowledges another
+generation, so a record's presence proves it is current.
+
+## Current: retained DH inputs
+
+The [DH column ledger](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+retains immutable packed payloads and publication/lease/route state in Rust.
+The [retained visibility owner](RUST-DH-VISIBILITY.md) now walks stock camera
+topology and supplies native candidates directly to the ledger. Java retains
+generation/retrieval orchestration, requested exact-material provenance, camera
+parameters and custom/shadow traversal, and hands the selected CPU frame
+reference to the renderer. Sorted key/statistic results still cross to Java;
+selected segment records
+are copied back only for diagnostics/compatibility observers. Ordinary publication builds frontend
+assets from the ledger; exact-material provenance retains the Java publication
+path. Batched collection checks each walked container's generation before
+publication/visibility admission. Container close retires only its lease, and
+a build finishing after section close releases its new container instead of
+installing it. Section tokens/container epochs reject stale callbacks, and
+retirement detaches an old container before closing it. Selection locks the
+visibility topology, then releases that lock before collector admission; this
+is not an atomic transaction across both owners. Java
+generation-tree ownership and broader frame preparation remain transitional.
+
+The October 10 [material-preservation policy](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+skips exact block provenance in ordinary play while retaining it for exact
+material topology, capture/legacy observation and the explicit forced A/B
+build. At that checkpoint Java converted full data to render columns,
+constructed faces, sorted/merged quads and built semantic packets. The later
+[render-column](RUST-DH-RENDER-COLUMNS.md) and [quad](RUST-DH-QUADS.md) checkpoints
+moved reduction and ordinary greedy topology into Rust while Java retained
+source traversal, contextual getters and subclass compatibility.
+[Complete box production](RUST-DH-VERTICAL-FACES.md) then moved admitted
+face geometry, stock shades and neighbor-light/material splitting into Rust. The later
+[packet owner](RUST-DH-PACKETS.md) moved layer selection, callback planning,
+shading and vertex/companion encoding into Rust. [Native column handoff](RUST-DH-COLUMN-HANDOFF.md)
+removed ordinary Java packet transport. At that checkpoint Java retained
+lifecycle calls, callback-event/results arrays, diagnostic projections and
+explicit compatibility packet APIs.
+The earlier preservation-only reductions did not migrate those producers or change GPU ownership,
+or establish ordinary-play acceptance from diagnostic profiles.
+
+The current [Rust-only DH render build](RUST-DH-RENDER-BUILD.md), at
+[`c357b63c`](https://github.com/HungLo2020/MattMC/commit/c357b63cd5afcc0951344c33ad2f4568d5c77e4f),
+converts each source and builds each section in Rust, including ordinary
+column/point traversal and neighbor selection. The Java geometry, merge and
+subclass packet paths are removed; every build's final packets use the native
+column handoff. Java retains contextual block/color and packet dirt/shade queries,
+settings, scheduling and lifecycle. Requested semantic sidecars still traverse
+spans/contributors in Java; debug source flags and water-input probes also retain
+Java loops. Native final payloads/companions remain allocated, and requested
+diagnostic projections still copy Java arrays. Exact-material publication has
+its own narrower gate; forced preservation alone enables neither publication nor
+exact topology. The current CPU boundary does not establish broad gameplay parity
+or a performance gain.
+
+Reduced-color GPU columns now suballocate shared device vertex/index pages;
+packed-uniform pass owners also share geometry bindings per vertex page.
+Exact-atlas residency keeps separate buffers, and DH source draw recording
+still emits individual indexed draws. See [page upload and retirement](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+for submission-gated reuse and idle binding retention. Shared storage is
+implemented; DH multi-draw and all-route retained scene ownership remain targets.
+
+DH generic-group boxes have used a retained CPU registry since ABI 72, with one
+per-frame group instance carrying light, shading, SSAO and an origin. ABI 75
+added a native owner/epoch in place of the inline origin for eligible
+[built-in clouds](RUST-DH-CLOUDS.md); ordinary API origins still come from Java.
+Native decode resolves the origin and expands ordinary camera-relative box
+requests. Java owns callbacks and change notifications; missing registered-group
+generations request resending, while expired native cloud epochs are rejected. This
+is separate from retained GPU terrain and phase 5's entity/block-entity target.
+Neither change establishes all-route scene ownership or Frozen parity.
+
+### Native DH visibility frame ownership
+
+Implemented at `6324cd1d`; the author reports scoped verification on 2026-10-09. The first release passes all seven
+lifecycle cases and reviewed vanilla/Iris+DH images. Its sixteen clean ABAB
+runs still fail vanilla/DH FPS and p99 floors; neither static ownership changes
+nor earlier profiles establish an isolated throughput gain. After late-input hardening, the final release also passes a fresh reviewed
+Iris+DH pair and paired 60,000-frame diagnostic profiles; source/library/Frozen
+integrity and cleanup pass. See the evidence below for its performance limits.
+
+ABI 74 removes the ordinary visible-segment round trip. The collector and
+renderer share `scene::lod::WorldLodColumnInstance` and an immutable native list.
+Java carries the frame identity, lifecycle and scalar layer counts; the bridge
+resolves that identity directly. It does not repack diagnostic readback into
+render inputs. The coordinator also consumes native layer counts, and completion
+copies capture records only when diagnostics request them.
+
+The collector ring retains at most three resolvable CPU frame snapshots, each
+bounded to 16,384 segments. Decoded `Arc` owners survive ring eviction/reset, so
+three snapshots is not a cap on all live frame memory. Unchanged ordered sets
+share storage and reuse their stability hash; changed sets still allocate a new
+list.
+Decode verifies identity, lifecycle, count and the exact selected decision,
+then retains immutable ownership before queueing. Clearing/resetting the
+collector invalidates unresolved references; already decoded frames keep their
+CPU list. Old identifiers are never reused. Derived passes can clear their list
+without copying another frame's storage. Existing column-retention protection,
+publication/generation checks and GAL resource/completion ownership remain.
+Compatibility appenders can add work after route selection; unclassified layers
+reject retained handoff without panicking or poisoning the ledger. Counts already
+computed for the immutable set establish this check without another full scan.
+
+The [ledger owner test](https://github.com/HungLo2020/MattMC/blob/6324cd1ddd9a281588cbb93bae1a2a1b94040f51/src/main/rust/render/dh_collector/frames.rs)
+resolves an owner, evicts/resets the ring and clears a derived list. It verifies
+shared CPU lifetime without running the actual queued frame integration. The
+[whole-frame decoder](https://github.com/HungLo2020/MattMC/blob/6324cd1ddd9a281588cbb93bae1a2a1b94040f51/src/main/rust/render/bridge/world/whole_frame.rs)
+provides the separate production identity-resolution path.
+
+Legacy inline inputs and explicit capture readback remain supported. Java still
+walks the DH tree, prepares frame matrices/configuration and owns any requested
+exact-material provenance. This DH slice does not migrate the entire producer. Later
+[live-section ownership](../world/chunk/RUST-LIVE-SECTIONS.md) is a separate
+loaded-world migration. GPU resources and presentation continue through the existing GAL.
+
+The accepted before/after diagnostic profiles are
+`goal5/map-policy-dh-profile-v2-20261008/` and
+`goal5/native-dh-frame-profile-20261009/`. Both verify the sampling window,
+source/library/Frozen integrity and clean 60,000-frame completion. In their
+15-second allocation windows (1 MiB sampling), consumption falls from432.01 to
+33.55 MB; the former encoder falls from191.89 MB to no observed allocation or
+CPU samples. The two paths' share of render-thread CPU samples falls from~4.7%
+to~1.5%. These are sampled component costs, not exact per-frame allocation or an
+isolated throughput gain. Benchmark machinery is reported separately. The
+original early-attachment profile remains rejected.
+
+`validation/native-dh-frame-ownership-20261009/` retains all seven lifecycle
+cases, reviewed vanilla/Iris+DH pairs and sixteen clean ABAB/6,000-frame rows.
+Its overall result is **FAIL**: vanilla and vanilla+DH miss FPS/p99 floors;
+both shader modes pass. This full comparison used release SHA1ad43eea before
+late-input rejection was hardened. Final release SHA77998a11 has2,396 Rust
+passes/3 ignores, a fresh reviewed Iris+DH pair in
+`goal5/native-dh-frame-hardened-proof-v2-20261009/`, and the accepted paired
+profiles above. Java1,729 passes/2 skips precede the native-only hardening;
+Java source and ABI are unchanged. These are [pinned author records](https://github.com/HungLo2020/MattMC/blob/6324cd1ddd9a281588cbb93bae1a2a1b94040f51/PROGRESS.md),
+not runtime reruns by this documentation review; unbundled receipts were not
+independently inspected. Broad parity and long-run memory remain open.
+
+## Phases
+
+Each phase ends with Rust/Java tests passing and the full parity matrix
+(below) recorded in `PROGRESS.md`, then a local commit.
+
+1. **Retained terrain sections.** `RenderScene` terrain records built when a
+   section mesh is accepted. Java sends a compact visible-section list instead
+   of per-section instance records; Rust generates terrain indirect runs for
+   both routes directly from the records. Removes per-frame terrain
+   validation, batch plans and range memos.
+2. **Shadow casters from the scene**, with Frozen-identical shadow section
+   selection (Iris shadow traversal). Current candidates use built geometry
+   without shadow-only builds and the shared leaf test described above;
+   complete scene-owned visibility remains part of the target.
+3. **Visibility in Rust.** Port Frozen's Sodium occlusion search exactly onto
+   the scene's section graph; Java sends only camera and frustum. Removes the
+   Java terrain enqueue (~1.2 ms).
+   *Status:* the search runs in Rust (`chunk/section_graph.rs`), and ordinary
+   frames also select compact camera layers, shadow candidates and animated
+   sections in `chunk/terrain_selection.rs`. Java skips its visible-list and
+   per-section record construction on that route. ABI 79 also removes ordinary
+   camera/caster pending/request copies through retained CPU frame identities;
+   selection still constructs native arrays each frame. Rust now owns build request
+   bookkeeping and entity-culling visit stamps; Java dispatches the listed
+   requests, invokes native publication-to-graph sync and marks selected sprites.
+   Shader-disabled frames also extract block entities from visited built sections plus global
+   entries when a current search exists; Java still performs their semantic
+   extraction, so this is not the retained-entity phase. Diagnostic/fault/
+   reload/readiness-receipt frames keep the Java producer. Render-list region
+   order, Iris's non-culling frustum and complete scene-owned visibility remain;
+   this does not complete every phase or remove Java.
+4. **Static instance data.** World origins become persistent per-section data
+   and the camera a per-frame uniform, so nothing per-section is written while
+   only the camera moves.
+5. **Retained entities and block entities**: persistent model instances, with
+   per-frame transform and pose data only. ABI 71 rigs are partial progress:
+   cacheable models reuse local-space assets and send raw poses, but Rust still
+   expands ordinary per-frame instances and Java retains animation/semantic
+   extraction. First-person and other ineligible models retain Java posing.
+   [#803](https://github.com/HungLo2020/MattMC/issues/803) and
+   [#819](https://github.com/HungLo2020/MattMC/issues/819) remain bounded gaps;
+   this is not completion of the retained-entity phase.
+6. **Beyond Frozen:** GPU-driven culling into indirect-count buffers, and
+   parallel command recording per pass.
+
+## Parity matrix
+
+Equal performance and matching visuals across vanilla, shaders, DH and
+shaders + DH, each in settled and moving scenes. Image differences must stay
+within the existing thresholds with zero validation events; see
+[Render Verification](RENDER-VERIFICATION.md) for the harness commands.

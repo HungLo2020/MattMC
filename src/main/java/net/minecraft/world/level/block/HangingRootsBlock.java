@@ -31,7 +31,9 @@ public class HangingRootsBlock extends Block implements SimpleWaterloggedBlock {
 
 	public HangingRootsBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override

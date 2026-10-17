@@ -47,7 +47,9 @@ public class BlockReptileEgg extends Block {
 
     public BlockReptileEgg(Supplier<EntityType<?>> births) {
         super(BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion());
-        this.registerDefaultState(this.stateDefinition.any().setValue(HATCH, Integer.valueOf(0)).setValue(EGGS, Integer.valueOf(1)));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.stateDefinition.any().setValue(HATCH, Integer.valueOf(0)).setValue(EGGS, Integer.valueOf(1)));
+        }
         this.births = births;
     }
 

@@ -42,6 +42,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     original = subprocess.check_output(['git','show',REFERENCE+':src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java'],cwd=ROOT,text=True)
     source = ROOT/'src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java'
+    from VerifyRustPaletteDistinct import strip_distinct
     entry = '\t\t\tif (this.getClass() == PalettedContainer.class) {\n\t\t\t\tvar packed = NativePalettePacking.pack(this.data.storage, this.data.palette, this.strategy, strategy);\n\t\t\t\tif (packed != null) return packed;\n\t\t\t}\n'
     a=original.index('public PalettedContainerRO.PackedData<T> pack(')
     pos=original.index('\t\t\tBitStorage bitStorage',a)
@@ -51,7 +52,7 @@ def main():
     expected = expected[:insert]+ENTRY+expected[insert:]
     from VerifyRustPaletteResize import strip_resize
     from VerifyRustPaletteUnpacking import strip_unpack
-    if strip_resize(strip_unpack(source.read_text()))!=expected:
+    if strip_resize(strip_unpack(strip_distinct(source.read_text())))!=expected:
         raise RuntimeError('Container source differs outside the three known native dispatch insertions')
     a=original.index('\tpublic void count(')
     b=original.index('\n\t@FunctionalInterface',a)

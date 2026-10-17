@@ -176,9 +176,8 @@ impl NamedSourceFrameSubmission {
             frontend.lod_gpu_residency.discard_submission(gal);
             frontend.lod_textured_gpu_residency.discard_submission(gal);
         }
-        if let Some(runtime) = frontend.shader_runtime.as_mut() {
-            color_transaction.discard(runtime, gal);
-        }
+        frontend.discard_source_color_submission(gal);
+        drop(color_transaction);
         if frontend
             .shader_runtime
             .as_ref()
@@ -455,13 +454,7 @@ impl PreparedNamedSourceFramePlan {
             frontend.lod_gpu_residency.discard_submission(gal);
             frontend.lod_textured_gpu_residency.discard_submission(gal);
         }
-        terrain.color_transaction.discard(
-            frontend
-                .shader_runtime
-                .as_mut()
-                .expect("source runtime remains installed while discarding a source frame"),
-            gal,
-        );
+        frontend.discard_source_color_submission(gal);
     }
 }
 

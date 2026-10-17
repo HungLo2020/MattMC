@@ -50,6 +50,18 @@ final class NativePaletteHistogram {
         }
     }
 
+    static Counts scan(NativeLiveBlockSection live) {
+        var counts = SCRATCH.get();
+        if (counts.inUse) return null;
+        counts.inUse = true;
+        try {
+            counts.size = live.histogram(counts.workspace, WORK_SIZE, counts.output);
+            if (counts.size < 1) { counts.close(); return null; }
+            MemorySegment.copy(counts.output, 0, MemorySegment.ofArray(counts.records), 0, counts.size * 8L);
+            return counts;
+        } catch (RuntimeException | Error failure) { counts.close(); throw failure; }
+    }
+
     static Counts scan(BitStorage storage) {
         if (storage == null
                 || (storage.getClass() != SimpleBitStorage.class

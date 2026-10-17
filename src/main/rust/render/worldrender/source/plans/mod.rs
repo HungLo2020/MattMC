@@ -34,6 +34,7 @@ impl WorldPrimitiveFrontend {
         graph_generation: u64,
         frame: &WorldPrimitiveFrame,
         batches: &[MeshBatch],
+        scene: &SceneTerrainFrame,
         shadow_batches: &[MeshBatch],
         extent: Extent3d,
         depth_texture: Handle,
@@ -41,7 +42,7 @@ impl WorldPrimitiveFrontend {
         shadow_targets: TerrainSourceShadowPassTargets,
         main_depth: NamedSourceMainDepthInputs,
         final_frame_target: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<PreparedNamedSourceFramePlan> {
         // The copied vanilla celestial quads are represented by the source
         // skytextured writer in this route. If that writer is absent, reject
@@ -93,18 +94,16 @@ impl WorldPrimitiveFrontend {
             frame.frame_id,
             std::slice::from_ref(&main_depth_resources),
         )?;
-        let source_sky_initializer = if source_sky_initializer_requested(frame) {
-            let runtime = self.shader_runtime.as_ref().ok_or_else(|| {
-                GalError::backend("shader runtime vanished before source sky discovery")
-            })?;
-            runtime
-                .prepared_lowered_pre_terrain_sky_program()?
-                .is_some()
-                || runtime
-                    .prepared_lowered_pre_terrain_celestial_program()?
-                    .is_some()
-        } else {
-            false
+        let source_color_initializer = {
+            let runtime = self.shader_runtime.as_ref().ok_or_else(||
+                GalError::backend("shader runtime vanished before source initializer discovery"))?;
+            let has_fullscreen = !runtime.prepared_lowered_pre_terrain_fullscreen_programs(
+                source_frame_includes_distant_horizons(frame))?.is_empty();
+            has_fullscreen || (source_horizon_initializer_requested(frame)
+                && runtime.prepared_lowered_pre_terrain_horizon_program()?.is_some())
+            || (source_sky_initializer_requested(frame) && (
+                runtime.prepared_lowered_pre_terrain_sky_program()?.is_some()
+                || runtime.prepared_lowered_pre_terrain_celestial_program()?.is_some()))
         };
         self.source_terrain_mesh_frame_memo = Some(std::collections::HashMap::new());
         let terrain = self.prepare_named_source_terrain_frame_plan(
@@ -114,13 +113,14 @@ impl WorldPrimitiveFrontend {
             graph_generation,
             frame,
             batches,
+            scene,
             shadow_batches,
             extent,
             depth_texture,
             depth_view,
             shadow_targets,
             clear_values,
-            source_sky_initializer,
+            source_color_initializer,
         );
         self.source_terrain_mesh_frame_memo = None;
         let mut terrain = terrain?;
@@ -132,13 +132,20 @@ impl WorldPrimitiveFrontend {
                 extent,
             },
         ));
-        terrain.pre_terrain_sky = match self.prepare_pre_terrain_source_sky_consumer(
+        terrain.pre_terrain_sky = match self.prepare_pre_terrain_fullscreen_consumers(gal, frame, terrain.color_targets()) {
+            Ok(consumers) => consumers,
+            Err(error) => {
+                PreparedNamedSourceFramePlan { terrain, distant_horizons: None, fullscreen_consumers: Vec::new(), final_output: None }.discard(self, gal);
+                return Err(error);
+            }
+        };
+        let sky = match self.prepare_pre_terrain_source_sky_consumers(
             gal,
             frame,
             terrain.color_targets(),
             &main_depth_resources,
         ) {
-            Ok(sky) => sky.into_iter().collect(),
+            Ok(sky) => sky,
             Err(error) => {
                 PreparedNamedSourceFramePlan {
                     terrain,
@@ -150,6 +157,7 @@ impl WorldPrimitiveFrontend {
                 return Err(error);
             }
         };
+        terrain.pre_terrain_sky.extend(sky);
         let celestial = match self.prepare_pre_terrain_source_celestial_consumers(
             gal,
             frame,

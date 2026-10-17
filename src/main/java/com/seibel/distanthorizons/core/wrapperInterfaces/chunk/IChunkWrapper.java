@@ -64,13 +64,9 @@ public interface IChunkWrapper extends IBindable
 	boolean isDhSkyLightCorrect();
 	
 	
+	/** DH light values are written only by the Rust lighting pass. */
 	int getDhSkyLight(int relX, int relY, int relZ);
-	void setDhSkyLight(int relX, int relY, int relZ, int lightValue);
-	void clearDhSkyLighting();
-	
 	int getDhBlockLight(int relX, int relY, int relZ);
-	void setDhBlockLight(int relX, int relY, int relZ, int lightValue);
-	void clearDhBlockLighting();
 	
 	
 	/** Note: don't modify this array, it will only be generated once and then shared between uses */

@@ -69,6 +69,8 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 	 * specifically: "it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap.getAndMoveToFirst()"
 	 */
 	private final ReentrantLock getChunkLock = new ReentrantLock();
+	/** One read-only imposter per wrapped chunk, as vanilla keeps one per chunk holder; guarded by itself. */
+	private final Long2ObjectOpenHashMap<ImposterProtoChunk> imposters = new Long2ObjectOpenHashMap<>();
 	
 	
 	
@@ -271,9 +273,19 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 	public ChunkAccess getChunk(int chunkX, int chunkZ, @NotNull ChunkStatus chunkStatus, boolean returnNonNull)
 	{
 		ChunkAccess chunk = this.getChunkAccess(chunkX, chunkZ, chunkStatus, returnNonNull);
-		if (chunk instanceof LevelChunk)
+		if (chunk instanceof LevelChunk levelChunk)
 		{
-			chunk = new ImposterProtoChunk((LevelChunk) chunk, /* allow writes */ false );
+			// Block reads and writes wrap on every call; reuse the wrapper.
+			synchronized (this.imposters)
+			{
+				ImposterProtoChunk imposter = this.imposters.get(ChunkPos.asLong(chunkX, chunkZ));
+				if (imposter == null || imposter.getWrapped() != levelChunk)
+				{
+					imposter = new ImposterProtoChunk(levelChunk, /* allow writes */ false );
+					this.imposters.put(ChunkPos.asLong(chunkX, chunkZ), imposter);
+				}
+				chunk = imposter;
+			}
 		}
 		return chunk;
 	}

@@ -143,16 +143,32 @@ public class ChunkStatusTasks {
 		WorldGenContext worldGenContext, ChunkStep chunkStep, StaticCache2D<GenerationChunkHolder> staticCache2D, ChunkAccess chunkAccess
 	) {
 		ServerLevel serverLevel = worldGenContext.level();
-		Heightmap.primeHeightmaps(
-			chunkAccess,
-			EnumSet.of(Heightmap.Types.MOTION_BLOCKING, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Heightmap.Types.OCEAN_FLOOR, Heightmap.Types.WORLD_SURFACE)
-		);
 		WorldGenRegion worldGenRegion = new WorldGenRegion(serverLevel, staticCache2D, chunkStep, chunkAccess);
-		if (!SharedConstants.DEBUG_DISABLE_FEATURES) {
-			worldGenContext.generator().applyBiomeDecoration(worldGenRegion, chunkAccess, serverLevel.structureManager().forWorldGenRegion(worldGenRegion));
+		// The step is one transaction over the chunks it may write: a failure publishes nothing.
+		var pos = chunkAccess.getPos();
+		int radius = worldGenRegion.nativeBlockStateWriteRadius();
+		java.util.List<ChunkAccess> writable = new java.util.ArrayList<>();
+		for (int dz = -radius; dz <= radius; dz++) {
+			for (int dx = -radius; dx <= radius; dx++) {
+				if (worldGenRegion.hasChunk(pos.x + dx, pos.z + dz)) writable.add(worldGenRegion.getChunk(pos.x + dx, pos.z + dz));
+			}
 		}
+		var transaction = net.minecraft.world.level.chunk.DecorationTransaction.begin(writable, chunkAccess, serverLevel.registryAccess());
+		try {
+			Heightmap.primeHeightmaps(
+				chunkAccess,
+				EnumSet.of(Heightmap.Types.MOTION_BLOCKING, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Heightmap.Types.OCEAN_FLOOR, Heightmap.Types.WORLD_SURFACE)
+			);
+			if (!SharedConstants.DEBUG_DISABLE_FEATURES) {
+				worldGenContext.generator().applyBiomeDecoration(worldGenRegion, chunkAccess, serverLevel.structureManager().forWorldGenRegion(worldGenRegion));
+			}
 
-		Blender.generateBorderTicks(worldGenRegion, chunkAccess);
+			Blender.generateBorderTicks(worldGenRegion, chunkAccess);
+		} catch (Throwable failure) {
+			transaction.rollback();
+			throw failure;
+		}
+		transaction.commit();
 		return CompletableFuture.completedFuture(chunkAccess);
 	}
 
@@ -191,25 +207,12 @@ public class ChunkStatusTasks {
 		return CompletableFuture.supplyAsync(() -> {
 			ProtoChunk protoChunk = (ProtoChunk)chunkAccess;
 			ServerLevel serverLevel = worldGenContext.level();
-			LevelChunk levelChunk;
-			if (protoChunk instanceof ImposterProtoChunk imposterProtoChunk) {
-				levelChunk = imposterProtoChunk.getWrapped();
-			} else {
-				levelChunk = new LevelChunk(serverLevel, protoChunk, levelChunkx -> {
+			return net.minecraft.server.level.NativeChunkGeneration.publishFull(worldGenContext, generationChunkHolder, protoChunk,
+				() -> new LevelChunk(serverLevel, protoChunk, levelChunkx -> {
 					try (ProblemReporter.ScopedCollector scopedCollector = new ProblemReporter.ScopedCollector(chunkAccess.problemPath(), LOGGER)) {
 						postLoadProtoChunk(serverLevel, TagValueInput.create(scopedCollector, serverLevel.registryAccess(), protoChunk.getEntities()));
 					}
-				});
-				generationChunkHolder.replaceProtoChunk(new ImposterProtoChunk(levelChunk, false));
-			}
-
-			levelChunk.setFullStatus(generationChunkHolder::getFullStatus);
-			levelChunk.runPostLoad();
-			levelChunk.setLoaded(true);
-			levelChunk.registerAllBlockEntitiesAfterLevelLoad();
-			levelChunk.registerTickContainerInLevel(serverLevel);
-			levelChunk.setUnsavedListener(worldGenContext.unsavedListener());
-			return levelChunk;
+				}));
 		}, worldGenContext.mainThreadExecutor());
 	}
 

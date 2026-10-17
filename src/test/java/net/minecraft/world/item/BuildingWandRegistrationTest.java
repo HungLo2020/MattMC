@@ -17,14 +17,14 @@ class BuildingWandRegistrationTest {
     @Test
     void buildingWandIsRegisteredAsStackSizeOneItem() throws IOException {
         String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/world/item/Items.java"));
-        int declarationStart = source.indexOf("BUILDING_WAND");
-        int declarationEnd = source.indexOf(";", declarationStart);
-        String declaration = source.substring(declarationStart, declarationEnd);
+        String catalog = Files.readString(Path.of("src/main/rust/content/item/catalog.rs"));
+        int entryStart = catalog.indexOf("item(\"building_wand\")");
+        String entry = catalog.substring(catalog.lastIndexOf('\n', entryStart), entryStart);
 
-        assertTrue(source.contains("public static final Item BUILDING_WAND"));
-        assertTrue(source.contains("registerItem(\"building_wand\", BuildingWandItem::new, new Item.Properties().stacksTo(1))"));
-        assertFalse(declaration.contains("durability("), "Building Wand should not have durability");
-        assertFalse(declaration.contains("MAX_DAMAGE"), "Building Wand should not have damage components");
+        assertTrue(source.contains("public static final Item BUILDING_WAND = registerItem(\"building_wand\", BuildingWandItem::new);"));
+        assertTrue(entry.contains("(\"max_stack_size\", r##\"1\"##)"), "Building Wand should stack to one");
+        assertFalse(entry.contains("max_damage"), "Building Wand should not have durability");
+        assertFalse(entry.contains("\"damage\""), "Building Wand should not have damage components");
     }
 
     @Test

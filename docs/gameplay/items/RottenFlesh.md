@@ -6,6 +6,8 @@
 
 Confirmed examples include [Zombie](../mobs/Zombie.md) and [Drowned](../mobs/Drowned.md) drops. Their bundled loot tables each roll **0–2 rotten flesh**, with Looting increasing the possible maximum by one per level, reaching **5 with Looting III**. These flesh pools do not require a player-attributed kill and have no fire-based cooked replacement. Mob loot must be enabled. These are selected sources, not a complete loot catalog. [Zombie loot][zombie-loot] · [Drowned loot][drowned-loot] · [Mob-loot rule][monster]
 
+For the separate Nether-related flesh tables, see [Zoglin](../mobs/Zoglin.md#drops) and [Zombified Piglin](../mobs/ZombifiedPiglin.md#drops).
+
 ## Eating
 
 One rotten flesh provides:

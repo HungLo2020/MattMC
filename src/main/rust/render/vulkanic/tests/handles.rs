@@ -48,6 +48,38 @@ fn dependencies_block_parent_destruction_and_allow_child_cleanup() {
 }
 
 #[test]
+fn retire_defers_a_referenced_resource_until_its_last_dependent_goes() {
+    let mut gal = gal();
+    let retired = gal
+        .create_texture(texture("tex", TextureFormat::Rgba8Unorm, vec![TextureUsage::Sampled]))
+        .unwrap();
+    let first = gal
+        .create_texture_view(view("first", retired, TextureFormat::Rgba8Unorm))
+        .unwrap();
+    let second = gal
+        .create_texture_view(view("second", retired, TextureFormat::Rgba8Unorm))
+        .unwrap();
+
+    // Retiring a bound texture neither fails nor destroys it.
+    gal.retire(retired).unwrap();
+    assert_eq!(1, gal.retired_while_referenced());
+    gal.destroy(first).unwrap();
+    assert_eq!(1, gal.retired_while_referenced());
+    // The last dependent's destruction releases it.
+    gal.destroy(second).unwrap();
+    assert_eq!(0, gal.retired_while_referenced());
+    assert_code(gal.destroy(retired), super::StatusCode::DoubleDestroy);
+    assert_eq!(0, gal.metrics().validation_failures);
+
+    // An unreferenced resource is destroyed at once.
+    let lone = gal
+        .create_texture(texture("lone", TextureFormat::Rgba8Unorm, vec![TextureUsage::Sampled]))
+        .unwrap();
+    gal.retire(lone).unwrap();
+    assert_code(gal.destroy(lone), super::StatusCode::DoubleDestroy);
+}
+
+#[test]
 fn command_recording_keeps_destroyed_resource_set_generation_live_until_submit() {
     let mut gal = gal();
     let buffer = gal

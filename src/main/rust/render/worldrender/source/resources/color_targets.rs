@@ -3,6 +3,35 @@
 use super::*;
 
 impl WorldPrimitiveFrontend {
+    /// Release frontend consumers before the runtime retires their named
+    /// color views. GAL retains physical resources for accepted submissions.
+    pub(crate) fn release_source_color_consumers(&mut self, gal: &mut VulkanicGal) {
+        self.release_role_dependent_source_pack_resources(gal, |role| {
+            matches!(role, TerrainSourceResourceRole::ShaderPackColor(_))
+        });
+        self.source_final_output_cache.destroy(gal);
+        let targets = std::mem::take(&mut self.source_terrain_color_pass_targets);
+        for (_, resources) in targets {
+            let _ = gal.retire(resources.targets.pass);
+            let _ = gal.retire(resources.targets.target);
+        }
+    }
+
+    pub(crate) fn discard_source_color_submission(&mut self, gal: &mut VulkanicGal) {
+        if self.shader_runtime.as_ref().is_some_and(|runtime| runtime.has_pending_source_color_targets()) {
+            self.release_source_color_consumers(gal);
+        } else {
+            // Even a failed frame over active images can stage new sampler
+            // wrappers. Their descriptors must go before wrapper retirement.
+            self.release_role_dependent_source_pack_resources(gal, |role| {
+                matches!(role, TerrainSourceResourceRole::ShaderPackColor(_))
+            });
+        }
+        if let Some(runtime) = self.shader_runtime.as_mut() {
+            runtime.discard_source_color_targets_submission(gal);
+        }
+    }
+
     /// Releases the frame-local state staged for a source frame whose
     /// recording failed after its plan was consumed.
     pub(crate) fn discard_unrecorded_source_frame(&mut self, gal: &mut VulkanicGal, frame_id: u64) {
@@ -14,8 +43,8 @@ impl WorldPrimitiveFrontend {
             self.lod_gpu_residency.discard_submission(gal);
             self.lod_textured_gpu_residency.discard_submission(gal);
         }
+        self.discard_source_color_submission(gal);
         if let Some(runtime) = self.shader_runtime.as_mut() {
-            runtime.discard_source_color_targets_submission(gal);
             runtime.discard_private_terrain_occupancy_submission();
         }
     }
@@ -35,7 +64,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
         phase: TerrainSourceColorPassPhase,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         if world_generation == 0 || graph_generation == 0 {
@@ -136,7 +165,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };
@@ -177,7 +206,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         self.stage_source_material_color_pass_targets(
             gal,
@@ -204,7 +233,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         self.stage_source_material_color_pass_targets(
             gal,
@@ -231,7 +260,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         self.stage_source_material_color_pass_targets(
             gal,
@@ -267,7 +296,7 @@ impl WorldPrimitiveFrontend {
         depth_texture: Handle,
         depth_view: Handle,
         depth_format: TextureFormat,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         let key = SourceTerrainColorPassTargetKey {
             world_generation,
@@ -337,7 +366,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };
@@ -373,7 +402,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         if world_generation == 0 || graph_generation == 0 {
             return Err(GalError::invalid_argument(
@@ -463,7 +492,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };
@@ -559,7 +588,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(view) => view,
                 Err(error) => {
-                    let _ = gal.destroy(texture);
+                    let _ = gal.retire(texture);
                     return Err(error);
                 }
             };
@@ -678,7 +707,7 @@ impl WorldPrimitiveFrontend {
         extent: Extent3d,
         program: &LoweredHandSourceProgram,
         color_targets: &ShaderPackColorTargets,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
         depth_format: TextureFormat,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
         if world_generation == 0 || graph_generation == 0 {
@@ -775,7 +804,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };
@@ -811,7 +840,7 @@ impl WorldPrimitiveFrontend {
         color_targets: &ShaderPackColorTargets,
         depth_texture: Handle,
         depth_view: Handle,
-        clear_values: ShaderPackColorBootstrapClearValues,
+        clear_values: ShaderPackColorClearValues,
         phase: TerrainSourceColorPassPhase,
         writer: &str,
     ) -> GalResult<&TerrainSourceColorPassTargets> {
@@ -905,7 +934,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };

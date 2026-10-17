@@ -1,0 +1,212 @@
+# Rust block registry
+
+> **Current behavior:** the Phase 1 shared registry plus implemented Phase 2
+> state graphs, properties, fluids, registered block definitions, physical
+> settings and intrinsic rules. Remaining fact producers and gameplay in the
+> [game model](index.md) are unfinished; see the [migration plan](MIGRATION-PLAN.md).
+
+Rust owns one registry of every block, property and block state:
+[`content/block/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/block/mod.rs).
+Rust subsystems derive their per-state lookup tables from it. They no longer
+receive a private table from their own Java bridge. The
+[native definition registry](BLOCK-DEFINITIONS.md) declares block names, order,
+property sets and defaults. Its [physical owner](BLOCK-PHYSICS.md) also supplies
+intrinsic settings. [Intrinsic state rules](BLOCK-INTRINSICS.md) supply map-color
+identities, emitted light and canonical fluid associations. Java supplies
+behavior factories, remaining shapes, blocked light and world-dependent facts.
+[Sound and offset settings](BLOCK-SOUND-AND-OFFSETS.md) also originate in Rust.
+[`NativeBlockRegistry`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/block/NativeBlockRegistry.java)
+exports those remaining facts once, lazily on the first `ready()` call after
+Java bootstrap has completed. Early calls return false without initializing the
+one-time export: Java marks bootstrap started before all state caches exist.
+This prevents an early partial export or bootstrap exception from permanently
+disabling every registry-backed consumer.
+The current wire format is **9**: block/state/face counts, per-state face IDs
+and remaining flags, blocked-light values and the face truth table. Names,
+schemas, defaults, value indices, emission, fluid associations and offsets are
+not exported; their definitions originate in Rust.
+Air and can-occlude flags derive from native physical definitions.
+[State policy](STATE-POLICY.md) supplies tick eligibility, leaf/entity markers and
+light-shape policy; Rust derives the corresponding registry flags. Imported
+packets supplying any of these bits are rejected. Fluid flags likewise derive natively.
+Rust shares [property schemas](PROPERTY-DEFINITIONS.md) directly and resolves
+fluid facts from the [fluid registry](FLUID-DEFINITIONS.md).
+
+## What it holds
+
+- **Typed IDs:** `BlockId`, `StateId(u16)`, `PropertyId` and `FaceId`.
+  Block and state IDs equal Java's `BuiltInRegistries.BLOCK` and
+  `Block.BLOCK_STATE_REGISTRY` IDs.
+- **Blocks:** each has a name, a contiguous state range, a default state, and
+  its properties in name order.
+- **Property arithmetic:** a state's value index for each property, `with_value` and
+  `state(block, values)`. These are arithmetic on the state ID; the last
+  property varies fastest. The [shared native state layout](STATE-GRAPHS.md)
+  also constructs the graph behind Java's temporary `StateDefinition` views.
+- **Per-state columns:**
+  - the owning block
+  - `StateFlags`: air, blocks motion, has fluid, random ticks, light-empty
+    shape, leaves, custom `BlockState` subclass, solid render, can occlude,
+    block entity, and falling fluid
+  - light block and emission
+  - six light occlusion faces
+  - typed fluid-state association; fluid kind and own height resolve from the
+    native fluid owner, while has-fluid/falling flags are derived at freeze
+  - model offset type; each block also has its maximum horizontal and
+    vertical offsets
+- **Faces:** the light occlusion faces (`LightEngine.getOcclusionShape`) interned
+  by exact box list, with face 0 empty. The face table holds
+  `Shapes.faceShapeOccludes` for every pair; Java computes it at export.
+
+Items, tags and biomes are not in this shared registry yet; entity types have
+their own [Rust catalog](ENTITY-TYPES.md).
+Existing native consumers may still use separately supplied Java metadata;
+the shared model remains future work (see the [migration plan](MIGRATION-PLAN.md)).
+
+## Consumers
+
+World and storage consumers cache immutable derived views beside their code,
+using `OnceLock` after the registry is installed. Terrain meshing derives its
+view per state registration and keeps its separate reloadable cache. Java
+passes state IDs at the consumer boundary:
+
+| Consumer | View | Java passes |
+|---|---|---|
+| [Light propagation](../world/lighting/RUST-LIGHT-PROPAGATION.md) | light types (`Tables::from_registry`) | palette, uniform or per-block state IDs |
+| [Skylight sources](../world/lighting/RUST-SKYLIGHT-SOURCES.md) | up/down descriptors and edge table | local palette state IDs; null for global |
+| [Heightmap priming](../world/levelgen/heightmap/RUST-HEIGHTMAP.md) | six-type masks per state | local palette state IDs; null for global |
+| [Noise fill](../world/levelgen/RUST-NOISE-FILL.md), proto chunk, surface | noise flags per state | nothing |
+| [Carvers](../world/levelgen/carver/index.md) | the block column | nothing |
+| [Chunk sections](../world/chunk/RUST-CHUNK-SECTIONS.md) | each state's `BlockState.CODEC` tape fragment and palette storage bits | state IDs as labels |
+| [Palette packing](../world/chunk/RUST-PALETTE-PACKING.md) | none: a global palette's state IDs are their own labels | no label table for global palettes |
+| Terrain meshing states (`render/chunk/meshing`) | the block facts of each meshing state | rendering's own columns (below) |
+
+**Terrain meshing states** mix rendering's own columns with block facts.
+`NativeStaticBlockModelRegistry` sends only rendering's columns through
+`registerStateView`: the model selector, materials and passes, shader-pack
+IDs, tint, skip groups, fluid sprites, and the model, cullable and
+fluid-overlay flags. Two controls say whether fluids are forced to Java and
+whether the native producer supports the state's fluid.
+[`state_from_registry`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/chunk/meshing/cache.rs)
+fills in the rest from the registry: air, solid render, occlusion, block
+entity, motion, emission, fluid type, height and falling, and offsets. The
+explicit `registerState` remains for corpus replays, benchmarks, and states
+Rust declines (including custom subclasses, unknown states or an unsupported
+native-fluid request), and when the registry is unavailable. A failed downcall
+throws; view rejection does not promise fallback after every exception. Java prepares only render-owned columns before trying the view. Explicit
+block/fluid facts are computed only when the view declines; the normal route
+does not reconstruct native-owned metadata in Java.
+`NativeMeshingStateViewTest` compares the explicit and derived records for
+every state in both fluid modes, field for field. This is a low-level record
+fixture, not an end-to-end render or reload test; its execution is not covered
+by the earlier aggregate results on the [verification page](BLOCK-REGISTRY-VERIFICATION.md).
+
+## Adding a column or a consumer
+
+1. Add the fact to `StateFacts` and the column in `content/block/mod.rs`.
+   For facts still owned by Java, export them in `NativeBlockRegistry.export()`
+   and decode them in
+   [`export.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/block/export.rs).
+   Bump `FORMAT` on both sides. Facts already owned by native content should
+   be resolved from typed IDs, not exported back through Java.
+2. Check it for every state in `NativeBlockRegistryTest` against Java's live
+   answer.
+3. In the consumer, derive the view from `&BlockRegistry` in a plain function
+   with a Rust unit test, and cache it with `OnceLock` behind
+   `content::block::installed()`.
+4. Gate the registry-backed route on `NativeBlockRegistry.ready()`. When it
+   is false or Rust declines a view, retain that consumer's existing fallback
+   (the explicit native record registration for meshing).
+
+The [fresh-process readiness control](https://github.com/HungLo2020/MattMC/blob/64db2b31690fdd62ca1b1968d1cf076f0fa09108/src/test/java/net/minecraft/world/level/block/NativeBlockRegistryReadinessTest.java)
+queries readiness before bootstrap and then requires successful installation
+afterward in a new JVM. This is a source-inspected focused sequence, not a
+newly executed suite or proof of concurrent/reentrant bootstrap safety.
+Run it with JDK25 and the native library built for the same worktree:
+
+```sh
+./gradlew -PmattmcRustProfile=release test -x testRustNative --tests net.minecraft.world.level.block.NativeBlockRegistryReadinessTest
+```
+
+## Constraints
+
+- **Property identities stay distinct.** Native declaration IDs identify schemas;
+  registry `PropertyId`s are assigned at first use of each declaration while
+  traversing the native block catalog. This preserves the former Java identity
+  ordering without importing Java property objects. Equal names do not merge
+  different declarations/domains; immutable schemas are shared by `Arc`.
+- **Fluid facts have one owner.** `StateFacts` accepts a `FluidStateId`, not a
+  kind/height copy. Supplying HAS_FLUID or FLUID_FALLING in its input flags is
+  rejected; the builder derives them from the fluid definition/state. Unknown
+  fluid IDs are rejected. The two-byte association replaces five bytes of
+  duplicated kind/height columns per block state. Native consumers also retain
+  exact source/flowing state identity, which those two columns alone cannot
+  represent.
+- **Installation is all or nothing.** The export is refused and registry-backed
+  views are unavailable if any of these fails:
+  - every block's states are contiguous, in block order
+  - every state is a distinct object at its own ID
+  - the state count is between 1 and 65,535, leaving `0xffff` reserved
+  - block/state counts agree with the native definitions
+  - the remaining per-state facts and face table satisfy their bounds
+- **Registered declarations are required.** Missing native names, invalid
+  declaration data or incompatible Java bindings fail block construction.
+  The synthetic/unregistered codec/test path may still choose Java domains,
+  defaults and physical settings; it does not rescue a missing registered
+  definition. A failed lazy remaining-fact installation is a separate boundary
+  and can leave consumer compatibility routes available.
+- **Custom `BlockState` subclasses** are flagged `CUSTOM`. Lighting,
+  skylight, heightmap and meshing views decline those states; the chunk-section
+  vocabulary declines the whole registry if one exists. Noise flags and the
+  carvers' block lookup still use the exported facts under their own existing
+  eligibility rules. There is no universal custom-state rejection.
+- **The registry is process-wide and immutable.** Installing an equal registry
+  again succeeds; a different one is rejected. This is not a content-reload or
+  generation-publication mechanism; the rendering cache has its own lifecycle.
+- **Views stay in their subsystem.** `content` must not depend on consumers.
+  The standalone [`src/test/rust/worldgen.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/test/rust/worldgen.rs)
+  harness includes `content` for that reason.
+
+## Testing
+
+```sh
+# Registry columns and property arithmetic against Java
+./gradlew test -x testRustNative --tests 'net.minecraft.world.level.block.NativeBlockRegistryTest'
+# Meshing view record parity (not selected by the aggregate driver below)
+./gradlew test -x testRustNative --tests 'net.sodium.client.render.chunk.compile.pipeline.NativeMeshingStateViewTest'
+# Rust units for the registry and its world/storage views
+(
+  cd src/main/rust || exit
+  for filter in content:: world::level::lighting world::level::levelgen::heightmap \
+    world::level::levelgen::noise_fill world::level::levelgen::proto_chunk \
+    world::level::levelgen::carver storage::chunk; do
+    cargo test --lib -- "$filter" || exit
+  done
+)
+# Selected consumer parity, old-against-new benchmarks and a results report
+python3 DevUtils/tests/content/VerifyRustBlockRegistry.py
+```
+
+The driver builds the reference commit in `build/block-registry-migration/`.
+It then compares, in fresh JVMs:
+- startup table construction, using
+  [`BlockTableStartup.java`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/content/BlockTableStartup.java)
+- each consumer's native benchmark, whose outputs must match between trees
+
+Results are in [Block registry verification](BLOCK-REGISTRY-VERIFICATION.md).
+The driver reports performance booleans in `results.json`; a successful exit
+does not require those booleans to pass. Inspect the per-case evidence before
+claiming a performance gate or full Phase 1 acceptance.
+
+## Troubleshooting
+
+- **A consumer suddenly takes its Java path everywhere:** check
+  `NativeBlockRegistry.ready()`. A registry change that breaks one of the
+  installation checks (for example, a block registered with states out of
+  order) disables the registry-backed routes. Meshing retains its explicit
+  registration fallback; other consumers retain their own compatibility paths.
+- **A `NativeBlockRegistryTest` column mismatch:** first identify the producer.
+  Check native definitions/rules for air/can-occlude, emitted light and
+  fluid-derived facts; check the Java exporter for the remaining columns. Use
+  the independent Frozen observer when both live views share a changed native declaration, since
+  agreement between those views alone cannot verify the original semantics.

@@ -15,6 +15,17 @@ Waterlogged building blocks and planted Kelp are not Water blocks for this test.
 
 Soul Sand and Magma schedule a column update **20 game ticks** after placement, and when an upper-neighbor update finds Water. Existing column support/direction changes schedule a **5-tick** recheck. Tick scheduling and loaded-world conditions matter; do not treat these as a measured elevator throughput. [Base schedules][soul] [magma] · [Column neighbor updates][column]
 
+### Preparing source Water with Kelp
+
+For a tall shaft, temporary [Kelp](Kelp.md#planting-and-water) can prepare the source Water before you install the bubble-column base. The following sequence is source-derived and **has not been tested in game**:
+
+1. Build a contained, one-block-wide shaft over a temporary solid support such as Cobblestone. Pour Water from the top and let it reach the bottom. Kelp placement accepts full-strength falling Water as well as source Water; weaker sideways flow does not pass its amount check. [Placement and support][shaft-kelp] [shaft-support]
+2. Plant Kelp at the bottom, then extend it through **every intended column cell**, using additional Kelp or [Bone Meal](Kelp.md#growth-bone-meal-and-trimming). Converting only the bottom few cells leaves the higher flow unfinished. Each occupied tip or stem holds source Water in the current native block definitions. [Kelp/stem definitions][shaft-catalog] · [Shared water rule][shaft-profile] [shaft-intrinsics]
+3. Break the lowest Kelp section and let the unsupported sections above clear. Remove any remaining plants before proceeding. Ordinary player removal and unsupported-plant destruction replace the plant with its fluid, so those former Kelp cells become actual source Water blocks. This step matters: a Kelp block's source fluid alone does **not** make it eligible for bubbles. [Player removal][shaft-breaking] · [Fluid-preserving removal][shaft-removal] · [Unsupported plants][shaft-support] · [Column eligibility][shaft-column]
+4. Replace the temporary support with **Soul Sand** for upward bubbles or **Magma Block** for downward bubbles. Keep the prepared water shaft intact and allow the base's scheduled update to run. Do not start this method with Magma: Kelp explicitly rejects it as support. [Kelp support exclusion][shaft-kelp] · [Base updates][shaft-soul] [shaft-magma]
+
+If bubbles stop partway up, inspect the first cell above them for remaining Kelp, non-source Water or another block. Preparing one vertical line does not guarantee source Water in neighboring cells or a wider room. Keep a safe way out while building; the finished column's breathing and motion rules below do not protect you while the shaft is still ordinary Water.
+
 ## Direction, motion and air
 
 Each column block stores its direction in `drag`: **false** for the Soul Sand upward flow and **true** for the Magma downward flow. Higher cells inherit the lower column's direction. Removing the valid base or interrupting support can turn affected column cells back into ordinary Water during updates. [Direction selection, support and replacement][column]
@@ -33,6 +44,8 @@ Its outline is empty and its normal block rendering is invisible; the particles 
 
 ## Verification and related pages
 
+The [Kelp preparation sequence](#preparing-source-water-with-kelp) was source-reviewed on **2026-10-14** at `f3815385fa503c082d0f8359464e8d765214f790`. The review followed current native Kelp/stem fluid definitions, Java placement/support callbacks, ordinary player removal and fluid-preserving destruction through to column eligibility and base updates. No construction, survival, timing or elevator gameplay test was run. The earlier review below retains its original scope.
+
 Source-reviewed on **2026-10-02** at `e87cde38c872d30ae86139bbee181937603af769`, including registered block properties, both active base triggers, source-water eligibility, update propagation, entity dispatch, air supply and bucket pickup. No in-game elevator, breathing, motion or floor-damage test was run. Data, world updates and later code changes can alter results.
 
 [Blocks](Blocks.md) · [Water and Lava](WaterAndLava.md) · [Kelp](Kelp.md) · [Magma Block item](../items/MagmaBlock.md) · [Soul Sand item](../items/SoulSand.md)
@@ -45,3 +58,14 @@ Source-reviewed on **2026-10-02** at `e87cde38c872d30ae86139bbee181937603af769`,
 [living]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/entity/LivingEntity.java#L424-L443
 [blocks]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/level/block/Blocks.java#L5224-L5235
 [bucket]: https://github.com/HungLo2020/MattMC/blob/e87cde38c872d30ae86139bbee181937603af769/src/main/java/net/minecraft/world/item/BucketItem.java
+
+[shaft-kelp]: https://github.com/HungLo2020/MattMC/blob/f3815385fa503c082d0f8359464e8d765214f790/src/main/java/net/minecraft/world/level/block/KelpBlock.java#L34-L75
+[shaft-support]: https://github.com/HungLo2020/MattMC/blob/f3815385fa503c082d0f8359464e8d765214f790/src/main/java/net/minecraft/world/level/block/GrowingPlantBlock.java#L46-L59
+[shaft-catalog]: https://github.com/HungLo2020/MattMC/blob/f3815385fa503c082d0f8359464e8d765214f790/src/main/rust/content/block/definitions/catalog.rs#L776-L777
+[shaft-profile]: https://github.com/HungLo2020/MattMC/blob/f3815385fa503c082d0f8359464e8d765214f790/src/main/rust/content/block/definitions/intrinsic/declarations.rs#L73
+[shaft-intrinsics]: https://github.com/HungLo2020/MattMC/blob/f3815385fa503c082d0f8359464e8d765214f790/src/main/rust/content/block/definitions/intrinsic.rs#L110-L124
+[shaft-breaking]: https://github.com/HungLo2020/MattMC/blob/f3815385fa503c082d0f8359464e8d765214f790/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L256-L295
+[shaft-removal]: https://github.com/HungLo2020/MattMC/blob/f3815385fa503c082d0f8359464e8d765214f790/src/main/java/net/minecraft/world/level/Level.java#L264-L291
+[shaft-column]: https://github.com/HungLo2020/MattMC/blob/f3815385fa503c082d0f8359464e8d765214f790/src/main/java/net/minecraft/world/level/block/BubbleColumnBlock.java#L81-L109
+[shaft-soul]: https://github.com/HungLo2020/MattMC/blob/f3815385fa503c082d0f8359464e8d765214f790/src/main/java/net/minecraft/world/level/block/SoulSandBlock.java#L49-L74
+[shaft-magma]: https://github.com/HungLo2020/MattMC/blob/f3815385fa503c082d0f8359464e8d765214f790/src/main/java/net/minecraft/world/level/block/MagmaBlock.java#L39-L64

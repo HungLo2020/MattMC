@@ -11,6 +11,7 @@ import com.seibel.distanthorizons.core.sql.repo.FullDataSourceV1Repo;
 import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
 import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataInputStream;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
+import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
@@ -19,9 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class FullDataSourceProviderV1<TDhLevel extends IDhLevel>
@@ -85,21 +84,13 @@ public class FullDataSourceProviderV1<TDhLevel extends IDhLevel>
 	 */
 	public CompletableFuture<FullDataSourceV1> getAsync(long pos)
 	{
-		AbstractExecutorService executor = ThreadPoolUtil.getFileHandlerExecutor();
+		PriorityTaskPicker.Executor executor = ThreadPoolUtil.getFileHandlerExecutor();
 		if (executor == null || executor.isTerminated())
 		{
 			return CompletableFuture.completedFuture(null);
 		}
 		
-		try
-		{
-			return CompletableFuture.supplyAsync(() -> this.get(pos), executor);
-		}
-		catch (RejectedExecutionException ignore)
-		{
-			// the thread pool was probably shut down because it's size is being changed, just wait a sec and it should be back
-			return CompletableFuture.completedFuture(null);
-		}
+		return executor.supplyAsync(() -> this.get(pos));
 	}
 	/**
 	 * Should only be used in internal file handler methods where we are already running on a file handler thread.

@@ -1,8 +1,6 @@
 package net.minecraft.world.entity.variant;
 
 import com.mojang.datafixers.DataFixUtils;
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -74,18 +72,6 @@ public interface PriorityProvider<Context, Condition extends PriorityProvider.Se
 
 		public Selector(int i) {
 			this(Optional.empty(), i);
-		}
-
-		public static <Context, Condition extends PriorityProvider.SelectorCondition<Context>> Codec<PriorityProvider.Selector<Context, Condition>> codec(
-			Codec<Condition> codec
-		) {
-			return RecordCodecBuilder.create(
-				instance -> instance.group(
-						codec.optionalFieldOf("condition").forGetter(PriorityProvider.Selector::condition),
-						Codec.INT.fieldOf("priority").forGetter(PriorityProvider.Selector::priority)
-					)
-					.apply(instance, PriorityProvider.Selector::new)
-			);
 		}
 	}
 

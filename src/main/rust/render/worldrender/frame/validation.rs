@@ -3,6 +3,13 @@
 use crate::render::worldrender::*;
 
 pub(in crate::render::worldrender) fn validate_frame(frame: &WorldPrimitiveFrame) -> GalResult<()> {
+    if !frame.static_terrain_shadow_casters.casters.is_empty()
+        || !frame.static_terrain_sections.sections.is_empty()
+    {
+        return Err(GalError::invalid_argument(
+            "static terrain sections and casters must be admitted before frame validation",
+        ));
+    }
     frame::header::validate_frame_header(frame)?;
     validate_shader_environment(&frame.shader_environment)?;
     validate_first_person_frame(&frame.first_person)?;
@@ -77,6 +84,9 @@ pub(in crate::render::worldrender) fn validate_frame(frame: &WorldPrimitiveFrame
         validate_mesh_instance(instance, frame)?;
     }
     for instance in &frame.first_person_mesh_instances {
+        if instance.entity_culling.is_some() {
+            return Err(GalError::invalid_argument("first-person meshes cannot carry world entity culling"));
+        }
         validate_mesh_instance(instance, frame)?;
         if instance.stratum != WORLD_STRATUM_ENTITY_MESH {
             return Err(GalError::ffi(
@@ -364,6 +374,13 @@ pub(in crate::render::worldrender) fn validate_mesh_instance(
     instance: &WorldMeshInstanceRequest,
     frame: &WorldPrimitiveFrame,
 ) -> GalResult<()> {
+    if let Some(inputs) = instance.entity_culling {
+        inputs.validate()?;
+        if !matches!(instance.stratum, WORLD_STRATUM_ENTITY_MESH | WORLD_STRATUM_ENTITY_SHADOW_CASTER)
+            || instance.block_entity_id != -1 {
+            return Err(GalError::invalid_argument("entity culling requires an entity draw domain"));
+        }
+    }
     if instance.model_submission_order.is_some() && instance.stratum != WORLD_STRATUM_ENTITY_MESH {
         return Err(GalError::invalid_argument(
             "model submission order requires an entity mesh",

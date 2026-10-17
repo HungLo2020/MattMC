@@ -10,6 +10,8 @@ The same item places a standing torch on suitable upper support or a wall torch 
 
 Ordinary Survival breaking returns **one Redstone Torch**, without needing Silk Touch or a tool tier. Explosion recovery is conditional. The torch breaks instantly and has no collision. [Properties][blocks] · [Loot][loot]
 
+Keep both standing and wall Redstone Torches **out of flowing water and piston paths**. Neither variant can be waterlogged: water that spreads into its position replaces it and runs the block-drop path. An extending piston also breaks a torch it reaches and drops its resources instead of moving it intact. Both variants have no collision and zero hardness in the current definitions. [Current profiles][current-catalog] · [Physical properties][current-physics] · [Empty fluid state][current-intrinsics] · [Fluid replacement][current-flow] · [Water drops][current-water] · [Piston selection][current-piston-resolver] · [Piston drops][current-piston]
+
 ## Input and output
 
 A standing torch reads power from the block **underneath it**; a wall torch reads from the block **behind its attachment**. Powering that support can turn the torch off. A nearby powered component is not automatically an input unless its wiring causes the support-side check to receive power. [Standing input][torch] · [Wall input][wall]
@@ -39,6 +41,8 @@ Keep the output separate from the input support when troubleshooting, and avoid 
 
 Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. Registration, recipes, loot, standing/wall placement, physical signal-query direction, active neighbor/tick callbacks, and burnout bookkeeping were checked. No crafting, placement, circuit, pulse, burnout, or lighting gameplay test was run.
 
+The water/piston paragraph was source-reviewed on **2026-10-09** at `4246f4e7bfc1f3ab7862272ebba5f1f38aa16953`, including current native definitions, their Java application, and the fluid/piston consumers. No water or piston gameplay test was run. The earlier timing and burnout review above remains dated separately. [Native property application][current-native]
+
 Related: [Redstone Torch item](../items/RedstoneTorch.md) · [Redstone Lamp](RedstoneLamp.md) · [Redstone](../redstone/Redstone.md) · [Blocks](Blocks.md)
 
 [blocks]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java
@@ -52,3 +56,12 @@ Related: [Redstone Torch item](../items/RedstoneTorch.md) · [Redstone Lamp](Red
 [support]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/BaseTorchBlock.java
 [wall-support]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/WallTorchBlock.java
 [wall-properties]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L7264-L7274
+
+[current-catalog]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/rust/content/block/definitions/catalog.rs#L299-L300
+[current-physics]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/rust/content/block/definitions/physics.rs#L261-L265
+[current-intrinsics]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/rust/content/block/definitions/intrinsic/declarations.rs#L108
+[current-flow]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/material/FlowingFluid.java
+[current-water]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/material/WaterFluid.java#L90-L94
+[current-piston-resolver]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/block/piston/PistonStructureResolver.java
+[current-piston]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/block/piston/PistonBaseBlock.java#L284-L301
+[current-native]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/block/state/NativeBlockDefinitions.java#L99-L122

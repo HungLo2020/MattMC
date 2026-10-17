@@ -38,9 +38,31 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
     DensityFunction.Visitor splineWrappingVisitor() { return wrappingVisitor; }
 	private final Long2IntMap preliminarySurfaceLevelCache = new Long2IntOpenHashMap();
 	private final Aquifer aquifer;
-	private final DensityFunction preliminarySurfaceLevel;
+	private DensityFunction preliminarySurfaceLevel;
+    // Rust computes preliminary surface levels when the chunk's wrapped
+    // function equals the RandomState's (empty blender); null keeps Java.
+    @Nullable
+    private final NativeSurfaceLevel nativeSurfaceLevel;
     CacheAllInCell aquiferDensity;
-	private final NoiseChunk.BlockStateFiller blockStateRule;
+	private NoiseChunk.BlockStateFiller blockStateRule;
+	// Chunk-wrapped ore vein inputs for the native fill gate; null without ore veins.
+	@Nullable
+	DensityFunction veinToggle;
+	@Nullable
+	DensityFunction veinRidged;
+	@Nullable
+	DensityFunction veinGap;
+    // Rust instantiates this chunk's noise from per-seed programs; null when the
+    // chunk wraps its graph in the constructor. Native chunks wrap only when a
+    // Java path asks (ensureWrapped), with the constructor's exact steps.
+    @Nullable
+    private final NativeChunkNoise nativeNoise;
+    private final NoiseGeneratorSettings settings;
+    private NoiseRouter wrappedRouter;
+    private boolean wrappedCells;
+    // The native traversal's current cell densities.
+    @Nullable
+    private final double[] nativeCellDensities;
 	private final Blender blender;
 	private final NoiseChunk.FlatCache blendAlpha;
 	private final NoiseChunk.FlatCache blendOffset;
@@ -136,34 +158,84 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		this.blendAlpha = new NoiseChunk.FlatCache(new NoiseChunk.BlendAlpha(), false);
 		this.blendOffset = new NoiseChunk.FlatCache(new NoiseChunk.BlendOffset(), false);
 		if (!blender.isEmpty()) {
-			for (int l = 0; l <= this.noiseSizeXZ; l++) {
-				int m = this.firstNoiseX + l;
-				int n = QuartPos.toBlock(m);
-
-				for (int o = 0; o <= this.noiseSizeXZ; o++) {
-					int p = this.firstNoiseZ + o;
-					int q = QuartPos.toBlock(p);
-					Blender.BlendingOutput blendingOutput = blender.blendOffsetAndFactor(n, q);
-					this.blendAlpha.values[l + o * this.blendAlpha.sizeXZ] = blendingOutput.alpha();
-					this.blendOffset.values[l + o * this.blendOffset.sizeXZ] = blendingOutput.blendingOffset();
-				}
-			}
+			blender.fillBlendingOutputs(this.firstNoiseX, this.firstNoiseZ, this.noiseSizeXZ + 1,
+				this.blendAlpha.values, this.blendOffset.values);
 		} else {
 			Arrays.fill(this.blendAlpha.values, 1.0);
 			Arrays.fill(this.blendOffset.values, 0.0);
 		}
 
-		NoiseRouter noiseRouter = randomState.router();
-		NoiseRouter noiseRouter2 = noiseRouter.mapAll(this.wrappingVisitor);
-		this.preliminarySurfaceLevel = this.randomState.optimizeUnary(noiseRouter2.preliminarySurfaceLevel());
+		this.settings = noiseGeneratorSettings;
+        boolean plain = blender == Blender.empty() && this.getClass() == NoiseChunk.class;
+        this.nativeSurfaceLevel = plain ? randomState.nativeSurfaceLevel() : null;
+        NativeChunkNoise template = plain && this.nativeSurfaceLevel != null && i * this.cellWidth == 16
+            ? randomState.nativeChunkNoise(noiseGeneratorSettings) : null;
+        // Structure terrain adjustment needs the final density's own program and
+        // a native Beardifier; other providers keep the chunk wrapped.
+        boolean beardOk = beardifierOrMarker == DensityFunctions.BeardifierMarker.INSTANCE || beardifierOrMarker == Beardifier.EMPTY
+            || beardifierOrMarker instanceof Beardifier structures && structures.nativeCells() != null && template != null && template.densityProgram != null;
+        this.nativeNoise = beardOk ? template : null;
+        this.nativeCellDensities = this.nativeNoise == null ? null : new double[this.cellWidth * this.cellWidth * this.cellHeight];
+        if (this.nativeNoise == null) this.wrapRouter();
 		if (!noiseGeneratorSettings.isAquifersEnabled()) {
 			this.aquifer = Aquifer.createDisabled(fluidPicker);
 		} else {
 			int n = SectionPos.blockToSectionCoord(j);
 			int o = SectionPos.blockToSectionCoord(k);
-			this.aquifer = Aquifer.create(this, new ChunkPos(n, o), noiseRouter2, randomState.aquiferRandom(), noiseSettings.minY(), noiseSettings.height(), fluidPicker);
+            this.aquifer = this.nativeNoise == null
+                ? Aquifer.create(this, new ChunkPos(n, o), this.wrappedRouter, randomState.aquiferRandom(), noiseSettings.minY(), noiseSettings.height(), fluidPicker)
+                : Aquifer.create(this, new ChunkPos(n, o), this::wrappedRouter, this.nativeNoise.barrier, randomState.aquiferRandom(), noiseSettings.minY(),
+                    noiseSettings.height(), fluidPicker);
 		}
+        if (this.nativeNoise == null) this.wrapCells();
+	}
 
+    /** The constructor's router wrapping. */
+    private void wrapRouter() {
+		NoiseRouter noiseRouter = this.randomState.router();
+		NoiseRouter noiseRouter2 = noiseRouter.mapAll(this.wrappingVisitor);
+		this.preliminarySurfaceLevel = this.randomState.optimizeUnary(noiseRouter2.preliminarySurfaceLevel());
+        this.wrappedRouter = noiseRouter2;
+    }
+
+    /** The chunk-wrapped router, wrapping a native chunk's graph on first use. */
+    NoiseRouter wrappedRouter() {
+        this.ensureWrapped();
+        return this.wrappedRouter;
+    }
+
+    /** Builds the Java graph of a native chunk as the constructor would have. */
+    void ensureWrapped() {
+        if (this.wrappedCells) return;
+        if (this.wrappedRouter == null) this.wrapRouter();
+        this.wrapCells();
+    }
+
+    /** The native cells of this chunk's structure Beardifier, or null for no adjustment. */
+    @Nullable
+    NativeBeardifier nativeBeardifier() {
+        return this.beardifier instanceof Beardifier structures && this.beardifier != Beardifier.EMPTY ? structures.nativeCells() : null;
+    }
+
+    @Nullable
+    NativeChunkNoise nativeNoise() {
+        return this.nativeNoise;
+    }
+
+    /** Cell densities the native traversal fills for aquifer materials. */
+    double[] nativeCellDensities() {
+        return this.nativeCellDensities;
+    }
+
+    /** The constructor's cell cache, block state rule and ore vein wrapping. */
+    private void wrapCells() {
+        this.wrappedCells = true;
+        NoiseRouter noiseRouter2 = this.wrappedRouter;
+        NoiseGeneratorSettings noiseGeneratorSettings = this.settings;
+        NoiseChunk.this.wrapCellsOf(noiseRouter2, noiseGeneratorSettings);
+    }
+
+    private void wrapCellsOf(NoiseRouter noiseRouter2, NoiseGeneratorSettings noiseGeneratorSettings) {
 		List<NoiseChunk.BlockStateFiller> list = new ArrayList();
 		DensityFunction densityFunction = DensityFunctions.cacheAllInCell(
 				DensityFunctions.add(noiseRouter2.finalDensity(), DensityFunctions.BeardifierMarker.INSTANCE)
@@ -176,7 +248,14 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
             list.add(context -> this.aquifer.computeSubstance(context,densityFunction.compute(context)));
         }
 		if (noiseGeneratorSettings.oreVeinsEnabled()) {
-			list.add(OreVeinifier.create(noiseRouter2.veinToggle(), noiseRouter2.veinRidged(), noiseRouter2.veinGap(), randomState.oreRandom()));
+			list.add(OreVeinifier.create(noiseRouter2.veinToggle(), noiseRouter2.veinRidged(), noiseRouter2.veinGap(), this.randomState.oreRandom()));
+			this.veinToggle = noiseRouter2.veinToggle();
+			this.veinRidged = noiseRouter2.veinRidged();
+			this.veinGap = noiseRouter2.veinGap();
+		} else {
+			this.veinToggle = null;
+			this.veinRidged = null;
+			this.veinGap = null;
 		}
 
 		this.blockStateRule = new MaterialRuleList((NoiseChunk.BlockStateFiller[])list.toArray(new NoiseChunk.BlockStateFiller[0]));
@@ -196,6 +275,7 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 
 	@Nullable
 	protected BlockState getInterpolatedState() {
+        this.ensureWrapped();
 		return this.blockStateRule.calculate(this);
 	}
 
@@ -215,6 +295,11 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 	}
 
 	public int maxPreliminarySurfaceLevel(int i, int j, int k, int l) {
+        if (this.nativeSurfaceLevel != null) return this.nativeMaxPreliminarySurfaceLevel(i, j, k, l);
+        return this.javaMaxPreliminarySurfaceLevel(i, j, k, l);
+    }
+
+    private int javaMaxPreliminarySurfaceLevel(int i, int j, int k, int l) {
 		int m = Integer.MIN_VALUE;
 
 		for (int n = j; n <= l; n += 4) {
@@ -235,9 +320,42 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		return this.preliminarySurfaceLevelCache.computeIfAbsent(ColumnPos.asLong(k, l), this::computePreliminarySurfaceLevel);
 	}
 
+    /** The loop below with every uncached column computed in native batches
+     * and cached in the order the loop would. Successive {@code o} (and
+     * {@code n}) are one quart apart, so each column appears once. */
+    private int nativeMaxPreliminarySurfaceLevel(int i, int j, int k, int l) {
+        long rows = l < j ? 0 : ((long)l - j) / 4 + 1, row = k < i ? 0 : ((long)k - i) / 4 + 1;
+        if (rows * row > 65536) return this.javaMaxPreliminarySurfaceLevel(i, j, k, l);
+        int m = Integer.MIN_VALUE, missing = 0, size = (int)(rows * row);
+        long[] columns = new long[size];
+        int[] xs = new int[size], zs = new int[size];
+        for (int n = j; n <= l; n += 4) {
+            for (int o = i; o <= k; o += 4) {
+                long column = ColumnPos.asLong(QuartPos.toBlock(QuartPos.fromBlock(o)), QuartPos.toBlock(QuartPos.fromBlock(n)));
+                if (this.preliminarySurfaceLevelCache.containsKey(column)) {
+                    m = Math.max(m, this.preliminarySurfaceLevelCache.get(column));
+                } else {
+                    columns[missing] = column;
+                    xs[missing] = ColumnPos.getX(column);
+                    zs[missing++] = ColumnPos.getZ(column);
+                }
+            }
+        }
+        if (missing == 0) return m;
+        int[] levels = new int[missing];
+        this.nativeSurfaceLevel.levels(xs, zs, levels, missing);
+        for (int index = 0; index < missing; index++) {
+            this.preliminarySurfaceLevelCache.put(columns[index], levels[index]);
+            m = Math.max(m, levels[index]);
+        }
+        return m;
+    }
+
 	private int computePreliminarySurfaceLevel(long l) {
 		int i = ColumnPos.getX(l);
 		int j = ColumnPos.getZ(l);
+        if (this.nativeSurfaceLevel != null) return this.nativeSurfaceLevel.level(i, j);
+        this.ensureWrapped();
 		return Mth.floor(this.preliminarySurfaceLevel.compute(new DensityFunction.SinglePointContext(i, 0, j)));
 	}
 
@@ -246,9 +364,21 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		return this.blender;
 	}
 
-	private void fillSlice(boolean bl, int i) {
+	private void fillSlice(boolean bl, int i, @Nullable NativeNoiseRouter router) {
 		this.cellStartBlockX = i * this.cellWidth;
 		this.inCellX = 0;
+        if (router != null && router.fill(bl, this.cellStartBlockX)) {
+            // The column loop's end state. Every field is reassigned before its
+            // next read; the counters only need to pass every recorded value.
+            this.cellStartBlockZ = (this.firstCellZ + this.cellCountXZ) * this.cellWidth;
+            this.inCellZ = 0;
+            this.cellStartBlockY = (this.cellCountY + this.cellNoiseMinY) * this.cellHeight;
+            this.inCellY = 0;
+            this.arrayIndex = this.cellCountY;
+            this.interpolationCounter += (long)(this.cellCountXZ + 1) * (this.cellCountY + 1) * this.interpolators.size();
+            this.arrayInterpolationCounter += this.cellCountXZ + 2;
+            return;
+        }
 
 		for (int j = 0; j < this.cellCountXZ + 1; j++) {
 			int k = this.firstCellZ + j;
@@ -266,19 +396,70 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 	}
 
 	public void initializeForFirstCellX() {
+        this.initializeForFirstCellX(null);
+	}
+
+    /** With a router, slices come from Rust; Java fills any slice it declines. */
+	void initializeForFirstCellX(@Nullable NativeNoiseRouter router) {
+        this.ensureWrapped();
 		if (this.interpolating) {
 			throw new IllegalStateException("Staring interpolation twice");
 		} else {
 			this.interpolating = true;
 			this.interpolationCounter = 0L;
-			this.fillSlice(true, this.firstCellX);
+			this.fillSlice(true, this.firstCellX, router);
 		}
 	}
 
 	public void advanceCellX(int i) {
-		this.fillSlice(false, this.firstCellX + i + 1);
+        this.advanceCellX(i, null);
+	}
+
+	void advanceCellX(int i, @Nullable NativeNoiseRouter router) {
+		this.fillSlice(false, this.firstCellX + i + 1, router);
 		this.cellStartBlockX = (this.firstCellX + i) * this.cellWidth;
 	}
+
+    int firstCellZ() {
+        return this.firstCellZ;
+    }
+
+    /** Calls {@code sink} with each cached (quart-aligned x, z, level). */
+    void forEachPreliminarySurfaceLevel(SurfaceLevelSink sink) {
+        for (Long2IntMap.Entry entry : this.preliminarySurfaceLevelCache.long2IntEntrySet()) {
+            sink.accept(ColumnPos.getX(entry.getLongKey()), ColumnPos.getZ(entry.getLongKey()), entry.getIntValue());
+        }
+    }
+
+    interface SurfaceLevelSink {
+        void accept(int x, int z, int level);
+    }
+
+    @Nullable
+    NativeSurfaceLevel nativeSurfaceLevel() {
+        return this.nativeSurfaceLevel;
+    }
+
+    int firstCellX() {
+        return this.firstCellX;
+    }
+
+    /** Starts interpolation for a traversal Rust runs: no Java slices are filled. */
+    void beginNativeTraversal() {
+        if (this.interpolating) throw new IllegalStateException("Staring interpolation twice");
+        this.interpolating = true;
+        this.interpolationCounter = 0L;
+    }
+
+    /** Java's slice fill at a cell X, for a slice the router declines. */
+    void fillJavaSlice(boolean first, int cellX) {
+        this.fillSlice(first, cellX, null);
+    }
+
+    /** Advances the cell counter past cells Rust traversed, as selectCellYZ would. */
+    void skipNativeCells(int cells) {
+        this.arrayInterpolationCounter += 2L * cells;
+    }
 
 	public NoiseChunk forIndex(int i) {
 		int j = Math.floorMod(i, this.cellWidth);
@@ -316,6 +497,7 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 
 	private final RandomState randomState;
     boolean aquiferBatchSafe() { return randomState.aquiferBatchSafe(); }
+    RandomState randomState() { return this.randomState; }
 	private final DensityBatch noiseBatch = new DensityBatch();
 
 	public void selectCellYZ(int i, int j) {
@@ -563,6 +745,10 @@ public class NoiseChunk implements DensityBatch.Provider, DensityFunction.Functi
 		final DensityFunction noiseFiller;
         private final DensityFunction evaluator;
 		final double[] values;
+
+        DensityFunction evaluator() {
+            return this.evaluator;
+        }
 
 		CacheAllInCell(final DensityFunction densityFunction) {
 			this.noiseFiller = densityFunction;

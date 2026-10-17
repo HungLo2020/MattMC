@@ -15,7 +15,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.block.model.FaceBakery;
 import net.minecraft.client.renderer.block.model.TextureSlots;
 import net.minecraft.client.resources.model.BlockModelRotation;
 import net.minecraft.client.resources.model.ModelBaker;
@@ -59,7 +58,11 @@ public class BlockModelWrapper implements ItemModel {
 		Set<Vector3f> set = new HashSet();
 
 		for (BakedQuad bakedQuad : list) {
-			FaceBakery.extractPositions(bakedQuad.vertices(), set::add);
+			int[] vertices = bakedQuad.vertices();
+			for (int vertex = 0; vertex < 4; vertex++) {
+				int at = vertex * 8;
+				set.add(new Vector3f(Float.intBitsToFloat(vertices[at]), Float.intBitsToFloat(vertices[at + 1]), Float.intBitsToFloat(vertices[at + 2])));
+			}
 		}
 
 		return (Vector3f[])set.toArray(Vector3f[]::new);

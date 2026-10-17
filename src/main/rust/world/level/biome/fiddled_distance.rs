@@ -1,4 +1,4 @@
-//! Fiddled-distance biome corner selection for a bounded column.
+//! Fiddled-distance biome selection shared by live worlds and surface columns.
 use std::slice;
 const MAX_COLUMN: usize = 4096;
 
@@ -23,6 +23,38 @@ fn jitter(seed: i64, x: i32, y: i32, z: i32) -> [f64; 3] {
         *v = (((s >> 24) & 1023) as f64 / 1024. - 0.5) * 0.9;
     }
     result
+}
+
+/// Frozen's strict first-winner ordering, including Java coordinate wrapping.
+pub(crate) fn corner(seed: i64, block: [i32; 3]) -> i32 {
+    let shifted = block.map(|v| v.wrapping_sub(2));
+    let base = shifted.map(|v| v >> 2);
+    let fraction = shifted.map(|v| (v & 3) as f64 / 4.0);
+    let mut best = f64::INFINITY;
+    let mut winner = 0;
+    for p in 0..8 {
+        let step = [p >> 2, (p >> 1) & 1, p & 1];
+        let pos = std::array::from_fn::<_, 3, _>(|i| base[i].wrapping_add(step[i]));
+        let offset = jitter(seed, pos[0], pos[1], pos[2]);
+        let delta = std::array::from_fn::<_, 3, _>(|i| fraction[i] - step[i] as f64 + offset[i]);
+        let distance = delta[2] * delta[2] + delta[1] * delta[1] + delta[0] * delta[0];
+        if best > distance {
+            best = distance;
+            winner = p;
+        }
+    }
+    winner
+}
+
+pub(crate) fn quart(seed: i64, block: [i32; 3]) -> [i32; 3] {
+    let winner = corner(seed, block);
+    let step = [winner >> 2, (winner >> 1) & 1, winner & 1];
+    std::array::from_fn(|i| (block[i].wrapping_sub(2) >> 2).wrapping_add(step[i]))
+}
+
+#[no_mangle]
+pub extern "C" fn mattmc_biome_corner(seed: i64, x: i32, y: i32, z: i32) -> i32 {
+    corner(seed, [x, y, z])
 }
 
 /// # Safety

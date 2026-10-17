@@ -85,9 +85,12 @@ class AtlasAnimationEncodingTest {
         try (var bridge = VulkanicGalBridge.create("rust-vulkan")) {
             assertThrows(IllegalStateException.class,
                 () -> bridge.stageAtlasAnimationAssets(terrainAtlas, 1, 40, List.of(source)));
-            Status before = bridge.updateWorldMeshAssets(1, List.of(), List.of(texture), List.of());
+            Status update = bridge.updateWorldMeshAssets(1, List.of(), List.of(texture), List.of());
+            // The update is a queued job accounted when it runs; a joining
+            // call gives a baseline that already includes it.
+            Status before = bridge.retire(0);
             Status staged = bridge.stageAtlasAnimationAssets(terrainAtlas, 1, 40, List.of(source));
-            assertEquals(before.submissionId(), staged.submissionId());
+            assertEquals(update.submissionId(), staged.submissionId());
             assertEquals(before.ffiCalls() + 1, staged.ffiCalls());
             assertEquals(48 + 64 + 32 + 32 + 8, staged.ffiInputBytes() - before.ffiInputBytes());
             assertThrows(IllegalStateException.class,

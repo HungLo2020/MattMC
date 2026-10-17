@@ -78,7 +78,8 @@ public class ParticleEngine {
 		if ((!GraphicsAuditTerrainParticleFixture.requested() && !GraphicsAuditAtlasParticleFixture.requested()
 			&& !GraphicsAuditBlockMarkerFixture.requested()
 			&& !GraphicsAuditShriekParticleFixture.requested()
-			&& !GraphicsAuditVibrationParticleFixture.requested())
+			&& !GraphicsAuditVibrationParticleFixture.requested()
+			&& !GraphicsAuditLeafParticleFixture.requested())
 			|| particle.getParticleLimit().isPresent()) {
 			throw new IllegalStateException("Unrequested or limited graphics audit particle");
 		}
@@ -103,6 +104,7 @@ public class ParticleEngine {
 	}
 
 	public void tick() {
+		GraphicsAuditLeafParticleFixture.install(net.minecraft.client.Minecraft.getInstance());
 		this.particles.forEach((particleRenderType, particleGroup) -> {
 			Profiler.get().push(particleRenderType.name());
 			particleGroup.tickParticles();

@@ -39,7 +39,7 @@ use crate::render::shaderpack::lowering::{FullscreenSourceRasterPrimitive, Terra
 use crate::render::shaderpack::programs::{shader_stage_code, LoweredFullscreenSourceProgram};
 use crate::render::shaderpack::resources::color_targets::{
     prepare_fullscreen_source_color_resources, resolve_fullscreen_source_color_attachments,
-    source_color_clear_color, FullscreenSourceColorAttachment, ShaderPackColorBootstrapClearValues,
+    source_color_clear_color, FullscreenSourceColorAttachment, ShaderPackColorClearValues,
     ShaderPackColorFramePlan, ShaderPackColorTargetManifest, ShaderPackColorTargets,
     ShaderPackSourceColorResources,
 };

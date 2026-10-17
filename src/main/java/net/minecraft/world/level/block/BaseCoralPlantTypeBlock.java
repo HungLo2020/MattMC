@@ -26,7 +26,9 @@ public abstract class BaseCoralPlantTypeBlock extends Block implements SimpleWat
 
 	protected BaseCoralPlantTypeBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, true));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, true));
+		}
 	}
 
 	@Override

@@ -23,6 +23,7 @@ import net.minecraft.util.random.Weighted;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.IronBarsBlock;
+import net.minecraft.world.level.block.NativeBlockRegistry;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.StemBlock;
 import net.minecraft.world.level.block.RedStoneWireBlock;
@@ -55,6 +56,9 @@ public final class NativeStaticBlockModelRegistry {
     public static final int STATE_FLAG_BLOCKS_MOTION = 1 << 8;
     public static final int STATE_FLAG_MODEL_FACE_CULLABLE = 1 << 9;
     public static final int STATE_FLAG_FLUID_OVERLAY_TRANSPARENT = 1 << 10;
+    // The flags rendering decides; the rest are block facts from the block registry.
+    private static final int RENDER_OWNED_FLAGS = STATE_FLAG_MODEL | STATE_FLAG_MODEL_FACE_CULLABLE
+            | STATE_FLAG_FLUID_OVERLAY_TRANSPARENT;
 
     public static int fluidOverlayFlags(BlockState state) {
         // Copy the declared resource property used by the ordinary fluid
@@ -104,7 +108,9 @@ public final class NativeStaticBlockModelRegistry {
     private static final int FLUID_SPRITE_LAVA_FLOW = 1 << 9;
 
     private static final Map<Integer, List<TextureAtlasSprite>> MODEL_SPRITES = new java.util.HashMap<>();
-    private static final Map<Integer, List<TextureAtlasSprite>> SELECTOR_SPRITES = new java.util.HashMap<>();
+    // Primitive keys: getSprites runs per block during meshing.
+    private static final it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<List<TextureAtlasSprite>> SELECTOR_SPRITES =
+            new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<>();
 
     private static int nextSelectorId;
     private static int nextModelId;
@@ -250,14 +256,26 @@ public final class NativeStaticBlockModelRegistry {
         }
 
         int flags = fluidOverlayFlags(state);
-        if (state.isAir()) {
-            flags |= STATE_FLAG_AIR;
-        }
         if (selectorId >= 0) {
             flags |= STATE_FLAG_MODEL;
             if (modelHasOnlyCullFaceQuads(model)) {
                 flags |= STATE_FLAG_MODEL_FACE_CULLABLE;
             }
+        }
+        FluidSpriteMetadata fluidSprites = fluidSpriteMetadata(fluidState);
+        int sameBlockSkipMask = sameBlockSkipMask(state);
+        // Rust owns block/fluid facts. Prepare only rendering columns on the
+        // normal path; explicit facts are computed only if the view declines.
+        if (NativeBlockRegistry.ready() && NativeStaticBlockModelCache.registerStateView(stateId, selectorId,
+                flags & RENDER_OWNED_FLAGS, material.bits(), modelPassId, 0, semanticBlockStateId(state),
+                fluidMaterialBits, fluidPassId, fluidBlockId, skipGroup(state, sameBlockSkipMask), sameBlockSkipMask,
+                tintType, (FORCE_JAVA_FLUIDS ? NativeStaticBlockModelCache.CONTROL_JAVA_FLUIDS : 0)
+                    | (isNativeFluidSupported(fluidState) ? NativeStaticBlockModelCache.CONTROL_NATIVE_FLUID : 0),
+                fluidSprites.values(), fluidSprites.overlayValid ? 1 : 0)) {
+            return stateId;
+        }
+        if (state.isAir()) {
+            flags |= STATE_FLAG_AIR;
         }
         if (!FORCE_JAVA_FLUIDS && !fluidState.isEmpty()) {
             flags |= STATE_FLAG_FLUID;
@@ -281,8 +299,6 @@ public final class NativeStaticBlockModelRegistry {
 
         int fluidType = FORCE_JAVA_FLUIDS ? FLUID_NONE : fluidType(fluidState);
         BlockBehaviour.OffsetType offsetType = state.sodium$getOffsetType();
-        FluidSpriteMetadata fluidSprites = fluidSpriteMetadata(fluidState);
-        int sameBlockSkipMask = sameBlockSkipMask(state);
         NativeStaticBlockModelCache.registerState(stateId, selectorId, flags, material.bits(), modelPassId,
 				state.getLightEmission(), 0, semanticBlockStateId(state), fluidMaterialBits, fluidPassId, fluidBlockId,
                 skipGroup(state, sameBlockSkipMask), sameBlockSkipMask, fluidType,
@@ -881,6 +897,20 @@ public final class NativeStaticBlockModelRegistry {
             boolean overlayValid) {
         private static final FluidSpriteMetadata DEFAULT = new FluidSpriteMetadata(FluidSprite.DEFAULT,
                 FluidSprite.DEFAULT, FluidSprite.DEFAULT, false);
+
+        /** The still, flow and overlay sprites as (u0, u1, v0, v1, shrink) each. */
+        private float[] values() {
+            float[] values = new float[15];
+            int at = 0;
+            for (FluidSprite sprite : new FluidSprite[]{this.still, this.flow, this.overlay}) {
+                values[at++] = sprite.u0;
+                values[at++] = sprite.u1;
+                values[at++] = sprite.v0;
+                values[at++] = sprite.v1;
+                values[at++] = sprite.shrink;
+            }
+            return values;
+        }
 
         private FluidSpriteMetadata withFlowFallback() {
             FluidSprite resolvedFlow = this.flow == null ? this.still : this.flow;

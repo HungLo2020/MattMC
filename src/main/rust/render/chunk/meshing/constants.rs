@@ -22,7 +22,8 @@ pub(super) const FLUID_FACE_TOP_NW_SE: i32 = 1;
 pub(super) const FLUID_FACE_BOTTOM: i32 = 2;
 pub(super) const FLUID_FACE_SIDE: i32 = 3;
 pub(super) const NATIVE_SECTION_BLOCK_FLAG_SUPPRESS_FLUID: i32 = 1;
-pub(super) const COMPACT_SECTION_SNAPSHOT_VERSION: i32 = 3;
+pub(super) const NATIVE_SECTION_BLOCK_FLAG_NATIVE_CULL: i32 = 1 << 2;
+pub(super) const COMPACT_SECTION_SNAPSHOT_VERSION: i32 = 5;
 pub(super) const COMPACT_SECTION_PADDED_LENGTH: usize = 18;
 pub(super) const COMPACT_SECTION_BLOCK_COUNT: usize = 16 * 16 * 16;
 pub(super) const POSITION_MAX_VALUE: f32 = (1 << 20) as f32;
@@ -42,10 +43,18 @@ pub(super) const STATE_FLAG_FLUID: i32 = 1 << 2;
 pub(super) const STATE_FLAG_SOLID_RENDER: i32 = 1 << 3;
 pub(super) const STATE_FLAG_FULL_OCCLUSION: i32 = 1 << 4;
 pub(super) const STATE_FLAG_LIGHT_BLOCK: i32 = 1 << 5;
+pub(super) const STATE_FLAG_BLOCK_ENTITY: i32 = 1 << 6;
 pub(super) const STATE_FLAG_CAN_OCCLUDE: i32 = 1 << 7;
 pub(super) const STATE_FLAG_BLOCKS_MOTION: i32 = 1 << 8;
 pub(super) const STATE_FLAG_MODEL_FACE_CULLABLE: i32 = 1 << 9;
 pub(super) const STATE_FLAG_FLUID_OVERLAY_TRANSPARENT: i32 = 1 << 10;
+/// The flags Java owns when the block registry supplies a state's block facts.
+pub(super) const STATE_FLAGS_RENDER_OWNED: i32 =
+    STATE_FLAG_MODEL | STATE_FLAG_MODEL_FACE_CULLABLE | STATE_FLAG_FLUID_OVERLAY_TRANSPARENT;
+/// Registration controls: fluids forced to the Java producer, and a fluid the
+/// native producer supports (`isNativeFluidSupported`).
+pub(super) const STATE_CONTROL_JAVA_FLUIDS: i32 = 1;
+pub(super) const STATE_CONTROL_NATIVE_FLUID: i32 = 1 << 1;
 pub(super) const MODEL_QUAD_FLAG_PARTIAL: i32 = 1;
 pub(super) const MODEL_QUAD_FLAG_PARALLEL: i32 = 1 << 1;
 pub(super) const MODEL_QUAD_FLAG_ALIGNED: i32 = 1 << 2;

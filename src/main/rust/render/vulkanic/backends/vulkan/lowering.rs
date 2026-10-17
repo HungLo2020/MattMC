@@ -4,6 +4,10 @@ use std::sync::Arc;
 use ash::vk;
 use ash::vk::Handle as _;
 use smallvec::SmallVec;
+mod staging;
+mod timeline;
+
+use staging::{StagingChunk, StagingCursor};
 
 use super::device::VulkanContext;
 use super::resources::VulkanObjects;
@@ -38,6 +42,8 @@ pub(super) struct VulkanLoweringMetrics {
     pub(super) gpu_timestamp_status: u64,
     pub(super) gpu_scope_nanos: [u64; GPU_PROFILE_SCOPE_COUNT],
     pub(super) gpu_frame_total_nanos: u64,
+    /// Native staging chunks created; reuse keeps this flat in steady state.
+    pub(super) staging_chunks_created: u64,
 }
 
 pub(super) struct SubmissionLowerer {
@@ -55,6 +61,8 @@ pub(super) struct SubmissionLowerer {
     statistics_scope_names: fn(u8) -> &'static str,
     live_command_buffers: HashSet<vk::CommandBuffer>,
     recycled_command_buffers: Vec<vk::CommandBuffer>,
+    /// Retired upload staging, reused by later encodes (bounded).
+    idle_staging: Vec<StagingChunk>,
     // Swapchain acquisition signals bounded binary semaphores. A semaphore is
     // returned to this pool only after the timeline proves that the submission
     // which waited on it has completed.
@@ -70,8 +78,10 @@ pub(super) struct SubmissionLowerer {
 }
 
 const GPU_TIMESTAMP_SET_COUNT: u32 = 8;
-// Frame start/end plus a start/end pair per profiling scope.
-const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 2 + 2 * GPU_PROFILE_SCOPE_COUNT as u32;
+// A scope can recur in disjoint passes. Each span owns one query pair;
+// overwriting the same scope's queries is invalid and loses earlier work.
+const GPU_TIMESTAMP_SPAN_COUNT: usize = 128;
+const GPU_TIMESTAMP_QUERIES_PER_SET: u32 = 2 + 2 * GPU_TIMESTAMP_SPAN_COUNT as u32;
 const PIPELINE_STATISTICS_SET_COUNT: u32 = 8;
 const PIPELINE_STATISTICS_PASS_QUERY_COUNT: u32 = 12;
 const PIPELINE_STATISTICS_QUERIES_PER_SET: u32 = PIPELINE_STATISTICS_PASS_QUERY_COUNT;
@@ -90,22 +100,53 @@ const MAX_COMPLETED_HOST_READ_BYTES: usize = 64 * 1024 * 1024;
 const FRAME_START_QUERY: u32 = 0;
 const FRAME_END_QUERY: u32 = 1;
 
-fn scope_start_query(scope: u8) -> u32 {
-    2 + 2 * u32::from(scope)
+fn span_start_query(span: u8) -> u32 {
+    2 + 2 * u32::from(span)
 }
 
-fn scope_end_query(scope: u8) -> u32 {
-    3 + 2 * u32::from(scope)
+fn span_end_query(span: u8) -> u32 {
+    3 + 2 * u32::from(span)
 }
 
 fn unnamed_profile_scope(_scope: u8) -> &'static str {
     "unnamed"
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct GpuTimestampSet {
     base_query: u32,
     active: bool,
+    span_count: u8,
+    span_scopes: [u8; GPU_TIMESTAMP_SPAN_COUNT],
+    overflowed: bool,
+}
+
+impl Default for GpuTimestampSet {
+    fn default() -> Self {
+        Self {
+            base_query: 0,
+            active: false,
+            span_count: 0,
+            span_scopes: [0; GPU_TIMESTAMP_SPAN_COUNT],
+            overflowed: false,
+        }
+    }
+}
+
+impl GpuTimestampSet {
+    fn allocate_span(&mut self, scope: u8) -> Option<u8> {
+        if !self.active {
+            return None;
+        }
+        if usize::from(self.span_count) == GPU_TIMESTAMP_SPAN_COUNT {
+            self.overflowed = true;
+            return None;
+        }
+        let span = self.span_count;
+        self.span_scopes[usize::from(span)] = scope;
+        self.span_count += 1;
+        Some(span)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -185,6 +226,7 @@ impl SubmissionLowerer {
             statistics_scope_names: unnamed_profile_scope,
             live_command_buffers: HashSet::new(),
             recycled_command_buffers: Vec::new(),
+            idle_staging: Vec::new(),
             acquire_semaphores: Vec::new(),
             available_acquire_semaphores: Vec::new(),
             present_semaphores: HashMap::new(),
@@ -199,11 +241,11 @@ impl SubmissionLowerer {
     ) -> GalResult<()> {
         let trace_submissions = trace_submissions_enabled();
         if trace_submissions {
-            println!(
+            trace::stdout(format_args!(
                 "vulkan.encode.batch label={} lists={}",
                 sanitize_label(&batch.label),
                 batch.command_lists.len()
-            );
+            ));
         }
         let alloc_started = std::time::Instant::now();
         let timestamp_set = self.allocate_timestamp_set();
@@ -214,6 +256,7 @@ impl SubmissionLowerer {
         let _zone = trace::Zone::new("vulkan.lowering.command-recording");
         let mut state = EncodingState {
             timestamp_set,
+            staging: StagingCursor::with_idle(std::mem::take(&mut self.idle_staging)),
             ..EncodingState::default()
         };
         let mut command_buffers = Vec::with_capacity(batch.command_lists.len().max(1));
@@ -266,12 +309,14 @@ impl SubmissionLowerer {
                     .command_buffer_begin_nanos
                     .saturating_add(elapsed_nanos_u64(begin_started));
                 let recording_started = std::time::Instant::now();
-                unsafe {
-                    self.context.begin_label(
-                        command_buffer,
-                        &format!("gal.batch.{}", sanitize_label(&batch.label)),
-                    )
-                };
+                if self.context.command_labels {
+                    unsafe {
+                        self.context.begin_label(
+                            command_buffer,
+                            &format!("gal.batch.{}", sanitize_label(&batch.label)),
+                        )
+                    };
+                }
                 if index == 0 {
                     if let (Some(pool), true) = (self.timestamp_pool, timestamp_set.active) {
                         unsafe {
@@ -305,18 +350,20 @@ impl SubmissionLowerer {
                 }
                 if let Some(list) = batch.command_lists.get(index) {
                     if trace_submissions {
-                        println!(
+                        trace::stdout(format_args!(
                             "vulkan.encode.list label={} ops={}",
                             sanitize_label(&list.label),
                             list.operations.len()
-                        );
+                        ));
                     }
-                    unsafe {
-                        self.context.begin_label(
-                            command_buffer,
-                            &format!("gal.command-list.{}", sanitize_label(&list.label)),
-                        )
-                    };
+                    if self.context.command_labels {
+                        unsafe {
+                            self.context.begin_label(
+                                command_buffer,
+                                &format!("gal.command-list.{}", sanitize_label(&list.label)),
+                            )
+                        };
+                    }
                     let mut op_index = 0usize;
                     while op_index < list.operations.len() {
                         // Consecutive barriers have no intervening command that
@@ -358,17 +405,42 @@ impl SubmissionLowerer {
                                 continue;
                             }
                         }
+                        // A run of host writes to distinct buffers (the GAL
+                        // gathers them at the start of a list) shares one
+                        // dependency on each side instead of draining per write.
+                        if matches!(list.operations[op_index], CommandOp::HostWriteBuffer { .. }) {
+                            let start = op_index;
+                            let mut end = op_index;
+                            let mut buffers = HashSet::new();
+                            while let Some(CommandOp::HostWriteBuffer { buffer, .. }) = list.operations.get(end) {
+                                if !buffers.insert(*buffer) {
+                                    break;
+                                }
+                                end += 1;
+                            }
+                            if end - start > 1 {
+                                self.encode_host_write_group(
+                                    objects,
+                                    command_buffer,
+                                    &mut state,
+                                    &list.operations[start..end],
+                                    &list.operations[end..],
+                                )?;
+                                op_index = end;
+                                continue;
+                            }
+                        }
                         let op = &list.operations[op_index];
                         let following_publication_barrier = following_shader_read_publication(
                             op,
                             list.operations.get(op_index + 1),
                         );
                         if trace_submissions {
-                            println!(
+                            trace::stdout(format_args!(
                                 "vulkan.encode.begin cb=0x{:016x} op={}",
                                 command_buffer.as_raw(),
                                 command_op_kind(op)
-                            );
+                            ));
                         }
                         self.encode_op(
                             objects,
@@ -378,11 +450,11 @@ impl SubmissionLowerer {
                             following_publication_barrier,
                         )?;
                         if trace_submissions {
-                            println!(
+                            trace::stdout(format_args!(
                                 "vulkan.encode.end cb=0x{:016x} op={}",
                                 command_buffer.as_raw(),
                                 command_op_kind(op)
-                            );
+                            ));
                         }
                         op_index += 1;
                     }
@@ -438,7 +510,15 @@ impl SubmissionLowerer {
             }
             Ok(())
         })();
+        self.metrics.staging_chunks_created = self
+            .metrics
+            .staging_chunks_created
+            .saturating_add(state.staging.chunks_created);
+        let staging = std::mem::take(&mut state.staging);
+        self.idle_staging = staging.idle;
         if let Err(error) = result {
+            // Never submitted: the GPU cannot read these chunks.
+            staging::recycle_chunks(&mut self.idle_staging, staging.used);
             self.free_command_buffers(&command_buffers)?;
             self.metrics.command_buffers_freed += command_buffers.len() as u64;
             return Err(error);
@@ -446,8 +526,8 @@ impl SubmissionLowerer {
         self.pending.push_back(EncodedSubmission {
             command_buffers,
             host_reads: state.host_reads,
-            uploads: state.uploads,
-            timestamp_set,
+            uploads: staging.used,
+            timestamp_set: state.timestamp_set,
             pipeline_statistics_set: state.pipeline_statistics_set,
             present_image_index,
         });
@@ -548,7 +628,7 @@ impl SubmissionLowerer {
             uploads: encoded.uploads,
             timestamp_set: encoded.timestamp_set,
             pipeline_statistics_set: encoded.pipeline_statistics_set,
-            publishes_frame_timestamps: encoded.present_image_index.is_some(),
+            present_image_index: encoded.present_image_index,
             acquire_wait_semaphore,
         });
         if let (Some(image_index), Some(semaphore)) =
@@ -561,16 +641,33 @@ impl SubmissionLowerer {
             self.in_flight.len() <= MAX_IN_FLIGHT_SUBMISSIONS,
             "Vulkan lowerer exceeded its bounded in-flight submission window"
         );
-        if trace_submissions_enabled() {
-            println!(
-                "vulkan.submission.ownership id={} pending={} in_flight={} live_command_buffers={} allocated={} freed={}",
+        if trace_submissions_enabled() || trace_gpu_overlap_enabled() {
+            // Acquisition ownership is not GPU completion. Sample the actual
+            // timeline without waiting or changing retirement state, and
+            // distinguish frame presents from offscreen/update submissions.
+            let sample_wall_start_ns = timeline::wall_time_ns();
+            let gpu_sample = match unsafe {
+                self.context.device.get_semaphore_counter_value(self.context.timeline)
+            } {
+                Ok(completed) => timeline::GpuOverlapSample::from_submissions(
+                    completed,
+                    self.in_flight.iter().map(|entry| (entry.id.0, entry.present_image_index)),
+                ).fields(),
+                Err(error) => format!("gpu_sample=error gpu_error={error:?} gpu_incomplete_images=unknown"),
+            };
+            let sample_wall_end_ns = timeline::wall_time_ns();
+            trace::stdout(format_args!(
+                "vulkan.submission.ownership id={} pending={} in_flight={} live_command_buffers={} allocated={} freed={} {} gpu_sample_wall_start_ns={} gpu_sample_wall_end_ns={}",
                 id.0,
                 self.pending.len(),
                 self.in_flight.len(),
                 self.live_command_buffers.len(),
                 self.metrics.command_buffers_allocated,
                 self.metrics.command_buffers_freed,
-            );
+                gpu_sample,
+                sample_wall_start_ns,
+                sample_wall_end_ns,
+            ));
         }
         Ok(())
     }
@@ -592,7 +689,8 @@ impl SubmissionLowerer {
             if front.id > self.completed {
                 break;
             }
-            let complete = self.in_flight.pop_front().expect("front existed");
+            let mut complete = self.in_flight.pop_front().expect("front existed");
+            staging::recycle_chunks(&mut self.idle_staging, std::mem::take(&mut complete.uploads));
             self.complete_host_reads(&complete);
             self.complete_gpu_timestamps(&complete);
             self.complete_pipeline_statistics(&complete);
@@ -612,10 +710,11 @@ impl SubmissionLowerer {
             let _zone = trace::Zone::new("vulkan.backend.wait-timeline");
             let wait_started = std::time::Instant::now();
             let context = &self.context;
-            let complete = wait_then_pop_front(&mut self.in_flight, |entry| {
+            let mut complete = wait_then_pop_front(&mut self.in_flight, |entry| {
                 wait_timeline(context, entry.id)
             })?
             .expect("front existed");
+            staging::recycle_chunks(&mut self.idle_staging, std::mem::take(&mut complete.uploads));
             self.metrics.timeline_wait_nanos = self
                 .metrics
                 .timeline_wait_nanos
@@ -819,6 +918,7 @@ impl SubmissionLowerer {
                 return GpuTimestampSet {
                     base_query,
                     active: true,
+                    ..GpuTimestampSet::default()
                 };
             }
         }
@@ -894,25 +994,28 @@ impl SubmissionLowerer {
         if state.current_timestamp_pass.map(|span| span.scope) == next.map(|span| span.scope) {
             return;
         }
-        if let Some(current) = state.current_timestamp_pass {
+        if let Some(query_span) = state.current_timestamp_query.take() {
             unsafe {
                 self.write_timestamp(
                     command_buffer,
                     state,
-                    scope_end_query(current.scope),
+                    span_end_query(query_span),
                     vk::PipelineStageFlags::BOTTOM_OF_PIPE,
                 );
             }
         }
         state.current_timestamp_pass = next;
         if let Some(next) = state.current_timestamp_pass {
-            unsafe {
-                self.write_timestamp(
-                    command_buffer,
-                    state,
-                    scope_start_query(next.scope),
-                    vk::PipelineStageFlags::TOP_OF_PIPE,
-                );
+            state.current_timestamp_query = state.timestamp_set.allocate_span(next.scope);
+            if let Some(query_span) = state.current_timestamp_query {
+                unsafe {
+                    self.write_timestamp(
+                        command_buffer,
+                        state,
+                        span_start_query(query_span),
+                        vk::PipelineStageFlags::TOP_OF_PIPE,
+                    );
+                }
             }
         }
     }
@@ -1034,6 +1137,100 @@ impl SubmissionLowerer {
     /// The GAL stream remains the source of truth: callers still retain every
     /// barrier for validation and profiling, and repeated handles are kept on
     /// the single-barrier path so a layout transition cannot be reordered.
+    /// Lowers consecutive host writes to distinct buffers with one barrier
+    /// before them and one after, omitting the after side for buffers the
+    /// barriers that follow publish to shader reads themselves.
+    fn encode_host_write_group(
+        &self,
+        objects: &VulkanObjects,
+        command_buffer: vk::CommandBuffer,
+        state: &mut EncodingState,
+        writes: &[CommandOp],
+        following: &[CommandOp],
+    ) -> GalResult<()> {
+        let _zone = trace::Zone::new("vulkan.lowering.host-write-group");
+        let published = |target: Handle| {
+            following
+                .iter()
+                .map_while(|op| match op {
+                    CommandOp::Barrier(barrier) => Some(barrier),
+                    _ => None,
+                })
+                .any(|barrier| {
+                    barrier.resource == target
+                        && barrier.before == TextureUsageState::TransferDst
+                        && barrier.after == TextureUsageState::ShaderRead
+                })
+        };
+        let mut before = Vec::with_capacity(writes.len());
+        let mut after = Vec::with_capacity(writes.len());
+        for op in writes {
+            let CommandOp::HostWriteBuffer { buffer: handle, offset, data } = op else {
+                return Err(GalError::backend("non-write operation reached Vulkan host-write group"));
+            };
+            if data.is_empty() {
+                continue;
+            }
+            let buffer = objects.buffer(*handle)?;
+            // Order reuse against reads/writes in earlier submissions too.
+            before.push(
+                vk::BufferMemoryBarrier2::default()
+                    .src_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
+                    .src_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE)
+                    .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                    .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                    .buffer(buffer.buffer)
+                    .offset(*offset)
+                    .size(data.len() as u64),
+            );
+            if !published(*handle) {
+                after.push(
+                    vk::BufferMemoryBarrier2::default()
+                        .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                        .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                        .dst_stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
+                        .dst_access_mask(vk::AccessFlags2::MEMORY_READ | vk::AccessFlags2::MEMORY_WRITE)
+                        .buffer(buffer.buffer)
+                        .offset(*offset)
+                        .size(data.len() as u64),
+                );
+            }
+        }
+        unsafe {
+            if !before.is_empty() {
+                self.context.device.cmd_pipeline_barrier2(
+                    command_buffer,
+                    &vk::DependencyInfo::default().buffer_memory_barriers(&before),
+                );
+            }
+            for op in writes {
+                let CommandOp::HostWriteBuffer { buffer: handle, offset, data } = op else {
+                    unreachable!("validated above");
+                };
+                if data.is_empty() {
+                    continue;
+                }
+                let buffer = objects.buffer(*handle)?;
+                if *offset % 4 == 0 && data.len() % 4 == 0 && data.len() <= 65_536 {
+                    self.context.device.cmd_update_buffer(command_buffer, buffer.buffer, *offset, data);
+                } else {
+                    // Staging is owned by this submission until its timeline retires.
+                    let (source, source_offset) = state.staging.stage(&self.context, data)?;
+                    self.context.device.cmd_copy_buffer(command_buffer, source, buffer.buffer,
+                        &[vk::BufferCopy::default().src_offset(source_offset)
+                            .dst_offset(*offset).size(data.len() as u64)]);
+                }
+            }
+            if !after.is_empty() {
+                self.context.device.cmd_pipeline_barrier2(
+                    command_buffer,
+                    &vk::DependencyInfo::default().buffer_memory_barriers(&after),
+                );
+            }
+        }
+        Ok(())
+    }
+
     fn encode_barrier_group(
         &self,
         objects: &VulkanObjects,
@@ -1088,7 +1285,7 @@ impl SubmissionLowerer {
                 if trace_barrier_label_filter()
                     .is_some_and(|filter| texture.label.contains(filter))
                 {
-                    println!(
+                    trace::stdout(format_args!(
                         "vulkan.barrier resource=0x{:016x} texture=0x{:016x} label={} before={:?} after={:?} mip={}..{} layer={}..{}",
                         barrier.resource.raw(),
                         texture_handle.raw(),
@@ -1099,7 +1296,7 @@ impl SubmissionLowerer {
                         range.mip_count,
                         range.base_layer,
                         range.layer_count,
-                    );
+                    ));
                 }
                 image_barriers.push(
                     vk::ImageMemoryBarrier2::default()
@@ -1179,12 +1376,12 @@ impl SubmissionLowerer {
                     depth_stencil,
                 } => {
                     if trace_submissions_enabled() {
-                        println!(
+                        trace::stdout(format_args!(
                             "vulkan.begin-pass target=0x{:016x} colors={} depth={}",
                             target.raw(),
                             colors.len(),
                             depth_stencil.is_some()
-                        );
+                        ));
                     }
                     let pass_object = objects.render_pass(*pass)?;
                     let timestamp_pass = TimingSpan::from_tag(pass_object.profile_tag);
@@ -1192,17 +1389,11 @@ impl SubmissionLowerer {
                         .profile_tag
                         .statistics_scope
                         .filter(|scope| usize::from(*scope) < GPU_PROFILE_SCOPE_COUNT);
-                    if let Some(span) = timestamp_pass {
-                        self.write_timestamp(
-                            command_buffer,
-                            state,
-                            scope_start_query(span.scope),
-                            vk::PipelineStageFlags::TOP_OF_PIPE,
-                        );
+                    self.switch_timestamp_pass(command_buffer, state, timestamp_pass);
+                    if self.context.command_labels {
+                        self.context
+                            .begin_label(command_buffer, &format!("gal.pass.0x{:016x}", pass.raw()));
                     }
-                    state.current_timestamp_pass = timestamp_pass;
-                    self.context
-                        .begin_label(command_buffer, &format!("gal.pass.0x{:016x}", pass.raw()));
                     if pass_object.target != *target {
                         return Err(GalError::backend(
                             "render pass target mismatch during lowering",
@@ -1424,14 +1615,7 @@ impl SubmissionLowerer {
                 CommandOp::EndPass => {
                     self.switch_pipeline_statistics_pass(command_buffer, state, None);
                     self.context.device.cmd_end_rendering(command_buffer);
-                    if let Some(span) = state.current_timestamp_pass {
-                        self.write_timestamp(
-                            command_buffer,
-                            state,
-                            scope_end_query(span.scope),
-                            vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-                        );
-                    }
+                    self.switch_timestamp_pass(command_buffer, state, None);
                     if let Some(present) = state.frame_present.take() {
                         state.pending_frame_presents.insert(present.target, present);
                     }
@@ -1523,13 +1707,13 @@ impl SubmissionLowerer {
                     dynamic_offsets,
                 } => {
                     if trace_resource_binding_ops_enabled() {
-                        eprintln!(
+                        trace::stderr(format_args!(
                             "vulkan.bind-resource-set layout={:?} set_index={} set={:?} dynamic_offsets={:?}",
                             pipeline_layout,
                             set_index,
                             set,
                             dynamic_offsets,
-                        );
+                        ));
                     }
                     let layout = objects.pipeline_layout(*pipeline_layout)?;
                     let set = objects.resource_set(*set)?;
@@ -1710,7 +1894,7 @@ impl SubmissionLowerer {
                     let buffer = objects.buffer(region.buffer)?;
                     let texture = objects.texture(region.texture)?;
                     if trace_resource_binding_ops_enabled() {
-                        eprintln!(
+                        trace::stderr(format_args!(
                             "vulkan.copy-buffer-to-texture buffer={:?} texture={:?} label={} offset={} row={} rows={} extent={}x{}x{}",
                             region.buffer,
                             region.texture,
@@ -1721,7 +1905,7 @@ impl SubmissionLowerer {
                             region.extent.width,
                             region.extent.height,
                             region.extent.depth,
-                        );
+                        ));
                     }
                     let copy =
                         buffer_image_copy(region, texture.aspect, texture.copy_bytes_per_texel);
@@ -2082,11 +2266,11 @@ impl SubmissionLowerer {
                     if *offset % 4 == 0 && data.len() % 4 == 0 && data.len() <= 65_536 {
                         self.context.device.cmd_update_buffer(command_buffer, buffer.buffer, *offset, data);
                     } else {
-                        let upload = SubmissionUpload::new(self.context.clone(), data)?;
-                        self.context.device.cmd_copy_buffer(command_buffer, upload.buffer, buffer.buffer,
-                            &[vk::BufferCopy::default().src_offset(0).dst_offset(*offset).size(data.len() as u64)]);
-                        // Ownership follows the submission until its timeline retires.
-                        state.uploads.push(upload);
+                        // Staging is owned by this submission until its timeline retires.
+                        let (source, source_offset) = state.staging.stage(&self.context, data)?;
+                        self.context.device.cmd_copy_buffer(command_buffer, source, buffer.buffer,
+                            &[vk::BufferCopy::default().src_offset(source_offset)
+                                .dst_offset(*offset).size(data.len() as u64)]);
                     }
                     if !following_publication_barrier {
                         let after = vk::BufferMemoryBarrier2::default()
@@ -2214,20 +2398,20 @@ impl SubmissionLowerer {
         // but their few-microsecond spans are not GPU frame measurements. Keep
         // the last completed presented frame visible until a newer presented
         // frame retires.
-        if !complete.publishes_frame_timestamps {
+        if complete.present_image_index.is_none() {
             return;
         }
         let Some(pool) = self.timestamp_pool else {
             self.apply_gpu_timestamp_result(GpuTimestampResult::default());
             return;
         };
-        if !complete.timestamp_set.active {
+        if !complete.timestamp_set.active || complete.timestamp_set.overflowed {
             self.apply_gpu_timestamp_result(GpuTimestampResult::default());
             return;
         }
         let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
         let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
-        for query in 0..GPU_TIMESTAMP_QUERIES_PER_SET {
+        for query in 0..(2 + 2 * u32::from(complete.timestamp_set.span_count)) {
             let mut value = [0_u64; 1];
             let result = unsafe {
                 self.context.device.get_query_pool_results(
@@ -2249,8 +2433,12 @@ impl SubmissionLowerer {
                 }
             }
         }
-        let mut result =
-            decode_gpu_timestamp_result(&values, &ready, self.context.timestamp_period);
+        let mut result = decode_gpu_timestamp_result(
+            &values,
+            &ready,
+            self.context.timestamp_period,
+            &complete.timestamp_set.span_scopes[..usize::from(complete.timestamp_set.span_count)],
+        );
         if result.status != 0 {
             // A nonzero value identifies the exact asynchronously completed
             // presentation submission. Consumers can therefore avoid sampling
@@ -2260,20 +2448,20 @@ impl SubmissionLowerer {
                 std::env::var("MATTMC_RUST_VULKAN_SCOPE_TIMESTAMPS").as_deref(),
                 Ok("1" | "true" | "TRUE")
             ) {
-                println!(
+                trace::stdout(format_args!(
                     "vulkan.scope-timestamps submission={} scope_nanos={:?} frame_total_nanos={} timestamp_period={} values={values:?} ready={ready:?}",
                     complete.id.0,
                     result.scope_nanos,
                     result.frame_total_nanos,
                     self.context.timestamp_period,
-                );
+                ));
             }
         }
         self.apply_gpu_timestamp_result(result);
     }
 
     fn complete_pipeline_statistics(&mut self, complete: &InFlightSubmission) {
-        if !complete.publishes_frame_timestamps || !complete.pipeline_statistics_set.active {
+        if complete.present_image_index.is_none() || !complete.pipeline_statistics_set.active {
             return;
         }
         let Some(pool) = self.pipeline_statistics_pool else {
@@ -2300,7 +2488,7 @@ impl SubmissionLowerer {
                         *total = total.saturating_add(value);
                     }
                 }
-                Ok(values) => println!(
+                Ok(values) => trace::stdout(format_args!(
                     "vulkan.pipeline-pass-stats submission={} pass={} input_vertices={} input_primitives={} vertex_invocations={} clipping_invocations={} clipping_primitives={} fragment_invocations={} compute_invocations={}",
                     complete.id.0,
                     kind,
@@ -2311,17 +2499,17 @@ impl SubmissionLowerer {
                     values.values[4],
                     values.values[5],
                     values.values[6],
-                ),
+                )),
                 Err(vk::Result::NOT_READY) => totals_ready = false,
-                Err(error) => eprintln!(
+                Err(error) => trace::stderr(format_args!(
                     "vulkan.pipeline-pass-stats read failed submission={} pass={} error={error:?}",
                     complete.id.0,
                     kind,
-                ),
+                )),
             }
         }
         if aggregate && totals_ready {
-            println!(
+            trace::stdout(format_args!(
                 "vulkan.pipeline-stats submission={} input_vertices={} input_primitives={} vertex_invocations={} clipping_invocations={} clipping_primitives={} fragment_invocations={} compute_invocations={}",
                 complete.id.0,
                 totals.values[0],
@@ -2331,7 +2519,7 @@ impl SubmissionLowerer {
                 totals.values[4],
                 totals.values[5],
                 totals.values[6],
-            );
+            ));
         }
     }
 
@@ -2485,6 +2673,7 @@ fn decode_gpu_timestamp_result(
     values: &[u64],
     ready: &[bool],
     timestamp_period: f32,
+    span_scopes: &[u8],
 ) -> GpuTimestampResult {
     let ready_delta = |start: u32, end: u32| -> u64 {
         let (start, end) = (start as usize, end as usize);
@@ -2501,8 +2690,13 @@ fn decode_gpu_timestamp_result(
     };
     let frame_total = ready_delta(FRAME_START_QUERY, FRAME_END_QUERY);
     let mut scope_nanos = [0_u64; GPU_PROFILE_SCOPE_COUNT];
-    for (scope, nanos) in scope_nanos.iter_mut().enumerate() {
-        *nanos = ready_delta(scope_start_query(scope as u8), scope_end_query(scope as u8));
+    for (span, scope) in span_scopes.iter().copied().enumerate() {
+        if let Some(nanos) = scope_nanos.get_mut(usize::from(scope)) {
+            *nanos = nanos.saturating_add(ready_delta(
+                span_start_query(span as u8),
+                span_end_query(span as u8),
+            ));
+        }
     }
     GpuTimestampResult {
         status: u64::from(frame_total > 0),
@@ -2514,6 +2708,43 @@ fn decode_gpu_timestamp_result(
 #[cfg(test)]
 mod timestamp_tests {
     use super::*;
+
+    fn decode_fixed_scopes(values: &[u64], ready: &[bool], period: f32) -> GpuTimestampResult {
+        let scopes: Vec<_> = (0..GPU_PROFILE_SCOPE_COUNT as u8).collect();
+        decode_gpu_timestamp_result(values, ready, period, &scopes)
+    }
+
+    #[test]
+    fn repeated_gpu_scopes_have_unique_queries_and_sum_disjoint_spans() {
+        let mut set = GpuTimestampSet {
+            active: true,
+            ..Default::default()
+        };
+        assert_eq!(Some(0), set.allocate_span(3));
+        assert_eq!(Some(1), set.allocate_span(7));
+        assert_eq!(Some(2), set.allocate_span(3));
+        let values = [100, 180, 110, 120, 130, 150, 160, 170];
+        let ready = [true; 8];
+        let result = decode_gpu_timestamp_result(&values, &ready, 2.0, &set.span_scopes[..3]);
+        assert_eq!(160, result.frame_total_nanos);
+        assert_eq!(40, result.scope_nanos[3]);
+        assert_eq!(40, result.scope_nanos[7]);
+        assert_eq!(1, result.status);
+    }
+
+    #[test]
+    fn gpu_timestamp_spans_are_bounded_without_reusing_written_queries() {
+        let mut set = GpuTimestampSet {
+            active: true,
+            ..Default::default()
+        };
+        for index in 0..GPU_TIMESTAMP_SPAN_COUNT {
+            assert_eq!(Some(index as u8), set.allocate_span(0));
+        }
+        assert_eq!(None, set.allocate_span(0));
+        assert!(set.overflowed);
+        assert_eq!(GPU_TIMESTAMP_SPAN_COUNT, usize::from(set.span_count));
+    }
 
     #[test]
     fn indirect_draws_split_when_multi_draw_is_not_enabled() {
@@ -2726,18 +2957,18 @@ mod timestamp_tests {
         let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
         for (query, value) in [
             (FRAME_START_QUERY, 10),
-            (scope_start_query(0), 12),
-            (scope_end_query(0), 18),
-            (scope_start_query(7), 19),
-            (scope_end_query(7), 27),
-            (scope_start_query(11), 27),
-            (scope_end_query(11), 29),
+            (span_start_query(0), 12),
+            (span_end_query(0), 18),
+            (span_start_query(7), 19),
+            (span_end_query(7), 27),
+            (span_start_query(11), 27),
+            (span_end_query(11), 29),
             (FRAME_END_QUERY, 30),
         ] {
             values[query as usize] = value;
             ready[query as usize] = true;
         }
-        let result = decode_gpu_timestamp_result(&values, &ready, 2.0);
+        let result = decode_fixed_scopes(&values, &ready, 2.0);
         assert_eq!(1, result.status);
         assert_eq!(12, result.scope_nanos[0]);
         assert_eq!(16, result.scope_nanos[7]);
@@ -2750,7 +2981,7 @@ mod timestamp_tests {
     fn gpu_timestamp_decoder_reports_unavailable_for_unwritten_first_frame() {
         let values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
         let ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
-        let result = decode_gpu_timestamp_result(&values, &ready, 1.0);
+        let result = decode_fixed_scopes(&values, &ready, 1.0);
         assert_eq!(0, result.status);
         assert_eq!(0, result.frame_total_nanos);
     }
@@ -2759,14 +2990,14 @@ mod timestamp_tests {
     fn gpu_timestamp_decoder_keeps_written_scope_when_other_queries_are_unavailable() {
         let mut values = [0_u64; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
         let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
-        for query in [FRAME_START_QUERY, FRAME_END_QUERY, scope_start_query(1), scope_end_query(1)] {
+        for query in [FRAME_START_QUERY, FRAME_END_QUERY, span_start_query(1), span_end_query(1)] {
             ready[query as usize] = true;
         }
         values[FRAME_START_QUERY as usize] = 100;
-        values[scope_start_query(1) as usize] = 110;
-        values[scope_end_query(1) as usize] = 160;
+        values[span_start_query(1) as usize] = 110;
+        values[span_end_query(1) as usize] = 160;
         values[FRAME_END_QUERY as usize] = 200;
-        let result = decode_gpu_timestamp_result(&values, &ready, 1.5);
+        let result = decode_fixed_scopes(&values, &ready, 1.5);
         assert_eq!(1, result.status);
         assert_eq!(150, result.frame_total_nanos);
         assert_eq!(75, result.scope_nanos[1]);
@@ -2779,12 +3010,12 @@ mod timestamp_tests {
         let mut ready = [false; GPU_TIMESTAMP_QUERIES_PER_SET as usize];
         ready[FRAME_START_QUERY as usize] = true;
         ready[FRAME_END_QUERY as usize] = true;
-        ready[scope_start_query(2) as usize] = true;
+        ready[span_start_query(2) as usize] = true;
         values[FRAME_START_QUERY as usize] = 3;
         values[FRAME_END_QUERY as usize] = 9;
-        values[scope_start_query(2) as usize] = 4;
-        values[scope_end_query(2) as usize] = 8;
-        let result = decode_gpu_timestamp_result(&values, &ready, 10.0);
+        values[span_start_query(2) as usize] = 4;
+        values[span_end_query(2) as usize] = 8;
+        let result = decode_fixed_scopes(&values, &ready, 10.0);
         assert_eq!(1, result.status);
         assert_eq!(60, result.frame_total_nanos);
         assert_eq!(0, result.scope_nanos[2]);
@@ -2920,41 +3151,6 @@ mod timestamp_tests {
 
 }
 
-// RAII also releases staging allocations when encoding or submission fails.
-struct SubmissionUpload {
-    context: Arc<VulkanContext>,
-    buffer: vk::Buffer,
-    memory: vk::DeviceMemory,
-}
-
-impl SubmissionUpload {
-    fn new(context: Arc<VulkanContext>, bytes: &[u8]) -> GalResult<Self> {
-        let info = vk::BufferCreateInfo::default().size(bytes.len() as u64)
-            .usage(vk::BufferUsageFlags::TRANSFER_SRC).sharing_mode(vk::SharingMode::EXCLUSIVE);
-        let buffer = unsafe { context.device.create_buffer(&info, None) }
-            .map_err(|e| GalError::backend(format!("upload buffer creation failed: {e:?}")))?;
-        let mut upload = Self { context, buffer, memory: vk::DeviceMemory::null() };
-        let requirements = unsafe { upload.context.device.get_buffer_memory_requirements(buffer) };
-        upload.memory = upload.context.allocate_memory(requirements,
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT)?;
-        unsafe { upload.context.device.bind_buffer_memory(buffer, upload.memory, 0) }
-            .map_err(|e| GalError::backend(format!("upload buffer binding failed: {e:?}")))?;
-        upload.context.write_mapped_memory(upload.memory, 0, bytes)?;
-        Ok(upload)
-    }
-}
-
-impl Drop for SubmissionUpload {
-    fn drop(&mut self) {
-        unsafe {
-            self.context.device.destroy_buffer(self.buffer, None);
-            if self.memory != vk::DeviceMemory::null() {
-                self.context.device.free_memory(self.memory, None);
-            }
-        }
-    }
-}
-
 #[derive(Default)]
 struct EncodingState {
     pass_extent: Option<crate::render::vulkanic::resources::Extent3d>,
@@ -2969,10 +3165,11 @@ struct EncodingState {
     transfer_dst_textures: BTreeSet<Handle>,
     pending_frame_presents: BTreeMap<Handle, FramePresentTransition>,
     host_reads: Vec<HostReadRequest>,
-    uploads: Vec<SubmissionUpload>,
+    staging: StagingCursor,
     timestamp_set: GpuTimestampSet,
     pipeline_statistics_set: PipelineStatisticsSet,
     current_timestamp_pass: Option<TimingSpan>,
+    current_timestamp_query: Option<u8>,
     current_pipeline_statistics_pass: Option<u32>,
     current_pipeline_statistics_kind: Option<u8>,
 }
@@ -2988,7 +3185,7 @@ struct FramePresentTransition {
 struct EncodedSubmission {
     command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
-    uploads: Vec<SubmissionUpload>,
+    uploads: Vec<StagingChunk>,
     timestamp_set: GpuTimestampSet,
     pipeline_statistics_set: PipelineStatisticsSet,
     present_image_index: Option<u32>,
@@ -2998,10 +3195,10 @@ struct InFlightSubmission {
     id: SubmissionId,
     command_buffers: Vec<vk::CommandBuffer>,
     host_reads: Vec<HostReadRequest>,
-    uploads: Vec<SubmissionUpload>,
+    uploads: Vec<StagingChunk>,
     timestamp_set: GpuTimestampSet,
     pipeline_statistics_set: PipelineStatisticsSet,
-    publishes_frame_timestamps: bool,
+    present_image_index: Option<u32>,
     acquire_wait_semaphore: Option<vk::Semaphore>,
 }
 
@@ -3352,7 +3549,7 @@ fn wait_timeline(context: &VulkanContext, id: SubmissionId) -> GalResult<()> {
 
 fn stdout_trace(message: &str) {
     if trace_submissions_enabled() {
-        println!("{message}");
+        trace::stdout(format_args!("{message}"));
     }
 }
 
@@ -3403,6 +3600,12 @@ fn command_op_kind(op: &CommandOp) -> &'static str {
 fn trace_submissions_enabled() -> bool {
     static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some())
+}
+
+/// Focused ownership/timeline output without the verbose per-command trace.
+fn trace_gpu_overlap_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_GPU_OVERLAP").is_some())
 }
 
 fn trace_resource_binding_ops_enabled() -> bool {

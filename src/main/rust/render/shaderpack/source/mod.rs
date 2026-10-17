@@ -15,6 +15,7 @@ use crate::render::shaderpack::properties::custom_uniforms::ShaderPackCustomUnif
 use crate::render::shaderpack::properties::held_light::ShaderPackHeldLightPolicy;
 use crate::render::shaderpack::properties::item_ids::ShaderPackItemIdMap;
 use crate::render::shaderpack::properties::shadow::ShaderPackShadowPolicy;
+use crate::render::shaderpack::properties::clouds::ShaderPackCloudPolicy;
 use crate::render::shaderpack::properties::wetness::ShaderPackWetnessPolicy;
 
 /// Reserved semantic configuration file generated alongside one complete
@@ -62,6 +63,8 @@ pub struct ShaderPackSource {
     files: BTreeMap<String, String>,
     runtime_semantic_defines: DerivedDefines,
     runtime_option_selection: DerivedOptionSelection,
+    frame_uniform_policies: crate::render::shaderpack::properties::frame_uniforms::FrameUniformPolicies,
+    shadow_policies: crate::render::shaderpack::properties::shadow::ShadowPolicies,
 }
 
 /// The saved pack options interpreted the way Iris applies them: a boolean
@@ -158,6 +161,8 @@ impl ShaderPackSource {
             files: map,
             runtime_semantic_defines: DerivedDefines::default(),
             runtime_option_selection: DerivedOptionSelection::default(),
+            frame_uniform_policies: Default::default(),
+            shadow_policies: Default::default(),
         })
     }
 
@@ -184,6 +189,18 @@ impl ShaderPackSource {
         normalize_source_path(path)
             .ok()
             .and_then(|path| self.files.get(&path).map(String::as_str))
+    }
+
+    pub(crate) fn paths(&self) -> impl Iterator<Item = &str> {
+        self.files.keys().map(String::as_str)
+    }
+
+    pub fn frame_uniform_policy(&self, scope: crate::render::shaderpack::contracts::terrain::TerrainProgramScope) -> GalResult<crate::render::shaderpack::properties::frame_uniforms::ShaderPackFrameUniformPolicy> {
+        self.frame_uniform_policies.get(self, scope)
+    }
+
+    pub fn shadow_policy_for_scope(&self, scope: crate::render::shaderpack::contracts::terrain::TerrainProgramScope) -> GalResult<Option<ShaderPackShadowPolicy>> {
+        self.shadow_policies.get(self, scope)
     }
 
     /// Returns an owned semantic source snapshot for a bounded transport or
@@ -542,6 +559,7 @@ pub struct ShaderPackSourceStore {
     active_held_light_policy: Option<ShaderPackHeldLightPolicy>,
     active_shadow_policy: Option<ShaderPackShadowPolicy>,
     active_wetness_policy: Option<ShaderPackWetnessPolicy>,
+    active_cloud_policy: Option<ShaderPackCloudPolicy>,
     failed_generations: Vec<u64>,
 }
 
@@ -604,7 +622,9 @@ impl ShaderPackSourceStore {
                 return Err(error);
             }
         };
+        let cloud_policy = ShaderPackCloudPolicy::from_source(&candidate);
         self.active = Some(candidate);
+        self.active_cloud_policy = Some(cloud_policy);
         self.active_item_id_map = Some(item_id_map);
         self.active_custom_uniform_policy = Some(custom_uniform_policy);
         self.active_held_light_policy = Some(held_light_policy);
@@ -634,6 +654,11 @@ impl ShaderPackSourceStore {
         self.active_custom_uniform_policy.as_ref()
     }
 
+    /// Cloud directives of the active source generation.
+    pub fn active_cloud_policy(&self) -> Option<ShaderPackCloudPolicy> {
+        self.active_cloud_policy
+    }
+
     /// The held-light policy belongs to the exact immutable source generation
     /// as the item map and source snapshot.
     pub fn active_held_light_policy(&self) -> Option<ShaderPackHeldLightPolicy> {
@@ -645,6 +670,10 @@ impl ShaderPackSourceStore {
     /// admission will then reject any required shadow uniforms explicitly.
     pub fn active_shadow_policy(&self) -> Option<ShaderPackShadowPolicy> {
         self.active_shadow_policy
+    }
+
+    pub fn active_shadow_policy_for_scope(&self, scope: crate::render::shaderpack::contracts::terrain::TerrainProgramScope) -> GalResult<Option<ShaderPackShadowPolicy>> {
+        self.active.as_ref().map(|source| source.shadow_policy_for_scope(scope)).transpose().map(Option::flatten)
     }
 
     /// Immutable wetness timing policy derived from the active source
@@ -696,4 +725,3 @@ fn normalize_source_path(path: &str) -> GalResult<String> {
 
 #[cfg(test)]
 mod tests;
-

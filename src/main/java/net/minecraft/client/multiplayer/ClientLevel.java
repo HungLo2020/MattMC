@@ -777,13 +777,9 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 
 	private void playSound(double d, double e, double f, SoundEvent soundEvent, SoundSource soundSource, float g, float h, boolean bl, long l) {
 		double i = this.minecraft.gameRenderer.getMainCamera().getPosition().distanceToSqr(d, e, f);
-		SimpleSoundInstance simpleSoundInstance = new SimpleSoundInstance(soundEvent, soundSource, g, h, RandomSource.create(l), d, e, f);
-		if (bl && i > 100.0) {
-			double j = Math.sqrt(i) / 40.0;
-			this.minecraft.getSoundManager().playDelayed(simpleSoundInstance, (int)(j * 20.0));
-		} else {
-			this.minecraft.getSoundManager().play(simpleSoundInstance);
-		}
+		// Rust resolves and plays it as `new SimpleSoundInstance(..., RandomSource.create(l), d, e, f)`.
+		int delay = bl && i > 100.0 ? (int)(Math.sqrt(i) / 40.0 * 20.0) : 0;
+		this.minecraft.getSoundManager().playEvent(soundEvent, soundSource, g, h, l, d, e, f, delay);
 	}
 
 	public void createFireworks(double d, double e, double f, double g, double h, double i, List<FireworkExplosion> list) {
@@ -935,6 +931,24 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		return this.dragonParts;
 	}
 
+	@Override
+	public Holder<Biome> getBiomeAtBlock(long seed, int x, int y, int z) {
+		if (this.getClass() == ClientLevel.class && this.chunkSource.getClass() == ClientChunkCache.class) {
+			Holder<Biome> biome = this.chunkSource.nativeBiomeAtBlock(seed, x, y, z);
+			if (biome != null) return biome;
+		}
+		return super.getBiomeAtBlock(seed, x, y, z);
+	}
+
+	@Override
+	public Holder<Biome> getNoiseBiome(int x, int y, int z) {
+		if (this.getClass() == ClientLevel.class && this.chunkSource.getClass() == ClientChunkCache.class) {
+			Holder<Biome> biome = this.chunkSource.nativeNoiseBiome(x, y, z);
+			if (biome != null) return biome;
+		}
+		return super.getNoiseBiome(x, y, z);
+	}
+
 	public Holder<Biome> getUncachedNoiseBiome(int i, int j, int k) {
 		return this.registryAccess().lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.PLAINS);
 	}
@@ -952,7 +966,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	public int getSkyColor(Vec3 vec3, float f) {
 		float g = this.getTimeOfDay(f);
 		Vec3 vec32 = vec3.subtract(2.0, 2.0, 2.0).scale(0.25);
-		
+
 		// Allow hooks to provide custom sky color sampling
 		CubicSampler.Vec3Fetcher rgbFetcher = (ix, jx, kx) -> Vec3.fromRGB24(((Biome)this.getBiomeManager().getNoiseBiomeAtQuart(ix, jx, kx).value()).getSkyColor());
 		Vec3 vec33 = null;
@@ -962,7 +976,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 				break;
 			}
 		}
-		
+
 		// Fall back to default implementation if no hook provided a result
 		if (vec33 == null) {
 			vec33 = CubicSampler.gaussianSampleVec3(vec32, rgbFetcher);

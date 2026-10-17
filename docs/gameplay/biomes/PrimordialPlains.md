@@ -1,6 +1,6 @@
 # Primordial Plains
 
-Primordial Plains (`minecraft:primordial_plains`) is one of the two biomes selected for [Primordial Caves](../dimensions/PrimordialCaves.md) by the bundled Normal world preset. Its surface rules favor grass and dirt, but it shares the dimension's ceiling and lack of skylight. **Bring food, wood, and lighting rather than relying on its plains-style feature and animal lists.**
+Primordial Plains (`minecraft:primordial_plains`) is a biome candidate in the [effective bundled Primordial Caves source](../dimensions/PrimordialCaves.md#what-currently-generates). The loaded dimension resource also includes Dry Midlands and Primordial Ocean; the literal Normal preset alone is not the final selection authority. Its surface rules favor grass and dirt, but it shares the dimension's ceiling and lack of skylight. **Bring food, wood, and lighting rather than relying on its plains-style feature and animal lists.**
 
 ## Terrain and resources
 

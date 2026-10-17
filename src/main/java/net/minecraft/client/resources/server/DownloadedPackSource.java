@@ -41,7 +41,7 @@ import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.DownloadQueue.BatchConfig;
 import net.minecraft.server.packs.DownloadQueue.BatchResult;
 import net.minecraft.server.packs.DownloadQueue.DownloadRequest;
-import net.minecraft.server.packs.FilePackResources.FileResourcesSupplier;
+import net.minecraft.server.packs.NativePackResources.ZipSupplier;
 import net.minecraft.server.packs.metadata.pack.PackFormat;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackSource;
@@ -248,7 +248,7 @@ public class DownloadedPackSource implements AutoCloseable {
 			String string = String.format(Locale.ROOT, "server/%08X/%s", this.packIdSerialNumber++, idAndPath.id());
 			Path path = idAndPath.path();
 			PackLocationInfo packLocationInfo = new PackLocationInfo(string, SERVER_NAME, this.packType, Optional.empty());
-			ResourcesSupplier resourcesSupplier = new FileResourcesSupplier(path);
+			ResourcesSupplier resourcesSupplier = new ZipSupplier(path);
 			PackFormat packFormat = SharedConstants.getCurrentVersion().packVersion(PackType.CLIENT_RESOURCES);
 			Metadata metadata = Pack.readPackMetadata(packLocationInfo, resourcesSupplier, packFormat, PackType.CLIENT_RESOURCES);
 			if (metadata == null) {

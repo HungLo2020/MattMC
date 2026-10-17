@@ -2,8 +2,6 @@ package net.minecraft.world.item.enchantment;
 
 import com.google.common.collect.Maps;
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import it.unimi.dsi.fastutil.objects.ObjectArraySet;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,14 +14,12 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
-import net.minecraft.core.RegistryCodecs;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
@@ -33,7 +29,6 @@ import net.minecraft.resources.RegistryFixedCodec;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.EnchantmentTags;
-import net.minecraft.util.ExtraCodecs;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.Unit;
 import net.minecraft.world.damagesource.DamageSource;
@@ -59,15 +54,7 @@ import org.apache.commons.lang3.mutable.MutableFloat;
 
 public record Enchantment(Component description, Enchantment.EnchantmentDefinition definition, HolderSet<Enchantment> exclusiveSet, DataComponentMap effects) {
 	public static final int MAX_LEVEL = 255;
-	public static final Codec<Enchantment> DIRECT_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				ComponentSerialization.CODEC.fieldOf("description").forGetter(Enchantment::description),
-				Enchantment.EnchantmentDefinition.CODEC.forGetter(Enchantment::definition),
-				RegistryCodecs.homogeneousList(Registries.ENCHANTMENT).optionalFieldOf("exclusive_set", HolderSet.direct()).forGetter(Enchantment::exclusiveSet),
-				EnchantmentEffectComponents.CODEC.optionalFieldOf("effects", DataComponentMap.EMPTY).forGetter(Enchantment::effects)
-			)
-			.apply(instance, Enchantment::new)
-	);
+	public static final Codec<Enchantment> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.ENCHANTMENT, false, net.minecraft.resources.NativeDataProjections::enchantment, net.minecraft.resources.NativeDataProjections::enchantmentOut);
 	public static final Codec<Holder<Enchantment>> CODEC = RegistryFixedCodec.create(Registries.ENCHANTMENT);
 	public static final StreamCodec<RegistryFriendlyByteBuf, Holder<Enchantment>> STREAM_CODEC = ByteBufCodecs.holderRegistry(Registries.ENCHANTMENT);
 
@@ -567,13 +554,6 @@ public record Enchantment(Component description, Enchantment.EnchantmentDefiniti
 	}
 
 	public record Cost(int base, int perLevelAboveFirst) {
-		public static final Codec<Enchantment.Cost> CODEC = RecordCodecBuilder.create(
-			instance -> instance.group(
-					Codec.INT.fieldOf("base").forGetter(Enchantment.Cost::base), Codec.INT.fieldOf("per_level_above_first").forGetter(Enchantment.Cost::perLevelAboveFirst)
-				)
-				.apply(instance, Enchantment.Cost::new)
-		);
-
 		public int calculate(int i) {
 			return this.base + this.perLevelAboveFirst * (i - 1);
 		}
@@ -589,18 +569,5 @@ public record Enchantment(Component description, Enchantment.EnchantmentDefiniti
 		int anvilCost,
 		List<EquipmentSlotGroup> slots
 	) {
-		public static final MapCodec<Enchantment.EnchantmentDefinition> CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					RegistryCodecs.homogeneousList(Registries.ITEM).fieldOf("supported_items").forGetter(Enchantment.EnchantmentDefinition::supportedItems),
-					RegistryCodecs.homogeneousList(Registries.ITEM).optionalFieldOf("primary_items").forGetter(Enchantment.EnchantmentDefinition::primaryItems),
-					ExtraCodecs.intRange(1, 1024).fieldOf("weight").forGetter(Enchantment.EnchantmentDefinition::weight),
-					ExtraCodecs.intRange(1, 255).fieldOf("max_level").forGetter(Enchantment.EnchantmentDefinition::maxLevel),
-					Enchantment.Cost.CODEC.fieldOf("min_cost").forGetter(Enchantment.EnchantmentDefinition::minCost),
-					Enchantment.Cost.CODEC.fieldOf("max_cost").forGetter(Enchantment.EnchantmentDefinition::maxCost),
-					ExtraCodecs.NON_NEGATIVE_INT.fieldOf("anvil_cost").forGetter(Enchantment.EnchantmentDefinition::anvilCost),
-					EquipmentSlotGroup.CODEC.listOf().fieldOf("slots").forGetter(Enchantment.EnchantmentDefinition::slots)
-				)
-				.apply(instance, Enchantment.EnchantmentDefinition::new)
-		);
 	}
 }

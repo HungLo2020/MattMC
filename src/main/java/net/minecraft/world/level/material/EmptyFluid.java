@@ -13,6 +13,10 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 public class EmptyFluid extends Fluid {
+	EmptyFluid(NativeFluidDefinitions.Definition definition) {
+		super(definition);
+	}
+
 	@Override
 	public Item getBucket() {
 		return Items.AIR;
@@ -34,38 +38,13 @@ public class EmptyFluid extends Fluid {
 	}
 
 	@Override
-	protected boolean isEmpty() {
-		return true;
-	}
-
-	@Override
-	protected float getExplosionResistance() {
-		return 0.0F;
-	}
-
-	@Override
 	public float getHeight(FluidState fluidState, BlockGetter blockGetter, BlockPos blockPos) {
-		return 0.0F;
-	}
-
-	@Override
-	public float getOwnHeight(FluidState fluidState) {
 		return 0.0F;
 	}
 
 	@Override
 	protected BlockState createLegacyBlock(FluidState fluidState) {
 		return Blocks.AIR.defaultBlockState();
-	}
-
-	@Override
-	public boolean isSource(FluidState fluidState) {
-		return false;
-	}
-
-	@Override
-	public int getAmount(FluidState fluidState) {
-		return 0;
 	}
 
 	@Override

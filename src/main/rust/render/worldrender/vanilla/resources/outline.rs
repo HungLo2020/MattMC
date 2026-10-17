@@ -45,11 +45,11 @@ impl WorldPrimitiveFrontend {
             self.destroy_entity_outline_mask_gpu_resources(gal);
             if let Some(sets) = self.entity_outline_post_effect_sets.take() {
                 for handle in sets.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
             for handle in previous.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let resources = features::outline::create_entity_outline_target_resources_with_depth(
@@ -66,7 +66,7 @@ impl WorldPrimitiveFrontend {
     pub(crate) fn destroy_entity_outline_mask_gpu_resources(&mut self, gal: &mut VulkanicGal) {
         if let Some(resources) = self.entity_outline_mask_gpu.take() {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -85,7 +85,7 @@ impl WorldPrimitiveFrontend {
         }
         if let Some(previous) = self.entity_outline_post_effect_pipelines.take() {
             for handle in previous.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let pipelines = features::outline::create_entity_outline_post_effect_pipelines(gal, color_format)?;
@@ -107,7 +107,7 @@ impl WorldPrimitiveFrontend {
         }
         if let Some(previous) = self.entity_outline_post_effect_sets.take() {
             for handle in previous.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let targets = self.entity_outline_targets.as_ref().ok_or_else(|| {
@@ -152,7 +152,7 @@ impl WorldPrimitiveFrontend {
         }
         if let Some(previous) = self.entity_outline_mask_gpu.take() {
             for handle in previous.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let mut created = Vec::new();
@@ -277,7 +277,7 @@ impl WorldPrimitiveFrontend {
             Ok(resources) => resources,
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 return Err(error);
             }

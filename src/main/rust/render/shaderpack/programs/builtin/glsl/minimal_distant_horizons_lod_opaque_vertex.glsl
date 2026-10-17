@@ -80,10 +80,9 @@ void main() {
     // vertex in the fragment stage.
     float light_sky = float(vertex.data.w & 0x0fu);
     float light_sky_uv = (light_sky + 0.5) / 16.0;
-    // Match standard.vert's VULKANIC_BACKEND contract. DH folds low sky
-    // coordinates into the lit half of the copied vanilla lightmap; omitting
-    // this made valid low-sky side and underside geometry render black.
-    light_sky_uv = max(light_sky_uv, 1.0 - light_sky_uv);
+    // Frozen OpenGL samples the original sky coordinate. Its Java Vulkan-only
+    // fold is not part of this semantic contract: folding dark rows upward
+    // incorrectly brightens submerged terrain and covered side faces.
     vec2 light_uv = vec2(
         // The compact Rust-owned stream stores one byte per channel:
         // sky, block, material, normal. Do not decode the block channel as

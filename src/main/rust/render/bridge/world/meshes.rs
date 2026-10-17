@@ -2,7 +2,72 @@
 
 use super::*;
 
-pub(super) fn decode_model_submission_order(instance: &FfiWorldMeshInstanceRecord) -> GalResult<Option<i32>> {
+pub(super) fn decode_entity_culling(
+    instance: &FfiWorldMeshInstanceRecord,
+    first_person: bool,
+) -> GalResult<Option<crate::render::worldrender::frame::entity_culling::WorldEntityCullingInputs>>
+{
+    if instance.entity_culling_mode != 0
+        && (first_person
+            || !matches!(
+                instance.stratum,
+                WORLD_STRATUM_ENTITY_MESH
+                    | crate::render::scene::strata::WORLD_STRATUM_ENTITY_SHADOW_CASTER
+            )
+            || instance.block_entity_id != -1
+            || instance.terrain_placement_mode != 0)
+    {
+        return Err(GalError::invalid_argument(
+            "invalid entity culling draw domain",
+        ));
+    }
+    decode_entity_culling_record(
+        instance.entity_culling_mode,
+        instance.entity_culling_flags,
+        instance.entity_culling_bounds,
+        instance.entity_culling_leash_bounds,
+        instance.entity_culling_camera,
+    )
+}
+
+pub(super) fn decode_entity_culling_record(
+    mode: u32,
+    flags: u32,
+    bounds: [f64; 6],
+    holder: [f64; 6],
+    camera: [f64; 3],
+) -> GalResult<Option<crate::render::worldrender::frame::entity_culling::WorldEntityCullingInputs>>
+{
+    use crate::render::worldrender::frame::entity_culling::*;
+    match mode {
+        0 if flags == 0 && bounds == [0.0; 6] && holder == [0.0; 6] && camera == [0.0; 3] => {
+            Ok(None)
+        }
+        1 => {
+            let leash = flags & ENTITY_CULL_LEASH_HOLDER != 0;
+            if !leash && holder != [0.0; 6] {
+                return Err(GalError::invalid_argument(
+                    "absent leash culling bounds must be zero",
+                ));
+            }
+            let copied = WorldEntityCullingInputs {
+                flags,
+                bounds,
+                leash_holder_bounds: leash.then_some(holder),
+                camera,
+            };
+            copied.validate()?;
+            Ok(Some(copied))
+        }
+        _ => Err(GalError::invalid_argument(
+            "invalid entity culling declaration",
+        )),
+    }
+}
+
+pub(super) fn decode_model_submission_order(
+    instance: &FfiWorldMeshInstanceRecord,
+) -> GalResult<Option<i32>> {
     match (
         instance.model_submission_order_mode,
         instance.model_submission_order,
@@ -163,7 +228,9 @@ pub(super) fn validate_mesh_instance_semantic_identity(
     Ok(())
 }
 
-pub(super) fn decode_mesh_instance_transform(instance: &FfiWorldMeshInstanceRecord) -> GalResult<[f32; 16]> {
+pub(super) fn decode_mesh_instance_transform(
+    instance: &FfiWorldMeshInstanceRecord,
+) -> GalResult<[f32; 16]> {
     match instance.terrain_placement_mode {
         0 if instance.terrain_origin == [0; 3] && instance.terrain_camera == [0.0; 3] => {
             Ok(instance.transform)
@@ -193,16 +260,9 @@ pub(crate) fn terrain_visible_facing_mask(instance: &FfiWorldMeshInstanceRecord)
     if instance.terrain_placement_mode != 1 {
         return 0x7f;
     }
-    let camera = instance.terrain_camera.map(|axis| axis.floor() as i64);
-    let origin = instance.terrain_origin.map(i64::from);
-    let mut mask = 1u8 << 6;
-    for axis in 0..3 {
-        if camera[axis] > origin[axis] - 3 {
-            mask |= 1 << axis;
-        }
-        if camera[axis] < origin[axis] + 19 {
-            mask |= 1 << (axis + 3);
-        }
+    crate::render::worldrender::terrain::placement::TerrainSectionPlacement {
+        origin: instance.terrain_origin,
+        camera: instance.terrain_camera,
     }
-    mask
+    .visible_facing_mask()
 }

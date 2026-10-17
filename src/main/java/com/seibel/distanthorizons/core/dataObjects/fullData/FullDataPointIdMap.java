@@ -50,6 +50,9 @@ public class FullDataPointIdMap
 	private final ConcurrentHashMap<BlockBiomeWrapperPair, Integer> idMap = new ConcurrentHashMap<>();
 	
 	private int cachedHashCode = 0;
+	private net.minecraft.world.level.chunk.NativeDhColumns nativeColumns;
+	private net.minecraft.world.level.chunk.NativeDhIdMap nativeMap;
+	private boolean nativeAllowed = true;
 	
 	
 	
@@ -58,6 +61,58 @@ public class FullDataPointIdMap
 	//=============//
 	
 	public FullDataPointIdMap(long pos) { this.pos = pos; }
+	public static FullDataPointIdMap fromNative(net.minecraft.world.level.chunk.NativeDhColumns columns)
+	{
+		var map = new FullDataPointIdMap(columns.position());
+		map.nativeColumns = columns;
+		return map;
+	}
+	private void detachNative()
+	{
+		var columns = this.nativeColumns;
+		if (columns == null) return;
+		this.blockBiomePairList.ensureCapacity(columns.materialCount());
+		for (int i = 0; i < columns.materialCount(); i++) this.blockBiomePairList.add(columns.material(i));
+		this.nativeColumns = null;
+		if (!this.initializeNative(true))
+			for (int i = 0; i < this.blockBiomePairList.size(); i++) this.idMap.put(this.blockBiomePairList.get(i), i);
+	}
+	/** Exact stock wrappers have immutable serial identities and hash semantics. */
+	private boolean initializeNative(boolean indexed)
+	{
+		if (this.nativeMap != null) return true;
+		if (!this.nativeAllowed || this.getClass() != FullDataPointIdMap.class) return false;
+		for (int i = 0; i < this.size(); i++)
+			if (!net.minecraft.world.level.chunk.NativeDhIdMap.supports(this.getEntry(i))) { this.nativeAllowed = false; return false; }
+		var map = new net.minecraft.world.level.chunk.NativeDhIdMap();
+		for (int i = 0; i < this.size(); i++) map.add(this.getEntry(i), indexed ? 1 : 2);
+		this.nativeMap = map;
+		return true;
+	}
+	private boolean ensureNative()
+	{
+		// Read-only producer maps keep their existing compatibility readers;
+		// only a recipient mutation needs a mutable Java binding list.
+		return this.initializeNative(true);
+	}
+	/** Bounded CPU owner for intrinsic DH material consumers; custom inputs decline. */
+	public net.minecraft.world.level.chunk.NativeDhIdMap nativeMaterialMap()
+	{
+		return this.ensureNative() ? this.nativeMap : null;
+	}
+
+	private void detachNativeMap()
+	{
+		if (this.nativeMap != null)
+		{
+			for (int i = 0; i < this.blockBiomePairList.size(); i++)
+				if (this.nativeMap.indexed(i)) this.idMap.put(this.blockBiomePairList.get(i), i);
+			this.nativeMap = null;
+		}
+		this.nativeAllowed = false;
+	}
+
+
 	
 	
 	
@@ -75,11 +130,11 @@ public class FullDataPointIdMap
 		BlockBiomeWrapperPair pair;
 		try
 		{
-			pair = this.blockBiomePairList.get(id);
+			pair = this.nativeColumns == null ? this.blockBiomePairList.get(id) : this.nativeColumns.material(id);
 		}
 		catch (IndexOutOfBoundsException e)
 		{
-			throw new IndexOutOfBoundsException("FullData ID Map out of sync for pos: "+DhSectionPos.toString(this.pos)+". ID: ["+id+"] greater than the number of known ID's: ["+this.blockBiomePairList.size()+"].");
+			throw new IndexOutOfBoundsException("FullData ID Map out of sync for pos: "+DhSectionPos.toString(this.pos)+". ID: ["+id+"] greater than the number of known ID's: ["+this.size()+"].");
 		}
 		
 		return pair;
@@ -87,10 +142,10 @@ public class FullDataPointIdMap
 	
 	
 	/** @return -1 if the list is empty */
-	public int getMaxValidId() { return this.blockBiomePairList.size() - 1; }
-	public int size() { return this.blockBiomePairList.size(); }
+	public int getMaxValidId() { return this.size() - 1; }
+	public int size() { return this.nativeColumns == null ? this.blockBiomePairList.size() : this.nativeColumns.materialCount(); }
 	
-	public boolean isEmpty() { return this.blockBiomePairList.isEmpty(); }
+	public boolean isEmpty() { return this.size() == 0; }
 	
 	public long getPos() { return this.pos; }
 	
@@ -107,6 +162,15 @@ public class FullDataPointIdMap
 	public int addIfNotPresentAndGetId(IBiomeWrapper biome, IBlockStateWrapper blockState) { return this.addIfNotPresentAndGetId(BlockBiomeWrapperPair.get(blockState, biome)); }
 	private int addIfNotPresentAndGetId(BlockBiomeWrapperPair pair)
 	{
+		this.detachNative();
+		if (net.minecraft.world.level.chunk.NativeDhIdMap.supports(pair) && this.initializeNative(true))
+		{
+			this.blockBiomePairList.ensureCapacity(this.blockBiomePairList.size() + 1);
+			int id = this.nativeMap.add(pair, 0);
+			if (id == this.blockBiomePairList.size()) { this.blockBiomePairList.add(pair); this.cachedHashCode = 0; }
+			return id;
+		}
+		this.detachNativeMap();
 		// try getting the existing ID
 		Integer nullableId = this.idMap.get(pair);
 		if (nullableId != null)
@@ -146,16 +210,28 @@ public class FullDataPointIdMap
 	 */
 	public void addAll(FullDataPointIdMap inputMap)
 	{
-		ArrayList<BlockBiomeWrapperPair> pairsToMerge = inputMap.blockBiomePairList;
-		for (int i = 0; i < pairsToMerge.size(); i++)
+		// Self-addAll observes its growing input size on the original route.
+		if (inputMap != this && this.getClass() == FullDataPointIdMap.class && inputMap.getClass() == FullDataPointIdMap.class
+			&& this.ensureNative() && inputMap.ensureNative())
 		{
-			BlockBiomeWrapperPair pair = pairsToMerge.get(i);
+			this.mergeNative(inputMap, true); return;
+		}
+		for (int i = 0; i < inputMap.size(); i++)
+		{
+			BlockBiomeWrapperPair pair = inputMap.getEntry(i);
 			this.add(pair);
 		}
 	}
 	/** allows for adding duplicate {@link BlockBiomeWrapperPair} */
 	private void add(BlockBiomeWrapperPair pair)
 	{
+		this.detachNative();
+		if (net.minecraft.world.level.chunk.NativeDhIdMap.supports(pair) && this.initializeNative(true))
+		{
+			this.blockBiomePairList.ensureCapacity(this.blockBiomePairList.size() + 1);
+			this.nativeMap.add(pair, 1); this.blockBiomePairList.add(pair); this.cachedHashCode = 0; return;
+		}
+		this.detachNativeMap();
 		int id = this.blockBiomePairList.size();
 		this.blockBiomePairList.add(pair);
 		this.idMap.put(pair, id);
@@ -175,11 +251,13 @@ public class FullDataPointIdMap
 	 */
 	public int[] mergeAndReturnRemappedEntityIds(FullDataPointIdMap inputMap)
 	{
-		ArrayList<BlockBiomeWrapperPair> entriesToMerge = inputMap.blockBiomePairList;
-		int[] remappedPairIds = new int[entriesToMerge.size()];
-		for (int i = 0; i < entriesToMerge.size(); i++)
+		int count = inputMap.size();
+		if (this.getClass() == FullDataPointIdMap.class && inputMap.getClass() == FullDataPointIdMap.class
+			&& this.ensureNative() && inputMap.ensureNative()) return this.mergeNative(inputMap, false);
+		int[] remappedPairIds = new int[count];
+		for (int i = 0; i < inputMap.size(); i++)
 		{
-			BlockBiomeWrapperPair entity = entriesToMerge.get(i);
+			BlockBiomeWrapperPair entity = inputMap.getEntry(i);
 			int id = this.addIfNotPresentAndGetId(entity);
 			remappedPairIds[i] = id;
 		}
@@ -187,10 +265,63 @@ public class FullDataPointIdMap
 		return remappedPairIds;
 	}
 	
+	/**
+	 * {@link #mergeAndReturnRemappedEntityIds} for a generated chunk's materials,
+	 * without building a producer map: each material, in order, is added unless
+	 * an equal entry exists, giving the same IDs, append order and tint bindings
+	 * as the native deduplicating merge.
+	 */
+	public int[] mergeAndReturnRemappedEntityIds(net.minecraft.world.level.chunk.NativeDhColumns columns)
+	{
+		int count = columns.materialCount();
+		int[] ids = new int[count];
+		boolean supported = true;
+		for (int i = 0; i < count && supported; i++) supported = net.minecraft.world.level.chunk.NativeDhIdMap.supports(columns.material(i));
+		if (supported && this.getClass() == FullDataPointIdMap.class && this.ensureNative())
+		{
+			this.detachNative();
+			int before = this.blockBiomePairList.size();
+			this.blockBiomePairList.ensureCapacity(Math.addExact(before, count));
+			for (int i = 0; i < count; i++)
+			{
+				BlockBiomeWrapperPair pair = columns.material(i);
+				int id = this.nativeMap.addIfAbsent(pair, this.blockBiomePairList.size());
+				if (id == this.blockBiomePairList.size()) this.blockBiomePairList.add(pair);
+				ids[i] = id;
+			}
+			if (this.blockBiomePairList.size() != before) this.cachedHashCode = 0;
+			return ids;
+		}
+		for (int i = 0; i < count; i++) ids[i] = this.addIfNotPresentAndGetId(columns.material(i));
+		return ids;
+	}
+	
+	private int[] mergeNative(FullDataPointIdMap inputMap, boolean append)
+	{
+		this.detachNative();
+		int count = inputMap.size(), before = this.blockBiomePairList.size();
+		this.blockBiomePairList.ensureCapacity(Math.addExact(before, count));
+		var merged = this.nativeMap.merge(inputMap.nativeMap, count, append);
+		for (int i = 0; i < merged.completed(); i++)
+			if (merged.ids()[i] == this.blockBiomePairList.size()) this.blockBiomePairList.add(inputMap.getEntry(i));
+		if (this.blockBiomePairList.size() != before) this.cachedHashCode = 0;
+		if (merged.completed() != count) throw new OutOfMemoryError("DH identity merge after " + merged.completed() + " entries");
+		if (!append && inputMap == this && this.blockBiomePairList.size() > count)
+		{
+			// Frozen's input list grows during a self-merge of unindexed imports;
+			// it completes this add before the fixed result array bounds failure.
+			int id = this.addIfNotPresentAndGetId(this.blockBiomePairList.get(count));
+			merged.ids()[count] = id;
+		}
+		return merged.ids();
+	}
+
 	/** Should only be used if this map is going to be reused, otherwise bad things will happen. */
 	public void clear(long pos)
 	{
 		this.pos = pos;
+		this.nativeColumns = null;
+		this.nativeMap = null; this.nativeAllowed = true;
 		this.blockBiomePairList.clear();
 		this.idMap.clear();
 		this.cachedHashCode = 0;
@@ -205,13 +336,14 @@ public class FullDataPointIdMap
 	/** Serializes all contained entries into the given stream, formatted in UTF */
 	public void serialize(DhDataOutputStream outputStream) throws IOException
 	{
-		outputStream.writeInt(this.blockBiomePairList.size());
+		outputStream.writeInt(this.size());
 		
 		// only used when debugging
 		HashMap<String, BlockBiomeWrapperPair> dataPointEntryBySerialization = new HashMap<>();
 		
-		for (BlockBiomeWrapperPair pair : this.blockBiomePairList)
+		for (int i = 0; i < this.size(); i++)
 		{
+			BlockBiomeWrapperPair pair = this.getEntry(i);
 			String entryString = pair.serialize();
 			outputStream.writeUTF(entryString);
 			
@@ -277,6 +409,8 @@ public class FullDataPointIdMap
 			LodUtil.assertNotReach("ID maps failed to deserialize for pos: ["+ DhSectionPos.toString(pos)+"], incorrect entity count. Expected count ["+entityCount+"], actual count ["+newMap.size()+"]");
 		}
 		
+		// Frozen imports preserve duplicate slots without populating its lookup.
+		newMap.initializeNative(false);
 		return newMap;
 	}
 	
@@ -306,17 +440,17 @@ public class FullDataPointIdMap
 	{
 		if (this.cachedHashCode == 0)
 		{
-			this.generateHashCode();
+			if (this.ensureNative()) this.cachedHashCode = this.nativeMap.hash(this.pos);
+			else this.generateHashCode();
 		}
 		return this.cachedHashCode;
 	}
 	private void generateHashCode()
 	{
 		int result = DhSectionPos.hashCode(this.pos);
-		for (int i = 0; i < this.blockBiomePairList.size(); i++)
-		{
-			result = 31 * result + this.blockBiomePairList.hashCode();
-		}
+		int listHash = 1;
+		for (int i = 0; i < this.size(); i++) listHash = 31 * listHash + this.getEntry(i).hashCode();
+		for (int i = 0; i < this.size(); i++) result = 31 * result + listHash;
 		this.cachedHashCode = result;
 	}
 	

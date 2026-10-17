@@ -48,6 +48,17 @@ public class Camera implements net.minecraft.world.waypoints.TrackedWaypoint.Cam
 	private float eyeHeight;
 	private float eyeHeightOld;
 	private float partialTickTime;
+	/** Bounded immutable projection input; world/immersion policy stays in Rust. */
+	private record NativeProjection(int fov, int width, int height, double halfHeight, double aspect) {}
+	private static volatile NativeProjection nativeProjection;
+	private static NativeProjection nativeProjection(int fov, int width, int height) {
+		var previous = nativeProjection;
+		if (previous != null && previous.fov == fov && previous.width == width && previous.height == height) return previous;
+		var next = new NativeProjection(fov, width, height,
+			Math.tan(fov * (float)(Math.PI / 180.0) / 2.0) * 0.05F, (double)width / height);
+		nativeProjection = next;
+		return next;
+	}
 
 	public void setup(BlockGetter blockGetter, Entity entity, boolean bl, boolean bl2, float f) {
 		this.initialized = true;
@@ -199,6 +210,29 @@ public class Camera implements net.minecraft.world.waypoints.TrackedWaypoint.Cam
 		if (!this.initialized) {
 			return FogType.NONE;
 		} else {
+			if (getClass() == Camera.class && this.level != null
+				&& this.level.getClass() == net.minecraft.client.multiplayer.ClientLevel.class
+				&& this.blockPosition.getX() == Mth.floor(this.position.x)
+				&& this.blockPosition.getY() == Mth.floor(this.position.y)
+				&& this.blockPosition.getZ() == Mth.floor(this.position.z)) {
+				var chunks = ((net.minecraft.client.multiplayer.ClientLevel)this.level).getChunkSource();
+				int tags = net.minecraft.world.level.chunk.NativeClientResidency.cameraFluidTags();
+				Minecraft minecraft = Minecraft.getInstance();
+				// Only pure stock getters may move before water admission. Custom or
+				// uninitialized projection providers keep the original lazy calls below.
+				if (tags >= 0 && minecraft != null && minecraft.getClass() == Minecraft.class
+					&& minecraft.getWindow() != null && minecraft.getWindow().getClass() == net.blaze3d.platform.Window.class
+					&& minecraft.options != null && minecraft.options.getClass() == Options.class
+					&& minecraft.options.fov() != null && minecraft.options.fov().getClass() == OptionInstance.class
+					&& minecraft.options.fov().get() != null) {
+					var projection = nativeProjection(minecraft.options.fov().get(), minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight());
+					int result = chunks.nativeCameraEnvironment(this.position, this.forwards, this.left, this.up, projection.halfHeight, projection.aspect, tags);
+					if (result == 0) return FogType.LAVA;
+					if (result == 1) return FogType.WATER;
+					if (result == 2) return FogType.POWDER_SNOW;
+					if (result == 5) return FogType.NONE;
+				}
+			}
 			FluidState fluidState = this.level.getFluidState(this.blockPosition);
 			if (fluidState.is(FluidTags.WATER) && this.position.y < this.blockPosition.getY() + fluidState.getHeight(this.level, this.blockPosition)) {
 				return FogType.WATER;

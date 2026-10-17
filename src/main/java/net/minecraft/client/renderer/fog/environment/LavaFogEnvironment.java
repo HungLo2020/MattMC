@@ -6,6 +6,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.fog.FogData;
+import net.minecraft.client.renderer.fog.NativeFog;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -24,19 +25,10 @@ public class LavaFogEnvironment extends FogEnvironment {
 
 	@Override
 	public void setupFog(FogData fogData, Entity entity, BlockPos blockPos, ClientLevel clientLevel, float f, DeltaTracker deltaTracker) {
-		if (entity.isSpectator()) {
-			fogData.environmentalStart = -8.0F;
-			fogData.environmentalEnd = f * 0.5F;
-		} else if (entity instanceof LivingEntity livingEntity && livingEntity.hasEffect(MobEffects.FIRE_RESISTANCE)) {
-			fogData.environmentalStart = 0.0F;
-			fogData.environmentalEnd = 5.0F;
-		} else {
-			fogData.environmentalStart = 0.25F;
-			fogData.environmentalEnd = 1.0F;
-		}
-
-		fogData.skyEnd = fogData.environmentalEnd;
-		fogData.cloudEnd = fogData.environmentalEnd;
+        int flags = entity.isSpectator() ? 1 : 0;
+        if (flags == 0 && entity instanceof LivingEntity livingEntity
+                && livingEntity.hasEffect(MobEffects.FIRE_RESISTANCE)) flags = 2;
+        NativeFog.ranges(fogData, 0, f, 0.0F, 0.0F, flags);
 	}
 
 	@Override

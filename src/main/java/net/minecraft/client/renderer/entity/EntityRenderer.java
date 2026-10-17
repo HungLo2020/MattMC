@@ -75,7 +75,29 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 		} else if (!this.affectedByCulling(entity)) {
 			return true;
 		} else {
-			AABB aABB = this.getBoundingBoxForCulling(entity).inflate(0.5);
+			// Keep renderer/equipment callbacks before admission. Living renderers
+			// normally return this same immutable box; derived boxes retain their route.
+			AABB suppliedBounds = this.getBoundingBoxForCulling(entity);
+			var geometry=entity.nativeCullingGeometry();
+			var hooks=HookRegistry.getEntityRendererHooks();
+			boolean stockHooks=hooks.isEmpty() || hooks.size()==1 && hooks.getFirst().getClass()==net.vulkanic.world.RustGalEntityCullingHook.class;
+			if(geometry!=null && suppliedBounds==entity.getBoundingBox() && frustum.getClass()==Frustum.class && stockHooks) {
+				AABB bounds=geometry.cullingBounds();
+				if(!hooks.isEmpty() && Boolean.FALSE.equals(hooks.getFirst().onEntityFrustumCheck(this,entity,frustum,bounds)))return false;
+				boolean visible=entity.nativeCullingGeometry()==geometry && geometry.cullingBounds()==bounds
+					? frustum.isVisibleEntity(geometry) : frustum.isVisible(bounds);
+				if(visible)return true;
+				// Preserve original leash callbacks and renderer-specific holder bounds.
+				if(entity instanceof Leashable leashable) {
+					Entity holder=leashable.getLeashHolder();
+					if(holder!=null) {
+						AABB holderBounds=this.entityRenderDispatcher.getRenderer(holder).getBoundingBoxForCulling(holder);
+						return frustum.isVisible(holderBounds) || frustum.isVisible(bounds.minmax(holderBounds));
+					}
+				}
+				return false;
+			}
+			AABB aABB = suppliedBounds.inflate(0.5);
 			if (aABB.hasNaN() || aABB.getSize() == 0.0) {
 				aABB = new AABB(entity.getX() - 2.0, entity.getY() - 2.0, entity.getZ() - 2.0, entity.getX() + 2.0, entity.getY() + 2.0, entity.getZ() + 2.0);
 			}
@@ -110,6 +132,71 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 
 	protected boolean affectedByCulling(T entity) {
 		return true;
+	}
+
+	/**
+	 * The {@code ELIGIBLE} culling fact alone, before any render-state
+	 * extraction: in render distance (or carrying the player) and in a
+	 * compiled section or outside build height.
+	 */
+	public final boolean rustShadowCullingEligible(T entity, Vec3 camera) {
+		return rustShadowCullingEligible(entity, camera, entity.hasIndirectPassenger(Minecraft.getInstance().player));
+	}
+
+	private static boolean rustShadowCullingEligible(Entity entity, Vec3 camera, boolean passenger) {
+		BlockPos position = entity.blockPosition();
+		return (entity.shouldRender(camera.x,camera.y,camera.z) || passenger)
+			&& (entity.level().isOutsideBuildHeight(position.getY())
+				|| Minecraft.getInstance().levelRenderer.isSectionCompiled(position));
+	}
+
+	/** Copies gameplay culling facts without constructing or querying a shadow frustum. */
+	public final net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord copyEntityCulling(T entity, Vec3 camera) {
+		return captureEntityCulling(entity, camera, null);
+	}
+
+	/** Capture directly into Rust-owned query storage, without intermediate records. */
+	public final void captureEntityShadowCandidate(T entity, Vec3 camera, net.vulkanic.bridge.EntityShadowQuery query) {
+		captureEntityCulling(entity, camera, java.util.Objects.requireNonNull(query));
+	}
+
+	private net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord captureEntityCulling(
+			T entity, Vec3 camera, net.vulkanic.bridge.EntityShadowQuery query) {
+		var client = Minecraft.getInstance();
+		boolean passenger = entity.hasIndirectPassenger(client.player);
+		boolean affected = this.affectedByCulling(entity);
+		AABB bounds = this.getBoundingBoxForCulling(entity).inflate(0.5);
+		if (bounds.hasNaN() || bounds.getSize() == 0.0) {
+			bounds = new AABB(entity.getX()-2,entity.getY()-2,entity.getZ()-2,
+				entity.getX()+2,entity.getY()+2,entity.getZ()+2);
+		}
+		int flags = 0;
+		if (rustShadowCullingEligible(entity, camera, passenger))
+			flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.ELIGIBLE;
+		if (passenger || !affected) flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.BYPASS_FRUSTUM;
+		if (client.player != null && (entity == client.player || entity == client.player.getVehicle()))
+			flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.PLAYER_GROUP;
+		if (affected && !passenger && HookRegistry.entityRendererHooksAffectShadowPass())
+			flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.UNRESOLVED_HOOKS;
+		AABB holderBounds = null;
+		net.vulkanic.bridge.VulkanicGalBridge.WorldAabbRecord holder = null;
+		if (entity instanceof Leashable leashable && leashable.getLeashHolder() != null) {
+			Entity leashHolder = leashable.getLeashHolder();
+			// Frozen does not inflate the holder's renderer-specific bounds.
+			holderBounds = java.util.Objects.requireNonNull(this.entityRenderDispatcher.getRenderer(leashHolder).getBoundingBoxForCulling(leashHolder));
+			if (query == null) holder = copiedEntityBounds(holderBounds);
+			flags |= net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.LEASH_HOLDER;
+		}
+		if (query != null) {
+			query.add(flags, bounds, holderBounds);
+			return null;
+		}
+		return new net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord(flags,copiedEntityBounds(bounds),holder);
+	}
+
+	private static net.vulkanic.bridge.VulkanicGalBridge.WorldAabbRecord copiedEntityBounds(AABB bounds) {
+		return new net.vulkanic.bridge.VulkanicGalBridge.WorldAabbRecord(
+			bounds.minX,bounds.minY,bounds.minZ,bounds.maxX,bounds.maxY,bounds.maxZ);
 	}
 
 	public Vec3 getRenderOffset(S entityRenderState) {

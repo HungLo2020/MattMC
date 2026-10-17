@@ -30,7 +30,9 @@ public class WallSkullBlock extends AbstractSkullBlock {
 
 	public WallSkullBlock(SkullBlock.Type type, BlockBehaviour.Properties properties) {
 		super(type, properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(FACING, Direction.NORTH));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(FACING, Direction.NORTH));
+		}
 	}
 
 	@Override

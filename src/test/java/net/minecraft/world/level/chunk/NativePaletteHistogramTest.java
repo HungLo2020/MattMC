@@ -1,5 +1,6 @@
 package net.minecraft.world.level.chunk;
 
+import org.junit.jupiter.api.Tag;
 import static org.junit.jupiter.api.Assertions.*;
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import java.util.*;
 import java.util.concurrent.*;
 
+@Tag("parity")
 class NativePaletteHistogramTest {
     record Occurrence(Object value, int count) {}
 
@@ -268,20 +270,7 @@ class NativePaletteHistogramTest {
     }
 
     static long rawCounts(LevelChunkSection section) {
-        try {
-            long packed = 0;
-            int shift = 0;
-            for (var name :
-                    List.of("nonEmptyBlockCount", "tickingBlockCount", "tickingFluidCount")) {
-                var f = LevelChunkSection.class.getDeclaredField(name);
-                f.setAccessible(true);
-                packed |= (long) Short.toUnsignedInt(f.getShort(section)) << shift;
-                shift += 16;
-            }
-            return packed;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
+        return section.packedSectionCounts();
     }
 
     @Test
@@ -398,7 +387,8 @@ class NativePaletteHistogramTest {
         var source = PalettePackingFixtures.states(2, 0, "cycle");
         var section = new LevelChunkSection(source, null);
         long before = rawCounts(section);
-        source.dataForNativeScan().storage().getRaw()[0] |= 15;
+        // Deliberately leave the native owner before injecting an invalid Java word.
+        source.dataForCompatibilityMutation().storage().getRaw()[0] |= 15;
         var a = new ArrayList<Occurrence>();
         var b = new ArrayList<Occurrence>();
         var first =

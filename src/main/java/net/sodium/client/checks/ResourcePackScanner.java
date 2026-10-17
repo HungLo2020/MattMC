@@ -175,7 +175,8 @@ public class ResourcePackScanner {
     }
 
     private static boolean isExternalResourcePack(PackResources pack) {
-        return pack instanceof PathPackResources || pack instanceof FilePackResources || pack instanceof CompositePackResources;
+        // Directory and ZIP packs; the built-in vanilla pack is not external.
+        return pack instanceof NativePackResources && !(pack instanceof VanillaPackResources);
     }
 
     private static String getResourcePackName(PackResources pack) {

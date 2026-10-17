@@ -24,6 +24,10 @@ public final class SkyLightEngine extends LightEngine<SkyLightSectionStorage.Sky
 		this(lightChunkGetter, new SkyLightSectionStorage(lightChunkGetter));
 	}
 
+    static SkyLightEngine withBindings(LightChunkGetter getter, NativeLightBindings bindings) {
+        return new SkyLightEngine(getter, new SkyLightSectionStorage(getter, bindings));
+    }
+
 	@VisibleForTesting
 	protected SkyLightEngine(LightChunkGetter lightChunkGetter, SkyLightSectionStorage skyLightSectionStorage) {
 		super(lightChunkGetter, skyLightSectionStorage);
@@ -39,6 +43,15 @@ public final class SkyLightEngine extends LightEngine<SkyLightSectionStorage.Sky
 		return chunkSkyLightSources == null ? k : chunkSkyLightSources.getLowestSourceY(SectionPos.sectionRelative(i), SectionPos.sectionRelative(j));
 	}
 
+    int sourceForNativeNode(int x,int z,int missing) { return this.getLowestSourceY(x,z,missing); }
+
+    /** Original contextual lookup only; the native query owns canonical consumption. */
+    @Nullable ChunkSkyLightSources sourceInputForNative(int x,int z,boolean highest) {
+        if(highest)return Objects.requireNonNullElse(this.getChunkSources(x,z),this.emptyChunkSources);
+        return this.getChunkSources(SectionPos.blockToSectionCoord(x),SectionPos.blockToSectionCoord(z));
+    }
+
+
 	@Nullable
 	private ChunkSkyLightSources getChunkSources(int i, int j) {
 		LightChunk lightChunk = this.chunkSource.getChunkForLighting(i, j);
@@ -47,6 +60,7 @@ public final class SkyLightEngine extends LightEngine<SkyLightSectionStorage.Sky
 
 	@Override
 	protected void checkNode(long l) {
+        if(this.lightCoordinator!=null){this.lightCoordinator.checkNode(l);return;}
 		int i = BlockPos.getX(l);
 		int j = BlockPos.getY(l);
 		int k = BlockPos.getZ(l);
@@ -292,63 +306,38 @@ public final class SkyLightEngine extends LightEngine<SkyLightSectionStorage.Sky
 	public void propagateLightSources(ChunkPos chunkPos) {
 		long l = SectionPos.getZeroNode(chunkPos.x, chunkPos.z);
 		this.storage.setLightEnabled(l, true);
+        this.propagateSourcesForNativeLevel(chunkPos.x,chunkPos.z);
+	}
+
+    int highestForNativeEnable(int x,int z){
+        return Objects.requireNonNullElse(this.getChunkSources(x,z),this.emptyChunkSources).getHighestLowestSourceY();
+    }
+    void propagateSourcesForNativeLevel(int chunkX,int chunkZ){
+        long l=SectionPos.getZeroNode(chunkX,chunkZ);
 		ChunkSkyLightSources chunkSkyLightSources = (ChunkSkyLightSources)Objects.requireNonNullElse(
-			this.getChunkSources(chunkPos.x, chunkPos.z), this.emptyChunkSources
+			this.getChunkSources(chunkX, chunkZ), this.emptyChunkSources
 		);
 		ChunkSkyLightSources chunkSkyLightSources2 = (ChunkSkyLightSources)Objects.requireNonNullElse(
-			this.getChunkSources(chunkPos.x, chunkPos.z - 1), this.emptyChunkSources
+			this.getChunkSources(chunkX, chunkZ - 1), this.emptyChunkSources
 		);
 		ChunkSkyLightSources chunkSkyLightSources3 = (ChunkSkyLightSources)Objects.requireNonNullElse(
-			this.getChunkSources(chunkPos.x, chunkPos.z + 1), this.emptyChunkSources
+			this.getChunkSources(chunkX, chunkZ + 1), this.emptyChunkSources
 		);
 		ChunkSkyLightSources chunkSkyLightSources4 = (ChunkSkyLightSources)Objects.requireNonNullElse(
-			this.getChunkSources(chunkPos.x - 1, chunkPos.z), this.emptyChunkSources
+			this.getChunkSources(chunkX - 1, chunkZ), this.emptyChunkSources
 		);
 		ChunkSkyLightSources chunkSkyLightSources5 = (ChunkSkyLightSources)Objects.requireNonNullElse(
-			this.getChunkSources(chunkPos.x + 1, chunkPos.z), this.emptyChunkSources
+			this.getChunkSources(chunkX + 1, chunkZ), this.emptyChunkSources
 		);
 		int i = this.storage.getTopSectionY(l);
 		int j = this.storage.getBottomSectionY();
-		int k = SectionPos.sectionToBlockCoord(chunkPos.x);
-		int m = SectionPos.sectionToBlockCoord(chunkPos.z);
+        if(this.lightCoordinator!=null){
+            NativeLightPropagation.SkySeed seed=NativeLightPropagation.skySeed(
+                chunkSkyLightSources,chunkSkyLightSources2,chunkSkyLightSources3,chunkSkyLightSources4,chunkSkyLightSources5);
+            if(seed!=null && this.lightCoordinator.seedSky(chunkX,chunkZ,i,j,seed))return;
+        }
 
-		for (int n = i - 1; n >= j; n--) {
-			long o = SectionPos.asLong(chunkPos.x, n, chunkPos.z);
-			DataLayer dataLayer = this.storage.getDataLayerToWrite(o);
-			if (dataLayer != null) {
-				int p = SectionPos.sectionToBlockCoord(n);
-				int q = p + 15;
-				boolean bl = false;
-
-				for (int r = 0; r < 16; r++) {
-					for (int s = 0; s < 16; s++) {
-						int t = chunkSkyLightSources.getLowestSourceY(s, r);
-						if (t <= q) {
-							int u = r == 0 ? chunkSkyLightSources2.getLowestSourceY(s, 15) : chunkSkyLightSources.getLowestSourceY(s, r - 1);
-							int v = r == 15 ? chunkSkyLightSources3.getLowestSourceY(s, 0) : chunkSkyLightSources.getLowestSourceY(s, r + 1);
-							int w = s == 0 ? chunkSkyLightSources4.getLowestSourceY(15, r) : chunkSkyLightSources.getLowestSourceY(s - 1, r);
-							int x = s == 15 ? chunkSkyLightSources5.getLowestSourceY(0, r) : chunkSkyLightSources.getLowestSourceY(s + 1, r);
-							int y = Math.max(Math.max(u, v), Math.max(w, x));
-
-							for (int z = q; z >= Math.max(p, t); z--) {
-								dataLayer.set(s, SectionPos.sectionRelative(z), r, 15);
-								if (z == t || z < y) {
-									long aa = BlockPos.asLong(k + s, z, m + r);
-									this.enqueueIncrease(aa, LightEngine.QueueEntry.increaseSkySourceInDirections(z == t, z < u, z < v, z < w, z < x));
-								}
-							}
-
-							if (t < p) {
-								bl = true;
-							}
-						}
-					}
-				}
-
-				if (!bl) {
-					break;
-				}
-			}
-		}
-	}
+        NativeLiveSkySources.run(this, this.storage, this.lightWork, chunkX, chunkZ, i, j,
+            chunkSkyLightSources, chunkSkyLightSources2, chunkSkyLightSources3, chunkSkyLightSources4, chunkSkyLightSources5);
+    }
 }

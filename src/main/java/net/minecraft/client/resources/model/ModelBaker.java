@@ -8,8 +8,6 @@ import net.minecraft.resources.ResourceLocation;
 public interface ModelBaker {
 	ResolvedModel getModel(ResourceLocation resourceLocation);
 
-	SpriteGetter sprites();
-
 	<T> T compute(ModelBaker.SharedOperationKey<T> sharedOperationKey);
 
 	@FunctionalInterface

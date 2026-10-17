@@ -24,6 +24,8 @@ import net.minecraft.world.level.chunk.ChunkSource;
 import net.minecraft.world.level.chunk.EmptyLevelChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.NativeBiomeWorld;
+import net.minecraft.world.level.chunk.NativeClientResidency;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap.Types;
 import net.minecraft.world.level.lighting.LevelLightEngine;
@@ -37,12 +39,54 @@ public class ClientChunkCache extends ChunkSource {
 	private final LevelLightEngine lightEngine;
 	volatile ClientChunkCache.Storage storage;
 	final ClientLevel level;
+	private final NativeBiomeWorld nativeBiomes;
+	private boolean readingBiomePacket;
 
 	public ClientChunkCache(ClientLevel clientLevel, int i) {
 		this.level = clientLevel;
 		this.emptyChunk = new EmptyLevelChunk(clientLevel, new ChunkPos(0, 0), clientLevel.registryAccess().lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.PLAINS));
 		this.lightEngine = new LevelLightEngine(this, true, clientLevel.dimensionType().hasSkyLight());
 		this.storage = new ClientChunkCache.Storage(calculateStorageRange(i));
+		this.nativeBiomes = clientLevel.getClass() == ClientLevel.class
+			? NativeBiomeWorld.create(clientLevel.palettedContainerFactory(), clientLevel.getMinY(), clientLevel.getHeight()) : null;
+		if (this.nativeBiomes != null) this.nativeBiomes.range(0, 0, this.storage.chunkRadius);
+	}
+
+	public net.minecraft.world.phys.Vec3 sampleNativeSky(net.minecraft.world.phys.Vec3 position) {
+		return this.nativeBiomes == null ? null : this.nativeBiomes.sample(position);
+	}
+
+	public net.minecraft.world.phys.Vec3 sampleNativeFog(net.minecraft.world.phys.Vec3 position) {
+		return this.nativeBiomes == null ? null : this.nativeBiomes.sampleFog(position);
+	}
+
+	public net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> nativeNoiseBiome(int x, int y, int z) {
+		return this.nativeBiomes == null || this.readingBiomePacket ? null : this.nativeBiomes.biome(x, y, z);
+	}
+
+	public net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> nativeBiomeAtBlock(long seed, int x, int y, int z) {
+		return this.nativeBiomes == null || this.readingBiomePacket ? null : this.nativeBiomes.biomeAtBlock(seed, x, y, z);
+	}
+
+	private void publishNativeWorldInputs(LevelChunk chunk) {
+		if (this.readingBiomePacket) return;
+		var storage = this.storage;
+		int index = storage.getIndex(chunk.getPos().x, chunk.getPos().z);
+		if (storage.getChunk(index) != chunk) return;
+		if (storage.nativeResidency != null) storage.nativeResidency.refreshWorldInputs(chunk, index, storage.nativeResidency.identity(index));
+		if (this.nativeBiomes != null) this.nativeBiomes.replace(chunk);
+	}
+
+	/** Ordinary camera queries consume Rust's loaded block owners directly. */
+	public int nativeCameraEnvironment(net.minecraft.world.phys.Vec3 position,
+		org.joml.Vector3f forward, org.joml.Vector3f left, org.joml.Vector3f up,
+		double halfHeight, double aspect, int tags) {
+		if (getClass() != ClientChunkCache.class || this.level == null || this.level.getClass() != ClientLevel.class
+			|| this.level.isDebug() || this.readingBiomePacket || this.storage == null) return -1;
+		var residency = this.storage.nativeResidency;
+		if (residency == null) return -1;
+		return residency.cameraEnvironment(this.level.getMinY(), this.level.getMaxY(), position,
+			forward, left, up, halfHeight, aspect, tags);
 	}
 
 	public LevelLightEngine getLightEngine() {
@@ -84,6 +128,38 @@ public class ClientChunkCache extends ChunkSource {
 		return this.level;
 	}
 
+	/** Visit loaded chunks in the original z/x order, observing mutations between callbacks. */
+	public void forEachLoadedChunkInRange(int centerX, int centerZ, int radius, Consumer<LevelChunk> consumer) {
+		if (radius < 0) throw new IllegalArgumentException("Negative chunk radius");
+		int minX=Math.subtractExact(centerX,radius), maxX=Math.addExact(centerX,radius);
+		int minZ=Math.subtractExact(centerZ,radius), maxZ=Math.addExact(centerZ,radius);
+		int x=minX, z=minZ;
+		Storage selected=null;
+		NativeClientResidency.Range range=null;
+		try {
+			while (true) {
+				Storage current=this.storage;
+				if (current!=selected) {
+					if (range!=null) range.close();
+					selected=current;
+					range=getClass()==ClientChunkCache.class && current.nativeResidency!=null
+						? current.nativeResidency.range(minX,maxX,minZ,maxZ) : null;
+				}
+				int slot=range==null ? -2 : range.next(x,z);
+				if (slot==-1) break;
+				LevelChunk chunk;
+				if (slot>=0) {
+					x=range.x; z=range.z;
+					chunk=current.getChunk(slot);
+					if (!isValidChunk(chunk,x,z)) chunk=null;
+				} else chunk=this.getChunk(x,z,ChunkStatus.FULL,false);
+				if (chunk!=null) consumer.accept(chunk);
+				if (x==maxX) { if (z==maxZ) break; x=minX; z++; }
+				else x++;
+			}
+		} finally { if (range!=null) range.close(); }
+	}
+
 	public void replaceBiomes(int i, int j, FriendlyByteBuf friendlyByteBuf) {
 		if (!this.storage.inRange(i, j)) {
 			LOGGER.warn("Ignoring chunk since it's not in the view range: {}, {}", i, j);
@@ -93,7 +169,9 @@ public class ClientChunkCache extends ChunkSource {
 			if (!isValidChunk(levelChunk, i, j)) {
 				LOGGER.warn("Ignoring chunk since it's not present: {}, {}", i, j);
 			} else {
-				levelChunk.replaceBiomes(friendlyByteBuf);
+				this.readingBiomePacket = true;
+				try { levelChunk.replaceBiomes(friendlyByteBuf); }
+				finally { this.readingBiomePacket = false; this.publishNativeWorldInputs(levelChunk); }
 			}
 		}
 	}
@@ -109,10 +187,18 @@ public class ClientChunkCache extends ChunkSource {
 			ChunkPos chunkPos = new ChunkPos(i, j);
 			if (!isValidChunk(levelChunk, i, j)) {
 				levelChunk = new LevelChunk(this.level, chunkPos);
-				levelChunk.replaceWithPacketData(friendlyByteBuf, map, consumer);
+				this.readingBiomePacket = true;
+				try { levelChunk.replaceWithPacketData(friendlyByteBuf, map, consumer); }
+				finally { this.readingBiomePacket = false; this.publishNativeWorldInputs(levelChunk); }
 				this.storage.replace(k, levelChunk);
+				this.publishNativeWorldInputs(levelChunk);
+				LevelChunk installed = levelChunk;
+				installed.setNativeSectionArrayEscapeListener(() -> this.publishNativeWorldInputs(installed));
+				for (var section : installed.getSectionsForRead()) section.setNativeBiomeListener(() -> this.publishNativeWorldInputs(installed));
 			} else {
-				levelChunk.replaceWithPacketData(friendlyByteBuf, map, consumer);
+				this.readingBiomePacket = true;
+				try { levelChunk.replaceWithPacketData(friendlyByteBuf, map, consumer); }
+				finally { this.readingBiomePacket = false; this.publishNativeWorldInputs(levelChunk); }
 				this.storage.refreshEmptySections(levelChunk);
 			}
 
@@ -131,8 +217,8 @@ public class ClientChunkCache extends ChunkSource {
 	}
 
 	public void updateViewCenter(int i, int j) {
-		this.storage.viewCenterX = i;
-		this.storage.viewCenterZ = j;
+		this.storage.center(i, j);
+		if (this.nativeBiomes != null) this.nativeBiomes.range(i, j, this.storage.chunkRadius);
 	}
 
 	public void updateViewRadius(int i) {
@@ -140,8 +226,7 @@ public class ClientChunkCache extends ChunkSource {
 		int k = calculateStorageRange(i);
 		if (j != k) {
 			ClientChunkCache.Storage storage = new ClientChunkCache.Storage(k);
-			storage.viewCenterX = this.storage.viewCenterX;
-			storage.viewCenterZ = this.storage.viewCenterZ;
+			storage.center(this.storage.centerX(), this.storage.centerZ());
 
 			for (int l = 0; l < this.storage.chunks.length(); l++) {
 				LevelChunk levelChunk = (LevelChunk)this.storage.chunks.get(l);
@@ -153,6 +238,17 @@ public class ClientChunkCache extends ChunkSource {
 				}
 			}
 
+			if (this.nativeBiomes != null) {
+				for (int l = 0; l < this.storage.chunks.length(); l++) {
+					var old = this.storage.chunks.get(l);
+					if (old != null && !storage.inRange(old.getPos().x, old.getPos().z)) {
+						this.nativeBiomes.remove(old.getPos().x, old.getPos().z);
+						old.setNativeSectionArrayEscapeListener(null);
+						for (var section : old.getSectionsForRead()) section.setNativeBiomeListener(null);
+					}
+				}
+				this.nativeBiomes.range(storage.centerX(), storage.centerZ(), storage.chunkRadius);
+			}
 			this.storage = storage;
 		}
 	}
@@ -166,7 +262,7 @@ public class ClientChunkCache extends ChunkSource {
 	}
 
 	public int getLoadedChunksCount() {
-		return this.storage.chunkCount;
+		return this.storage.count();
 	}
 
 	/**
@@ -176,9 +272,9 @@ public class ClientChunkCache extends ChunkSource {
 	 */
 	public long getLoadedChunkPositionFingerprint() {
 		Storage storage = this.storage;
-		long fingerprint = storage.loadedChunkPositionFingerprint;
-		fingerprint = mixChunkIdentity(fingerprint ^ Integer.toUnsignedLong(storage.chunkCount));
-		fingerprint ^= mixChunkIdentity(ChunkPos.asLong(storage.viewCenterX, storage.viewCenterZ));
+		long fingerprint = storage.fingerprint();
+		fingerprint = mixChunkIdentity(fingerprint ^ Integer.toUnsignedLong(storage.count()));
+		fingerprint ^= mixChunkIdentity(ChunkPos.asLong(storage.centerX(), storage.centerZ()));
 		return fingerprint;
 	}
 
@@ -195,7 +291,7 @@ public class ClientChunkCache extends ChunkSource {
 	}
 
 	public LongOpenHashSet getLoadedEmptySections() {
-		return this.storage.loadedEmptySections;
+		return this.storage.emptySections();
 	}
 
 	public void onSectionEmptinessChanged(int i, int j, int k, boolean bl) {
@@ -205,7 +301,8 @@ public class ClientChunkCache extends ChunkSource {
 	@Environment(EnvType.CLIENT)
 	final class Storage {
 		final AtomicReferenceArray<LevelChunk> chunks;
-		final LongOpenHashSet loadedEmptySections = new LongOpenHashSet();
+		final NativeClientResidency nativeResidency;
+		final LongOpenHashSet loadedEmptySections;
 		final int chunkRadius;
 		private final int viewRange;
 		volatile int viewCenterX;
@@ -216,36 +313,67 @@ public class ClientChunkCache extends ChunkSource {
 		Storage(final int i) {
 			this.chunkRadius = i;
 			this.viewRange = i * 2 + 1;
-			this.chunks = new AtomicReferenceArray(this.viewRange * this.viewRange);
+			this.chunks = new AtomicReferenceArray<>(this.viewRange * this.viewRange);
+            this.nativeResidency = NativeClientResidency.create(i);
+            this.loadedEmptySections = this.nativeResidency == null ? new LongOpenHashSet() : null;
 		}
+
+        int count() { return this.nativeResidency == null ? this.chunkCount : this.nativeResidency.count(); }
+        long fingerprint() { return this.nativeResidency == null ? this.loadedChunkPositionFingerprint : this.nativeResidency.fingerprint(); }
+        int centerX() { return this.nativeResidency == null ? this.viewCenterX : this.nativeResidency.centerX(); }
+        int centerZ() { return this.nativeResidency == null ? this.viewCenterZ : this.nativeResidency.centerZ(); }
+        void center(int x, int z) {
+            if (this.nativeResidency == null) { this.viewCenterX = x; this.viewCenterZ = z; }
+            else this.nativeResidency.center(x, z);
+        }
+        LongOpenHashSet emptySections() {
+            return this.nativeResidency == null ? this.loadedEmptySections : this.nativeResidency.emptySections();
+        }
+        boolean emptyChanged(long key, boolean empty) {
+            return this.nativeResidency == null ? (empty ? this.loadedEmptySections.add(key) : this.loadedEmptySections.remove(key))
+                : this.nativeResidency.empty(key, empty);
+        }
+        void positionChanged(ChunkPos pos) {
+            if (this.nativeResidency == null) this.loadedChunkPositionFingerprint ^= mixChunkIdentity(ChunkPos.asLong(pos.x, pos.z));
+            else this.nativeResidency.position(pos.x, pos.z);
+        }
 
 		int getIndex(int i, int j) {
 			return Math.floorMod(j, this.viewRange) * this.viewRange + Math.floorMod(i, this.viewRange);
 		}
 
 		void replace(int i, @Nullable LevelChunk levelChunk) {
-			LevelChunk levelChunk2 = (LevelChunk)this.chunks.getAndSet(i, levelChunk);
+			LevelChunk levelChunk2 = this.chunks.getAndSet(i, levelChunk);
+            long id = this.nativeResidency == null ? 0 : this.nativeResidency.publish(i, levelChunk);
 			if (levelChunk2 != null) {
-				this.chunkCount--;
+				if (this.nativeResidency == null) this.chunkCount--;
 				ChunkPos oldPos = levelChunk2.getPos();
-				this.loadedChunkPositionFingerprint ^= mixChunkIdentity(ChunkPos.asLong(oldPos.x, oldPos.z));
+				levelChunk2.setNativeSectionArrayEscapeListener(null);
+				if (ClientChunkCache.this.nativeBiomes != null) ClientChunkCache.this.nativeBiomes.remove(oldPos.x, oldPos.z);
+				for (var section : levelChunk2.getSectionsForRead()) section.setNativeBiomeListener(null);
+				this.positionChanged(oldPos);
 				this.dropEmptySections(levelChunk2);
 				ClientChunkCache.this.level.unload(levelChunk2);
 			}
 
 			if (levelChunk != null) {
-				this.chunkCount++;
+				if (this.nativeResidency == null) this.chunkCount++;
+                else this.nativeResidency.admitted();
 				ChunkPos newPos = levelChunk.getPos();
-				this.loadedChunkPositionFingerprint ^= mixChunkIdentity(ChunkPos.asLong(newPos.x, newPos.z));
-				this.addEmptySections(levelChunk);
+				this.positionChanged(newPos);
+				this.addEmptySections(levelChunk, i, id);
 			}
 		}
 
 		void drop(int i, LevelChunk levelChunk) {
 			if (this.chunks.compareAndSet(i, levelChunk, null)) {
-				this.chunkCount--;
+                if (this.nativeResidency == null) this.chunkCount--;
+                else this.nativeResidency.dropped(i);
 				ChunkPos chunkPos = levelChunk.getPos();
-				this.loadedChunkPositionFingerprint ^= mixChunkIdentity(ChunkPos.asLong(chunkPos.x, chunkPos.z));
+				levelChunk.setNativeSectionArrayEscapeListener(null);
+				if (ClientChunkCache.this.nativeBiomes != null) ClientChunkCache.this.nativeBiomes.remove(chunkPos.x, chunkPos.z);
+				for (var section : levelChunk.getSectionsForRead()) section.setNativeBiomeListener(null);
+				this.positionChanged(chunkPos);
 				this.dropEmptySections(levelChunk);
 			}
 
@@ -261,15 +389,16 @@ public class ClientChunkCache extends ChunkSource {
 			if (this.inRange(i, k)) {
 				long l = SectionPos.asLong(i, j, k);
 				if (bl) {
-					this.loadedEmptySections.add(l);
-				} else if (this.loadedEmptySections.remove(l)) {
+					this.emptyChanged(l, true);
+				} else if (this.emptyChanged(l, false)) {
 					ClientChunkCache.this.level.onSectionBecomingNonEmpty(l);
 				}
 			}
 		}
 
 		private void dropEmptySections(LevelChunk levelChunk) {
-			LevelChunkSection[] levelChunkSections = levelChunk.getSections();
+            if (this.nativeResidency != null) { this.nativeResidency.dropEmpty(levelChunk); return; }
+			LevelChunkSection[] levelChunkSections = levelChunk.getSectionsForRead();
 
 			for (int i = 0; i < levelChunkSections.length; i++) {
 				ChunkPos chunkPos = levelChunk.getPos();
@@ -277,8 +406,9 @@ public class ClientChunkCache extends ChunkSource {
 			}
 		}
 
-		private void addEmptySections(LevelChunk levelChunk) {
-			LevelChunkSection[] levelChunkSections = levelChunk.getSections();
+		private void addEmptySections(LevelChunk levelChunk, int index, long id) {
+            if (this.nativeResidency != null) { this.nativeResidency.addEmpty(levelChunk, index, id); return; }
+			LevelChunkSection[] levelChunkSections = levelChunk.getSectionsForRead();
 
 			for (int i = 0; i < levelChunkSections.length; i++) {
 				LevelChunkSection levelChunkSection = levelChunkSections[i];
@@ -290,22 +420,32 @@ public class ClientChunkCache extends ChunkSource {
 		}
 
 		void refreshEmptySections(LevelChunk levelChunk) {
+            if (this.nativeResidency != null) {
+                int index = -1;
+                if (levelChunk.getClass() == LevelChunk.class) {
+                    ChunkPos pos = levelChunk.getPos();
+                    index = this.getIndex(pos.x, pos.z);
+                    if (this.chunks.get(index) != levelChunk) index = -1;
+                }
+                this.nativeResidency.refresh(levelChunk, index, this.nativeResidency.identity(index), ClientChunkCache.this.level::onSectionBecomingNonEmpty);
+                return;
+            }
 			ChunkPos chunkPos = levelChunk.getPos();
-			LevelChunkSection[] levelChunkSections = levelChunk.getSections();
+			LevelChunkSection[] levelChunkSections = levelChunk.getSectionsForRead();
 
 			for (int i = 0; i < levelChunkSections.length; i++) {
 				LevelChunkSection levelChunkSection = levelChunkSections[i];
 				long l = SectionPos.asLong(chunkPos.x, levelChunk.getSectionYFromSectionIndex(i), chunkPos.z);
 				if (levelChunkSection.hasOnlyAir()) {
-					this.loadedEmptySections.add(l);
-				} else if (this.loadedEmptySections.remove(l)) {
+					this.emptyChanged(l, true);
+				} else if (this.emptyChanged(l, false)) {
 					ClientChunkCache.this.level.onSectionBecomingNonEmpty(l);
 				}
 			}
 		}
 
 		boolean inRange(int i, int j) {
-			return Math.abs(i - this.viewCenterX) <= this.chunkRadius && Math.abs(j - this.viewCenterZ) <= this.chunkRadius;
+			return Math.abs(i - this.centerX()) <= this.chunkRadius && Math.abs(j - this.centerZ()) <= this.chunkRadius;
 		}
 
 		@Nullable
@@ -320,8 +460,8 @@ public class ClientChunkCache extends ChunkSource {
 				try {
 					int i = ClientChunkCache.this.storage.chunkRadius;
 
-					for (int j = this.viewCenterZ - i; j <= this.viewCenterZ + i; j++) {
-						for (int k = this.viewCenterX - i; k <= this.viewCenterX + i; k++) {
+					for (int j = this.centerZ() - i; j <= this.centerZ() + i; j++) {
+						for (int k = this.centerX() - i; k <= this.centerX() + i; k++) {
 							LevelChunk levelChunk = (LevelChunk)ClientChunkCache.this.storage.chunks.get(ClientChunkCache.this.storage.getIndex(k, j));
 							if (levelChunk != null) {
 								ChunkPos chunkPos = levelChunk.getPos();

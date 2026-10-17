@@ -57,7 +57,9 @@ public class NetherPortalBlock extends Block implements Portal {
 
 	public NetherPortalBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(AXIS, Direction.Axis.X));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(AXIS, Direction.Axis.X));
+		}
 	}
 
 	@Override

@@ -30,6 +30,7 @@ public class FallenTreeFeature extends Feature<FallenTreeConfiguration> {
 
 	@Override
 	public boolean place(FeaturePlaceContext<FallenTreeConfiguration> featurePlaceContext) {
+		if (net.minecraft.world.level.levelgen.NativeFallenTrees.place(this, featurePlaceContext)) return true;
 		this.placeFallenTree(featurePlaceContext.config(), featurePlaceContext.origin(), featurePlaceContext.level(), featurePlaceContext.random());
 		return true;
 	}

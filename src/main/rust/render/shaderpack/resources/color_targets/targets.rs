@@ -101,6 +101,7 @@ pub(crate) struct ShaderPackColorTarget {
 pub(crate) struct ShaderPackColorTargets {
     pub identity: ShaderPackColorTargetIdentity,
     pub(super) targets: BTreeMap<String, ShaderPackColorTarget>,
+    pub(super) clear_passes: ShaderPackColorClearPasses,
 }
 
 pub(super) fn color_resource_generation(
@@ -124,6 +125,11 @@ pub(super) fn color_resource_generation(
 }
 
 impl ShaderPackColorTargets {
+    /// True when both sets name the same images and views per target.
+    pub(crate) fn same_images(&self, other: &Self) -> bool {
+        self.targets == other.targets
+    }
+
     pub(crate) fn target(&self, name: &str) -> Option<ShaderPackColorTarget> {
         self.targets.get(name).copied()
     }
@@ -295,17 +301,19 @@ impl ShaderPackColorTargets {
                     )));
                 }
             }
-            Ok(Self { identity, targets })
+            let clear_passes = ShaderPackColorClearPasses::create(gal, &identity, &targets, &mut created)?;
+            Ok(Self { identity, targets, clear_passes })
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
     }
 
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
+        self.clear_passes.destroy(gal);
         for target in self.targets.into_values() {
             for handle in [
                 target.previous_attachment_view,
@@ -319,7 +327,9 @@ impl ShaderPackColorTargets {
             .into_iter()
             .flatten()
             {
-                let _ = gal.destroy(handle);
+                // Cached fullscreen/final-output consumers of the old
+                // generation may still bind these views.
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -423,6 +433,10 @@ pub(crate) struct ShaderPackColorTargetCache {
 }
 
 impl ShaderPackColorTargetCache {
+    pub(crate) fn has_pending_targets(&self) -> bool {
+        self.pending.is_some()
+    }
+
     pub(crate) fn stage(
         &mut self,
         gal: &mut VulkanicGal,

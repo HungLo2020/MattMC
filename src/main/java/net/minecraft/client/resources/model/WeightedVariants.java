@@ -34,17 +34,4 @@ public class WeightedVariants implements BlockStateModel {
 	public WeightedList<BlockStateModel> sodium$getWeightedModels() {
 		return this.list;
 	}
-
-	@Environment(EnvType.CLIENT)
-	public record Unbaked(WeightedList<BlockStateModel.Unbaked> entries) implements BlockStateModel.Unbaked {
-		@Override
-		public BlockStateModel bake(ModelBaker modelBaker) {
-			return new WeightedVariants(this.entries.map(unbaked -> unbaked.bake(modelBaker)));
-		}
-
-		@Override
-		public void resolveDependencies(ResolvableModel.Resolver resolver) {
-			this.entries.unwrap().forEach(weighted -> ((BlockStateModel.Unbaked)weighted.value()).resolveDependencies(resolver));
-		}
-	}
 }

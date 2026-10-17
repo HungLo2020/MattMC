@@ -13,7 +13,7 @@ gal/            VulkanicGal, one module per concern:
   bindings        resource-set validation
   lifetime        destroy and the dependency graph
   recording       command-recording scopes, command lists
-  command_validation, hazards, normalization, submission   submit path
+  command_validation, hazards, normalization, host_write_hoist, submission   submit path
   frames          presentation surface
   profiling, capture, test_hooks, arena
 resources.rs    descriptors, formats, usages, BackendCapabilities
@@ -35,6 +35,12 @@ Rules, enforced by `architecture_boundary.rs`:
   documented; test hooks are `#[cfg(test)]` `*_for_test`.
 - Code outside `vulkanic` uses the public GAL modules only; tests there build
   GALs through `test_support` (test builds only).
+
+Submit moves each `HostWriteBuffer` wrapped in its own transitions to the
+start of its command list when nothing earlier in that list references the
+buffer (`gal/host_write_hoist.rs`); the Vulkan backend then lowers the run
+of writes behind one dependency. A write left between passes drains the GPU,
+so keep per-frame uniform writes self-contained (barrier, write, barrier).
 
 Known large functions kept intact: the command-op validator
 (`gal/command_validation.rs`) and the hazard analysis (`gal/hazards.rs`).

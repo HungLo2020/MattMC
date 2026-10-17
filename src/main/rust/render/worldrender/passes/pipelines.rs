@@ -355,7 +355,7 @@ pub(in crate::render::worldrender) fn create_material_data_slot(
     }) {
         Ok(resource_set) => resource_set,
         Err(error) => {
-            let _ = gal.destroy(uniform_buffer);
+            let _ = gal.retire(uniform_buffer);
             return Err(error);
         }
     };

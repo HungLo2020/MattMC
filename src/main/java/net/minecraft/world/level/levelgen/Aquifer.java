@@ -19,22 +19,40 @@ public interface Aquifer {
 		int j,
 		Aquifer.FluidPicker fluidPicker
 	) {
-		return new Aquifer.NoiseBasedAquifer(noiseChunk, chunkPos, noiseRouter, positionalRandomFactory, i, j, fluidPicker);
+		return new Aquifer.NoiseBasedAquifer(noiseChunk, chunkPos, () -> noiseRouter, noiseRouter.barrierNoise(), positionalRandomFactory, i, j, fluidPicker);
+	}
+
+    /** An aquifer over a router resolved when a Java source is first evaluated,
+     * with the barrier noise given directly (it is read eagerly). */
+	static Aquifer create(
+		NoiseChunk noiseChunk,
+		ChunkPos chunkPos,
+		java.util.function.Supplier<NoiseRouter> noiseRouter,
+		DensityFunction barrierNoise,
+		PositionalRandomFactory positionalRandomFactory,
+		int i,
+		int j,
+		Aquifer.FluidPicker fluidPicker
+	) {
+		return new Aquifer.NoiseBasedAquifer(noiseChunk, chunkPos, noiseRouter, barrierNoise, positionalRandomFactory, i, j, fluidPicker);
 	}
 
 	static Aquifer createDisabled(Aquifer.FluidPicker fluidPicker) {
-		return new Aquifer() {
-			@Nullable
-			@Override
-			public BlockState computeSubstance(DensityFunction.FunctionContext functionContext, double d) {
-				return d > 0.0 ? null : fluidPicker.computeFluid(functionContext.blockX(), functionContext.blockY(), functionContext.blockZ()).at(functionContext.blockY());
-			}
+		return new Aquifer.Disabled(fluidPicker);
+	}
 
-			@Override
-			public boolean shouldScheduleFluidUpdate() {
-				return false;
-			}
-		};
+	/** The disabled aquifer, named so the native NOISE fill can recognize its picker. */
+	record Disabled(Aquifer.FluidPicker fluidPicker) implements Aquifer {
+		@Nullable
+		@Override
+		public BlockState computeSubstance(DensityFunction.FunctionContext functionContext, double d) {
+			return d > 0.0 ? null : this.fluidPicker.computeFluid(functionContext.blockX(), functionContext.blockY(), functionContext.blockZ()).at(functionContext.blockY());
+		}
+
+		@Override
+		public boolean shouldScheduleFluidUpdate() {
+			return false;
+		}
 	}
 
 	@Nullable
@@ -56,16 +74,16 @@ public interface Aquifer {
 	public static class NoiseBasedAquifer implements Aquifer {
 		private final NoiseChunk noiseChunk;
 		private final DensityFunction barrierNoise;
-		private final DensityFunction fluidLevelFloodednessNoise;
-		private final DensityFunction fluidLevelSpreadNoise;
-		private final DensityFunction lavaNoise;
+        // The chunk-wrapped sources, resolved on first use: a native chunk wraps
+        // its graph only if a Java path evaluates one of them.
+        private final java.util.function.Supplier<NoiseRouter> sourceRouter;
+        @Nullable
+        private NoiseRouter sources;
 		private final PositionalRandomFactory positionalRandomFactory;
 		private final Aquifer.FluidStatus[] aquiferCache;
 		private final long[] aquiferLocationCache;
 		private NativeAquifer nativeAquifer;
 		private final Aquifer.FluidPicker globalFluidPicker;
-		private final DensityFunction erosion;
-		private final DensityFunction depth;
 		private boolean shouldScheduleFluidUpdate;
 		private final int skipSamplingAboveY;
 		private final int minGridX;
@@ -78,19 +96,16 @@ public interface Aquifer {
 		NoiseBasedAquifer(
 			NoiseChunk noiseChunk,
 			ChunkPos chunkPos,
-			NoiseRouter noiseRouter,
+			java.util.function.Supplier<NoiseRouter> noiseRouter,
+			DensityFunction barrierNoise,
 			PositionalRandomFactory positionalRandomFactory,
 			int i,
 			int j,
 			Aquifer.FluidPicker fluidPicker
 		) {
 			this.noiseChunk = noiseChunk;
-			this.barrierNoise = noiseRouter.barrierNoise();
-			this.fluidLevelFloodednessNoise = noiseRouter.fluidLevelFloodednessNoise();
-			this.fluidLevelSpreadNoise = noiseRouter.fluidLevelSpreadNoise();
-			this.lavaNoise = noiseRouter.lavaNoise();
-			this.erosion = noiseRouter.erosion();
-			this.depth = noiseRouter.depth();
+			this.barrierNoise = barrierNoise;
+            this.sourceRouter = noiseRouter;
 			this.positionalRandomFactory = positionalRandomFactory;
 			this.minGridX = gridX(chunkPos.getMinBlockX() + -5) + 0;
 			this.globalFluidPicker = fluidPicker;
@@ -114,13 +129,11 @@ public interface Aquifer {
 
 		}
 
-        private NativeAquifer nativeAquifer() {
+        NativeAquifer nativeAquifer() {
             if(this.nativeAquifer==null) {
                 this.nativeAquifer = new NativeAquifer(this, noiseChunk, aquiferLocationCache,
                     new int[]{minGridX,minGridY,minGridZ,gridSizeX,gridSizeZ},
-                    globalFluidPicker, barrierNoise, skipSamplingAboveY,
-                    positionalRandomFactory.getClass() == XoroshiroRandomSource.XoroshiroPositionalRandomFactory.class
-                        || positionalRandomFactory.getClass() == LegacyRandomSource.LegacyPositionalRandomFactory.class);
+                    globalFluidPicker, barrierNoise, skipSamplingAboveY, positionalRandomFactory);
             }
             return this.nativeAquifer;
         }
@@ -166,6 +179,12 @@ public interface Aquifer {
 
         // Random factories and lazy fluid/noise sources remain Java bindings.
         // Unknown factories visit precisely the original twelve centers in order.
+        long[] locationCache() { return aquiferLocationCache; }
+
+        int skipSamplingAboveY() { return skipSamplingAboveY; }
+
+        Aquifer.FluidPicker globalFluidPicker() { return globalFluidPicker; }
+
         long location(int x, int y, int z) {
             int index = getIndex(x,y,z);
             long value = aquiferLocationCache[index];
@@ -199,6 +218,12 @@ public interface Aquifer {
 		public boolean shouldScheduleFluidUpdate() {
 			return this.shouldScheduleFluidUpdate;
 		}
+
+        /** The flag after a native CARVERS stage's last substance decision. */
+        void setScheduleFluidUpdate(boolean schedule) {
+            this.shouldScheduleFluidUpdate = schedule;
+            if (this.nativeAquifer != null) this.nativeAquifer.setScheduleFluidUpdate(schedule);
+        }
 
 
 		private static int gridX(int i) {
@@ -241,12 +266,13 @@ public interface Aquifer {
         Aquifer.FluidStatus fluidSource(int x,int y,int z) { return globalFluidPicker.computeFluid(x,y,z); }
         int surfaceSource(int x,int z) { return noiseChunk.preliminarySurfaceLevel(x,z); }
         double noiseSource(int kind,DensityFunction.SinglePointContext context) {
+            if(sources==null)sources=sourceRouter.get();
             return switch(kind) {
-                case 3 -> erosion.compute(context);
-                case 4 -> depth.compute(context);
-                case 5 -> fluidLevelFloodednessNoise.compute(context);
-                case 6 -> fluidLevelSpreadNoise.compute(context);
-                case 7 -> lavaNoise.compute(context);
+                case 3 -> sources.erosion().compute(context);
+                case 4 -> sources.depth().compute(context);
+                case 5 -> sources.fluidLevelFloodednessNoise().compute(context);
+                case 6 -> sources.fluidLevelSpreadNoise().compute(context);
+                case 7 -> sources.lavaNoise().compute(context);
                 default -> throw new IllegalArgumentException("Unknown aquifer noise request: "+kind);
             };
         }

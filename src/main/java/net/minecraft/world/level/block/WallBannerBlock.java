@@ -33,7 +33,9 @@ public class WallBannerBlock extends AbstractBannerBlock {
 
 	public WallBannerBlock(DyeColor dyeColor, BlockBehaviour.Properties properties) {
 		super(dyeColor, properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+		}
 	}
 
 	@Override

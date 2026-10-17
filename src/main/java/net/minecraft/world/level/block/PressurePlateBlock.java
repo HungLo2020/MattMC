@@ -2,6 +2,7 @@ package net.minecraft.world.level.block;
 
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.world.level.block.state.properties.NativeBlockFamilies;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -25,9 +26,16 @@ public class PressurePlateBlock extends BasePressurePlateBlock {
 		return CODEC;
 	}
 
+	/** Registered content takes its family configuration from Rust. */
+	public PressurePlateBlock(BlockBehaviour.Properties properties) {
+		this(NativeBlockFamilies.set(properties, NativeBlockFamilies.Kind.PRESSURE_PLATE), properties);
+	}
+
 	public PressurePlateBlock(BlockSetType blockSetType, BlockBehaviour.Properties properties) {
 		super(properties, blockSetType);
-		this.registerDefaultState(this.stateDefinition.any().setValue(POWERED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(POWERED, false));
+		}
 	}
 
 	@Override

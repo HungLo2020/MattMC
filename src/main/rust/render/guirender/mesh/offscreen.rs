@@ -181,7 +181,7 @@ impl GuiMeshOffscreenTargetCache {
             }
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 Err(error)
             }
@@ -295,6 +295,6 @@ pub(super) fn destroy_target(gal: &mut VulkanicGal, target: GuiMeshOffscreenTarg
         target.color_view,
         target.color,
     ] {
-        let _ = gal.destroy(handle);
+        let _ = gal.retire(handle);
     }
 }

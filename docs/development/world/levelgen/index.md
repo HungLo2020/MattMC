@@ -3,14 +3,37 @@
 Start with the affected evaluator's guide before changing world generation.
 Preserve seed compatibility, evaluation order, and Java/native ownership rules.
 
-- [Feature Generation](feature/index.md): ore geometry and placement verification.
+- [Carving](carver/index.md): canyon geometry, live-mask ordering and focused verification.
+- [Old-terrain Blending](blending/index.md): batched height grids and saved-world compatibility.
+- [Feature Generation](feature/index.md): native decoration of placed features, ore geometry, geode density fields.
+- [FULL-chunk Verification](RUST-FULL-GENERATION.md): Frozen/Current FULL-chunk parity, resume, failure-injection and timing drivers.
+- [Retained chunk generation](../chunk-loading/RUST-CHUNK-GENERATION.md):
+  in-progress task/holder ownership through stage execution and FULL publication.
 - [Heightmaps](heightmap/index.md): packed chunk-column reconstruction and parity checks.
+- [Random-source Ownership](RUST-RANDOM-SOURCES.md): canonical state, actual native consumers, subclass boundaries and remaining migration.
 - [Noise Evaluation](RUST-NOISE.md): sampler behavior and parity checks.
+- [Perlin Graph Construction](RUST-PERLIN.md): native octave policy, actual VM identities, mutable amplitude readers and verification.
+- [Normal Noise Production](RUST-NORMAL.md): actual child ownership, iterator boundaries and mutable-tail cache correction.
+- [Blended and Perlin-Simplex Production](RUST-COMPOSITE-PRODUCERS.md): actual child graphs, VM allocation boundaries and snapshot lifetimes.
 - [Density Evaluation](RUST-DENSITY.md): expression evaluation, batching, and verification.
 - [Terrain Splines](RUST-SPLINE.md): native curve plans, coordinate bindings, and focused parity/performance checks.
+- [Structure Generation](structure/index.md): native structure-template placement, processors and verification.
 - [Structure Terrain Adjustment](RUST-BEARDIFIER.md): Beardifier cell evaluation, geometry ownership, and parity/performance checks.
+- [NOISE Fill](RUST-NOISE-FILL.md): native block loop, ore veins, section/heightmap
+  ownership, eligibility gate and parity/performance checks.
+- [Noise Router](RUST-NOISE-ROUTER.md): native interpolation slices from compiled
+  density graphs, short circuits, cache rules and parity/performance checks.
+- [Preliminary Surface Level](RUST-PRELIMINARY-SURFACE.md): per-RandomState native
+  surface programs, batched column searches and parity/performance checks.
+- [Chunk Noise Instantiation](RUST-CHUNK-NOISE.md): per-seed templates that replace
+  per-chunk Java graph wrapping, lazy wrapping and parity/performance checks.
 - [Aquifer Evaluation](RUST-AQUIFER.md): cell material decisions, fluid sources, and parity/performance checks.
 - [Surface Evaluation](RUST-SURFACE.md): column processing, callbacks, and compatibility limits.
+- [Native Generation Section Handoff](RUST-STAGE-HANDOFF.md): direct Rust
+  input snapshots and live-owner adoption for NOISE/SURFACE/CARVERS.
+- [Surface Chunk Storage](RUST-SURFACE-STORAGE.md): Rust-owned sections and
+  heightmaps shared by the SURFACE and CARVERS stages, the install contract and
+  parity/performance checks.
 - [World-Generation Organization and Refactor Report](RUST-WORLDGEN-ORGANIZATION.md):
   module ownership and the recorded correctness/performance comparisons.
 

@@ -43,6 +43,16 @@ public class RegistryOps<T> extends DelegatingOps<T> {
 		return this.lookupProvider.lookup(resourceKey).map(RegistryOps.RegistryInfo::owner);
 	}
 
+	/** Whether references into registries this context lacks decode as bare keys; see {@link RegistryOps.RegistryInfoLookup#keepsUnresolvedKeys}. */
+	public boolean keepsUnresolvedKeys() {
+		return this.lookupProvider.keepsUnresolvedKeys();
+	}
+
+	/** Unknown providers and wrappers never inherit snapshot admission. */
+	public final boolean hasControlledFinalizedLookups() {
+		return this.lookupProvider instanceof RegistryOps.HolderLookupAdapter adapter && adapter.controlledFinalizedLookups;
+	}
+
 	public <E> Optional<HolderGetter<E>> getter(ResourceKey<? extends Registry<? extends E>> resourceKey) {
 		return this.lookupProvider.lookup(resourceKey).map(RegistryOps.RegistryInfo::getter);
 	}
@@ -90,10 +100,13 @@ public class RegistryOps<T> extends DelegatingOps<T> {
 
 	static final class HolderLookupAdapter implements RegistryOps.RegistryInfoLookup {
 		private final HolderLookup.Provider lookupProvider;
+		private final boolean controlledFinalizedLookups;
 		private final Map<ResourceKey<? extends Registry<?>>, Optional<? extends RegistryOps.RegistryInfo<?>>> lookups = new ConcurrentHashMap();
 
 		public HolderLookupAdapter(HolderLookup.Provider provider) {
 			this.lookupProvider = provider;
+			this.controlledFinalizedLookups = provider instanceof net.minecraft.core.RegistryAccess.ImmutableRegistryAccess access
+				&& access.hasControlledFinalizedLookups();
 		}
 
 		@Override
@@ -124,5 +137,14 @@ public class RegistryOps<T> extends DelegatingOps<T> {
 
 	public interface RegistryInfoLookup {
 		<T> Optional<RegistryOps.RegistryInfo<T>> lookup(ResourceKey<? extends Registry<? extends T>> resourceKey);
+
+		/**
+		 * True only for content definitions decoded before data-driven
+		 * registries exist (Rust item components): a reference such as an
+		 * {@code EitherHolder} key then stays a key instead of failing.
+		 */
+		default boolean keepsUnresolvedKeys() {
+			return false;
+		}
 	}
 }

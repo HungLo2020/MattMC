@@ -8,6 +8,11 @@ Java retains placement endpoints, original RNG draws, cached `Mth` float-table
 factors, build-height checks, visited bits, target rules, block writes and cleanup.
 `ScatteredOreFeature` and `OreVeinifier` are separate algorithms and are unchanged.
 
+Ordinary ore placements now run entirely in Rust through
+[native decoration](RUST-DECORATION.md), which calls the same span kernel
+without crossing the boundary per vein. The Java route below remains for
+declined regions and placements, and for `-Dmattmc.worldgen.javaDecoration=true`.
+
 One call handles a vein and returns ordered `(x, y, firstZ, lastZ)` spans. Spans
 preserve duplicate candidates and traversal order: build-height callbacks must
 still run before deduplication. Output buffers grow and retry using the same

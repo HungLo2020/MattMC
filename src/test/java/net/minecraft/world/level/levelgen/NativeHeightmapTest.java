@@ -1,5 +1,6 @@
 package net.minecraft.world.level.levelgen;
 
+import org.junit.jupiter.api.Tag;
 import java.util.*;
 import java.util.concurrent.*;
 import net.minecraft.SharedConstants;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("parity")
 class NativeHeightmapTest {
     @BeforeAll static void bootstrap() { SharedConstants.tryDetectVersion(); Bootstrap.bootStrap(); }
 
@@ -33,7 +35,7 @@ class NativeHeightmapTest {
         }
     }
 
-    @Test void everyTypeSubsetAndExistingRawBits() {
+    @Tag("slow") @Test void everyTypeSubsetAndExistingRawBits() {
         int cases = 0;
         for (var pattern : HeightmapFixtures.WORKLOADS) for (int seed = 0; seed < 8; seed++) {
             int minY = new int[]{-64,0,-2032,2032}[seed % 4];
@@ -124,9 +126,7 @@ class NativeHeightmapTest {
 
     @Test void corruptPackedIdPreservesOriginalFailureAndPartialWrites() throws Exception {
         var source = HeightmapFixtures.chunk("solid",-64,32,0);
-        var field = PalettedContainer.class.getDeclaredField("data");field.setAccessible(true);
-        var data = (PalettedContainer.Data<?>)field.get(source.getSection(1).getStates());
-        long[] words = data.storage().getRaw();words[words.length-1] |= 15L << 60;
+        long[] words = net.minecraft.world.level.chunk.SectionFingerprint.rawWords(source.getSection(1).getStates());words[words.length-1] |= 15L << 60;
         var a = HeightmapFixtures.withSections(source.getSections(),-64,32);
         var b = HeightmapFixtures.withSections(source.getSections(),-64,32);
         var expected = assertThrows(RuntimeException.class,()->JavaHeightmapPrimer.primeHeightmaps(a,types(63)));

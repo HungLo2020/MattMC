@@ -130,6 +130,16 @@ public class StructurePlaceSettings {
 		return this.knownShape;
 	}
 
+	/** Native templates: a fixed random replaces the per-position ones. */
+	public boolean nativeHasRandom() {
+		return this.random != null;
+	}
+
+	/** Native templates: whether the fixed random is this one (block rot then draws from it). */
+	public boolean nativeRandomIs(RandomSource randomSource) {
+		return this.random == randomSource;
+	}
+
 	public List<StructureProcessor> getProcessors() {
 		return this.processors;
 	}

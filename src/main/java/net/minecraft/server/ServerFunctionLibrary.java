@@ -72,7 +72,7 @@ public class ServerFunctionLibrary implements PreparableReloadListener {
 		PreparableReloadListener.SharedState sharedState, Executor executor, PreparableReloadListener.PreparationBarrier preparationBarrier, Executor executor2
 	) {
 		ResourceManager resourceManager = sharedState.resourceManager();
-		CompletableFuture<Map<ResourceLocation, List<TagLoader.EntryWithSource>>> completableFuture = CompletableFuture.supplyAsync(
+		CompletableFuture<TagLoader.Loaded> completableFuture = CompletableFuture.supplyAsync(
 			() -> this.tagsLoader.load(resourceManager), executor
 		);
 		CompletableFuture<Map<ResourceLocation, CompletableFuture<CommandFunction<CommandSourceStack>>>> completableFuture2 = CompletableFuture.supplyAsync(
@@ -114,7 +114,7 @@ public class ServerFunctionLibrary implements PreparableReloadListener {
 						return null;
 					}).join());
 					this.functions = builder.build();
-					this.tags = this.tagsLoader.build((Map<ResourceLocation, List<TagLoader.EntryWithSource>>)pair.getFirst());
+					this.tags = this.tagsLoader.build((TagLoader.Loaded)pair.getFirst());
 				},
 				executor2
 			);

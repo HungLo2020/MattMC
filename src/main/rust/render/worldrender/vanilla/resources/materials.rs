@@ -143,6 +143,19 @@ impl WorldPrimitiveFrontend {
             } else {
                 vertex_source.to_owned()
             };
+            let vertex_source = if key.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC {
+                vertex_source.replacen("#version 450", "#version 450\n#define VULKANIC_GAL_SKY_FOG", 1)
+            } else {
+                vertex_source
+            };
+            let vertex_source = if is_map_material(key.material_id) {
+                let source = vertex_source.replacen("#version 450", "#version 450\n#define VULKANIC_GAL_MAP_TEXT", 1);
+                if self.mesh_texture_assets.get(&key.texture_id).is_some_and(|asset|
+                    asset.coordinate_origin == WorldMeshTextureCoordinateOrigin::MinecraftTopLeft)
+                {
+                    source.replacen("#version 450", "#version 450\n#define VULKANIC_GAL_MAP_UV_TOP_LEFT", 1)
+                } else { source }
+            } else { vertex_source };
             let vertex_shader = gal.create_shader_module(ShaderModuleDesc {
                 label: format!("{label}.vertex"),
                 stage: ShaderStage::Vertex,
@@ -159,6 +172,11 @@ impl WorldPrimitiveFrontend {
                     WORLD_PARTICLE_MATERIAL_FRAGMENT_SHADER.to_vec()
                 } else if key.material_id == WORLD_MATERIAL_ID_CELESTIAL {
                     WORLD_CELESTIAL_MATERIAL_FRAGMENT_SHADER.to_vec()
+                } else if key.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC {
+                    WORLD_SKY_MATERIAL_FRAGMENT_SHADER.to_vec()
+                } else if is_map_material(key.material_id) {
+                    std::str::from_utf8(WORLD_MATERIAL_FRAGMENT_SHADER).unwrap()
+                        .replacen("#version 450", "#version 450\n#define VULKANIC_GAL_MAP_TEXT", 1).into_bytes()
                 } else {
                     WORLD_MATERIAL_FRAGMENT_SHADER.to_vec()
                 },
@@ -288,7 +306,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.material_resources.insert(key, result?);
@@ -450,7 +468,7 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.material_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }

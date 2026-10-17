@@ -12,14 +12,9 @@ import net.minecraft.world.item.enchantment.EnchantedItemInUse;
 import net.minecraft.world.phys.Vec3;
 
 public record PlaySoundEffect(Holder<SoundEvent> soundEvent, FloatProvider volume, FloatProvider pitch) implements EnchantmentEntityEffect {
-	public static final MapCodec<PlaySoundEffect> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				SoundEvent.CODEC.fieldOf("sound").forGetter(PlaySoundEffect::soundEvent),
-				FloatProvider.codec(1.0E-5F, 10.0F).fieldOf("volume").forGetter(PlaySoundEffect::volume),
-				FloatProvider.codec(1.0E-5F, 2.0F).fieldOf("pitch").forGetter(PlaySoundEffect::pitch)
-			)
-			.apply(instance, PlaySoundEffect::new)
-	);
+	/** The native codec's `play_sound` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<PlaySoundEffect> CODEC = (MapCodec<PlaySoundEffect>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:play_sound");
 
 	@Override
 	public void apply(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3) {

@@ -7,8 +7,18 @@ impl WorldPrimitiveFrontend {
         &mut self, gal: &mut VulkanicGal, generation: u64, frame_target: Handle,
         frame: WorldPrimitiveFrame, clear_background: bool, raster_y_direction: RasterYDirection,
     ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
+        self.append_frame_ops_inner_with_source_preparation(
+            gal, generation, frame_target, frame, clear_background, raster_y_direction, false,
+        )
+    }
+
+    pub(crate) fn append_frame_ops_inner_with_source_preparation(
+        &mut self, gal: &mut VulkanicGal, generation: u64, frame_target: Handle,
+        frame: WorldPrimitiveFrame, clear_background: bool, raster_y_direction: RasterYDirection,
+        preparing_source_entry: bool,
+    ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
         let previous = self.defer_world_uploads;
-        let result = self.record_frame_ops(gal, generation, frame_target, frame, clear_background, raster_y_direction);
+        let result = self.record_frame_ops(gal, generation, frame_target, frame, clear_background, raster_y_direction, preparing_source_entry);
         self.defer_world_uploads = previous;
         result
     }
@@ -21,7 +31,10 @@ impl WorldPrimitiveFrontend {
         mut frame: WorldPrimitiveFrame,
         clear_background: bool,
         raster_y_direction: RasterYDirection,
+        preparing_source_entry: bool,
     ) -> GalResult<(Vec<CommandOp>, WorldPrimitiveSubmitStats)> {
+        // The vanilla graph draws terrain from instances.
+        self.expand_static_terrain(&mut frame)?;
         self.pending_terrain_external_item_entity_written = false;
         // Staged device-local uploads are batched into one flush per frame.
         let batch_staged_uploads = gal.capabilities().supports(BackendFeature::DeviceLocalMemory);
@@ -116,6 +129,13 @@ impl WorldPrimitiveFrontend {
         let target_query_started = std::time::Instant::now();
         let color_format = gal.pass_target_color_format(frame_target)?;
         let color_attachment = gal.pass_target_color_attachment(frame_target)?;
+        let owned_color_texture = if frame_target.kind()
+            == Some(crate::render::vulkanic::handles::HandleKind::RenderTarget)
+        {
+            Some(gal.pass_target_color_texture(frame_target)?)
+        } else {
+            None
+        };
         profile.world_prepare_target_query_nanos = elapsed_nanos_u64(target_query_started);
         let had_resources = self
             .resources
@@ -139,14 +159,14 @@ impl WorldPrimitiveFrontend {
         let use_g_buffer_mesh_path = uses_shader_g_buffer_mesh_path(
             &frame,
             clear_background,
-            // An explicitly requested source route needs one Rust-owned
-            // G-buffer warmup frame to establish depth history before exact
-            // source admission can arm. The warmup still uses the complete
-            // vanilla semantic draw path; source execution remains gated by
-            // the armed flag below.
+            // Source preparation uses the normal semantic graph to establish
+            // depth history; selected execution still requires admission.
             self.runtime_source_execution_is_armed() || source_preparation_warmup,
             self.pending_terrain_fabulous_handoff,
-        );
+        ) || (preparing_source_entry && clear_background && frame.background.enabled
+            && frame.voxel_volume.world_generation != 0);
+        // Entry may contain only sky and a hand while terrain/LOD data streams
+        // in. Its private graph must still initialize the depth snapshots.
         // The direct Rust DH compositor overlays its private sparse target
         // after the background/sky setup and before ordinary opaque terrain.
         // Keep the vanilla sky fan in that target so uncovered pixels retain
@@ -284,18 +304,7 @@ impl WorldPrimitiveFrontend {
         self.mesh_batch_identity_scratch = mesh_identity_scratch;
         let mut sorted_index_payload = Vec::new();
         let mesh_batch_plan = if has_camera_sorted_meshes {
-            let mut combined = Vec::with_capacity(
-                static_mesh_batch_plan.len()
-                    + frame
-                        .mesh_instances
-                        .iter()
-                        .filter(|instance| {
-                            instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
-                        })
-                        .count(),
-            );
-            combined.extend(static_mesh_batch_plan.iter().cloned());
-            combined.extend(mesh_batches_selected_with_sorted_indices(
+            let sorted_batches = mesh_batches_selected_with_sorted_indices(
                 &frame,
                 self,
                 color_format,
@@ -304,9 +313,10 @@ impl WorldPrimitiveFrontend {
                 false,
                 MeshBatchSelection::CameraSorted,
                 (!use_g_buffer_mesh_path).then_some(&mut sorted_index_payload),
-            )?);
-            sort_mesh_batches(&mut combined, &frame);
-            Arc::new(combined)
+            )?;
+            // Both parts are already in batch order: merge instead of
+            // re-sorting the whole frame's batches.
+            Arc::new(merge_sorted_mesh_batches(&static_mesh_batch_plan, sorted_batches, &frame))
         } else {
             static_mesh_batch_plan
         };
@@ -409,7 +419,7 @@ impl WorldPrimitiveFrontend {
             || !distant_horizons_box_batches.is_empty()
             || material_batches
                 .iter()
-                .any(|batch| material_uses_particle_shader(batch.key.source_program));
+                .any(|batch| material_uses_lightmap(batch.key));
         if builtin_terrain_lightmap_required {
             let Some(lightmap_frame) = frame.shader_environment.vanilla_lightmap else {
                 return Err(GalError::unsupported_feature(
@@ -612,6 +622,7 @@ impl WorldPrimitiveFrontend {
                 frame.viewport_height,
                 color_format,
                 final_depth_format,
+                terrain_program_scope_for_sky_type(frame.background.sky_type)?,
                 &mut profile,
             )?;
             g_buffer_final_binding_key = Some(self.ensure_g_buffer_final_binding(
@@ -1031,9 +1042,15 @@ impl WorldPrimitiveFrontend {
         let mut forward_material_draws = Vec::new();
         let mut receiver_shadow_ops = Vec::new();
         let mut deferred_entity_layer_ops = Vec::new();
+        // Frozen draws particles in their own frame pass after the whole main
+        // pass: after translucent terrain and both DH vanilla-fade boundaries.
+        // Drawn earlier, a DH fade reads the terrain behind each particle and
+        // replaces the particle's pixels with LOD/sky colour.
+        let mut late_particle_ops = Vec::new();
         if !material_batches.is_empty() {
             let mut material_slot_indices = BTreeMap::new();
             let mut material_draws = Vec::with_capacity(material_batches.len());
+            let mut particle_draws = Vec::with_capacity(material_batches.len());
             for batch in material_batches {
                 let slot_index = material_slot_indices.entry(batch.key).or_insert(0usize);
                 let resources = self.material_resources.get(&batch.key).ok_or_else(|| {
@@ -1069,6 +1086,7 @@ impl WorldPrimitiveFrontend {
                     resources.index_buffer,
                     batch.count() as u32,
                 ));
+                particle_draws.push(batch.key.source_program == WORLD_MATERIAL_SOURCE_PARTICLES);
             }
             if use_g_buffer_mesh_path {
                 forward_material_draws = material_draws
@@ -1112,20 +1130,29 @@ impl WorldPrimitiveFrontend {
                     }),
                 });
                 for (
-                    material_id,
-                    pipeline,
-                    pipeline_layout,
-                    resource_set,
-                    requires_lightmap,
-                    index_buffer,
-                    instance_count,
-                ) in material_draws
+                    (
+                        material_id,
+                        pipeline,
+                        pipeline_layout,
+                        resource_set,
+                        requires_lightmap,
+                        index_buffer,
+                        instance_count,
+                    ),
+                    particle,
+                ) in material_draws.into_iter().zip(particle_draws)
                 {
                     // Receiver shadows consume the completed world depth.
                     // The direct terrain pass below clears that attachment;
                     // emitting shadows here would erase them under terrain.
-                    let ops = if material_id == WORLD_MATERIAL_ID_ENTITY_SHADOW {
+                    let ops = if particle {
+                        &mut late_particle_ops
+                    } else if material_id == WORLD_MATERIAL_ID_ENTITY_SHADOW {
                         &mut receiver_shadow_ops
+                    } else if is_map_material(material_id) {
+                        // Maps use the text pipeline after opaque entity/model meshes.
+                        // Drawing them earlier lets the frame erase their color.
+                        &mut deferred_entity_layer_ops
                     } else if material_id == WORLD_MATERIAL_ID_ENERGY_SWIRL {
                         // EnergySwirl is authored after its entity's base model.
                         // Its inflated shell writes depth, so drawing this material
@@ -1145,7 +1172,7 @@ impl WorldPrimitiveFrontend {
                     if requires_lightmap {
                         let lightmap = builtin_terrain_lightmap_resource_set.ok_or_else(|| {
                             GalError::backend(
-                                "weather material pipeline has no staged Rust lightmap binding",
+                                "lightmapped material pipeline has no staged Rust lightmap binding",
                             )
                         })?;
                         ops.push(CommandOp::BindResourceSet {
@@ -1311,7 +1338,7 @@ impl WorldPrimitiveFrontend {
             frame.frame_id,
             Some(lod_material_started),
         );
-        if !mesh_batches.is_empty() || !lod_mesh_draws.is_empty() {
+        if !mesh_batches.is_empty() || !lod_mesh_draws.is_empty() || use_g_buffer_mesh_path {
             // The direct vanilla graph and the admitted source graph consume
             // the same immutable frame fog semantics.  Keep this bounded
             // diagnostic at their shared submission boundary so ordinary
@@ -1446,7 +1473,7 @@ impl WorldPrimitiveFrontend {
                             resources.shadow_pipeline,
                             resources.pipeline,
                             resources.pipeline_layout,
-                            resources.resource_set,
+                            Some(resources.resource_set),
                             None,
                             candidate.binding.map(|binding| binding.resource_set),
                         )
@@ -1544,6 +1571,16 @@ impl WorldPrimitiveFrontend {
                                 }),
                             )
                         } else {
+                            // Only draws outside the shared page binding need the
+                            // per-mesh set; create it on first use.
+                            let resource_set = match resource_set {
+                                Some(set) => set,
+                                None => self.ensure_mesh_resource_set(
+                                    gal,
+                                    batch.key,
+                                    mesh_stream_binding.buffer,
+                                )?,
+                            };
                             (
                                 resource_set,
                                 mesh_stream_dynamic_offsets_inline(
@@ -1682,6 +1719,7 @@ impl WorldPrimitiveFrontend {
                         indirect_stream.map(|stream| TerrainIndexedIndirect {
                             buffer: stream.buffer,
                             offset: command_offset,
+                            draw_count: 1,
                         });
                 }
                 let draws = pending_draws
@@ -1884,7 +1922,9 @@ impl WorldPrimitiveFrontend {
                     compositor_dh_fog_parameters[18] = -4.0;
                 }
                 if !skip_dh_composite_for_audit {
-                    let previous_vanilla_color = if self.lod_vanilla_snapshot_initialized {
+                    let previous_vanilla_color = if self.lod_vanilla_sample_state_initialized
+                        || self.pending_lod_vanilla_sample_state_established
+                    {
                         TextureUsageState::ShaderRead
                     } else {
                         TextureUsageState::Undefined
@@ -1921,12 +1961,12 @@ impl WorldPrimitiveFrontend {
                     if far_clip_fade {
                         resources.append_vanilla_snapshot(
                             frame_target,
+                            owned_color_texture,
                             depth_texture,
                             previous_vanilla_color,
                             previous_vanilla_depth,
                             &mut ops,
                         );
-                        self.pending_lod_vanilla_snapshot_written = true;
                     } else {
                         resources.append_vanilla_sample_state(
                             previous_vanilla_color,
@@ -1934,6 +1974,10 @@ impl WorldPrimitiveFrontend {
                             &mut ops,
                         );
                     }
+                    // Both paths establish ShaderRead for the resolver. Later
+                    // vanilla fade copies must preserve that same-frame use,
+                    // even when far fade did not need snapshot contents.
+                    self.pending_lod_vanilla_sample_state_established = true;
                     let previous_resolved = if self.lod_direct_composition_initialized {
                         TextureUsageState::ShaderRead
                     } else {
@@ -2331,7 +2375,9 @@ impl WorldPrimitiveFrontend {
                                     "direct DH composition resources missing before deferred composite",
                                 )
                             })?;
-                        let previous_vanilla_state = if self.lod_vanilla_snapshot_initialized {
+                        let previous_vanilla_state = if self.lod_vanilla_sample_state_initialized
+                            || self.pending_lod_vanilla_sample_state_established
+                        {
                             TextureUsageState::ShaderRead
                         } else {
                             TextureUsageState::Undefined
@@ -2339,6 +2385,7 @@ impl WorldPrimitiveFrontend {
                         if vanilla_fade_mode > 0.0 {
                             resources.append_vanilla_snapshot(
                                 frame_target,
+                                owned_color_texture,
                                 depth_texture,
                                 previous_vanilla_state,
                                 previous_vanilla_state,
@@ -2353,7 +2400,7 @@ impl WorldPrimitiveFrontend {
                         }
                         ops.append(&mut deferred_dh_composite_ops);
                         self.pending_lod_direct_composition_written = true;
-                        self.pending_lod_vanilla_snapshot_written = true;
+                        self.pending_lod_vanilla_sample_state_established = true;
                         dh_composite_inserted = true;
                         ops.push(CommandOp::BeginPass {
                             pass,
@@ -2425,7 +2472,9 @@ impl WorldPrimitiveFrontend {
                         "direct DH composition resources missing before deferred composite",
                     )
                 })?;
-            let previous_vanilla_state = if self.lod_vanilla_snapshot_initialized {
+            let previous_vanilla_state = if self.lod_vanilla_sample_state_initialized
+                || self.pending_lod_vanilla_sample_state_established
+            {
                 TextureUsageState::ShaderRead
             } else {
                 TextureUsageState::Undefined
@@ -2433,6 +2482,7 @@ impl WorldPrimitiveFrontend {
             if vanilla_fade_mode > 0.0 || far_clip_fade {
                 resources.append_vanilla_snapshot(
                     frame_target,
+                    owned_color_texture,
                     depth_texture,
                     previous_vanilla_state,
                     previous_vanilla_state,
@@ -2447,7 +2497,7 @@ impl WorldPrimitiveFrontend {
             }
             ops.append(&mut deferred_dh_composite_ops);
             self.pending_lod_direct_composition_written = true;
-            self.pending_lod_vanilla_snapshot_written = true;
+            self.pending_lod_vanilla_sample_state_established = true;
         }
         if !final_double_pass_dh_composite_ops.is_empty() {
             let resources = self
@@ -2463,6 +2513,7 @@ impl WorldPrimitiveFrontend {
             // private DH source exactly once at Frozen's second fade boundary.
             resources.append_vanilla_snapshot(
                 frame_target,
+                owned_color_texture,
                 depth_texture,
                 TextureUsageState::ShaderRead,
                 TextureUsageState::ShaderRead,
@@ -2470,7 +2521,7 @@ impl WorldPrimitiveFrontend {
             );
             ops.append(&mut final_double_pass_dh_composite_ops);
             self.pending_lod_direct_composition_written = true;
-            self.pending_lod_vanilla_snapshot_written = true;
+            self.pending_lod_vanilla_sample_state_established = true;
         }
         if !deferred_entity_layer_ops.is_empty() {
             ops.push(CommandOp::BeginPass {
@@ -2500,6 +2551,21 @@ impl WorldPrimitiveFrontend {
                 }),
             });
             ops.extend(receiver_shadow_ops);
+            ops.push(CommandOp::EndPass);
+        }
+        if !late_particle_ops.is_empty() {
+            ops.push(CommandOp::BeginPass {
+                pass,
+                target: frame_target,
+                colors: vec![loaded_frame_color_attachment(color_attachment)],
+                depth_stencil: Some(PassAttachment {
+                    view: depth_view,
+                    load_op: AttachmentLoadOp::Load,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_color: None,
+                }),
+            });
+            ops.extend(late_particle_ops);
             ops.push(CommandOp::EndPass);
         }
         if let Some(outline_plan) = entity_outline_plan.as_ref() {
@@ -2867,13 +2933,14 @@ impl WorldPrimitiveFrontend {
             static TRACES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             if TRACES.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 4 {
                 for instance in &hand_instances {
-                    eprintln!("standard-foil.hand-input frame={} mesh={} foil={:?} model={:?} view={:?} projection={:?}",
+                    crate::core::console::stderr(format_args!("standard-foil.hand-input frame={} mesh={} foil={:?} model={:?} view={:?} projection={:?}",
                         parent_frame.frame_id, instance.mesh_key, instance.item_foil, instance.transform,
-                        hand.model_view_matrix, hand.projection_matrix);
+                        hand.model_view_matrix, hand.projection_matrix));
                 }
             }
         }
-        let mut hand_frame = parent_frame.clone();
+        // Every geometry list below is replaced or cleared; skip copying them.
+        let mut hand_frame = parent_frame.clone_without_geometry();
         hand_frame.frame_id = parent_frame.frame_id;
         hand_frame.view_matrix = hand.model_view_matrix;
         hand_frame.projection_matrix = hand.projection_matrix;

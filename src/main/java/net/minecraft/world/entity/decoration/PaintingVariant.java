@@ -1,7 +1,6 @@
 package net.minecraft.world.entity.decoration;
 
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Optional;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -12,19 +11,9 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.RegistryFixedCodec;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.ExtraCodecs;
 
 public record PaintingVariant(int width, int height, ResourceLocation assetId, Optional<Component> title, Optional<Component> author) {
-	public static final Codec<PaintingVariant> DIRECT_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				ExtraCodecs.intRange(1, 16).fieldOf("width").forGetter(PaintingVariant::width),
-				ExtraCodecs.intRange(1, 16).fieldOf("height").forGetter(PaintingVariant::height),
-				ResourceLocation.CODEC.fieldOf("asset_id").forGetter(PaintingVariant::assetId),
-				ComponentSerialization.CODEC.optionalFieldOf("title").forGetter(PaintingVariant::title),
-				ComponentSerialization.CODEC.optionalFieldOf("author").forGetter(PaintingVariant::author)
-			)
-			.apply(instance, PaintingVariant::new)
-	);
+	public static final Codec<PaintingVariant> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.PAINTING_VARIANT, false, net.minecraft.resources.NativeDataProjections::painting, net.minecraft.resources.NativeDataProjections::paintingOut);
 	public static final StreamCodec<RegistryFriendlyByteBuf, PaintingVariant> DIRECT_STREAM_CODEC = StreamCodec.composite(
 		ByteBufCodecs.VAR_INT,
 		PaintingVariant::width,

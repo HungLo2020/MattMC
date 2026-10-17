@@ -61,9 +61,10 @@ use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::guirender::atlas_reference::{
     AcceptedAtlasIncarnation, GuiAtlasOwner, GuiAtlasReference, GuiAtlasReferences,
 };
+#[cfg(test)]
+use crate::render::guirender::mesh::prepare_draws as prepare_gui_mesh_draws;
 use crate::render::guirender::mesh::{
-    geometry_fingerprint as gui_mesh_geometry_fingerprint, prepare_draws as prepare_gui_mesh_draws,
-    prepare_draws_with_reuse as prepare_gui_mesh_draws_with_reuse,
+    geometry_fingerprint as gui_mesh_geometry_fingerprint,
     resolved_item_raster as resolve_gui_mesh_item_raster, GuiMeshBatchRequest,
     GuiMeshCompositeResources, GuiMeshLightingMode, GuiMeshMaterialMode,
     GuiMeshOffscreenTargetCache, GuiMeshPassResources, GuiMeshPreparedDraw, GuiMeshSharedProgram,
@@ -105,6 +106,8 @@ pub struct GuiFrontend {
     cached_pass: Option<CachedPass>,
     mesh_targets: GuiMeshOffscreenTargetCache,
     mesh_rasters: BTreeMap<GuiMeshRasterKey, GuiMeshPassResources>,
+    /// Prepared geometry of recent explicit meshes without a reusable raster.
+    prepared_geometry: crate::render::guirender::mesh::PreparedGeometryMemo,
     mesh_geometry_streams: Option<(Handle, Handle)>,
     mesh_shared_programs: BTreeMap<GuiMeshSharedProgramKey, GuiMeshSharedProgram>,
     mesh_composites: BTreeMap<GuiMeshCompositeKey, GuiMeshCompositeResources>,
@@ -115,6 +118,8 @@ pub struct GuiFrontend {
     // alone is never evidence that their bytes reached the GPU.
     mesh_geometry_transaction: u64,
     mesh_geometry_cache: BTreeMap<(GuiMeshRasterKey, u64, u64), GuiMeshGeometryResidency>,
+    /// Ranges displaced while pending commands still referenced them.
+    mesh_geometry_retired: Vec<GuiMeshGeometryResidency>,
     mesh_geometry_free_ranges: BTreeMap<(), Vec<GuiMeshGeometryResidency>>,
     mesh_composite_uniform_cursor: u64,
     blur_resources: Option<GuiBlurResources>,
@@ -157,25 +162,25 @@ impl GuiFrontend {
             let _ = resources.target.destroy(gal);
         }
         if let Some(pass) = self.cached_pass.take() {
-            let _ = gal.destroy(pass.pass);
+            let _ = gal.retire(pass.pass);
         }
         let mesh_rasters = std::mem::take(&mut self.mesh_rasters);
         for resources in mesh_rasters.into_values() {
             resources.destroy_asset_resources(gal);
         }
         if let Some((vertices, indices)) = self.mesh_geometry_streams.take() {
-            let _ = gal.destroy(indices);
-            let _ = gal.destroy(vertices);
+            let _ = gal.retire(indices);
+            let _ = gal.retire(vertices);
         }
         let resources = std::mem::take(&mut self.resources);
         for resource in resources.values() {
             for handle in resource.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         for pipeline in std::mem::take(&mut self.shared_pipelines).into_values() {
             for handle in pipeline.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         // Mesh raster resource sets also reference these images/samplers.
@@ -189,13 +194,14 @@ impl GuiFrontend {
                 texture.texture,
                 texture.upload_buffer,
             ] {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         for program in std::mem::take(&mut self.mesh_shared_programs).into_values() {
             program.destroy(gal);
         }
         self.mesh_geometry_cache.clear();
+        self.mesh_geometry_retired.clear();
         self.mesh_geometry_free_ranges.clear();
         let mesh_composites = std::mem::take(&mut self.mesh_composites);
         let mut mesh_composites = mesh_composites.into_values().collect::<Vec<_>>();

@@ -56,7 +56,9 @@ public class BlockTerrapinEgg extends BaseEntityBlock {
 
     public BlockTerrapinEgg(BlockBehaviour.Properties properties) {
         super(properties);
-        this.registerDefaultState(this.stateDefinition.any().setValue(HATCH, Integer.valueOf(0)).setValue(EGGS, Integer.valueOf(1)));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.stateDefinition.any().setValue(HATCH, Integer.valueOf(0)).setValue(EGGS, Integer.valueOf(1)));
+        }
     }
 
     public static boolean hasProperHabitat(BlockGetter reader, BlockPos blockReader) {

@@ -115,7 +115,27 @@ pub const FFI_ABI_V42_VERSION: u32 = 42;
 /// v53 adds immutable orb appearance assets, lowered to geometry only in Rust.
 /// v54 adds semantic orb placement to the ordered entity mesh stream.
 /// v58 adds explicit equal-depth/write semantics for entity mesh layers.
-pub const FFI_ABI_VERSION: u32 = 66;
+/// v67 appends the copied user shadow-distance setting to shader frames and
+/// expands the layout-query offset table to 72 fields (312 bytes).
+/// v68 appends bounded copied entity culling bounds and extraction roles.
+/// v69 appends compact off-camera static-terrain shadow casters and the
+/// frame's terrain camera; Rust expands them into shadow-only instances.
+/// v70 appends compact camera-visible static-terrain sections; Java no
+/// longer sends a per-section terrain instance record.
+/// v71 appends model-rig part poses: Java sends one instance per entity model
+/// and Rust expands the registered part hierarchy.
+/// v72 appends retained DH generic group instances: group boxes are
+/// registered once and each frame sends only the groups' origins.
+/// v73 adds indexed map-color CPU image input, expanded only by the Rust frontend.
+/// v74 appends a bounded native CPU DH visibility-frame reference.
+/// v75 appends native CPU cloud owner/pose fields to retained DH instances.
+/// v76 appends immutable CPU item poses for direct GUI consumption.
+/// v77 adds direct native world/hand item poses and parent normal semantics.
+/// v78 adds a retained identity manifest to incremental raw GUI image updates.
+/// v79 appends a bounded native CPU terrain-selection reference.
+/// v80 adds immutable GUI item template instances and source-layer foil facts.
+/// v81 appends a native star field flag and sky rotation to the world background.
+pub const FFI_ABI_VERSION: u32 = 81;
 
 pub const FFI_INITIAL_PRESENTATION_SUPPORTED: bool = false;
 

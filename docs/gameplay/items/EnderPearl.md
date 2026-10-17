@@ -25,7 +25,7 @@ The thrown pearl teleports its eligible owner when it hits. The destination uses
 A successful player teleport attempts **5 damage points, or 2.5 hearts**, before applicable protection and immunity checks. Do not use that as a fixed final health loss:
 
 - Ordinary armor protection does not reduce this damage: the bundled damage tag bypasses armor
-- Pearl damage is also tagged as fall damage. The bundled Feather Falling enchantment can reduce it, and disabling the `fallDamage` game rule makes the player immune to this tagged damage
+- Pearl damage is also tagged as fall damage. The bundled [Feather Falling](../enchanting/FeatherFalling.md) enchantment can reduce it, and disabling the `fallDamage` game rule makes the player immune to this tagged damage
 - Other applicable damage protection, absorption, or invulnerability can affect the result
 
 Keep enough health for the teleport and for what is waiting at the destination. A successful hit on another entity calls a zero-damage projectile hit; the pearl is primarily a movement tool, not a direct-damage weapon.
@@ -36,7 +36,7 @@ The impact must resolve an eligible owner. For a player in the same dimension, t
 
 The pearl itself has an additional restriction when leaving the End for the Overworld: a player owner must have seen the credits. This is not a guide to building a cross-dimension pearl system.
 
-The player-teleport branch also has a **5% Endermite-spawn check** when the pearl's world allows monster spawning. Be ready for a mob as well as the destination terrain.
+The player-teleport branch also has a **5% [Endermite](../mobs/Endermite.md#ender-pearl-spawns) spawn check** when the pearl's world allows monster spawning. Be ready for a mob as well as the destination terrain.
 
 The default `enderPearlsVanishOnDeath` rule is true. Under that rule, an ordinary dead player's thrown pearls are discarded. Persistent pearl setups, logout/rejoin behavior, and chunk-loading arrangements are outside this page's verification; do not depend on one as an untested recovery plan.
 

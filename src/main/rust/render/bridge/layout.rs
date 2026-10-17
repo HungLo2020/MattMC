@@ -7,8 +7,13 @@ use std::mem::offset_of;
 pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
     macro_rules! layout {
         ($id:expr, $ty:ty, [$($field:tt),* $(,)?]) => {{
-            let mut offsets = [0_u32; 64];
-            let fields = [$(offset_of!($ty, $field) as u32),*];
+            const FIELDS: &[u32] = &[$(offset_of!($ty, $field) as u32),*];
+            const {
+                assert!(FIELDS.len() <= FFI_MAX_STRUCT_LAYOUT_FIELDS,
+                    "ABI record exceeds the mirrored layout-query capacity");
+            }
+            let mut offsets = [0_u32; FFI_MAX_STRUCT_LAYOUT_FIELDS];
+            let fields = FIELDS;
             offsets[..fields.len()].copy_from_slice(&fields);
             FfiStructLayout {
                 header: FfiHeader {
@@ -612,13 +617,17 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 block_model_bounds,
                 block_item_layout,
                 item_cache_identity,
-                item_cache_mode
+                item_cache_mode,
+                native_item_transform,
+                native_item_transform_mode,
+                native_item_template,
+                item_layer_foils
             ]
         ),
         91 => layout!(
             91,
             FfiGuiRawImageUpdateRequest,
-            [header, generation, assets, negotiated_feature_bits]
+            [header, generation, assets, negotiated_feature_bits, retained_asset_ids]
         ),
         49 => layout!(
             49,
@@ -772,7 +781,18 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 engine_menu_blur_radius,
                 world_particle_quads,
                 world_experience_orbs,
-                world_distant_horizons_generic_boxes
+                world_distant_horizons_generic_boxes,
+                world_static_terrain_shadow_casters,
+                static_terrain_camera,
+                world_static_terrain_sections,
+                world_model_rig_poses,
+                world_dh_generic_group_instances,
+                dh_generic_camera,
+                world_lod_frame_id,
+                world_lod_frame_lifecycle,
+                world_lod_frame_count,
+                world_terrain_frame_owner,
+                world_terrain_frame_id
             ]
         ),
         89 => layout!(
@@ -932,7 +952,9 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 sky_end_flash_intensity,
                 sky_end_flash_x_angle,
                 sky_end_flash_y_angle,
-                sky_color_argb
+                sky_color_argb,
+                sky_native_stars,
+                sky_star_transform
             ]
         ),
         57 => layout!(57, FfiWorldCrackAssetPayload, [byte_size, stage, png_bytes]),
@@ -1178,7 +1200,17 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 decal_normal_pose,
                 model_submission_order_mode,
                 model_submission_order,
-                packed_light
+                packed_light,
+                entity_culling_mode,
+                entity_culling_flags,
+                entity_culling_bounds,
+                entity_culling_leash_bounds,
+                entity_culling_camera,
+                native_item_transform,
+                native_item_transform_mode,
+                native_item_parent_properties,
+                native_item_parent_normal,
+                native_item_parent_trusted
             ]
         ),
         70 => layout!(
@@ -1446,7 +1478,8 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 fog_render_distance_end,
                 distant_horizons_render_distance,
                 fog_sky_end,
-                fog_clouds_end
+                fog_clouds_end,
+                configured_shadow_distance_chunks
             ]
         ),
         98 => layout!(
@@ -1588,7 +1621,13 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 entity_transform,
                 camera_orientation,
                 entity_id,
-                reserved0
+                reserved0,
+                entity_culling_mode,
+                entity_culling_flags,
+                entity_culling_bounds,
+                entity_culling_leash_bounds,
+                shadow_only,
+                entity_culling_camera
             ]
         ),
         111 => layout!(
@@ -1604,6 +1643,25 @@ pub(crate) fn layout_for_struct(struct_id: u32) -> GalResult<FfiStructLayout> {
                 shading
             ]
         ),
+        112 => layout!(
+            112,
+            FfiStaticTerrainShadowCaster,
+            [mesh_key, mesh_generation, origin, depth_policy]
+        ),
+        113 => layout!(
+            113,
+            FfiStaticTerrainSection,
+            [mesh_key, mesh_generation, origin, depth_policy, flags, reserved]
+        ),
+        114 => layout!(114, FfiModelRigNode, [parent, flags, mesh_key, mesh_generation]),
+        115 => layout!(115, FfiModelRigPose, [offset, rotation, scale, flags]),
+        116 => layout!(116, FfiDhGenericGroupBox, [min, max, color_argb, material]),
+        117 => layout!(
+            117,
+            FfiDhGenericGroupInstance,
+            [group_id, generation, origin, packed_light, flags, shading, cloud_state, cloud_pose_epoch]
+        ),
+        118 => layout!(118, FfiGuiItemLayerFoil, [mode, clock_millis, speed, strength]),
         _ => {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,

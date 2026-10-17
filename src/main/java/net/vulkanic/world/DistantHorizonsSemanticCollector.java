@@ -13,7 +13,6 @@ import com.seibel.distanthorizons.core.render.renderer.RenderParams;
 import com.seibel.distanthorizons.core.util.RenderUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
 import net.vulkanic.bridge.VulkanicGalBridge;
 
@@ -32,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Private CPU-side boundary for the Rust-owned Distant Horizons route.
@@ -57,24 +55,6 @@ public final class DistantHorizonsSemanticCollector {
 	 * rgba8, material8, normal8, and u16 reserved padding. */
 	public static final int VERTEX_STRIDE_BYTES = 16;
 
-	private static final int MAX_RETAINED_COLUMNS = 512;
-	private static final long MAX_RETAINED_BYTES = 64L * 1024L * 1024L;
-	/**
-	 * A copied DH column can contain several large quad streams.  Publish a
-	 * bounded semantic slice per frame so Panama never constructs one enormous
-	 * temporary object graph for every pending column at once.  The Rust asset
-	 * cache and generation checks remain the owner of publication ordering.
-	 */
-	// Keep each explicit Rust residency transaction short enough that DH streaming
-	// cannot monopolize the render thread while the whole-frame presenter is live.
-	// The pending queue remains lossless; later frames drain the bounded batches.
-	// Resolving exact face provenance performs bounded vanilla model extraction
-	// for each material identity.  Admit a small batch so visible DH rebuilds do
-	// not spend hundreds of frames publishing one column at a time, while the
-	// byte cap keeps temporary Java/Rust staging bounded for dense modded worlds.
-	private static final int MAX_PENDING_ASSET_COLUMNS_PER_UPDATE = 16;
-	private static final long MAX_PENDING_ASSET_BYTES_PER_UPDATE = 16L * 1024L * 1024L;
-	private static final int MAX_VISIBLE_SEGMENTS = 16_384;
 	private static final int MAX_LOD_SEGMENTS_PER_COLUMN = 512;
 	private static final int MAX_LOD_VERTICES_PER_SEGMENT = 2_097_152;
 	private static final int MAX_LOD_MATERIAL_ID = 15;
@@ -82,7 +62,6 @@ public final class DistantHorizonsSemanticCollector {
 	private static final int MAX_LOD_MATERIAL_IDENTITIES_PER_COLUMN = 4_096;
 	/** A not-yet-published column still consumes visibility bookkeeping. */
 	private static final int MAX_PENDING_VISIBLE_COLUMN_KEYS = 16_384;
-	private static final int MAX_PUBLICATION_TRACE_EVENTS = 24;
 	/** A bounded semantic transport segment. It is intentionally below Rust's
 	 * ABI maximum so a single legacy CPU buffer cannot make the entire coarse
 	 * asset update malformed. The boundary is quad aligned and has no native
@@ -113,26 +92,21 @@ public final class DistantHorizonsSemanticCollector {
 	/** Frozen's optional DH far-clip fade runs before the vanilla transition;
 	 * Rust consumes this as policy data and owns the actual composition pass. */
 	public static final int RENDER_FLAG_DH_FAR_CLIP_FADE = 1 << 7;
-	private static final AtomicLong NEXT_GENERATION = new AtomicLong(1L);
-	private static final AtomicLong NEXT_UPDATE_GENERATION = new AtomicLong(1L);
-	private static final Map<Long, LodColumnSnapshot> COLUMNS = new LinkedHashMap<>(16, 0.75F, true);
-	/** Primitive mirror for the DH quadtree's very hot readiness lookup. The
-	 * semantic snapshot map remains the sole data owner; this prevents a Long
-	 * allocation for every recursive {@code LodRenderSection.canRender} probe. */
-	private static final LongOpenHashSet COLUMN_KEYS = new LongOpenHashSet();
-	/** Last acknowledged immutable asset per live column, retained only when an
-	 * explicit source/capture consumer needs its full CPU geometry. Ordinary
-	 * whole-frame rendering retains the compact draw descriptor below instead. */
-	private static final Map<Long, LodColumnSnapshot> PUBLISHED_COLUMNS = new LinkedHashMap<>();
-	/**
-	 * Minimal published identity needed to reproduce DH's real visible list after
-	 * the native upload owns the immutable geometry. Keeping copied vertex arrays
-	 * here needlessly retained the full copied columns after Rust had accepted
-	 * them, even though later frames submit only column/segment identities.
-	 */
-	private static final Map<Long, PublishedColumnDrawMetadata> PUBLISHED_DRAW_METADATA = new LinkedHashMap<>();
+	/** Guards the provenance maps below together with the Rust ledger
+	 * ({@link DhCollectorLedger}), which owns every column decision (current,
+	 * pending, in-flight, published and retiring generations, owner leases,
+	 * lifecycle resets, the visible segments being prepared and the route
+	 * receipts) and every column payload. Each ledger call returns effects
+	 * that keep these maps holding exactly the provenance it references. */
+	private static final Object LOCK = new Object();
 	/** Exact material provenance retained beside, never inside, the legacy LOD ABI. */
-	private static final Map<Long, LodMaterialProvenanceSnapshot> MATERIAL_PROVENANCE = new LinkedHashMap<>();
+	private static final Map<Long, LodMaterialProvenanceSnapshot> MATERIAL_PROVENANCE = new java.util.HashMap<>();
+	/** Java copies of ledger payloads, made only when a diagnostic, probe or
+	 * the provenance publication path reads one ({@link #currentColumnLocked},
+	 * {@link #publishedColumnLocked}) and dropped by the effects that replace
+	 * them. */
+	private static final Map<Long, LodColumnSnapshot> CURRENT_COPIES = new java.util.HashMap<>();
+	private static final Map<Long, LodColumnSnapshot> PUBLISHED_COPIES = new java.util.HashMap<>();
 	/** Provenance paired with the acknowledged asset, never with a newer build. */
 	private static final Map<Long, LodMaterialProvenanceSnapshot> PUBLISHED_MATERIAL_PROVENANCE = new LinkedHashMap<>();
 	/** Exact-atlas coverage is derived solely from an immutable published column
@@ -155,35 +129,16 @@ public final class DistantHorizonsSemanticCollector {
 		new LinkedHashMap<>(128, 0.75F, true);
 	private static final Map<BridgeVariantMaterialKey, BridgeFaceMaterialResolution> BRIDGE_VARIANT_FACE_MATERIAL_CACHE =
 		new LinkedHashMap<>(256, 0.75F, true);
-	private static final Map<Long, LodColumnSnapshot> PENDING_COLUMNS = new LinkedHashMap<>();
-	/** Current real render-list columns awaiting publication. These are an asset
-	 * upload priority only; they never select a route or synthesize visibility. */
-	private static final Set<Long> PENDING_VISIBLE_COLUMN_KEYS = new LinkedHashSet<>();
-	/** Current real DH quadtree/frustum candidates, copied as CPU identities.
-	 * Keeping this separate from publication demand prevents the byte LRU from
-	 * evicting a still-visible column between its build and next preflight. */
-	private static final Set<Long> VISIBLE_CANDIDATE_COLUMN_KEYS = new LinkedHashSet<>();
-	private static int publicationTraceEvents;
-	/** Assets handed to the combined coordinator but not yet acknowledged. A
-	 * column remains reserved until acknowledgement so replacement builds cannot
-	 * starve its last coherent published generation. */
-	private static final Map<Long, Long> IN_FLIGHT_ASSET_GENERATIONS = new LinkedHashMap<>();
-	/** In-flight generations that crossed a world/resource reset. A late native
-	 * acknowledgement for one of these may retire the old asset, but it must not
-	 * become the published generation for a reused column key. */
-	private static final Map<Long, Long> INVALIDATED_IN_FLIGHT_ASSET_GENERATIONS = new LinkedHashMap<>();
-	private static final Map<Long, Long> PENDING_RETIREMENTS = new LinkedHashMap<>();
-	/** Exact old generations scheduled by the most recent lifecycle reset.
-	 * Entries leave this map only through an acknowledged retirement or when a
-	 * newer asset for the same key atomically replaces that Rust cache entry. */
-	private static final Map<Long, Long> LAST_LIFECYCLE_RETIREMENTS = new LinkedHashMap<>();
-	private static final Map<Long, Long> PUBLISHED_GENERATIONS = new LinkedHashMap<>();
-	/** Capture-only first-difference evidence for columns rebuilt with new payloads. */
-	private static final Map<Long, String> LAST_COLUMN_PAYLOAD_DIFFERENCES = new LinkedHashMap<>();
-	private static final List<VulkanicGalBridge.WorldLodColumnInstanceRecord> PENDING_VISIBLE_SEGMENTS = new ArrayList<>();
-	/** Last semantic DH segment set handed to the combined frame. Diagnostic
-	 * capture may inspect this bounded copy, but it never feeds admission. */
+	private static int executionTraceEvents;
+	private static long lastExecutionTraceNanos;
+	private static int rejectionTraceEvents;
+	private static long lastRejectionTraceNanos;
+	/** Last semantic DH segment set handed to the combined frame (the ledger's
+	 * last consumed set, as records). Diagnostic capture may inspect this
+	 * bounded copy, but it never feeds admission. */
 	private static List<VulkanicGalBridge.WorldLodColumnInstanceRecord> LAST_CONSUMED_VISIBLE_SEGMENTS = List.of();
+	/** Reused under LOCK; immutable scalar references are copied into the frame. */
+	private static final long[] CONSUMED_VISIBLE_FRAME_HEADER = new long[9];
 	/** Immutable source snapshots captured at the actual Java-to-Rust frame
 	 * handoff. DH is allowed to publish replacements after this point, but those
 	 * replacements must not rewrite capture provenance for the submitted frame. */
@@ -197,16 +152,10 @@ public final class DistantHorizonsSemanticCollector {
 	private static final int MAX_EXECUTED_VISIBLE_SEGMENT_SNAPSHOTS = 4;
 	private static final Map<Long, List<ExecutedVisibleSegmentSnapshot>>
 		EXECUTED_VISIBLE_SEGMENTS_BY_WORLD_FRAME = new LinkedHashMap<>();
+	/** The copied render parameters of the frame being prepared. Whether that
+	 * frame is enabled, and its flags, are the ledger's. */
 	private static VulkanicGalBridge.WorldLodRenderFrameRecord PENDING_RENDER_FRAME =
 		VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
-	private static long routeFrame;
-	/** Capture-only visible-set stability witness. DH can keep reselecting its
-	 * quadtree segments while immutable payloads are already published. */
-	private static long lastVisibleSetSignature = Long.MIN_VALUE;
-	private static long lastVisibleSetChangeRouteFrame = Long.MIN_VALUE;
-	private static String routeDecision = "not-attempted";
-	private static String routeReason = "not-requested";
-	private static int routeOpaqueSegments;
 	/** Visible opaque segments whose copied quad sidecars still name one
 	 * source material per quad. These are candidates for the private exact
 	 * atlas route; they are deliberately separate from generic route selection
@@ -256,59 +205,90 @@ public final class DistantHorizonsSemanticCollector {
 	/** Bounded identity-level evidence for unresolved coarse contributors. */
 	private static final int MAX_ROUTE_EXACT_ATLAS_IDENTITY_COUNTS = 128;
 	private static final Map<String, Integer> routeExactAtlasResolutionIdentityCounts = new LinkedHashMap<>();
-	private static int routeTransparentSegments;
-	private static int routeWaterSegments;
-	private static int routeVisibleColumns;
-	private static int routeUnpublishedVisibleColumns;
-	private static int routeCachedColumns;
-	private static int routeSemanticCandidateColumns;
-	private static int routeSemanticUnpublishedCandidates;
-	private static long semanticBuildAttempts;
-	private static long semanticColumnsBuilt;
-	private static long semanticColumnsReused;
-	private static long semanticColumnsReplaced;
-	private static String lastPayloadDifference = "none";
-	/** Durable lifecycle evidence. Route selection resumes after a reset and
-	 * overwrites routeReason, so reset/retirement proof must have its own
-	 * monotonic receipt instead of relying on transient route state. */
-	private static long lifecycleResetCount;
-	private static long resourceReloadResetCount;
-	private static long worldUnloadResetCount;
-	private static String lastLifecycleResetReason = "none";
-	private static int lastLifecyclePublishedRetirements;
-	private static int lastLifecycleInvalidatedInFlight;
-	private static int lastLifecycleRetirementsAcknowledged;
-	private static int lastLifecycleRetirementsSupersededByReplacement;
-	private static long lastLifecycleGenerationFloor;
-	/** Route frame at which the most recent visible-column payload replacement was observed. */
-	private static long lastPayloadChangeRouteFrame = Long.MIN_VALUE;
-	private static String routeMatrixStatus = "not-observed";
-	private static float routeClipDistance = -1.0F;
-	/** Bounded provenance for the DH matrix gate. This is diagnostic-only and
-	 * deliberately records semantic values rather than renderer state. */
-	private static String routeMatrixDetail = "not-observed";
-	private static boolean routeSelected;
-	private static int routeExecutionCount;
-	private static long lastExecutedRouteFrame;
-	private static long lastExecutedWorldFrame;
-	private static long lastExecutedSubmission;
-	private static long lastExecutedCaptureFrame;
-	private static int lastExecutedInstances;
-	private static int lastExecutedOpaqueInstances;
-	private static int lastExecutedTransparentInstances;
-	private static int lastExecutedWaterInstances;
-	private static boolean lastExecutedFrameSemanticsEnabled;
-	private static long retainedBytes;
-	/** Bounded separately from the legacy vertex copies because this sidecar is
-	 * deliberately outside their stable ABI. */
-	private static long retainedMaterialProvenanceBytes;
-	private static int nextVisibleOrder;
 	/** Capture-only probes for the render-data boundary that precedes DH quad
 	 * generation. They are configured solely by the deterministic fixture and
 	 * never affect source conversion, mesh construction, or route selection. */
 	private static List<BlockPos> waterSourceInputProbes = List.of();
 	private static List<BlockPos> configuredWaterSourceInputProbes = List.of();
 	private static final Map<BlockPos, WaterSourceInputTrace> WATER_SOURCE_INPUT_TRACES = new LinkedHashMap<>();
+
+	/** The configuration the ledger needs for this call. */
+	private static int ledgerConfig() {
+		return (usesRustWholeFrameSemanticBuild() ? DhCollectorLedger.CONFIG_RUST_WHOLE_FRAME : 0)
+			| (retainsLegacyObservationSnapshots() ? DhCollectorLedger.CONFIG_LEGACY_OBSERVATION : 0)
+			| (executionSnapshotsEnabled() ? DhCollectorLedger.CONFIG_EXECUTION_SNAPSHOTS : 0)
+			| (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics") ? DhCollectorLedger.CONFIG_TRACE_PUBLICATION : 0);
+	}
+
+	/**
+	 * Applies a ledger call's effects to the provenance maps and payload
+	 * copies. {@code builtProvenance} is the provenance of the column that call
+	 * recorded; {@code updateProvenance} that of the update it acknowledged.
+	 */
+	private static void applyEffectsLocked(
+		int count,
+		LodMaterialProvenanceSnapshot builtProvenance,
+		Map<Long, LodMaterialProvenanceSnapshot> updateProvenance
+	) {
+		long[] effects = DhCollectorLedger.takeEffects(count);
+		for (int at = 0; at < effects.length; at += 3) {
+			long key = effects[at + 1];
+			long detail = effects[at + 2];
+			switch ((int)effects[at]) {
+				case DhCollectorLedger.EFFECT_SET_CURRENT -> {
+					CURRENT_COPIES.remove(key);
+					if (builtProvenance != null) MATERIAL_PROVENANCE.put(key, builtProvenance);
+					else MATERIAL_PROVENANCE.remove(key);
+				}
+				case DhCollectorLedger.EFFECT_DROP_CURRENT -> {
+					CURRENT_COPIES.remove(key);
+					MATERIAL_PROVENANCE.remove(key);
+				}
+				case DhCollectorLedger.EFFECT_PUBLISH_CURRENT -> {
+					PUBLISHED_COPIES.remove(key);
+					if (builtProvenance != null) PUBLISHED_MATERIAL_PROVENANCE.put(key, builtProvenance);
+					else if (detail != 0L) PUBLISHED_MATERIAL_PROVENANCE.remove(key);
+				}
+				case DhCollectorLedger.EFFECT_PUBLISH_UPDATE -> {
+					PUBLISHED_COPIES.remove(key);
+					LodMaterialProvenanceSnapshot provenance = updateProvenance.get(key);
+					if (provenance == null) PUBLISHED_MATERIAL_PROVENANCE.remove(key);
+					else PUBLISHED_MATERIAL_PROVENANCE.put(key, provenance);
+				}
+				case DhCollectorLedger.EFFECT_DROP_PUBLISHED -> {
+					PUBLISHED_COPIES.remove(key);
+					PUBLISHED_MATERIAL_PROVENANCE.remove(key);
+				}
+				case DhCollectorLedger.EFFECT_CLEAR -> {
+					CURRENT_COPIES.clear();
+					MATERIAL_PROVENANCE.clear();
+					PUBLISHED_COPIES.clear();
+					PUBLISHED_MATERIAL_PROVENANCE.clear();
+				}
+				default -> throw new IllegalStateException("Unknown DH ledger effect " + effects[at]);
+			}
+		}
+	}
+
+	/** Segment records from the ledger's five-long encoding. */
+	private static List<VulkanicGalBridge.WorldLodColumnInstanceRecord> records(long[] values) {
+		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> records = new ArrayList<>(values.length / 5);
+		for (int at = 0; at + 4 < values.length; at += 5) {
+			records.add(new VulkanicGalBridge.WorldLodColumnInstanceRecord(
+				values[at], values[at + 1], (int)values[at + 2], (int)values[at + 3], (int)values[at + 4]
+			));
+		}
+		return List.copyOf(records);
+	}
+
+	private static List<VulkanicGalBridge.WorldLodColumnInstanceRecord> pendingVisibleSegmentsLocked() {
+		return records(DhCollectorLedger.segments(DhCollectorLedger.SEGMENTS_PENDING));
+	}
+
+	/** The prepared frame as the ledger has it: the copied parameters with its flags, or disabled. */
+	private static VulkanicGalBridge.WorldLodRenderFrameRecord frameRecord(boolean enabled, int flags) {
+		return enabled ? withFlags(PENDING_RENDER_FRAME, flags) : VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
+	}
 
 	private DistantHorizonsSemanticCollector() {
 	}
@@ -319,7 +299,7 @@ public final class DistantHorizonsSemanticCollector {
 	 * cannot accidentally certify a later fixture from stale data.
 	 */
 	public static void configureWaterSourceInputProbes(List<BlockPos> probes) {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			configuredWaterSourceInputProbes = probes == null ? List.of() : List.copyOf(probes.stream().limit(8).toList());
 			waterSourceInputProbes = configuredWaterSourceInputProbes;
 			WATER_SOURCE_INPUT_TRACES.clear();
@@ -333,7 +313,7 @@ public final class DistantHorizonsSemanticCollector {
 	 * initializes, but it never changes semantic conversion or submitted data.
 	 */
 	public static void ensureWaterSourceInputProbes(List<BlockPos> probes) {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			if (waterSourceInputProbes.isEmpty() && probes != null && !probes.isEmpty()) {
 				configuredWaterSourceInputProbes = List.copyOf(probes.stream().limit(8).toList());
 				waterSourceInputProbes = configuredWaterSourceInputProbes;
@@ -348,6 +328,13 @@ public final class DistantHorizonsSemanticCollector {
 	 * {@code LodQuadBuilder}; it makes loss during full-data reduction visible
 	 * without fabricating water geometry or inspecting renderer state.
 	 */
+	/** Whether any capture probe watches DH source inputs; checked once per section build. */
+	public static boolean hasWaterSourceInputProbes() {
+		synchronized (LOCK) {
+			return !waterSourceInputProbes.isEmpty();
+		}
+	}
+
 	public static void recordWaterSourceInput(
 		long sectionKey,
 		byte detailLevel,
@@ -357,7 +344,7 @@ public final class DistantHorizonsSemanticCollector {
 		long data,
 		int semanticMaterialId
 	) {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			if (waterSourceInputProbes.isEmpty()) {
 				return;
 			}
@@ -393,7 +380,7 @@ public final class DistantHorizonsSemanticCollector {
 			return new WaterSourceInputReceipt(false, "no-water-probes", List.of());
 		}
 		List<WaterSourceInputTrace> traces = new ArrayList<>(Math.min(probes.size(), 8));
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			for (BlockPos probe : probes.stream().limit(8).toList()) {
 				WaterSourceInputTrace trace = WATER_SOURCE_INPUT_TRACES.get(probe);
 				if (trace != null) {
@@ -422,25 +409,6 @@ public final class DistantHorizonsSemanticCollector {
 	) {
 		private ExecutedVisibleSegmentSnapshot {
 			Objects.requireNonNull(instance, "instance");
-		}
-	}
-
-	/** Immutable non-geometry descriptor for an acknowledged LOD column. */
-	private record PublishedColumnDrawMetadata(
-		long generation,
-		int opaqueSegments,
-		int transparentSideSegments,
-		int transparentUpSegments,
-		int waterSegments
-	) {
-		static PublishedColumnDrawMetadata from(LodColumnSnapshot column) {
-			return new PublishedColumnDrawMetadata(
-				column.generation(),
-				emittedSegmentCount(column.opaque()),
-				emittedSegmentCount(column.transparentSide()),
-				emittedSegmentCount(column.transparentUp()),
-				emittedSegmentCount(column.transparentWaterUp())
-			);
 		}
 	}
 
@@ -493,13 +461,11 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	private static boolean selectedSourceExecutionRequested() {
-		String value = System.getenv("MATTMC_RUST_SELECTED_SOURCE_EXECUTION");
-		return value != null && (value.equals("1") || value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes"));
+		return net.vulkanic.world.NativeRenderLaunchConfiguration.selectedSourceExecutionRequested();
 	}
 
 	private static boolean graphicsAuditEnabled() {
-		String value = System.getenv("MATTMC_GRAPHICS_AUDIT");
-		return value != null && (value.equals("1") || value.equalsIgnoreCase("true"));
+		return NativeRenderLaunchConfiguration.graphicsAuditEnabled();
 	}
 
 	/**
@@ -523,8 +489,25 @@ public final class DistantHorizonsSemanticCollector {
 	 * stream, so retaining and expanding an exact-atlas representation there
 	 * only duplicates memory and CPU work.
 	 */
+	/**
+	 * Whether DH render-data building must keep exact per-block semantic
+	 * materials (spans, variants, horizontal contributors, material-split faces
+	 * and merges). Only exact-material topology and exact-atlas capture consume
+	 * them, through {@link #materialProvenancePublicationRequired()}; ordinary
+	 * play publishes packed vertices only, so keeping them there just blocked
+	 * same-color merges, split faces and cost ~1.4x Frozen's loader CPU.
+	 * Launch-time properties only, so a section never flips mid-session.
+	 */
+	public static boolean semanticMaterialPreservationRequired() {
+		return EXACT_MATERIAL_TOPOLOGY || exactAtlasCoverageRequested() || Boolean.getBoolean(FORCE_SEMANTIC_PRESERVATION_PROPERTY);
+	}
+
+	/** Dev A/B switch: restores the previous always-preserve DH build without enabling capture. */
+	public static final String FORCE_SEMANTIC_PRESERVATION_PROPERTY =
+		"mattmc.dev.rustGalDistantHorizons.forceSemanticPreservation";
+
 	private static boolean materialProvenancePublicationRequired() {
-		if (Boolean.getBoolean(EXACT_MATERIAL_TOPOLOGY_PROPERTY)) {
+		if (EXACT_MATERIAL_TOPOLOGY) {
 			return true;
 		}
 		// A selected shader pack shades DH's reduced-color stream (Iris); the
@@ -559,34 +542,34 @@ public final class DistantHorizonsSemanticCollector {
 		// DH's greedy topology (Frozen), exactly as ordinary gameplay with a
 		// selected pack does here. The exact split is an explicit diagnostic
 		// build only; the selected-source harness flag must not change geometry.
-		return usesRustWholeFrameSemanticBuild() && Boolean.getBoolean(EXACT_MATERIAL_TOPOLOGY_PROPERTY);
+		// Flag first: this runs per DH quad and the route check reads config.
+		return EXACT_MATERIAL_TOPOLOGY && usesRustWholeFrameSemanticBuild();
 	}
 
 	/** Opt-in exact-material DH topology for exact-atlas source diagnostics. */
 	public static final String EXACT_MATERIAL_TOPOLOGY_PROPERTY =
 		"mattmc.dev.rustGalDistantHorizons.exactMaterialTopology";
+	/**
+	 * Launch-time diagnostic switch, read once. {@link #usesExactMaterialTopologyBuild()}
+	 * runs per DH quad; a system-property lookup there cost a ConcurrentHashMap
+	 * read every call.
+	 */
+	private static final boolean EXACT_MATERIAL_TOPOLOGY = Boolean.getBoolean(EXACT_MATERIAL_TOPOLOGY_PROPERTY);
 
 	/** Whether copied CPU geometry exists for this real DH quadtree section.
 	 * This is quadtree bookkeeping only: it stops DH from indefinitely queuing
 	 * the same source work while Rust owns the eventual presentation. */
 	public static boolean hasColumn(long columnKey) {
-		synchronized (COLUMNS) {
-			return COLUMN_KEYS.contains(columnKey)
-				|| (publishedDrawMetadataLocked(columnKey) != null && !PENDING_RETIREMENTS.containsKey(columnKey));
+		synchronized (LOCK) {
+			return DhCollectorLedger.query(DhCollectorLedger.QUERY_HAS_COLUMN, columnKey) != 0L;
 		}
 	}
 
 	/** Generation-qualified CPU lifecycle check for DH container owners. */
 	public static boolean hasColumn(long columnKey, long columnGeneration) {
 		if (columnGeneration == 0L) return false;
-		synchronized (COLUMNS) {
-			LodColumnSnapshot column = COLUMNS.get(columnKey);
-			if (column != null && column.generation() == columnGeneration) {
-				return true;
-			}
-			PublishedColumnDrawMetadata published = publishedDrawMetadataLocked(columnKey);
-			return published != null && published.generation() == columnGeneration
-				&& !Objects.equals(PENDING_RETIREMENTS.get(columnKey), columnGeneration);
+		synchronized (LOCK) {
+			return DhCollectorLedger.hasColumnGeneration(columnKey, columnGeneration);
 		}
 	}
 
@@ -594,8 +577,8 @@ public final class DistantHorizonsSemanticCollector {
 	 * transaction. Callers that construct a visible Rust render list must use
 	 * this boundary, never the merely-collected quadtree state above. */
 	public static boolean hasPublishedColumn(long columnKey) {
-		synchronized (COLUMNS) {
-			return publishedDrawMetadataLocked(columnKey) != null || publishedColumnLocked(columnKey) != null;
+		synchronized (LOCK) {
+			return DhCollectorLedger.query(DhCollectorLedger.QUERY_HAS_PUBLISHED_COLUMN, columnKey) != 0L;
 		}
 	}
 
@@ -611,13 +594,8 @@ public final class DistantHorizonsSemanticCollector {
 		if (!enabled()) {
 			return false;
 		}
-		synchronized (COLUMNS) {
-			LodColumnSnapshot current = COLUMNS.get(columnKey);
-			Long publishedGeneration = PUBLISHED_GENERATIONS.get(columnKey);
-			if (current != null && (publishedGeneration == null || publishedGeneration.longValue() != current.generation())) {
-				markPendingVisibleColumnLocked(columnKey);
-			}
-			return publishedDrawMetadataLocked(columnKey) != null || publishedColumnLocked(columnKey) != null;
+		synchronized (LOCK) {
+			return DhCollectorLedger.requestPublication(columnKey);
 		}
 	}
 
@@ -627,10 +605,12 @@ public final class DistantHorizonsSemanticCollector {
 	 * Rust frame nor changes a route decision.
 	 */
 	public static boolean hasObservedVisibleOpaqueColumnCoveringBlock(int blockX, int blockZ) {
-		synchronized (COLUMNS) {
-			for (VulkanicGalBridge.WorldLodColumnInstanceRecord segment : PENDING_VISIBLE_SEGMENTS) {
+		synchronized (LOCK) {
+			for (VulkanicGalBridge.WorldLodColumnInstanceRecord segment : pendingVisibleSegmentsLocked()) {
 				if (segment.layer() != 1) continue;
-				LodColumnSnapshot column = COLUMNS.get(segment.columnKey());
+				// COLUMNS.get: an access in the ledger's LRU, as it was in Java.
+				long current = DhCollectorLedger.query(DhCollectorLedger.QUERY_TOUCH, segment.columnKey());
+				LodColumnSnapshot column = current == 0L ? null : currentColumnLocked(segment.columnKey());
 				if (column == null || column.generation() != segment.columnGeneration()
 					|| segment.segmentIndex() < 0 || segment.segmentIndex() >= column.opaque().size()) continue;
 				List<LodVertex> vertices = column.opaque().get(segment.segmentIndex()).vertices();
@@ -652,7 +632,7 @@ public final class DistantHorizonsSemanticCollector {
 	 * exact Minecraft sprite that the reduced source did not preserve.
 	 */
 	public static boolean hasLastConsumedVisibleOpaqueColumnCoveringBlock(int blockX, int blockZ) {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			for (VulkanicGalBridge.WorldLodColumnInstanceRecord instance : LAST_CONSUMED_VISIBLE_SEGMENTS) {
 				if (instance.layer() != 1) {
 					continue;
@@ -680,13 +660,12 @@ public final class DistantHorizonsSemanticCollector {
 	 * consumed by the current Rust frame.
 	 */
 	public static ColumnCoverageDiagnostics columnCoverageDiagnosticsAtBlock(int blockX, int blockZ) {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			int cachedColumns = 0;
 			int publishedColumns = 0;
 			int consumedOpaqueSegments = 0;
 			List<String> samples = new ArrayList<>();
-			for (Map.Entry<Long, LodColumnSnapshot> entry : COLUMNS.entrySet()) {
-				long columnKey = entry.getKey();
+			for (long columnKey : DhCollectorLedger.columnKeys()) {
 				int minX = DhSectionPos.getMinCornerBlockX(columnKey);
 				int minZ = DhSectionPos.getMinCornerBlockZ(columnKey);
 				int width = DhSectionPos.getBlockWidth(columnKey);
@@ -694,8 +673,8 @@ public final class DistantHorizonsSemanticCollector {
 					continue;
 				}
 				cachedColumns++;
-				LodColumnSnapshot column = entry.getValue();
-				boolean published = Objects.equals(PUBLISHED_GENERATIONS.get(columnKey), column.generation());
+				LodColumnSnapshot column = currentColumnLocked(columnKey);
+				boolean published = DhCollectorLedger.query(DhCollectorLedger.QUERY_PUBLISHED_GENERATION, columnKey) == column.generation();
 				if (published) {
 					publishedColumns++;
 				}
@@ -709,7 +688,7 @@ public final class DistantHorizonsSemanticCollector {
 				}
 				consumedOpaqueSegments += consumedOpaque;
 				if (samples.size() < 8) {
-					String payloadDifference = LAST_COLUMN_PAYLOAD_DIFFERENCES.get(columnKey);
+					String payloadDifference = DhCollectorLedger.payloadDifference(columnKey);
 					samples.add(
 						"column=" + columnKey
 							+ ",generation=" + column.generation()
@@ -746,7 +725,7 @@ public final class DistantHorizonsSemanticCollector {
 			}
 			return blockId.endsWith("_STATE_") ? blockId : blockId + "_STATE_";
 		}).toList();
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			Map<Integer, ColumnRenderSource.SemanticMaterialIdentity> visibleMaterials = new LinkedHashMap<>();
 			for (VulkanicGalBridge.WorldLodColumnInstanceRecord instance : LAST_CONSUMED_VISIBLE_SEGMENTS) {
 				if (instance.layer() != 1) {
@@ -806,7 +785,8 @@ public final class DistantHorizonsSemanticCollector {
 			throw new IllegalArgumentException("DH semantic material identity must be non-blank");
 		}
 		String prefix = blockId.endsWith("_STATE_") ? blockId : blockId + "_STATE_";
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
+			long lastExecutedWorldFrame = DhCollectorLedger.query(DhCollectorLedger.QUERY_LAST_EXECUTED_WORLD_FRAME, 0L);
 			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> visibleSegments = lastExecutedWorldFrame > 0L
 				? executedSegmentsForWorldFrameLocked(lastExecutedWorldFrame)
 				: LAST_CONSUMED_VISIBLE_SEGMENTS;
@@ -866,11 +846,11 @@ public final class DistantHorizonsSemanticCollector {
 	) {
 		long executionWorldFrame = 0L;
 		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> visibleSegments;
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			if (legacyObservedSegments) {
-				visibleSegments = List.copyOf(PENDING_VISIBLE_SEGMENTS);
+				visibleSegments = pendingVisibleSegmentsLocked();
 			} else {
-				executionWorldFrame = lastExecutedWorldFrame;
+				executionWorldFrame = DhCollectorLedger.query(DhCollectorLedger.QUERY_LAST_EXECUTED_WORLD_FRAME, 0L);
 				visibleSegments = executionWorldFrame > 0L
 					? executedSegmentsForWorldFrameLocked(executionWorldFrame)
 					: LAST_CONSUMED_VISIBLE_SEGMENTS;
@@ -911,7 +891,7 @@ public final class DistantHorizonsSemanticCollector {
 		int materialMatches = 0;
 		int exactVariantQuads = 0;
 		int resolvedSpriteMatches = 0;
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			for (VulkanicGalBridge.WorldLodColumnInstanceRecord instance : visibleSegments) {
 				if (instance.layer() != 1) {
 					continue;
@@ -1156,8 +1136,8 @@ public final class DistantHorizonsSemanticCollector {
 		}
 		long executionWorldFrame;
 		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> visibleSegments;
-		synchronized (COLUMNS) {
-			executionWorldFrame = lastExecutedWorldFrame;
+		synchronized (LOCK) {
+			executionWorldFrame = DhCollectorLedger.query(DhCollectorLedger.QUERY_LAST_EXECUTED_WORLD_FRAME, 0L);
 			visibleSegments = executionWorldFrame > 0L
 				? executedSegmentsForWorldFrameLocked(executionWorldFrame)
 				: LAST_CONSUMED_VISIBLE_SEGMENTS;
@@ -1185,7 +1165,7 @@ public final class DistantHorizonsSemanticCollector {
 			return new DistantHorizonsWaterProbeReceipt(false, "no-water-probes", 0L, List.of());
 		}
 		List<DistantHorizonsWaterProbeResult> results = new ArrayList<>(Math.min(probes.size(), 8));
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			for (BlockPos probe : probes.stream().limit(8).toList()) {
 				results.add(waterSourceProbeResultLocked(probe));
 			}
@@ -1207,7 +1187,7 @@ public final class DistantHorizonsSemanticCollector {
 			return new DistantHorizonsWaterProbeReceipt(false, "no-water-probes", 0L, List.of());
 		}
 		List<DistantHorizonsWaterProbeResult> results = new ArrayList<>(Math.min(probes.size(), 8));
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			for (BlockPos probe : probes.stream().limit(8).toList()) {
 				results.add(waterCachedProbeResultLocked(probe));
 			}
@@ -1221,8 +1201,7 @@ public final class DistantHorizonsSemanticCollector {
 
 	private static DistantHorizonsWaterProbeResult waterSourceProbeResultLocked(BlockPos probe) {
 		String firstWaterBounds = "";
-		for (Map.Entry<Long, LodColumnSnapshot> entry : PUBLISHED_COLUMNS.entrySet()) {
-			long columnKey = entry.getKey();
+		for (long columnKey : DhCollectorLedger.publishedPayloadKeys()) {
 			LodColumnSnapshot column = publishedColumnLocked(columnKey);
 			LodMaterialProvenanceSnapshot provenance = publishedMaterialProvenanceLocked(columnKey);
 			if (column == null || provenance == null) {
@@ -1284,13 +1263,12 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	private static DistantHorizonsWaterProbeResult waterCachedProbeResultLocked(BlockPos probe) {
-		for (Map.Entry<Long, LodColumnSnapshot> entry : COLUMNS.entrySet()) {
-			long columnKey = entry.getKey();
-			LodColumnSnapshot column = entry.getValue();
+		for (long columnKey : DhCollectorLedger.columnKeys()) {
 			LodMaterialProvenanceSnapshot provenance = MATERIAL_PROVENANCE.get(columnKey);
 			if (provenance == null) {
 				continue;
 			}
+			LodColumnSnapshot column = currentColumnLocked(columnKey);
 			int waterSegmentIndex = nonEmptySegmentCount(column.opaque())
 				+ nonEmptySegmentCount(column.transparentSide())
 				+ nonEmptySegmentCount(column.transparentUp());
@@ -1329,7 +1307,7 @@ public final class DistantHorizonsSemanticCollector {
 		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> visibleSegments,
 		long executionWorldFrame
 	) {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			for (VulkanicGalBridge.WorldLodColumnInstanceRecord instance : visibleSegments) {
 				if (instance.layer() != 4) {
 					continue;
@@ -1470,7 +1448,65 @@ public final class DistantHorizonsSemanticCollector {
 		LodQuadBuilder.SemanticVertexBufferBuild transparentUp,
 		LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp
 	) {
-		if (!enabled()) return 0L;
+		return recordRustSemanticColumn(columnKey, origin, semanticMaterials, inputCoverage, outputCoverage,
+			opaque, transparentSide, transparentUp, transparentWaterUp, false).generation();
+	}
+
+	/** Ordinary native producers transfer final CPU bytes directly into the Rust ledger. */
+	public static SemanticColumnLease recordOwnedNativeRustSemanticBuiltColumn(
+		long columnKey, DhBlockPos origin,
+		List<ColumnRenderSource.SemanticMaterialIdentity> semanticMaterials,
+		LodQuadBuilder.SemanticQuadCoverage inputCoverage,
+		com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding.NativeDhBuiltColumn column
+	) {
+		if (!enabled()) return new SemanticColumnLease(columnKey, 0L, 0L);
+		Objects.requireNonNull(semanticMaterials, "semanticMaterials");
+		if (graphicsAuditEnabled()) {
+			int[] samples = column.waterSamples();
+			String[] streams = {"opaque", "transparent-side", "transparent-up", "water-up"};
+			for (int i = 0; i < samples.length; i += 2) {
+				int color = samples[i + 1];
+				recordPackedWaterColorSample(streams[samples[i]], color >>> 16 & 255, color >>> 8 & 255, color & 255, color >>> 24);
+			}
+		}
+		LodMaterialProvenanceSnapshot provenance = null;
+		if (materialProvenancePublicationRequired()) {
+			var opaque = column.project(0); var side = column.project(1);
+			var up = column.project(2); var water = column.project(3);
+			provenance = new LodMaterialProvenanceSnapshot(
+				semanticMaterials, inputCoverage, column.coverage(),
+				validateOwnedMaterialIds(opaque, semanticMaterials.size()), opaque.semanticVariantStates(), opaque.semanticVariantPositions(),
+				validateOwnedMaterialIds(side, semanticMaterials.size()), side.semanticVariantStates(), side.semanticVariantPositions(),
+				validateOwnedMaterialIds(up, semanticMaterials.size()), up.semanticVariantStates(), up.semanticVariantPositions(),
+				validateOwnedMaterialIds(water, semanticMaterials.size()), water.semanticVariantStates(), water.semanticVariantPositions());
+		}
+		if (!enabled()) return new SemanticColumnLease(columnKey, 0L, 0L);
+		Objects.requireNonNull(origin, "origin");
+		long generation = DhCollectorLedger.allocateGeneration();
+		int x = origin.getX(), y = origin.getY(), z = origin.getZ();
+		column.validatePublication(generation);
+		synchronized (LOCK) {
+			long[] result = new long[2];
+			int effects = DhCollectorLedger.check(column.record(ledgerConfig(), columnKey, generation, x, y, z,
+				provenance == null ? -1L : provenance.byteSize(), Objects.equals(MATERIAL_PROVENANCE.get(columnKey), provenance), true, result));
+			applyEffectsLocked(effects, provenance, Map.of());
+			return new SemanticColumnLease(columnKey, result[0], result[1]);
+		}
+	}
+
+	private static SemanticColumnLease recordRustSemanticColumn(
+		long columnKey,
+		DhBlockPos origin,
+		List<ColumnRenderSource.SemanticMaterialIdentity> semanticMaterials,
+		LodQuadBuilder.SemanticQuadCoverage inputCoverage,
+		LodQuadBuilder.SemanticQuadCoverage outputCoverage,
+		LodQuadBuilder.SemanticVertexBufferBuild opaque,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentSide,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentUp,
+		LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp,
+		boolean retainOwner
+	) {
+		if (!enabled()) return new SemanticColumnLease(columnKey, 0L, 0L);
 		Objects.requireNonNull(semanticMaterials, "semanticMaterials");
 		recordPackedWaterColorSamples(opaque.packedVertexBuffers(), "opaque");
 		recordPackedWaterColorSamples(transparentSide.packedVertexBuffers(), "transparent-side");
@@ -1487,7 +1523,7 @@ public final class DistantHorizonsSemanticCollector {
 			: null;
 		return recordOwnedPackedColumnSnapshot(
 			columnKey, origin, opaque.packedVertexBuffers(), transparentSide.packedVertexBuffers(),
-			transparentUp.packedVertexBuffers(), transparentWaterUp.packedVertexBuffers(), provenance
+			transparentUp.packedVertexBuffers(), transparentWaterUp.packedVertexBuffers(), provenance, retainOwner
 		);
 	}
 
@@ -1497,17 +1533,17 @@ public final class DistantHorizonsSemanticCollector {
 			for (int offset = 0; offset + VERTEX_STRIDE_BYTES <= packet.length; offset += VERTEX_STRIDE_BYTES) {
 				int material = packet[offset + 12] & 0xff;
 				if (material != EDhApiBlockMaterial.WATER.index) continue;
-				String sample = stream + ":rgb="
-					+ (packet[offset + 8] & 0xff) + ","
-					+ (packet[offset + 9] & 0xff) + ","
-					+ (packet[offset + 10] & 0xff)
-					+ ":alpha=" + (packet[offset + 11] & 0xff);
-				synchronized (AUDIT_PACKED_WATER_COLORS) {
-					if (AUDIT_PACKED_WATER_COLORS.size() >= 16 || !AUDIT_PACKED_WATER_COLORS.add(sample)) continue;
-				}
-				System.out.println("[MattMC graphics audit] DH packed water vertex " + sample);
+				recordPackedWaterColorSample(stream, packet[offset + 8] & 255, packet[offset + 9] & 255, packet[offset + 10] & 255, packet[offset + 11] & 255);
 			}
 		}
+	}
+
+	private static void recordPackedWaterColorSample(String stream, int red, int green, int blue, int alpha) {
+		String sample = stream + ":rgb=" + red + "," + green + "," + blue + ":alpha=" + alpha;
+		synchronized (AUDIT_PACKED_WATER_COLORS) {
+			if (AUDIT_PACKED_WATER_COLORS.size() >= 16 || !AUDIT_PACKED_WATER_COLORS.add(sample)) return;
+		}
+		System.out.println("[MattMC graphics audit] DH packed water vertex " + sample);
 	}
 
 	private static List<int[]> validateOwnedMaterialIds(
@@ -1524,130 +1560,85 @@ public final class DistantHorizonsSemanticCollector {
 		return build.semanticMaterialIds();
 	}
 
-	private static long recordOwnedPackedColumnSnapshot(
+	private static SemanticColumnLease recordOwnedPackedColumnSnapshot(
 		long columnKey,
 		DhBlockPos origin,
 		List<byte[]> opaque,
 		List<byte[]> transparentSide,
 		List<byte[]> transparentUp,
 		List<byte[]> transparentWaterUp,
-		LodMaterialProvenanceSnapshot provenance
+		LodMaterialProvenanceSnapshot provenance,
+		boolean retainOwner
 	) {
-		if (!enabled()) return 0L;
+		if (!enabled()) return new SemanticColumnLease(columnKey, 0L, 0L);
 		Objects.requireNonNull(origin, "origin");
 		LodColumnSnapshot snapshot = new LodColumnSnapshot(
-			columnKey, NEXT_GENERATION.getAndIncrement(), origin.getX(), origin.getY(), origin.getZ(),
+			columnKey, DhCollectorLedger.allocateGeneration(), origin.getX(), origin.getY(), origin.getZ(),
 			ownedPackedBuffers(opaque), ownedPackedBuffers(transparentSide),
 			ownedPackedBuffers(transparentUp), ownedPackedBuffers(transparentWaterUp)
 		);
-		synchronized (COLUMNS) {
-			return recordBuiltSnapshotLocked(columnKey, snapshot, provenance);
+		synchronized (LOCK) {
+			long[] result = new long[2];
+			recordBuiltSnapshotLocked(columnKey, snapshot, provenance, retainOwner, result);
+			return new SemanticColumnLease(columnKey, result[0], result[1]);
 		}
 	}
 
-	/** Installs one already immutable snapshot while holding {@link #COLUMNS}. */
+	/** An idempotent CPU lifetime token, never a native resource or GPU handle.
+	 * Its owner group lives in the ledger; replacement and reset start a new
+	 * group, so a late close cannot release a newer group for the same key. */
+	public static final class SemanticColumnLease implements AutoCloseable {
+		private final long columnKey;
+		private final long generation;
+		private final long ownerToken;
+		private boolean closed;
+
+		private SemanticColumnLease(long columnKey, long generation, long ownerToken) {
+			this.columnKey = columnKey;
+			this.generation = generation;
+			this.ownerToken = ownerToken;
+		}
+
+		public long generation() { return this.generation; }
+
+		@Override
+		public void close() {
+			synchronized (LOCK) {
+				if (this.closed) return;
+				this.closed = true;
+				if (this.ownerToken == 0L) return;
+				applyEffectsLocked(DhCollectorLedger.releaseOwner(ledgerConfig(), this.columnKey, this.generation, this.ownerToken),
+					null, Map.of());
+			}
+		}
+	}
+
+	/** Hands one validated snapshot's payload to the ledger while holding
+	 * {@link #LOCK}: Rust copies the packed segments, compares them with the
+	 * current column and decides; Java keeps only the provenance. Writes
+	 * [generation, owner token] to {@code result} and returns the generation
+	 * (0 for an empty build). */
 	private static long recordBuiltSnapshotLocked(
 		long columnKey,
 		LodColumnSnapshot snapshot,
-		LodMaterialProvenanceSnapshot provenance
+		LodMaterialProvenanceSnapshot provenance,
+		boolean retainOwner,
+		long[] result
 	) {
-		if (!snapshot.hasSegments()) {
-			// A completed empty build owns no native asset, but it is not active
-			// until LodRenderSection installs its container. Keep the previous
-			// acknowledged generation drawable until that swap closes its owning
-			// container; removing it on this worker thread creates a one-frame hole.
-			return 0L;
+		List<List<LodBufferSnapshot>> layers = List.of(
+			snapshot.opaque(), snapshot.transparentSide(), snapshot.transparentUp(), snapshot.transparentWaterUp());
+		for (int layer = 0; layer < layers.size(); layer++) {
+			for (LodBufferSnapshot segment : layers.get(layer)) {
+				DhCollectorLedger.stageSegment(layer, segment.sourceBufferIndex(), segment.packedVerticesForRust());
 			}
-			LodColumnSnapshot replaced = COLUMNS.get(columnKey);
-			if (replaced != null && replaced.hasSamePayload(snapshot)) {
-				// DH can rebuild an unchanged visible column on consecutive frames.
-				// Keep its acknowledged semantic generation stable so the same Rust
-				// asset remains eligible until its copied payload actually changes.
-				LodMaterialProvenanceSnapshot previousProvenance = MATERIAL_PROVENANCE.get(columnKey);
-				if (Objects.equals(previousProvenance, provenance)) {
-					if (usesRustWholeFrameSemanticBuild()
-						&& !Objects.equals(PUBLISHED_GENERATIONS.get(columnKey), replaced.generation())) {
-						markPendingVisibleColumnLocked(columnKey);
-					}
-					semanticColumnsBuilt++;
-					semanticColumnsReused++;
-					return replaced.generation();
-				}
-				// Geometry is unchanged, but its semantic material sidecar is not.
-				// Publish the newly generated snapshot so the Rust update carries a
-				// strictly newer generation; re-queuing the old snapshot would make the
-				// bridge reject it as stale while leaving Rust with old provenance.
-				COLUMNS.put(columnKey, snapshot);
-				COLUMN_KEYS.add(columnKey);
-				if (provenance != null) {
-					replaceMaterialProvenanceLocked(columnKey, provenance);
-				} else {
-					removeMaterialProvenanceLocked(columnKey);
-				}
-				if (retainsLegacyObservationSnapshots()) {
-					PUBLISHED_GENERATIONS.put(columnKey, snapshot.generation());
-					PUBLISHED_COLUMNS.put(columnKey, snapshot);
-					if (provenance != null) {
-						PUBLISHED_MATERIAL_PROVENANCE.put(columnKey, provenance);
-					} else {
-						PUBLISHED_MATERIAL_PROVENANCE.remove(columnKey);
-					}
-					PENDING_COLUMNS.remove(columnKey);
-				} else {
-					PENDING_COLUMNS.put(columnKey, snapshot);
-					// Every Rust semantic build was requested by the live DH quadtree.
-					// Demand publication immediately: waiting for the next traversal left
-					// transition children unprotected long enough for the byte-bounded
-					// staging cache to evict them, so their parent could never hand off.
-					if (usesRustWholeFrameSemanticBuild()) {
-						markPendingVisibleColumnLocked(columnKey);
-					}
-				}
-				semanticColumnsBuilt++;
-				return snapshot.generation();
-			}
-			if (replaced != null) {
-				semanticColumnsReplaced++;
-				lastPayloadChangeRouteFrame = routeFrame;
-				lastPayloadDifference = replaced.payloadDifference(snapshot);
-				LAST_COLUMN_PAYLOAD_DIFFERENCES.put(columnKey, lastPayloadDifference);
-			}
-			COLUMNS.put(columnKey, snapshot);
-			COLUMN_KEYS.add(columnKey);
-			if (provenance == null) {
-				removeMaterialProvenanceLocked(columnKey);
-			} else {
-				replaceMaterialProvenanceLocked(columnKey, provenance);
-			}
-			if (replaced != null) {
-				retainedBytes -= replaced.byteSize();
-			}
-			retainedBytes += snapshot.byteSize();
-			Long supersededRetirement = PENDING_RETIREMENTS.remove(columnKey);
-			if (supersededRetirement != null
-				&& Objects.equals(LAST_LIFECYCLE_RETIREMENTS.get(columnKey), supersededRetirement)) {
-				LAST_LIFECYCLE_RETIREMENTS.remove(columnKey);
-				lastLifecycleRetirementsSupersededByReplacement++;
-			}
-			if (retainsLegacyObservationSnapshots()) {
-				// Java's VBO lifecycle may close this container before its real draw
-				// reaches the capture hook. Publish only this copied observation so
-				// recordVisibleSegment can correlate that draw; no FFI update is made.
-				PUBLISHED_GENERATIONS.put(columnKey, snapshot.generation());
-				PUBLISHED_COLUMNS.put(columnKey, snapshot);
-				if (provenance != null) {
-					PUBLISHED_MATERIAL_PROVENANCE.put(columnKey, provenance);
-				}
-				PENDING_COLUMNS.remove(columnKey);
-			} else {
-				PENDING_COLUMNS.put(columnKey, snapshot);
-				if (usesRustWholeFrameSemanticBuild()) {
-					markPendingVisibleColumnLocked(columnKey);
-				}
-			}
-			trimRetainedColumnsLocked(MAX_RETAINED_COLUMNS, MAX_RETAINED_BYTES);
-			semanticColumnsBuilt++;
-			return snapshot.generation();
+		}
+		boolean sameProvenance = Objects.equals(MATERIAL_PROVENANCE.get(columnKey), provenance);
+		int effects = DhCollectorLedger.recordBuilt(
+			ledgerConfig(), columnKey, snapshot.generation(), snapshot.originX(), snapshot.originY(), snapshot.originZ(),
+			provenance == null ? -1L : provenance.byteSize(), sameProvenance, retainOwner, result
+		);
+		applyEffectsLocked(effects, provenance, Map.of());
+		return result[0];
 	}
 
 	/** Capture-only hook used at LodQuadBuilder's shared packed-byte boundary.
@@ -1667,8 +1658,8 @@ public final class DistantHorizonsSemanticCollector {
 	 * substitute. */
 	public static void recordSemanticBuildAttempt(long columnKey) {
 		if (usesRustWholeFrameSemanticBuild()) {
-			synchronized (COLUMNS) {
-				semanticBuildAttempts++;
+			synchronized (LOCK) {
+				DhCollectorLedger.recordBuildAttempt(DhCollectorLedger.CONFIG_RUST_WHOLE_FRAME);
 			}
 		}
 	}
@@ -1677,8 +1668,8 @@ public final class DistantHorizonsSemanticCollector {
 		if (retainsLegacyObservationSnapshots()) {
 			return;
 		}
-		synchronized (COLUMNS) {
-			removeColumnLocked(columnKey);
+		synchronized (LOCK) {
+			applyEffectsLocked(DhCollectorLedger.removeColumn(ledgerConfig(), columnKey, -1L), null, Map.of());
 		}
 	}
 
@@ -1689,16 +1680,8 @@ public final class DistantHorizonsSemanticCollector {
 		if (retainsLegacyObservationSnapshots() || columnGeneration <= 0L) {
 			return;
 		}
-		synchronized (COLUMNS) {
-			LodColumnSnapshot current = COLUMNS.get(columnKey);
-			if (current != null && current.generation() == columnGeneration) {
-				removeColumnLocked(columnKey);
-				return;
-			}
-			PublishedColumnDrawMetadata published = publishedDrawMetadataLocked(columnKey);
-			if (current == null && published != null && published.generation() == columnGeneration) {
-				removeColumnLocked(columnKey);
-			}
+		synchronized (LOCK) {
+			applyEffectsLocked(DhCollectorLedger.removeColumn(ledgerConfig(), columnKey, columnGeneration), null, Map.of());
 		}
 	}
 
@@ -1732,25 +1715,12 @@ public final class DistantHorizonsSemanticCollector {
 			: "missing-exact-camera";
 		String matrixDetail = matrixDetail(renderParams, modelViewValues, projectionValues, combinedValues, projectionInverseValues);
 		if (!"finite".equals(matrixStatus)) {
-			synchronized (COLUMNS) {
-				PENDING_VISIBLE_SEGMENTS.clear();
-				nextVisibleOrder = 0;
+			synchronized (LOCK) {
 				PENDING_RENDER_FRAME = VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
-				routeFrame++;
-				routeDecision = "rejected";
-				routeReason = "missing-exact-camera".equals(matrixStatus)
+				DhCollectorLedger.beginFrame(false, 0, "missing-exact-camera".equals(matrixStatus)
 					? "missing-dh-camera-semantics"
-					: "non-finite-dh-render-matrix";
-				routeMatrixStatus = matrixStatus;
-				routeMatrixDetail = matrixDetail;
-				routeOpaqueSegments = 0;
+					: "non-finite-dh-render-matrix", matrixStatus, matrixDetail);
 				resetExactAtlasIdentityCoverage();
-				routeTransparentSegments = 0;
-				routeWaterSegments = 0;
-				routeVisibleColumns = 0;
-				routeUnpublishedVisibleColumns = 0;
-				routeCachedColumns = COLUMNS.size();
-				routeSelected = false;
 			}
 			return false;
 		}
@@ -1779,8 +1749,8 @@ public final class DistantHorizonsSemanticCollector {
 				}
 			}
 		}
-		synchronized (COLUMNS) {
-			routeClipDistance = clipDistance;
+		synchronized (LOCK) {
+			DhCollectorLedger.setClipDistance(clipDistance);
 		}
 		int earthCurveRatio = Config.Client.Advanced.Graphics.Experimental.earthCurveRatio.get();
 		int flags = 0;
@@ -1831,23 +1801,10 @@ public final class DistantHorizonsSemanticCollector {
 			renderParams.clientLevelWrapper.getMaxHeight(),
 			ssaoParameters()
 		);
-		synchronized (COLUMNS) {
-			PENDING_VISIBLE_SEGMENTS.clear();
-			nextVisibleOrder = 0;
+		synchronized (LOCK) {
 			PENDING_RENDER_FRAME = renderFrame;
-			routeFrame++;
-			routeDecision = "preflight";
-			routeReason = "pending";
-			routeMatrixStatus = matrixStatus;
-			routeMatrixDetail = matrixDetail;
-			routeOpaqueSegments = 0;
+			DhCollectorLedger.beginFrame(true, renderFrame.flags(), "pending", matrixStatus, matrixDetail);
 			resetExactAtlasIdentityCoverage();
-			routeTransparentSegments = 0;
-			routeWaterSegments = 0;
-			routeVisibleColumns = 0;
-			routeUnpublishedVisibleColumns = 0;
-			routeCachedColumns = COLUMNS.size();
-			routeSelected = false;
 		}
 		return true;
 	}
@@ -2031,32 +1988,24 @@ public final class DistantHorizonsSemanticCollector {
 		if (!enabled()) {
 			return VisibleColumnSegments.EMPTY;
 		}
-		synchronized (COLUMNS) {
-			LodColumnSnapshot current = COLUMNS.get(columnKey);
-			// A closed container keeps its last published descriptor until Rust
-			// acknowledges retirement. It is no longer eligible for a new frame:
-			// this render-list traversal can precede the preflight that retires it.
-			if (current == null && PENDING_RETIREMENTS.containsKey(columnKey)) {
+		synchronized (LOCK) {
+			// The ledger admits only the acknowledged generation: a closed column
+			// awaiting retirement is not eligible, an unpublished one is queued for
+			// publication, and a rebuilt one keeps its acknowledged asset until the
+			// replacement is acknowledged.
+			boolean exactAtlas = exactAtlasCoverageRequested();
+			long[] admitted = new long[5];
+			if (!DhCollectorLedger.visibleColumn(columnKey, !exactAtlas, admitted)) {
 				return VisibleColumnSegments.EMPTY;
 			}
-			PublishedColumnDrawMetadata column = publishedDrawMetadataLocked(columnKey);
-			if (column == null) {
-				if (current == null) {
-					return VisibleColumnSegments.EMPTY;
-				}
-				markPendingVisibleColumnLocked(columnKey);
-				routeUnpublishedVisibleColumns++;
-				return VisibleColumnSegments.EMPTY;
-			}
-			if (current != null && column.generation() != current.generation()) {
-				// Preserve one acknowledged Rust asset during asynchronous rebuilds;
-				// switch to the replacement only after its asset update is acknowledged.
-				markPendingVisibleColumnLocked(columnKey);
-			}
-			int opaqueSegments = column.opaqueSegments();
-			if (exactAtlasCoverageRequested()) {
+			long generation = admitted[0];
+			int opaqueSegments = (int)admitted[1];
+			int transparentSideSegments = (int)admitted[2];
+			int transparentUpSegments = (int)admitted[3];
+			int waterSegments = (int)admitted[4];
+			if (exactAtlas) {
 				LodColumnSnapshot exactAtlasColumn = publishedColumnLocked(columnKey);
-				if (exactAtlasColumn == null || exactAtlasColumn.generation() != column.generation()) {
+				if (exactAtlasColumn == null || exactAtlasColumn.generation() != generation) {
 					throw new IllegalStateException("exact-atlas coverage requires its published LOD geometry");
 				}
 				ExactAtlasIdentityCoverage exactAtlasCoverage = exactAtlasIdentityCoverageCached(exactAtlasColumn);
@@ -2085,7 +2034,7 @@ public final class DistantHorizonsSemanticCollector {
 				if (routeExactAtlasCoverageSamples.size() < 12) {
 					routeExactAtlasCoverageSamples.add(
 						"column=" + columnKey
-						+ ",generation=" + column.generation()
+						+ ",generation=" + generation
 						+ ",inputOpaqueKnown=" + exactAtlasCoverage.inputOpaqueKnownQuads()
 						+ ",outputOpaqueKnown=" + exactAtlasCoverage.outputOpaqueKnownQuads()
 						+ ",outputOpaqueUnavailable=" + exactAtlasCoverage.outputOpaqueUnavailableQuads()
@@ -2094,22 +2043,10 @@ public final class DistantHorizonsSemanticCollector {
 						+ ",table=" + exactAtlasCoverage.identityTableEntries()
 					);
 				}
+				DhCollectorLedger.appendVisibleColumn(columnKey, generation, opaqueSegments, transparentSideSegments,
+					transparentUpSegments, waterSegments);
 			}
-			int transparentSideSegments = column.transparentSideSegments();
-			int transparentUpSegments = column.transparentUpSegments();
-			int waterSegments = column.waterSegments();
-			int transparentSegments = transparentSideSegments + transparentUpSegments;
-			int admittedSegments = opaqueSegments + transparentSegments + waterSegments;
-			if (PENDING_VISIBLE_SEGMENTS.size() + admittedSegments > MAX_VISIBLE_SEGMENTS) {
-				throw new IllegalStateException("Distant Horizons visible LOD segment capture exceeds " + MAX_VISIBLE_SEGMENTS);
-			}
-			appendVisibleSegments(columnKey, column.generation(), 1, 0, opaqueSegments);
-			appendVisibleSegments(columnKey, column.generation(), 2, opaqueSegments, transparentSideSegments);
-			appendVisibleSegments(columnKey, column.generation(), 3,
-				opaqueSegments + transparentSideSegments, transparentUpSegments);
-			appendVisibleSegments(columnKey, column.generation(), 4,
-				opaqueSegments + transparentSideSegments + transparentUpSegments, waterSegments);
-			return new VisibleColumnSegments(opaqueSegments, transparentSegments, waterSegments);
+			return new VisibleColumnSegments(opaqueSegments, transparentSideSegments + transparentUpSegments, waterSegments);
 		}
 	}
 
@@ -2121,43 +2058,6 @@ public final class DistantHorizonsSemanticCollector {
 		return count;
 	}
 
-	private static void appendVisibleSegments(
-		LodColumnSnapshot column,
-		int layer,
-		int globalSegmentOffset,
-		List<LodBufferSnapshot> buffers
-	) {
-		int compactIndex = 0;
-		for (LodBufferSnapshot buffer : buffers) {
-			if (buffer.vertices().isEmpty()) continue;
-			PENDING_VISIBLE_SEGMENTS.add(new VulkanicGalBridge.WorldLodColumnInstanceRecord(
-				column.columnKey(), column.generation(), layer,
-				globalSegmentOffset + compactIndex, nextVisibleOrder++
-			));
-			compactIndex++;
-		}
-	}
-
-	private static void appendVisibleSegments(
-		long columnKey, long generation, int layer, int globalSegmentOffset, int segmentCount
-	) {
-		for (int compactIndex = 0; compactIndex < segmentCount; compactIndex++) {
-			PENDING_VISIBLE_SEGMENTS.add(new VulkanicGalBridge.WorldLodColumnInstanceRecord(
-				columnKey, generation, layer, globalSegmentOffset + compactIndex, nextVisibleOrder++
-			));
-		}
-	}
-
-	private static void markPendingVisibleColumnLocked(long columnKey) {
-		if (PENDING_VISIBLE_COLUMN_KEYS.contains(columnKey)) return;
-		if (PENDING_VISIBLE_COLUMN_KEYS.size() >= MAX_PENDING_VISIBLE_COLUMN_KEYS) {
-			throw new IllegalStateException(
-				"Distant Horizons pending visible-column admission exceeds " + MAX_PENDING_VISIBLE_COLUMN_KEYS
-			);
-		}
-		PENDING_VISIBLE_COLUMN_KEYS.add(columnKey);
-	}
-
 	/**
 	 * Consumes the visible DH instances and their copied render-frame decision as
 	 * one semantic transaction. The two legacy accessors remain for tests and
@@ -2165,55 +2065,66 @@ public final class DistantHorizonsSemanticCollector {
 	 * otherwise a route reset between calls can combine visible instances from
 	 * one generation with disabled flags from the next one.
 	 */
+	/** A consumed frame's DH semantics and the collector lifecycle they belong to. */
 	public record ConsumedVisibleFrame(
 		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> visibleSegments,
-		VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame
-	) {}
-
-	public static ConsumedVisibleFrame consumeVisibleFrame() {
-		if (!enabled()) {
-			return new ConsumedVisibleFrame(List.of(), VulkanicGalBridge.WorldLodRenderFrameRecord.disabled());
+		VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame,
+		long lifecycle,
+		VulkanicGalBridge.WorldLodFrameReference nativeReference
+	) {
+		public ConsumedVisibleFrame(List<VulkanicGalBridge.WorldLodColumnInstanceRecord> visibleSegments,
+			VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame, long lifecycle) {
+			this(visibleSegments, renderFrame, lifecycle, VulkanicGalBridge.WorldLodFrameReference.EMPTY);
 		}
-		synchronized (COLUMNS) {
-			VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame = PENDING_RENDER_FRAME;
-			boolean selected = routeSelected
-				&& renderFrame.enabled()
-				&& (renderFrame.flags() & RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED) != 0;
-			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> result = selected
-				? List.copyOf(PENDING_VISIBLE_SEGMENTS)
-				: List.of();
-			long visibleSetSignature = visibleSetSignatureLocked(result);
-			if (visibleSetSignature != lastVisibleSetSignature) {
-				lastVisibleSetSignature = visibleSetSignature;
-				lastVisibleSetChangeRouteFrame = routeFrame;
+	}
+
+	/** Completed-frame DH receipts dropped because their lifecycle had ended. */
+	public static long staleRouteExecutionReceipts() {
+		synchronized (LOCK) {
+			return DhCollectorLedger.query(DhCollectorLedger.QUERY_STALE_RECEIPTS, 0L);
+		}
+	}
+
+	/** Compatibility/observation accessor: returns eager immutable records. */
+	public static ConsumedVisibleFrame consumeVisibleFrame() {
+		return consumeVisibleFrame(true);
+	}
+
+	/** Production handoff keeps the selected CPU list in Rust. */
+	public static ConsumedVisibleFrame consumeRetainedVisibleFrame() {
+		return consumeVisibleFrame(executionSnapshotsEnabled());
+	}
+
+	private static ConsumedVisibleFrame consumeVisibleFrame(boolean readback) {
+		if (!enabled()) {
+			synchronized (LOCK) {
+				return new ConsumedVisibleFrame(List.of(), VulkanicGalBridge.WorldLodRenderFrameRecord.disabled(),
+					DhCollectorLedger.query(DhCollectorLedger.QUERY_LIFECYCLE, 0L));
 			}
-			if (!result.isEmpty()) {
+		}
+		synchronized (LOCK) {
+			// The ledger hands over the selected segments with the frame they were
+			// prepared for, clears both and tracks visible-set stability.
+			long[] header = CONSUMED_VISIBLE_FRAME_HEADER;
+			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> result =
+				records(DhCollectorLedger.consumeRetained(readback, header));
+			VulkanicGalBridge.WorldLodFrameReference nativeReference = header[4] == 0L
+				? VulkanicGalBridge.WorldLodFrameReference.EMPTY
+				: new VulkanicGalBridge.WorldLodFrameReference(header[4], header[2],
+					Math.toIntExact(header[5]), Math.toIntExact(header[6]), Math.toIntExact(header[7]), Math.toIntExact(header[8]));
+			VulkanicGalBridge.WorldLodRenderFrameRecord renderFrame = frameRecord(header[0] != 0L, (int)header[1]);
+			if (header[5] != 0L) {
 				RustGalTerrainRenderer.ensureTerrainAtlasAssetForWorldMesh();
 			}
 			LAST_CONSUMED_VISIBLE_SEGMENTS = result;
 			LAST_CONSUMED_VISIBLE_SEGMENT_SNAPSHOTS = executionSnapshotsEnabled()
 				? snapshotExecutedSegmentsLocked(result)
 				: List.of();
-			PENDING_VISIBLE_SEGMENTS.clear();
 			PENDING_RENDER_FRAME = VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
-			ConsumedVisibleFrame consumed = new ConsumedVisibleFrame(result, renderFrame);
-			writeSemanticPayloadReceiptLocked(routeFrame, result);
+			ConsumedVisibleFrame consumed = new ConsumedVisibleFrame(result, renderFrame, header[2], nativeReference);
+			writeSemanticPayloadReceiptLocked(header[3], result);
 			return consumed;
 		}
-	}
-
-	private static long visibleSetSignatureLocked(
-		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> visible
-	) {
-		long hash = 0xcbf29ce484222325L;
-		for (VulkanicGalBridge.WorldLodColumnInstanceRecord instance : visible) {
-			hash = fnvUpdate(hash, instance.columnKey());
-			hash = fnvUpdate(hash, instance.columnGeneration());
-			hash = fnvUpdate(hash, instance.layer());
-			hash = fnvUpdate(hash, instance.segmentIndex());
-			hash = fnvUpdate(hash, instance.order());
-		}
-		return fnvUpdate(hash, visible.size());
 	}
 
 	private static long fnvUpdate(long hash, long value) {
@@ -2369,26 +2280,10 @@ public final class DistantHorizonsSemanticCollector {
 		if (!enabled()) {
 			return;
 		}
-		synchronized (COLUMNS) {
-			if (!PENDING_RENDER_FRAME.enabled()) {
-				throw new IllegalStateException("Cannot select a Rust DH route without enabled frame semantics");
-			}
-			if (PENDING_VISIBLE_SEGMENTS.stream().anyMatch(instance -> instance.layer() < 1 || instance.layer() > 4)) {
-				throw new IllegalStateException("Cannot select Rust DH material route with visible unsupported segments");
-			}
-			if ((PENDING_RENDER_FRAME.flags() & RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED) != 0) {
+		synchronized (LOCK) {
+			if (!DhCollectorLedger.selectRoute(hasCompleteVisibleExactAtlasCoverage())) {
 				return;
 			}
-			PENDING_RENDER_FRAME = withFlags(
-				PENDING_RENDER_FRAME,
-				PENDING_RENDER_FRAME.flags() | RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED
-			);
-			routeDecision = "selected";
-			routeReason = hasCompleteVisibleExactAtlasCoverage()
-			? "all-visible-material-segments-supported"
-			: "reduced-color-with-partial-exact-atlas";
-			recomputePendingVisibleRouteLocked();
-			routeSelected = true;
 			// Capture-only semantic receipt: this proves that the real DH visible
 			// list reached Rust route admission, without retaining a Java renderer
 			// object or authorizing a fallback draw.
@@ -2417,18 +2312,19 @@ public final class DistantHorizonsSemanticCollector {
 		if (opaqueSegments < 0 || transparentSegments < 0 || waterSegments < 0) {
 			throw new IllegalArgumentException("Distant Horizons route diagnostics cannot contain negative segment counts");
 		}
-		synchronized (COLUMNS) {
-			routeDecision = "rejected";
-			routeReason = reason;
-			routeOpaqueSegments = opaqueSegments;
-			routeTransparentSegments = transparentSegments;
-			routeWaterSegments = waterSegments;
-			routeSelected = false;
-			PENDING_VISIBLE_SEGMENTS.clear();
-			PENDING_RENDER_FRAME = withFlags(
-				PENDING_RENDER_FRAME,
-				PENDING_RENDER_FRAME.flags() & ~RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED
-			);
+		synchronized (LOCK) {
+			DhCollectorLedger.rejectRoute(reason, opaqueSegments, transparentSegments, waterSegments);
+			if (Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.traceExecution")
+				&& rejectionTraceEvents < 240) {
+				long now = System.nanoTime();
+				if (rejectionTraceEvents == 0 || now - lastRejectionTraceNanos >= 1_000_000_000L) {
+					lastRejectionTraceNanos = now;
+					rejectionTraceEvents++;
+					System.out.println("[MattMC DH] rejected reason=" + reason
+						+ " opaque=" + opaqueSegments + " transparent=" + transparentSegments
+						+ " water=" + waterSegments + " wall_ms=" + System.currentTimeMillis());
+				}
+			}
 		}
 	}
 
@@ -2471,25 +2367,59 @@ public final class DistantHorizonsSemanticCollector {
 		boolean frameSemanticsEnabled,
 		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> submittedSegments
 	) {
+		// The current lifecycle: this caller's frame cannot predate it.
+		recordRustMaterialRouteExecution(worldFrame, submission, captureFrame, instances, opaqueInstances,
+			transparentInstances, waterInstances, frameSemanticsEnabled, submittedSegments, Long.MIN_VALUE);
+	}
+
+	/**
+	 * Records a completed frame's DH execution. {@code lifecycle} is the DH
+	 * lifecycle the frame was consumed under ({@link ConsumedVisibleFrame#lifecycle()}):
+	 * frames are pipelined, so a frame produced while the route was selected
+	 * can complete after a world unload or resource reload cleared the
+	 * collector (save and quit, a reload). That receipt describes columns
+	 * that no longer exist and is dropped, never recorded against the new
+	 * lifecycle. Within one lifecycle the frame's own segments prove the route
+	 * was selected when it was consumed, whatever the route state is now.
+	 */
+	public static void recordRustMaterialRouteExecution(
+		long worldFrame,
+		long submission,
+		long captureFrame,
+		int instances,
+		int opaqueInstances,
+		int transparentInstances,
+		int waterInstances,
+		boolean frameSemanticsEnabled,
+		List<VulkanicGalBridge.WorldLodColumnInstanceRecord> submittedSegments,
+		long lifecycle
+	) {
 		if (worldFrame < 0L || submission <= 0L || captureFrame < 0L || instances <= 0
 			|| opaqueInstances < 0 || transparentInstances < 0 || waterInstances < 0
 			|| opaqueInstances + transparentInstances + waterInstances != instances || !frameSemanticsEnabled) {
 			throw new IllegalArgumentException("invalid successful Rust DH material-route execution correlation");
 		}
-		synchronized (COLUMNS) {
-			if (!routeSelected) {
-				throw new IllegalStateException("cannot record Rust DH execution without the selected route");
+		synchronized (LOCK) {
+			// The ledger drops a receipt from an ended lifecycle and records the rest.
+			long routeFrame = DhCollectorLedger.recordExecution(lifecycle, worldFrame, submission, captureFrame, instances,
+				opaqueInstances, transparentInstances, waterInstances);
+			if (routeFrame < 0L) {
+				return;
 			}
-			lastExecutedRouteFrame = routeFrame;
-			lastExecutedWorldFrame = worldFrame;
-			lastExecutedSubmission = submission;
-			lastExecutedCaptureFrame = captureFrame;
-			lastExecutedInstances = instances;
-			lastExecutedOpaqueInstances = opaqueInstances;
-			lastExecutedTransparentInstances = transparentInstances;
-			lastExecutedWaterInstances = waterInstances;
-			lastExecutedFrameSemanticsEnabled = true;
-			routeExecutionCount++;
+			if (Boolean.getBoolean("mattmc.dev.rustGalDistantHorizons.traceExecution")
+				&& executionTraceEvents < 240) {
+				long now = System.nanoTime();
+				if (executionTraceEvents == 0 || now - lastExecutionTraceNanos >= 1_000_000_000L) {
+					lastExecutionTraceNanos = now;
+					executionTraceEvents++;
+					// Successful native submission carrying these immutable DH segments.
+					// No geometry snapshots, GPU state or alternate execution path.
+					System.out.println("[MattMC DH] submitted world_frame=" + worldFrame
+						+ " submission=" + submission + " instances=" + instances
+						+ " opaque=" + opaqueInstances + " transparent=" + transparentInstances
+						+ " water=" + waterInstances + " wall_ms=" + System.currentTimeMillis());
+				}
+			}
 			if (exactAtlasCoverageRequested()) {
 				long signature = 17L;
 				signature = 31L * signature + routeExactAtlasOutputKnownQuads;
@@ -2514,10 +2444,11 @@ public final class DistantHorizonsSemanticCollector {
 			net.minecraft.client.dev.DeterministicCameraCapture.recordSubmittedWorkIdentityForCompletedFrame(
 				"distant-horizons", executionIdentity
 			);
+			if (!executionSnapshotsEnabled()) return;
 			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> executedSegments = submittedSegments == null
 				? LAST_CONSUMED_VISIBLE_SEGMENTS
 				: List.copyOf(submittedSegments);
-			if (executionSnapshotsEnabled() && executedSegments.size() == instances) {
+			if (executedSegments.size() == instances) {
 				List<ExecutedVisibleSegmentSnapshot> snapshots = executedSegments.equals(LAST_CONSUMED_VISIBLE_SEGMENTS)
 					? LAST_CONSUMED_VISIBLE_SEGMENT_SNAPSHOTS
 					: snapshotExecutedSegmentsLocked(executedSegments);
@@ -2556,13 +2487,96 @@ public final class DistantHorizonsSemanticCollector {
 		if (visibleColumns < 0) {
 			throw new IllegalArgumentException("visibleColumns must be non-negative");
 		}
-		synchronized (COLUMNS) {
-			routeVisibleColumns = visibleColumns;
-			routeCachedColumns = COLUMNS.size();
+		synchronized (LOCK) {
+			DhCollectorLedger.observeRenderList(visibleColumns);
 		}
 	}
 
 	/** Bounded visibility evidence from DH's quadtree traversal. */
+	/**
+	 * One frame of DH's semantic render list: the near-to-far column keys, the
+	 * candidates still waiting for publication, and (when {@code admitted})
+	 * the segments admitted for the frame being prepared. Publication requests
+	 * that failed were skipped, as the per-column walk skipped them after
+	 * logging; {@code requestFailure} describes the first.
+	 */
+	public record VisibleFrame(
+		long[] nearToFar,
+		int unpublished,
+		boolean admitted,
+		VisibleColumnSegments segments,
+		int requestFailures,
+		String requestFailure,
+		int columnCount
+	) {
+		public VisibleFrame(long[] nearToFar, int unpublished, boolean admitted,
+			VisibleColumnSegments segments, int requestFailures, String requestFailure) {
+			this(nearToFar, unpublished, admitted, segments, requestFailures, requestFailure, nearToFar.length);
+		}
+		public static final VisibleFrame EMPTY = new VisibleFrame(new long[0], 0, false, VisibleColumnSegments.EMPTY, 0, null);
+	}
+
+	/**
+	 * DH's per-frame render list in one ledger call. {@code walked} holds the
+	 * first {@code count} drawable containers the quadtree walk reached, as
+	 * (key, generation) pairs. In walk order this drops containers whose
+	 * generation is no longer current ({@link #hasColumn}) and requests
+	 * publication of each unpublished column; it then sorts the candidates near
+	 * to far around the quadtree's center, records them as this frame's
+	 * visibility, and admits their visible segments. Exact-atlas coverage needs
+	 * Java's per-column accounting, so then the caller admits each column
+	 * through {@link #recordVisibleMaterialColumn}.
+	 */
+	public static VisibleFrame collectVisibleFrame(long[] walked, int count, int centerX, int centerZ) {
+		boolean enabled = enabled();
+		boolean admit = enabled && !exactAtlasCoverageRequested();
+		int flags = (enabled ? DhCollectorLedger.VISIBLE_FRAME_ENABLED : 0) | (admit ? DhCollectorLedger.VISIBLE_FRAME_ADMIT : 0);
+		long[] frame;
+		synchronized (LOCK) {
+			frame = DhCollectorLedger.visibleFrame(walked, count, centerX, centerZ, flags);
+		}
+        return visibleFrameResult(frame,admit);
+    }
+
+    public static VisibleFrame collectVisibleTree(NativeDhVisibility tree,float[] planes,float minY,float maxY,long[] stats) {
+        return collectVisibleTree(tree,planes,minY,maxY,stats,false);
+    }
+
+    /** Ordinary admitted frames retain ordered identities in Rust; Java needs only counts. */
+    public static VisibleFrame collectVisibleTreeSummary(NativeDhVisibility tree,float[] planes,float minY,float maxY,long[] stats) {
+        return collectVisibleTree(tree,planes,minY,maxY,stats,true);
+    }
+
+    private static VisibleFrame collectVisibleTree(NativeDhVisibility tree,float[] planes,float minY,float maxY,long[] stats,boolean summary) {
+        boolean enabled=enabled();boolean admit=enabled&&!exactAtlasCoverageRequested();
+        boolean compact=summary&&admit;
+        int flags=(enabled?DhCollectorLedger.VISIBLE_FRAME_ENABLED:0)|(admit?DhCollectorLedger.VISIBLE_FRAME_ADMIT:0)
+            |(compact?DhCollectorLedger.VISIBLE_FRAME_SUMMARY:0);
+        long[] frame;
+        synchronized(LOCK) {frame=DhCollectorLedger.visibleTree(tree,planes,minY,maxY,flags,stats);}
+        return visibleFrameResult(frame,admit,compact);
+    }
+
+    private static VisibleFrame visibleFrameResult(long[] frame,boolean admit) {
+		return visibleFrameResult(frame, admit, false);
+	}
+
+	private static VisibleFrame visibleFrameResult(long[] frame,boolean admit,boolean summary) {
+		String requestFailure = null;
+		if (frame[1] > 0L) {
+			try {
+				DhCollectorLedger.check((int)frame[3]);
+			} catch (RuntimeException error) {
+				requestFailure = "column " + frame[2] + ": " + error.getMessage();
+			}
+		}
+		VisibleColumnSegments segments = new VisibleColumnSegments(
+			(int)frame[4], (int)(frame[5] + frame[6]), (int)frame[7]);
+		return new VisibleFrame(summary ? VisibleFrame.EMPTY.nearToFar() : Arrays.copyOfRange(frame, 9, frame.length),
+			(int)frame[0], admit, segments, (int)frame[1], requestFailure,
+			summary ? Math.toIntExact(frame[9]) : frame.length - 9);
+	}
+
 	public static void recordRenderListVisibilityStats(
 		int candidates,
 		int unpublished,
@@ -2571,19 +2585,16 @@ public final class DistantHorizonsSemanticCollector {
 		if (!enabled() || candidates < 0 || unpublished < 0 || unpublished > candidates
 			|| candidateColumnKeys == null || candidateColumnKeys.size() != candidates
 			|| candidates > MAX_PENDING_VISIBLE_COLUMN_KEYS) return;
-		synchronized (COLUMNS) {
-			routeSemanticCandidateColumns = candidates;
-			routeSemanticUnpublishedCandidates = unpublished;
-			VISIBLE_CANDIDATE_COLUMN_KEYS.clear();
-			VISIBLE_CANDIDATE_COLUMN_KEYS.addAll(candidateColumnKeys);
+		synchronized (LOCK) {
+			DhCollectorLedger.recordVisibility(candidates, unpublished, candidateColumnKeys);
 		}
 	}
 
 	/** Real visible columns rebuilt after the latest accepted Rust asset update
 	 * must wait for publication instead of referencing an older Rust payload. */
 	public static boolean hasUnpublishedVisibleColumns() {
-		synchronized (COLUMNS) {
-			return routeUnpublishedVisibleColumns > 0;
+		synchronized (LOCK) {
+			return DhCollectorLedger.query(DhCollectorLedger.QUERY_UNPUBLISHED_VISIBLE, 0L) > 0L;
 		}
 	}
 
@@ -2597,12 +2608,8 @@ public final class DistantHorizonsSemanticCollector {
 	 */
 	public static boolean visiblePayloadStableForCapture(int requiredFrames) {
 		if (requiredFrames <= 0) return true;
-		synchronized (COLUMNS) {
-			boolean payloadStable = lastPayloadChangeRouteFrame == Long.MIN_VALUE
-				|| routeFrame - lastPayloadChangeRouteFrame >= requiredFrames;
-			boolean visibleSetStable = lastVisibleSetChangeRouteFrame == Long.MIN_VALUE
-				|| routeFrame - lastVisibleSetChangeRouteFrame >= requiredFrames;
-			return payloadStable && visibleSetStable;
+		synchronized (LOCK) {
+			return DhCollectorLedger.query(DhCollectorLedger.QUERY_PAYLOAD_STABLE, requiredFrames) != 0L;
 		}
 	}
 
@@ -2613,9 +2620,9 @@ public final class DistantHorizonsSemanticCollector {
 	 * while exact atlas records are overlaid only for proven identities.
 	 */
 	public static boolean hasCompleteVisibleExactAtlasCoverage() {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			return exactAtlasCoverageRequested()
-				&& !PENDING_VISIBLE_SEGMENTS.isEmpty()
+				&& DhCollectorLedger.query(DhCollectorLedger.QUERY_PENDING_SEGMENTS, 0L) > 0L
 				&& routeExactAtlasOutputMixedQuads == 0
 				&& routeExactAtlasOutputUnavailableQuads == 0
 				&& routeExactAtlasInvalidIdentityQuads == 0;
@@ -2629,7 +2636,7 @@ public final class DistantHorizonsSemanticCollector {
 	 * generations immediately afterward, invalidating the screenshot's plan.
 	 */
 	public static boolean exactAtlasCoverageStableForCapture() {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			return exactAtlasCoverageStableFrames >= 3
 				&& routeExactAtlasOutputKnownQuads > 0
 				&& routeExactAtlasOutputMixedQuads == 0;
@@ -2638,21 +2645,26 @@ public final class DistantHorizonsSemanticCollector {
 
 	/** Bounded route evidence for deterministic captures and regression tests. */
 	public static int routeExecutionCount() {
-		synchronized (COLUMNS) {
-			return routeExecutionCount;
+		synchronized (LOCK) {
+			return (int)DhCollectorLedger.query(DhCollectorLedger.QUERY_EXECUTIONS, 0L);
 		}
 	}
 
 	public static RouteDiagnostics routeDiagnosticsSnapshot() {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
+			// Ledger numbers in mattmc_dh_collector_diagnostics order; the
+			// exact-atlas evidence stays with these Java diagnostics.
+			DhCollectorLedger.Diagnostics ledger = DhCollectorLedger.diagnostics();
+			long[] n = ledger.numbers();
+			String[] s = ledger.text();
 			return new RouteDiagnostics(
-				routeFrame,
-				routeDecision,
-				routeReason,
-				routeMatrixStatus,
-				routeMatrixDetail,
-				routeClipDistance,
-				routeOpaqueSegments,
+				n[0],
+				s[0],
+				s[1],
+				s[2],
+				s[3],
+				Float.intBitsToFloat((int)n[1]),
+				(int)n[2],
 				routeExactAtlasIdentitySegments,
 				routeExactAtlasIdentityQuads,
 				routeExactAtlasPartialSegments,
@@ -2675,47 +2687,47 @@ public final class DistantHorizonsSemanticCollector {
 				routeExactAtlasOutputOpaqueKnownQuads,
 				routeExactAtlasOutputOpaqueMixedQuads,
 				routeExactAtlasOutputOpaqueUnavailableQuads,
-				routeTransparentSegments,
-				routeWaterSegments,
-				routeVisibleColumns,
-				routeCachedColumns,
-				routeSemanticCandidateColumns,
-				routeSemanticUnpublishedCandidates,
-				routeUnpublishedVisibleColumns,
-				semanticBuildAttempts,
-				semanticColumnsBuilt,
-				semanticColumnsReused,
-				semanticColumnsReplaced,
-				lastPayloadDifference,
-				lifecycleResetCount,
-				resourceReloadResetCount,
-				worldUnloadResetCount,
-				lastLifecycleResetReason,
-				lastLifecyclePublishedRetirements,
-				lastLifecycleInvalidatedInFlight,
-				lastLifecycleRetirementsAcknowledged,
-				lastLifecycleRetirementsSupersededByReplacement,
-				LAST_LIFECYCLE_RETIREMENTS.size(),
-				PENDING_RETIREMENTS.size(),
-				INVALIDATED_IN_FLIGHT_ASSET_GENERATIONS.size(),
-				lastLifecycleGenerationFloor,
-				minimumPublishedGenerationLocked(),
+				(int)n[3],
+				(int)n[4],
+				(int)n[5],
+				(int)n[6],
+				(int)n[7],
+				(int)n[8],
+				(int)n[9],
+				n[10],
+				n[11],
+				n[12],
+				n[13],
+				s[4],
+				n[14],
+				n[15],
+				n[16],
+				s[5],
+				(int)n[17],
+				(int)n[18],
+				(int)n[19],
+				(int)n[20],
+				(int)n[21],
+				(int)n[22],
+				(int)n[23],
+				n[24],
+				n[25],
 				List.copyOf(routeExactAtlasCoverageSamples),
 				exactAtlasResolutionStatusSummary(),
 				exactAtlasResolutionSamplesSnapshot(),
-				retainedBytes,
-				oversizedColumnCountLocked(),
-				PENDING_RENDER_FRAME.enabled(),
-				routeSelected,
-				lastExecutedRouteFrame,
-				lastExecutedWorldFrame,
-				lastExecutedSubmission,
-				lastExecutedCaptureFrame,
-				lastExecutedInstances,
-				lastExecutedOpaqueInstances,
-				lastExecutedTransparentInstances,
-				lastExecutedWaterInstances,
-				lastExecutedFrameSemanticsEnabled
+				n[26],
+				(int)n[27],
+				n[28] != 0L,
+				n[29] != 0L,
+				n[30],
+				n[31],
+				n[32],
+				n[33],
+				(int)n[34],
+				(int)n[35],
+				(int)n[36],
+				(int)n[37],
+				n[38] != 0L
 			);
 		}
 	}
@@ -2737,89 +2749,22 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	private static void clearWithReason(String reason) {
-		synchronized (COLUMNS) {
-			lifecycleResetCount++;
-			if ("resource-reload".equals(reason)) resourceReloadResetCount++;
-			if ("world-unload".equals(reason)) worldUnloadResetCount++;
-			// Startup and harness teardown can issue empty clears. Preserve the
-			// most recent reset that actually owned native work so a later empty
-			// disconnect cannot erase its retirement receipt.
-			boolean materialReset = !PUBLISHED_GENERATIONS.isEmpty()
-				|| !IN_FLIGHT_ASSET_GENERATIONS.isEmpty();
-			if (materialReset) {
-				lastLifecycleResetReason = reason;
-				lastLifecyclePublishedRetirements = PUBLISHED_GENERATIONS.size();
-				lastLifecycleInvalidatedInFlight = IN_FLIGHT_ASSET_GENERATIONS.size();
-				lastLifecycleRetirementsAcknowledged = 0;
-				lastLifecycleRetirementsSupersededByReplacement = 0;
-				lastLifecycleGenerationFloor = NEXT_GENERATION.get();
-				LAST_LIFECYCLE_RETIREMENTS.clear();
-				LAST_LIFECYCLE_RETIREMENTS.putAll(PUBLISHED_GENERATIONS);
-			}
+		synchronized (LOCK) {
+			// The ledger retires every published generation through the normal
+			// pending-update path and keeps the lifecycle receipts.
+			applyEffectsLocked(DhCollectorLedger.clear(reason), null, Map.of());
 			DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
-			for (Map.Entry<Long, Long> published : PUBLISHED_GENERATIONS.entrySet()) {
-				PENDING_RETIREMENTS.put(published.getKey(), published.getValue());
-			}
-			COLUMNS.clear();
-			COLUMN_KEYS.clear();
-			PUBLISHED_COLUMNS.clear();
-			PUBLISHED_DRAW_METADATA.clear();
-			MATERIAL_PROVENANCE.clear();
-			PUBLISHED_MATERIAL_PROVENANCE.clear();
 			EXACT_ATLAS_COVERAGE_CACHE.clear();
 			BRIDGE_FACE_MATERIAL_CACHE.clear();
 			BRIDGE_VARIANT_FACE_MATERIAL_CACHE.clear();
-			PENDING_COLUMNS.clear();
-			PENDING_VISIBLE_COLUMN_KEYS.clear();
-			VISIBLE_CANDIDATE_COLUMN_KEYS.clear();
-			INVALIDATED_IN_FLIGHT_ASSET_GENERATIONS.clear();
-			INVALIDATED_IN_FLIGHT_ASSET_GENERATIONS.putAll(IN_FLIGHT_ASSET_GENERATIONS);
-			IN_FLIGHT_ASSET_GENERATIONS.clear();
-			PUBLISHED_GENERATIONS.clear();
-			LAST_COLUMN_PAYLOAD_DIFFERENCES.clear();
-			PENDING_VISIBLE_SEGMENTS.clear();
 			LAST_CONSUMED_VISIBLE_SEGMENTS = List.of();
 			LAST_CONSUMED_VISIBLE_SEGMENT_SNAPSHOTS = List.of();
 			EXECUTED_VISIBLE_SEGMENTS_BY_WORLD_FRAME.clear();
 			PENDING_RENDER_FRAME = VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
-			nextVisibleOrder = 0;
-			routeDecision = "cleared";
-			routeReason = reason;
-			routeMatrixStatus = "not-observed";
-			routeMatrixDetail = "not-observed";
-			routeOpaqueSegments = 0;
 			resetExactAtlasIdentityCoverage();
-			routeTransparentSegments = 0;
-			routeWaterSegments = 0;
-			routeVisibleColumns = 0;
-			routeUnpublishedVisibleColumns = 0;
-			routeCachedColumns = 0;
-			routeSemanticCandidateColumns = 0;
-			routeSemanticUnpublishedCandidates = 0;
-			semanticBuildAttempts = 0L;
-			semanticColumnsBuilt = 0L;
-			semanticColumnsReused = 0L;
-			semanticColumnsReplaced = 0L;
-			lastPayloadDifference = "none";
-			lastPayloadChangeRouteFrame = Long.MIN_VALUE;
 			routeExactAtlasResolutionStatusCounts.clear();
 			routeExactAtlasResolutionSamples.clear();
 			routeExactAtlasResolutionIdentityCounts.clear();
-			routeSelected = false;
-			routeExecutionCount = 0;
-			lastExecutedRouteFrame = 0L;
-			lastExecutedWorldFrame = 0L;
-			lastExecutedSubmission = 0L;
-			lastExecutedCaptureFrame = 0L;
-			lastExecutedInstances = 0;
-			lastExecutedOpaqueInstances = 0;
-			lastExecutedTransparentInstances = 0;
-			lastExecutedWaterInstances = 0;
-			lastExecutedFrameSemanticsEnabled = false;
-			retainedBytes = 0L;
-			retainedMaterialProvenanceBytes = 0L;
-			lastVisibleSetSignature = Long.MIN_VALUE;
-			lastVisibleSetChangeRouteFrame = Long.MIN_VALUE;
 			exactAtlasCoverageStableSignature = 0L;
 			exactAtlasCoverageStableFrame = Long.MIN_VALUE;
 			exactAtlasCoverageStableFrames = 0;
@@ -2890,38 +2835,48 @@ public final class DistantHorizonsSemanticCollector {
 		};
 	}
 
+	/** A copy of the retained published payload, when it is the ledger's published generation. */
 	private static LodColumnSnapshot publishedColumnLocked(long columnKey) {
-		LodColumnSnapshot column = PUBLISHED_COLUMNS.get(columnKey);
-		if (column == null) {
+		long generation = DhCollectorLedger.query(DhCollectorLedger.QUERY_PUBLISHED_PAYLOAD_GENERATION, columnKey);
+		return generation == 0L ? null
+			: payloadCopyLocked(PUBLISHED_COPIES, columnKey, generation, DhCollectorLedger.PAYLOAD_PUBLISHED);
+	}
+
+	/** A copy of the current payload, without counting as a column access. */
+	private static LodColumnSnapshot currentColumnLocked(long columnKey) {
+		long generation = DhCollectorLedger.query(DhCollectorLedger.QUERY_CURRENT_GENERATION, columnKey);
+		return generation == 0L ? null
+			: payloadCopyLocked(CURRENT_COPIES, columnKey, generation, DhCollectorLedger.PAYLOAD_CURRENT);
+	}
+
+	private static LodColumnSnapshot payloadCopyLocked(
+		Map<Long, LodColumnSnapshot> copies, long columnKey, long generation, int which
+	) {
+		LodColumnSnapshot copy = copies.get(columnKey);
+		if (copy != null && copy.generation() == generation) return copy;
+		DhCollectorLedger.PayloadCopy payload = DhCollectorLedger.payload(columnKey, which);
+		if (payload == null) {
+			copies.remove(columnKey);
 			return null;
 		}
-		Long publishedGeneration = PUBLISHED_GENERATIONS.get(columnKey);
-		return publishedGeneration != null && publishedGeneration.longValue() == column.generation()
-			? column
-			: null;
-	}
-
-	private static PublishedColumnDrawMetadata publishedDrawMetadataLocked(long columnKey) {
-		PublishedColumnDrawMetadata metadata = PUBLISHED_DRAW_METADATA.get(columnKey);
-		Long generation = PUBLISHED_GENERATIONS.get(columnKey);
-		return metadata != null && generation != null && generation.longValue() == metadata.generation()
-			? metadata
-			: null;
-	}
-
-	/**
-	 * After Rust has synchronously accepted an ordinary reduced-color column, the
-	 * native asset/resource ownership is sufficient for future frames. Keep only
-	 * the generation-qualified segment descriptor in Java; source execution and
-	 * diagnostics deliberately retain their complete immutable snapshots.
-	 */
-	private static void discardAcknowledgedPayloadLocked(long columnKey, LodColumnSnapshot snapshot) {
-		if (!COLUMNS.remove(columnKey, snapshot)) {
-			return;
+		long[] header = payload.header();
+		List<List<LodBufferSnapshot>> layers = new ArrayList<>(4);
+		int segment = 8;
+		int offset = 0;
+		for (int layer = 0; layer < 4; layer++) {
+			List<LodBufferSnapshot> buffers = new ArrayList<>((int)header[4 + layer]);
+			for (int index = 0; index < header[4 + layer]; index++, segment += 2) {
+				int length = (int)header[segment + 1];
+				buffers.add(LodBufferSnapshot.fromPacked((int)header[segment],
+					Arrays.copyOfRange(payload.bytes(), offset, offset + length)));
+				offset += length;
+			}
+			layers.add(buffers);
 		}
-		COLUMN_KEYS.remove(columnKey);
-		retainedBytes -= snapshot.byteSize();
-		removeMaterialProvenanceLocked(columnKey);
+		copy = new LodColumnSnapshot(columnKey, header[0], (int)header[1], (int)header[2], (int)header[3],
+			layers.get(0), layers.get(1), layers.get(2), layers.get(3));
+		copies.put(columnKey, copy);
+		return copy;
 	}
 
 	private static LodMaterialProvenanceSnapshot publishedMaterialProvenanceLocked(long columnKey) {
@@ -2939,13 +2894,65 @@ public final class DistantHorizonsSemanticCollector {
 			return null;
 		}
 		boolean profileUpdate = Boolean.getBoolean("mattmc.dev.graphicsFrameBenchmark.dhChurnCounters");
-		long selectStarted = profileUpdate ? System.nanoTime() : 0L;
-		PendingAssetUpdate update = pendingUpdate(true);
-		long selectEnded = profileUpdate ? System.nanoTime() : 0L;
+		long[] outcome = new long[6];
+		long flushStarted = System.nanoTime();
+		VulkanicGalBridge.Status status = bridge.flushWorldLodCollector(ledgerConfig(), outcome);
+		if (outcome[0] == 3L) {
+			DhCollectorLedger.check((int)outcome[1]);
+		}
+		if (outcome[0] == 2L) {
+			return flushPendingAssetsFromJava(bridge, profileUpdate);
+		}
 		if (profileUpdate) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
-				"world.distant-horizons.asset-select", selectEnded - selectStarted);
+				"world.distant-horizons.asset-select", outcome[0] == 1L ? outcome[4] : System.nanoTime() - flushStarted);
 		}
+		if (outcome[0] != 1L) {
+			return null;
+		}
+		long[] update = DhCollectorLedger.takeOutput(3 + 2 * (int)(outcome[1] + outcome[3]));
+		int assetsAt = 3;
+		int retirementsAt = assetsAt + (int)update[1] * 2;
+		long[] assets = Arrays.copyOfRange(update, assetsAt, retirementsAt);
+		long[] retirements = Arrays.copyOfRange(update, retirementsAt, update.length);
+		if (profileUpdate) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+				"world.distant-horizons.asset-update-columns", outcome[1]);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+				"world.distant-horizons.asset-update-bytes", outcome[2]);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+				"world.distant-horizons.asset-native-update", outcome[5]);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+				"world.distant-horizons.asset-bridge", outcome[5]);
+		}
+		if (System.getenv("MATTMC_TRACE_WHOLE_FRAME") != null) {
+			System.err.println("whole-frame.dh-assets.begin generation=" + update[0]
+				+ " columns=" + outcome[1]
+				+ " snapshots_bytes=" + outcome[2]
+				+ " retirements=" + outcome[3]);
+			System.err.println("whole-frame.dh-assets.end generation=" + update[0]
+				+ " elapsed_nanos=" + outcome[5]);
+		}
+		long acknowledgeStarted = profileUpdate ? System.nanoTime() : 0L;
+		try {
+			acknowledge(assets, retirements, Map.of());
+		} catch (RuntimeException error) {
+			synchronized (LOCK) {
+				DhCollectorLedger.releaseInFlight(assets);
+			}
+			throw error;
+		}
+		if (profileUpdate) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample(
+				"world.distant-horizons.asset-acknowledge", System.nanoTime() - acknowledgeStarted);
+		}
+		return status;
+	}
+
+	/** Publishes an update carrying material provenance, which needs Java's
+	 * model resolution, through the Java-packed bridge call. */
+	private static VulkanicGalBridge.Status flushPendingAssetsFromJava(VulkanicGalBridge bridge, boolean profileUpdate) {
+		PendingAssetUpdate update = pendingUpdate(true);
 		if (update == null) {
 			return null;
 		}
@@ -2998,251 +3005,83 @@ public final class DistantHorizonsSemanticCollector {
 		return pendingUpdate(false);
 	}
 
+	/**
+	 * The ledger selects the bounded update (visible demand first, never a
+	 * column selected for the frame being prepared or already in flight) and
+	 * marks it in flight; Java builds the copied records from copies of its
+	 * payloads.
+	 */
 	private static PendingAssetUpdate pendingUpdate(boolean visibleCandidatesOnly) {
-		synchronized (COLUMNS) {
-			if (PENDING_COLUMNS.isEmpty() && PENDING_RETIREMENTS.isEmpty()) {
+		synchronized (LOCK) {
+			long[] selected = DhCollectorLedger.pendingUpdate(ledgerConfig(), visibleCandidatesOnly);
+			if (selected.length == 0) {
 				return null;
 			}
-			List<LodColumnSnapshot> selectedSnapshots = selectPendingAssetSnapshotsLocked(visibleCandidatesOnly);
-			if (selectedSnapshots.isEmpty() && PENDING_RETIREMENTS.isEmpty()) {
-				return null;
-			}
-			List<VulkanicGalBridge.WorldLodColumnAssetRecord> assets = new ArrayList<>(selectedSnapshots.size());
-			List<VulkanicGalBridge.WorldLodColumnMaterialProvenanceRecord> materialProvenance =
-				new ArrayList<>(selectedSnapshots.size());
+			int assetCount = (int)selected[1];
+			int retirementCount = (int)selected[2];
+			List<LodColumnSnapshot> selectedSnapshots = new ArrayList<>(assetCount);
+			List<VulkanicGalBridge.WorldLodColumnAssetRecord> assets = new ArrayList<>(assetCount);
+			List<VulkanicGalBridge.WorldLodColumnMaterialProvenanceRecord> materialProvenance = new ArrayList<>(assetCount);
 			Map<Long, LodMaterialProvenanceSnapshot> selectedProvenance = new LinkedHashMap<>();
-			for (LodColumnSnapshot snapshot : selectedSnapshots) {
+			for (int index = 0; index < assetCount; index++) {
+				long columnKey = selected[3 + index * 2];
+				long generation = selected[4 + index * 2];
+				LodColumnSnapshot snapshot = currentColumnLocked(columnKey);
+				if (snapshot == null || snapshot.generation() != generation) {
+					throw new IllegalStateException("Distant Horizons ledger selected column " + columnKey
+						+ " generation " + generation + " without its copied payload");
+				}
+				selectedSnapshots.add(snapshot);
 				assets.add(snapshot.toBridgeRecord());
-				LodMaterialProvenanceSnapshot provenance = MATERIAL_PROVENANCE.get(snapshot.columnKey());
+				LodMaterialProvenanceSnapshot provenance = MATERIAL_PROVENANCE.get(columnKey);
 				if (provenance != null) {
 					materialProvenance.add(snapshot.toBridgeMaterialProvenance(provenance));
-					selectedProvenance.put(snapshot.columnKey(), provenance);
+					selectedProvenance.put(columnKey, provenance);
 				}
 			}
-			List<VulkanicGalBridge.WorldLodColumnRetirementRecord> retirements = PENDING_RETIREMENTS.entrySet().stream()
-				.map(entry -> new VulkanicGalBridge.WorldLodColumnRetirementRecord(entry.getKey(), entry.getValue()))
-				.toList();
+			List<VulkanicGalBridge.WorldLodColumnRetirementRecord> retirements = new ArrayList<>(retirementCount);
+			int retirementsAt = 3 + assetCount * 2;
+			for (int index = 0; index < retirementCount; index++) {
+				retirements.add(new VulkanicGalBridge.WorldLodColumnRetirementRecord(
+					selected[retirementsAt + index * 2], selected[retirementsAt + index * 2 + 1]
+				));
+			}
 			return new PendingAssetUpdate(
-				NEXT_UPDATE_GENERATION.get(), List.copyOf(selectedSnapshots), List.copyOf(assets), retirements,
+				selected[0], List.copyOf(selectedSnapshots), List.copyOf(assets), List.copyOf(retirements),
 				List.copyOf(materialProvenance), Map.copyOf(selectedProvenance)
 			);
 		}
 	}
 
-	private static List<LodColumnSnapshot> selectPendingAssetSnapshotsLocked(boolean visibleCandidatesOnly) {
-		List<LodColumnSnapshot> selected = new ArrayList<>(MAX_PENDING_ASSET_COLUMNS_PER_UPDATE);
-		long selectedBytes = 0L;
-		List<LodColumnSnapshot> ordered = new ArrayList<>(PENDING_COLUMNS.size());
-		for (long columnKey : PENDING_VISIBLE_COLUMN_KEYS) {
-			LodColumnSnapshot snapshot = PENDING_COLUMNS.get(columnKey);
-			if (snapshot != null) ordered.add(snapshot);
-		}
-		// Production publication spends the bounded upload budget only on the
-		// current or explicitly pending visible set. Background CPU snapshots stay
-		// eligible for later traversal but never consume Rust residency merely
-		// because visible demand happened to drain between frames.
-		if (PENDING_VISIBLE_COLUMN_KEYS.isEmpty() && visibleCandidatesOnly) {
-			for (long columnKey : VISIBLE_CANDIDATE_COLUMN_KEYS) {
-				LodColumnSnapshot snapshot = PENDING_COLUMNS.get(columnKey);
-				if (snapshot != null) ordered.add(snapshot);
-			}
-		} else if (PENDING_VISIBLE_COLUMN_KEYS.isEmpty()) {
-			ordered.addAll(PENDING_COLUMNS.values());
-		}
-		for (LodColumnSnapshot snapshot : ordered) {
-			// The coordinator may be re-entered while native code owns the copied
-			// payload. Do not let a small source-side rebuild replace that live
-			// submission with another update for the same column. Once the first
-			// update is acknowledged, the latest pending generation is selected.
-			if (IN_FLIGHT_ASSET_GENERATIONS.containsKey(snapshot.columnKey())) {
-				continue;
-			}
-			long snapshotBytes = pendingUpdateByteSize(snapshot);
-			boolean exceedsByteBudget = selectedBytes > 0L
-				&& snapshotBytes > MAX_PENDING_ASSET_BYTES_PER_UPDATE - selectedBytes;
-			if (selected.size() == MAX_PENDING_ASSET_COLUMNS_PER_UPDATE || exceedsByteBudget) {
-				break;
-			}
-			selected.add(snapshot);
-			selectedBytes = Math.addExact(selectedBytes, snapshotBytes);
-		}
-		for (LodColumnSnapshot snapshot : selected) {
-			IN_FLIGHT_ASSET_GENERATIONS.put(snapshot.columnKey(), snapshot.generation());
-		}
-		tracePublicationLocked("select", selected);
-		return selected;
-	}
-
-	private static long pendingUpdateByteSize(LodColumnSnapshot snapshot) {
-		long bytes = snapshot.byteSize();
-		LodMaterialProvenanceSnapshot provenance = MATERIAL_PROVENANCE.get(snapshot.columnKey());
-		return provenance == null ? bytes : Math.addExact(bytes, provenance.byteSize());
-	}
-
 	private static void acknowledge(PendingAssetUpdate update) {
-		synchronized (COLUMNS) {
-			List<VulkanicGalBridge.WorldLodColumnAssetRecord> advancedAssets = new ArrayList<>();
-			for (int assetIndex = 0; assetIndex < update.assets().size(); assetIndex++) {
-				VulkanicGalBridge.WorldLodColumnAssetRecord asset = update.assets().get(assetIndex);
-				LodColumnSnapshot snapshot = update.snapshots().get(assetIndex);
-				if (Objects.equals(IN_FLIGHT_ASSET_GENERATIONS.get(asset.columnKey()), asset.columnGeneration())) {
-					IN_FLIGHT_ASSET_GENERATIONS.remove(asset.columnKey());
-				}
-				boolean invalidatedInFlight = Objects.equals(
-					INVALIDATED_IN_FLIGHT_ASSET_GENERATIONS.get(asset.columnKey()), asset.columnGeneration()
-				);
-				if (invalidatedInFlight) {
-					INVALIDATED_IN_FLIGHT_ASSET_GENERATIONS.remove(asset.columnKey());
-				}
-				boolean wasVisibleDemand = PENDING_VISIBLE_COLUMN_KEYS.contains(asset.columnKey());
-				LodColumnSnapshot pending = PENDING_COLUMNS.get(asset.columnKey());
-				if (pending != null && pending.generation() == asset.columnGeneration()) {
-					PENDING_COLUMNS.remove(asset.columnKey());
-				}
-				Long publishedGeneration = PUBLISHED_GENERATIONS.get(asset.columnKey());
-				if (publishedGeneration != null && publishedGeneration.longValue() != asset.columnGeneration()) {
-					advancedAssets.add(asset);
-				}
-				LodColumnSnapshot current = COLUMNS.get(asset.columnKey());
-				if (current == null) {
-					// The column left the world while this copied asset was in flight.
-					// Retire that exact Rust generation; never resurrect it locally.
-					PUBLISHED_GENERATIONS.remove(asset.columnKey());
-					PUBLISHED_COLUMNS.remove(asset.columnKey());
-					PUBLISHED_DRAW_METADATA.remove(asset.columnKey());
-					PUBLISHED_MATERIAL_PROVENANCE.remove(asset.columnKey());
-					PENDING_RETIREMENTS.put(asset.columnKey(), asset.columnGeneration());
-				} else if (current.generation() != asset.columnGeneration() && invalidatedInFlight) {
-					// A reset or rebuild may reuse the same column key before an older
-					// native update returns. The old payload may have reached Rust, but it
-					// is no longer the current semantic generation. Retire it and leave the
-					// newer snapshot pending; publishing the old snapshot here would let a
-					// late acknowledgement resurrect the previous world's material state.
-					PENDING_RETIREMENTS.put(asset.columnKey(), asset.columnGeneration());
-				} else {
-					// A same-world replacement can be built while the older generation
-					// is still in flight. Keep that older acknowledged transaction
-					// drawable until the replacement is accepted.
-					PUBLISHED_GENERATIONS.put(asset.columnKey(), asset.columnGeneration());
-					PUBLISHED_DRAW_METADATA.put(asset.columnKey(), PublishedColumnDrawMetadata.from(snapshot));
-					if (executionSnapshotsEnabled()) {
-						PUBLISHED_COLUMNS.put(asset.columnKey(), snapshot);
-					} else {
-						PUBLISHED_COLUMNS.remove(asset.columnKey());
-					}
-					LodMaterialProvenanceSnapshot publishedProvenance = update.materialProvenanceByColumn().get(asset.columnKey());
-					if (publishedProvenance == null) {
-						PUBLISHED_MATERIAL_PROVENANCE.remove(asset.columnKey());
-					} else {
-						PUBLISHED_MATERIAL_PROVENANCE.put(asset.columnKey(), publishedProvenance);
-					}
-					if (!executionSnapshotsEnabled() && current.generation() == asset.columnGeneration()) {
-						discardAcknowledgedPayloadLocked(asset.columnKey(), current);
-					}
-				}
-				if (current != null && current.generation() == asset.columnGeneration()) {
-					PENDING_VISIBLE_COLUMN_KEYS.remove(asset.columnKey());
-				}
-				if (wasVisibleDemand) {
-					tracePublicationLocked("ack key=" + asset.columnKey()
-						+ " published=" + asset.columnGeneration()
-						+ " current=" + (current == null ? "missing" : current.generation())
-						+ " retained_visible_demand=" + PENDING_VISIBLE_COLUMN_KEYS.contains(asset.columnKey()));
-				}
-			}
-			invalidateVisibleReferencesForAdvancedAssetsLocked(advancedAssets);
-			for (VulkanicGalBridge.WorldLodColumnRetirementRecord retirement : update.retirements()) {
-				Long pending = PENDING_RETIREMENTS.get(retirement.columnKey());
-				if (pending != null && pending == retirement.columnGeneration()) {
-					PENDING_RETIREMENTS.remove(retirement.columnKey());
-				}
-				if (Objects.equals(PUBLISHED_GENERATIONS.get(retirement.columnKey()), retirement.columnGeneration())) {
-					PUBLISHED_GENERATIONS.remove(retirement.columnKey());
-					PUBLISHED_COLUMNS.remove(retirement.columnKey());
-					PUBLISHED_DRAW_METADATA.remove(retirement.columnKey());
-					PUBLISHED_MATERIAL_PROVENANCE.remove(retirement.columnKey());
-				}
-				if (Objects.equals(
-					LAST_LIFECYCLE_RETIREMENTS.get(retirement.columnKey()), retirement.columnGeneration()
-				)) {
-					LAST_LIFECYCLE_RETIREMENTS.remove(retirement.columnKey());
-					lastLifecycleRetirementsAcknowledged++;
-				}
-			}
-			invalidateVisibleReferencesForRetiredAssetsLocked(update.retirements());
-			NEXT_UPDATE_GENERATION.incrementAndGet();
+		long[] assets = new long[update.assets().size() * 2];
+		for (int index = 0; index < update.assets().size(); index++) {
+			assets[index * 2] = update.assets().get(index).columnKey();
+			assets[index * 2 + 1] = update.assets().get(index).columnGeneration();
 		}
+		long[] retirements = new long[update.retirements().size() * 2];
+		for (int index = 0; index < update.retirements().size(); index++) {
+			retirements[index * 2] = update.retirements().get(index).columnKey();
+			retirements[index * 2 + 1] = update.retirements().get(index).columnGeneration();
+		}
+		acknowledge(assets, retirements, update.materialProvenanceByColumn());
 	}
 
-	private static void invalidateVisibleReferencesForRetiredAssetsLocked(
-		List<VulkanicGalBridge.WorldLodColumnRetirementRecord> retirements
-	) {
-		if (retirements.isEmpty() || PENDING_VISIBLE_SEGMENTS.isEmpty()) return;
-		int before = PENDING_VISIBLE_SEGMENTS.size();
-		PENDING_VISIBLE_SEGMENTS.removeIf(instance -> retirements.stream().anyMatch(retirement ->
-			retirement.columnKey() == instance.columnKey()
-				&& retirement.columnGeneration() == instance.columnGeneration()
-		));
-		if (PENDING_VISIBLE_SEGMENTS.size() == before) return;
-		recomputePendingVisibleRouteLocked();
-		if (PENDING_VISIBLE_SEGMENTS.isEmpty()) {
-			PENDING_RENDER_FRAME = withFlags(
-				PENDING_RENDER_FRAME,
-				PENDING_RENDER_FRAME.flags() & ~RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED
-			);
-			routeDecision = "rejected";
-			routeReason = "asset-retired-before-submit";
-			routeSelected = false;
+	/** {@code assets} and {@code retirements}: (key, generation) each. */
+	private static void acknowledge(long[] assets, long[] retirements, Map<Long, LodMaterialProvenanceSnapshot> provenance) {
+		synchronized (LOCK) {
+			applyEffectsLocked(DhCollectorLedger.acknowledge(ledgerConfig(), assets, retirements), null, provenance);
 		}
 	}
 
 	private static void releaseInFlightAssets(PendingAssetUpdate update) {
-		synchronized (COLUMNS) {
-			for (VulkanicGalBridge.WorldLodColumnAssetRecord asset : update.assets()) {
-				if (Objects.equals(IN_FLIGHT_ASSET_GENERATIONS.get(asset.columnKey()), asset.columnGeneration())) {
-					IN_FLIGHT_ASSET_GENERATIONS.remove(asset.columnKey());
-				}
-				if (Objects.equals(INVALIDATED_IN_FLIGHT_ASSET_GENERATIONS.get(asset.columnKey()), asset.columnGeneration())) {
-					INVALIDATED_IN_FLIGHT_ASSET_GENERATIONS.remove(asset.columnKey());
-				}
+		synchronized (LOCK) {
+			long[] assets = new long[update.assets().size() * 2];
+			for (int index = 0; index < update.assets().size(); index++) {
+				assets[index * 2] = update.assets().get(index).columnKey();
+				assets[index * 2 + 1] = update.assets().get(index).columnGeneration();
 			}
-		}
-	}
-
-	/**
-	 * A visibility traversal may complete between Java producing an immutable
-	 * column replacement and the coordinator publishing that replacement. Such
-	 * references are no longer valid once Rust owns the newer generation. Drop
-	 * only those stale references; the real DH traversal repopulates them on
-	 * its next frame. This preserves the Rust generation invariant rather than
-	 * allowing a stale instance to select an unrelated cached payload.
-	 */
-	private static void invalidateVisibleReferencesForAdvancedAssetsLocked(
-		List<VulkanicGalBridge.WorldLodColumnAssetRecord> advancedAssets
-	) {
-		if (advancedAssets.isEmpty() || PENDING_VISIBLE_SEGMENTS.isEmpty()) {
-			return;
-		}
-		int before = PENDING_VISIBLE_SEGMENTS.size();
-		PENDING_VISIBLE_SEGMENTS.removeIf(instance -> advancedAssets.stream().anyMatch(asset ->
-			asset.columnKey() == instance.columnKey()
-				&& asset.columnGeneration() != instance.columnGeneration()
-		));
-		if (PENDING_VISIBLE_SEGMENTS.size() == before) {
-			return;
-		}
-		recomputePendingVisibleRouteLocked();
-		if (PENDING_VISIBLE_SEGMENTS.isEmpty()) {
-			PENDING_RENDER_FRAME = withFlags(
-				PENDING_RENDER_FRAME,
-				PENDING_RENDER_FRAME.flags() & ~RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED
-			);
-			routeDecision = "rejected";
-			routeReason = "asset-generation-advanced-before-submit";
-			routeSelected = false;
-		} else {
-			routeDecision = "selected";
-			routeReason = "stale-visible-references-pruned";
+			DhCollectorLedger.releaseInFlight(assets);
 		}
 	}
 
@@ -3325,160 +3164,6 @@ public final class DistantHorizonsSemanticCollector {
 		return routeExactAtlasResolutionStatusCounts.entrySet().stream()
 			.map(entry -> entry.getKey() + "=" + entry.getValue())
 			.collect(java.util.stream.Collectors.joining(","));
-	}
-
-	private static void removeColumnLocked(long columnKey) {
-		LodColumnSnapshot removed = COLUMNS.remove(columnKey);
-		COLUMN_KEYS.remove(columnKey);
-		removeMaterialProvenanceLocked(columnKey);
-		if (removed != null) {
-			retainedBytes -= removed.byteSize();
-		}
-		PENDING_COLUMNS.remove(columnKey);
-		PENDING_VISIBLE_COLUMN_KEYS.remove(columnKey);
-		// A DH buffer can close after its column was selected by the render-list
-		// traversal but before the bounded preflight asset update. That update will
-		// retire the native column immediately, so the still-pending instance must
-		// leave the same Java transaction. LAST_CONSUMED_VISIBLE_SEGMENTS is left
-		// intact: once consumeFrame() freezes a frame, the coordinator deliberately
-		// defers this retirement until after that frame has presented.
-		if (PENDING_VISIBLE_SEGMENTS.removeIf(instance -> instance.columnKey() == columnKey)) {
-			recomputePendingVisibleRouteLocked();
-			if (PENDING_VISIBLE_SEGMENTS.isEmpty()) {
-				routeSelected = false;
-				routeDecision = "rejected";
-				routeReason = "visible-columns-retired-before-submit";
-				PENDING_RENDER_FRAME = withFlags(
-					PENDING_RENDER_FRAME,
-					PENDING_RENDER_FRAME.flags() & ~RENDER_FLAG_RUST_NON_WATER_ROUTE_SELECTED
-				);
-			}
-		}
-		IN_FLIGHT_ASSET_GENERATIONS.remove(columnKey);
-		LAST_COLUMN_PAYLOAD_DIFFERENCES.remove(columnKey);
-		Long publishedGeneration = PUBLISHED_GENERATIONS.get(columnKey);
-		if (publishedGeneration != null) {
-			// The native asset remains valid until Rust acknowledges this explicit
-			// retirement. Keep its immutable descriptor and material sidecar for
-			// the same interval. If DH rebuilds this key before the update flushes,
-			// recordBuiltSnapshotLocked cancels the retirement and the acknowledged
-			// generation can cover the replacement without a one-frame hole.
-			PENDING_RETIREMENTS.put(columnKey, publishedGeneration);
-		}
-	}
-
-	private static void recomputePendingVisibleRouteLocked() {
-		routeOpaqueSegments = 0;
-		routeTransparentSegments = 0;
-		routeWaterSegments = 0;
-		for (VulkanicGalBridge.WorldLodColumnInstanceRecord instance : PENDING_VISIBLE_SEGMENTS) {
-			switch (instance.layer()) {
-				case 1 -> routeOpaqueSegments++;
-				case 2, 3 -> routeTransparentSegments++;
-				case 4 -> routeWaterSegments++;
-				default -> { }
-			}
-		}
-	}
-
-	private static void tracePublicationLocked(String phase, List<LodColumnSnapshot> selected) {
-		if (publicationTraceEvents >= MAX_PUBLICATION_TRACE_EVENTS
-			|| PENDING_VISIBLE_COLUMN_KEYS.isEmpty()
-			|| !Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
-			return;
-		}
-		String keys = selected.stream()
-			.limit(4)
-			.map(snapshot -> snapshot.columnKey() + ":" + snapshot.generation())
-			.collect(java.util.stream.Collectors.joining(","));
-		tracePublicationLocked(phase + " pending=" + PENDING_COLUMNS.size()
-			+ " visible_pending=" + PENDING_VISIBLE_COLUMN_KEYS.size()
-			+ " selected=" + selected.size() + " keys=" + keys);
-	}
-
-	private static void tracePublicationLocked(String message) {
-		if (publicationTraceEvents >= MAX_PUBLICATION_TRACE_EVENTS
-			|| !Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
-			return;
-		}
-		publicationTraceEvents++;
-		System.out.println("[MattMC graphics audit] DH asset publication " + message);
-	}
-
-	private static void replaceMaterialProvenanceLocked(long columnKey, LodMaterialProvenanceSnapshot provenance) {
-		LodMaterialProvenanceSnapshot previous = MATERIAL_PROVENANCE.put(columnKey, provenance);
-		if (previous != null) {
-			retainedMaterialProvenanceBytes -= previous.byteSize();
-		}
-		retainedMaterialProvenanceBytes += provenance.byteSize();
-	}
-
-	private static void removeMaterialProvenanceLocked(long columnKey) {
-		LodMaterialProvenanceSnapshot removed = MATERIAL_PROVENANCE.remove(columnKey);
-		if (removed != null) {
-			retainedMaterialProvenanceBytes -= removed.byteSize();
-		}
-	}
-
-	/**
-	 * Keep copied CPU geometry bounded without discarding the sole oversized
-	 * column before DH's real quadtree has a frame to select it. Legacy DH VBOs
-	 * use fixed-size buffers, but the semantic representation can combine many
-	 * valid transport segments for one column. Once another column arrives the
-	 * ordinary LRU and byte limits resume immediately.
-	 */
-	private static void trimRetainedColumnsLocked(int maximumColumns, long maximumBytes) {
-		if (maximumColumns <= 0 || maximumBytes <= 0L) {
-			throw new IllegalArgumentException("Distant Horizons semantic retention bounds must be positive");
-		}
-		while (
-			(COLUMNS.size() > maximumColumns || retainedBytes + retainedMaterialProvenanceBytes > maximumBytes)
-			&& COLUMNS.size() > 1
-		) {
-			Long evictionKey = eldestUnprotectedColumnKeyLocked();
-			// Never turn a real visible column back into an apparent cache miss.
-			// The owning LodBufferContainer will retire it when DH removes or
-			// reloads that render section. A temporarily oversized visible working
-			// set is bounded by DH's own quadtree lifecycle. The collector's byte
-			// and count targets may not evict a live transition child: doing so
-			// prevents all four siblings from ever becoming ready together.
-			if (evictionKey == null) {
-				break;
-			}
-			removeColumnLocked(evictionKey);
-		}
-	}
-
-	private static Long eldestUnprotectedColumnKeyLocked() {
-		for (long columnKey : COLUMNS.keySet()) {
-			if (VISIBLE_CANDIDATE_COLUMN_KEYS.contains(columnKey)) continue;
-			if (PENDING_VISIBLE_COLUMN_KEYS.contains(columnKey)) continue;
-			boolean consumedVisible = false;
-			for (VulkanicGalBridge.WorldLodColumnInstanceRecord instance : LAST_CONSUMED_VISIBLE_SEGMENTS) {
-				if (instance.columnKey() == columnKey) {
-					consumedVisible = true;
-					break;
-				}
-			}
-			if (!consumedVisible) return columnKey;
-		}
-		return null;
-	}
-
-	private static int oversizedColumnCountLocked() {
-		int oversized = 0;
-		for (LodColumnSnapshot snapshot : COLUMNS.values()) {
-			if (snapshot.byteSize() > MAX_RETAINED_BYTES) {
-				oversized++;
-			}
-		}
-		return oversized;
-	}
-
-	private static long minimumPublishedGenerationLocked() {
-		long minimum = Long.MAX_VALUE;
-		for (long generation : PUBLISHED_GENERATIONS.values()) minimum = Math.min(minimum, generation);
-		return minimum == Long.MAX_VALUE ? 0L : minimum;
 	}
 
 	/** Capture-only cache/publish/consumption state for one world position. */
@@ -3684,7 +3369,7 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	private static BridgeFaceMaterialResolution bridgeFaceMaterialResolution(String blockStateIdentity) {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			BridgeFaceMaterialResolution cached = BRIDGE_FACE_MATERIAL_CACHE.get(blockStateIdentity);
 			if (cached != null) {
 				return cached;
@@ -3705,7 +3390,7 @@ public final class DistantHorizonsSemanticCollector {
 		long packedBlockPosition
 	) {
 		BridgeVariantMaterialKey key = new BridgeVariantMaterialKey(blockStateIdentity, packedBlockPosition);
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			BridgeFaceMaterialResolution cached = BRIDGE_VARIANT_FACE_MATERIAL_CACHE.get(key);
 			if (cached != null) {
 				return cached;
@@ -3932,71 +3617,6 @@ public final class DistantHorizonsSemanticCollector {
 		List<LodBufferSnapshot> transparentUp,
 		List<LodBufferSnapshot> transparentWaterUp
 	) {
-		boolean hasSamePayload(LodColumnSnapshot other) {
-			return this.columnKey == other.columnKey
-				&& this.originX == other.originX
-				&& this.originY == other.originY
-				&& this.originZ == other.originZ
-				&& this.opaque.equals(other.opaque)
-				&& this.transparentSide.equals(other.transparentSide)
-				&& this.transparentUp.equals(other.transparentUp)
-				&& this.transparentWaterUp.equals(other.transparentWaterUp);
-		}
-
-		String payloadDifference(LodColumnSnapshot other) {
-			if (this.originX != other.originX || this.originY != other.originY || this.originZ != other.originZ) {
-				return "origin";
-			}
-			String opaqueDifference = bufferDifference(this.opaque, other.opaque, "opaque");
-			if (opaqueDifference != null) return opaqueDifference;
-			String sideDifference = bufferDifference(this.transparentSide, other.transparentSide, "transparent-side");
-			if (sideDifference != null) return sideDifference;
-			String upDifference = bufferDifference(this.transparentUp, other.transparentUp, "transparent-up");
-			if (upDifference != null) return upDifference;
-			String waterDifference = bufferDifference(this.transparentWaterUp, other.transparentWaterUp, "transparent-water-up");
-			return waterDifference == null ? "unknown" : waterDifference;
-		}
-
-		private static String bufferDifference(List<LodBufferSnapshot> left, List<LodBufferSnapshot> right, String name) {
-			if (left.size() != right.size()) return name + "-segment-count";
-			for (int index = 0; index < left.size(); index++) {
-				LodBufferSnapshot leftBuffer = left.get(index);
-				LodBufferSnapshot rightBuffer = right.get(index);
-				if (leftBuffer.sourceBufferIndex() != rightBuffer.sourceBufferIndex()) return name + "-source-index";
-				if (leftBuffer.vertices().size() != rightBuffer.vertices().size()) return name + "-vertex-count";
-				for (int vertexIndex = 0; vertexIndex < leftBuffer.vertices().size(); vertexIndex++) {
-					String vertexDifference = vertexDifference(
-						leftBuffer.vertices().get(vertexIndex),
-						rightBuffer.vertices().get(vertexIndex)
-					);
-					if (vertexDifference != null) {
-						return name + "[" + index + "].vertex[" + vertexIndex + "]." + vertexDifference;
-					}
-				}
-			}
-			return null;
-		}
-
-		private static String vertexDifference(LodVertex left, LodVertex right) {
-			if (left.localX() != right.localX()) return valueDifference("local-x", left.localX(), right.localX());
-			if (left.localY() != right.localY()) return valueDifference("local-y", left.localY(), right.localY());
-			if (left.localZ() != right.localZ()) return valueDifference("local-z", left.localZ(), right.localZ());
-			if (left.packedLightAndMicroOffset() != right.packedLightAndMicroOffset()) {
-				return valueDifference("packed-light-micro", left.packedLightAndMicroOffset(), right.packedLightAndMicroOffset());
-			}
-			if (left.red() != right.red()) return valueDifference("red", left.red(), right.red());
-			if (left.green() != right.green()) return valueDifference("green", left.green(), right.green());
-			if (left.blue() != right.blue()) return valueDifference("blue", left.blue(), right.blue());
-			if (left.alpha() != right.alpha()) return valueDifference("alpha", left.alpha(), right.alpha());
-			if (left.materialId() != right.materialId()) return valueDifference("material-id", left.materialId(), right.materialId());
-			if (left.normalIndex() != right.normalIndex()) return valueDifference("normal-index", left.normalIndex(), right.normalIndex());
-			if (left.padding() != right.padding()) return valueDifference("padding", left.padding(), right.padding());
-			return null;
-		}
-
-		private static String valueDifference(String field, int left, int right) {
-			return field + "=" + left + "->" + right;
-		}
 		public LodColumnSnapshot {
 			if (generation <= 0L) {
 				throw new IllegalArgumentException("generation must be positive");
@@ -4030,6 +3650,18 @@ public final class DistantHorizonsSemanticCollector {
 			for (LodBufferSnapshot buffer : buffers) {
 				if (buffer.vertices().isEmpty() || buffer.vertices().size() > MAX_LOD_VERTICES_PER_SEGMENT) {
 					throw new IllegalArgumentException("Distant Horizons LOD segment vertex count exceeds Rust bound");
+				}
+				if (buffer.vertices() instanceof PackedLodVertexList packed) {
+					// Position and light fields are unsigned u16 by construction.
+					// Validate the restricted byte fields directly, without decoding
+					// a ByteBuffer and Java record for every ordinary DH vertex.
+					for (int offset = 0; offset < packed.bytes.length; offset += VERTEX_STRIDE_BYTES) {
+						if (Byte.toUnsignedInt(packed.bytes[offset + 12]) > MAX_LOD_MATERIAL_ID
+							|| Byte.toUnsignedInt(packed.bytes[offset + 13]) > MAX_LOD_NORMAL_INDEX) {
+							throw new IllegalArgumentException("Distant Horizons LOD vertex is outside Rust semantic bounds");
+						}
+					}
+					continue;
 				}
 				for (LodVertex vertex : buffer.vertices()) {
 					if (vertex.localX() < 0 || vertex.localX() > 0xFFFF
@@ -4660,62 +4292,21 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	static void beginRustOpaqueRouteFrameForTest() {
-		synchronized (COLUMNS) {
-			PENDING_VISIBLE_SEGMENTS.clear();
-			nextVisibleOrder = 0;
+		synchronized (LOCK) {
 			PENDING_RENDER_FRAME = new VulkanicGalBridge.WorldLodRenderFrameRecord(
 				true, 0, 0, identityMatrix(), identityMatrix(), identityMatrix(), identityMatrix(),
 				0.0F, 0.01F, 0.0F, 0.0F, 0, 0, new float[3], new float[20], 0
 			);
-			routeFrame++;
-			routeDecision = "test-preflight";
-			routeReason = "pending";
-			routeOpaqueSegments = 0;
+			DhCollectorLedger.beginTestFrame(true);
 			resetExactAtlasIdentityCoverage();
-			routeTransparentSegments = 0;
-			routeWaterSegments = 0;
-			routeVisibleColumns = 0;
-			routeUnpublishedVisibleColumns = 0;
-			routeCachedColumns = 0;
-			routeSemanticCandidateColumns = 0;
-			routeSemanticUnpublishedCandidates = 0;
-			semanticBuildAttempts = 0L;
-			semanticColumnsBuilt = 0L;
-			semanticColumnsReused = 0L;
-			semanticColumnsReplaced = 0L;
-			lastPayloadDifference = "none";
-			lastPayloadChangeRouteFrame = Long.MIN_VALUE;
-			lastVisibleSetSignature = Long.MIN_VALUE;
-			lastVisibleSetChangeRouteFrame = Long.MIN_VALUE;
-			routeSelected = false;
-			lastExecutedRouteFrame = 0L;
-			lastExecutedWorldFrame = 0L;
-			lastExecutedSubmission = 0L;
-			lastExecutedCaptureFrame = 0L;
-			lastExecutedInstances = 0;
-			lastExecutedOpaqueInstances = 0;
-			lastExecutedTransparentInstances = 0;
-			lastExecutedWaterInstances = 0;
-			lastExecutedFrameSemanticsEnabled = false;
 		}
 	}
 
 	static void beginVisibleFrameForTest() {
-		synchronized (COLUMNS) {
-			PENDING_VISIBLE_SEGMENTS.clear();
-			nextVisibleOrder = 0;
+		synchronized (LOCK) {
 			PENDING_RENDER_FRAME = VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
-			routeFrame++;
-			routeDecision = "test-preflight";
-			routeReason = "pending";
-			routeOpaqueSegments = 0;
+			DhCollectorLedger.beginTestFrame(false);
 			resetExactAtlasIdentityCoverage();
-			routeTransparentSegments = 0;
-			routeWaterSegments = 0;
-			routeVisibleColumns = 0;
-			routeUnpublishedVisibleColumns = 0;
-			routeCachedColumns = COLUMNS.size();
-			routeSelected = false;
 		}
 	}
 
@@ -4724,8 +4315,10 @@ public final class DistantHorizonsSemanticCollector {
 		if (!enabled()) {
 			return VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
 		}
-		synchronized (COLUMNS) {
-			VulkanicGalBridge.WorldLodRenderFrameRecord result = PENDING_RENDER_FRAME;
+		synchronized (LOCK) {
+			long[] header = new long[4];
+			DhCollectorLedger.consume(DhCollectorLedger.CONSUME_RENDER_FRAME, header);
+			VulkanicGalBridge.WorldLodRenderFrameRecord result = frameRecord(header[0] != 0L, (int)header[1]);
 			PENDING_RENDER_FRAME = VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
 			return result;
 		}
@@ -4736,13 +4329,12 @@ public final class DistantHorizonsSemanticCollector {
 		if (!enabled()) {
 			return List.of();
 		}
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			// The coordinator activates a pending replacement after this frame has
 			// presented. The visible list therefore stays paired with the last
 			// acknowledged immutable column generation for the entire submission.
-			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> result = routeSelected
-				? List.copyOf(PENDING_VISIBLE_SEGMENTS)
-				: List.of();
+			List<VulkanicGalBridge.WorldLodColumnInstanceRecord> result =
+				records(DhCollectorLedger.consume(DhCollectorLedger.CONSUME_VISIBLE_SEGMENTS, new long[4]));
 			if (!result.isEmpty()) {
 				// The visible DH set uses the same copied block atlas as indexed
 				// terrain meshes. Publish that semantic resource before the combined
@@ -4754,7 +4346,6 @@ public final class DistantHorizonsSemanticCollector {
 			LAST_CONSUMED_VISIBLE_SEGMENT_SNAPSHOTS = executionSnapshotsEnabled()
 				? snapshotExecutedSegmentsLocked(result)
 				: List.of();
-			PENDING_VISIBLE_SEGMENTS.clear();
 			return result;
 		}
 	}
@@ -4764,7 +4355,7 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	static List<VulkanicGalBridge.WorldLodColumnInstanceRecord> executedVisibleSegmentsForTest(long worldFrame) {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			return executedSegmentsForWorldFrameLocked(worldFrame);
 		}
 	}
@@ -4791,7 +4382,7 @@ public final class DistantHorizonsSemanticCollector {
 			}
 			return blockId.endsWith("_STATE_") ? blockId : blockId + "_STATE_";
 		}).toList();
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			for (VulkanicGalBridge.WorldLodColumnInstanceRecord instance : LAST_CONSUMED_VISIBLE_SEGMENTS) {
 				long columnKey = instance.columnKey();
 				int minX = DhSectionPos.getMinCornerBlockX(columnKey);
@@ -4820,7 +4411,7 @@ public final class DistantHorizonsSemanticCollector {
 	}
 
 	static LodMaterialProvenanceSnapshot materialProvenanceForTest(long columnKey) {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			return MATERIAL_PROVENANCE.get(columnKey);
 		}
 	}
@@ -4950,7 +4541,7 @@ public final class DistantHorizonsSemanticCollector {
 		if (!enabled()) {
 			return;
 		}
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			LodColumnSnapshot column = publishedColumnLocked(columnKey);
 			if (column == null) {
 				return;
@@ -4959,102 +4550,42 @@ public final class DistantHorizonsSemanticCollector {
 			if (segmentIndexes.isEmpty()) {
 				return;
 			}
-			if (PENDING_VISIBLE_SEGMENTS.size() + segmentIndexes.size() > MAX_VISIBLE_SEGMENTS) {
-				throw new IllegalStateException("Distant Horizons visible LOD segment capture exceeds " + MAX_VISIBLE_SEGMENTS);
-			}
-			for (int segmentIndex : segmentIndexes) {
-				PENDING_VISIBLE_SEGMENTS.add(new VulkanicGalBridge.WorldLodColumnInstanceRecord(
-					column.columnKey(), column.generation(), layer, segmentIndex, nextVisibleOrder++
-				));
-			}
+			DhCollectorLedger.appendSegments(column.columnKey(), column.generation(), layer,
+				segmentIndexes.stream().mapToInt(Integer::intValue).toArray());
 		}
 	}
 
 	static void resetForTest() {
-		synchronized (COLUMNS) {
+		synchronized (LOCK) {
 			DistantHorizonsFaceMaterialResolver.clearCachedStateResolutions();
-			COLUMNS.clear();
-			COLUMN_KEYS.clear();
-			PUBLISHED_COLUMNS.clear();
-			PUBLISHED_DRAW_METADATA.clear();
-			MATERIAL_PROVENANCE.clear();
-			PUBLISHED_MATERIAL_PROVENANCE.clear();
+			applyEffectsLocked(DhCollectorLedger.resetForTest(), null, Map.of());
 			EXACT_ATLAS_COVERAGE_CACHE.clear();
 			BRIDGE_FACE_MATERIAL_CACHE.clear();
 			BRIDGE_VARIANT_FACE_MATERIAL_CACHE.clear();
-			PENDING_COLUMNS.clear();
-			PENDING_RETIREMENTS.clear();
-			PUBLISHED_GENERATIONS.clear();
-			LAST_COLUMN_PAYLOAD_DIFFERENCES.clear();
-			PENDING_VISIBLE_SEGMENTS.clear();
-			PENDING_VISIBLE_COLUMN_KEYS.clear();
-			VISIBLE_CANDIDATE_COLUMN_KEYS.clear();
-			publicationTraceEvents = 0;
-			IN_FLIGHT_ASSET_GENERATIONS.clear();
-			INVALIDATED_IN_FLIGHT_ASSET_GENERATIONS.clear();
-			LAST_LIFECYCLE_RETIREMENTS.clear();
+			executionTraceEvents = 0;
+			lastExecutionTraceNanos = 0L;
+			rejectionTraceEvents = 0;
+			lastRejectionTraceNanos = 0L;
 			LAST_CONSUMED_VISIBLE_SEGMENTS = List.of();
 			LAST_CONSUMED_VISIBLE_SEGMENT_SNAPSHOTS = List.of();
 			EXECUTED_VISIBLE_SEGMENTS_BY_WORLD_FRAME.clear();
 			PENDING_RENDER_FRAME = VulkanicGalBridge.WorldLodRenderFrameRecord.disabled();
-			retainedBytes = 0L;
-			retainedMaterialProvenanceBytes = 0L;
-			NEXT_GENERATION.set(1L);
-			NEXT_UPDATE_GENERATION.set(1L);
-			nextVisibleOrder = 0;
-			routeFrame = 0L;
-			routeDecision = "not-attempted";
-			routeReason = "not-requested";
-			routeMatrixStatus = "not-observed";
-			routeMatrixDetail = "not-observed";
-			routeOpaqueSegments = 0;
 			resetExactAtlasIdentityCoverage();
-			routeTransparentSegments = 0;
-			routeWaterSegments = 0;
-			routeVisibleColumns = 0;
-			routeUnpublishedVisibleColumns = 0;
-			routeCachedColumns = 0;
-			semanticBuildAttempts = 0L;
-			semanticColumnsBuilt = 0L;
-			semanticColumnsReused = 0L;
-			semanticColumnsReplaced = 0L;
-			lastPayloadDifference = "none";
-			lifecycleResetCount = 0L;
-			resourceReloadResetCount = 0L;
-			worldUnloadResetCount = 0L;
-			lastLifecycleResetReason = "none";
-			lastLifecyclePublishedRetirements = 0;
-			lastLifecycleInvalidatedInFlight = 0;
-			lastLifecycleRetirementsAcknowledged = 0;
-			lastLifecycleRetirementsSupersededByReplacement = 0;
-			lastLifecycleGenerationFloor = 0L;
-			lastPayloadChangeRouteFrame = Long.MIN_VALUE;
-			lastVisibleSetSignature = Long.MIN_VALUE;
-			lastVisibleSetChangeRouteFrame = Long.MIN_VALUE;
-			routeSelected = false;
-			lastExecutedRouteFrame = 0L;
-			lastExecutedWorldFrame = 0L;
-			lastExecutedSubmission = 0L;
-			lastExecutedCaptureFrame = 0L;
-			lastExecutedInstances = 0;
-			lastExecutedOpaqueInstances = 0;
-			lastExecutedTransparentInstances = 0;
-			lastExecutedWaterInstances = 0;
-			lastExecutedFrameSemanticsEnabled = false;
 			waterSourceInputProbes = configuredWaterSourceInputProbes;
 			WATER_SOURCE_INPUT_TRACES.clear();
 		}
 	}
 
 	static LodColumnSnapshot snapshotForTest(long columnKey) {
-		synchronized (COLUMNS) {
-			return COLUMNS.get(columnKey);
+		synchronized (LOCK) {
+			// COLUMNS.get: an access in the ledger's LRU, as it was in Java.
+			return DhCollectorLedger.query(DhCollectorLedger.QUERY_TOUCH, columnKey) == 0L ? null : currentColumnLocked(columnKey);
 		}
 	}
 
 	static void trimRetainedColumnsForTest(int maximumColumns, long maximumBytes) {
-		synchronized (COLUMNS) {
-			trimRetainedColumnsLocked(maximumColumns, maximumBytes);
+		synchronized (LOCK) {
+			applyEffectsLocked(DhCollectorLedger.trim(maximumColumns, maximumBytes), null, Map.of());
 		}
 	}
 
@@ -5216,7 +4747,7 @@ public final class DistantHorizonsSemanticCollector {
 		Objects.requireNonNull(origin, "origin");
 		LodColumnSnapshot snapshot = new LodColumnSnapshot(
 			columnKey,
-			NEXT_GENERATION.getAndIncrement(),
+			DhCollectorLedger.allocateGeneration(),
 			origin.getX(),
 			origin.getY(),
 			origin.getZ(),
@@ -5225,8 +4756,8 @@ public final class DistantHorizonsSemanticCollector {
 			copyBuffers(transparentUp),
 			copyBuffers(transparentWaterUp)
 		);
-		synchronized (COLUMNS) {
-			recordBuiltSnapshotLocked(columnKey, snapshot, provenance);
+		synchronized (LOCK) {
+			recordBuiltSnapshotLocked(columnKey, snapshot, provenance, false, new long[2]);
 		}
 	}
 

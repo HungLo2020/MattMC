@@ -17,9 +17,9 @@ import org.slf4j.Logger;
 
 public record RunFunction(ResourceLocation function) implements EnchantmentEntityEffect {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	public static final MapCodec<RunFunction> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(ResourceLocation.CODEC.fieldOf("function").forGetter(RunFunction::function)).apply(instance, RunFunction::new)
-	);
+	/** The native codec's `run_function` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<RunFunction> CODEC = (MapCodec<RunFunction>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:run_function");
 
 	@Override
 	public void apply(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3) {

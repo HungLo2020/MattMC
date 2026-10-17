@@ -96,6 +96,89 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_atlas_animation_tick(
     })
 }
 
+/// Queued form of `mattmc_vulkanic_gal_atlas_animation_tick`: the tick is
+/// validated and copied on the calling thread and delivered by the frame
+/// worker after the jobs already queued. `accepted_out` reports queuing; a
+/// tick the renderer then refuses is reported by the next queued-frame join,
+/// which fails closed exactly like a refused synchronous tick.
+///
+/// # Safety
+/// `visible_ids` must address `visible_count` ids; the out pointers are writable.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_atlas_animation_tick_queued(
+    context_id: u64,
+    texture_id: u32,
+    generation: u64,
+    tick: u64,
+    visible_ids: *const u32,
+    visible_count: u64,
+    animate_only_visible: u32,
+    accepted_out: *mut u32,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    if !accepted_out.is_null() {
+        accepted_out.write(0);
+    }
+    let queued = with_queue(context_id, |pipeline| {
+        if accepted_out.is_null()
+            || texture_id == 0
+            || generation == 0
+            || visible_count > 16384
+            || animate_only_visible > 1
+        {
+            return Err(GalError::invalid_argument("invalid animation tick transport"));
+        }
+        let ids = read_limited_slice(
+            FfiSlice { ptr: visible_ids, count: visible_count },
+            true,
+            "animation visible sprite ids",
+        )?;
+        let visible: std::collections::BTreeSet<u32> = ids.iter().copied().collect();
+        if visible.len() != ids.len() || visible.contains(&0) {
+            return Err(GalError::invalid_argument("invalid animation visibility identities"));
+        }
+        let handoff = pipeline.context_handoff();
+        pipeline.enqueue(move |queue| {
+            let handoff = handoff;
+            // SAFETY: queued jobs run on the worker, which owns the context
+            // until a bridge entry point joins (see `bridge::pipeline`).
+            let context = unsafe { &mut *handoff.0 };
+            context.ffi_calls += 1;
+            context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(40 + visible_count * 4);
+            let result = context.world_primitive_frontend.advance_atlas_animation_before_frame(
+                &mut context.gal,
+                crate::render::shared::sprite_interpolation::AtlasAnimationTickEvent {
+                    texture_id,
+                    generation,
+                    tick,
+                    visible,
+                    animate_only_visible: animate_only_visible != 0,
+                },
+            );
+            let error = match result {
+                Ok(true) => return,
+                Ok(false) => GalError::invalid_argument(format!(
+                    "queued atlas animation tick {tick} for texture {texture_id} was not accepted"
+                )),
+                Err(error) => error,
+            };
+            set_last_error(context, &error);
+            record_queued_error(queue, &error);
+        })
+    });
+    match queued {
+        Ok(()) => {
+            accepted_out.write(1);
+            write_status_out(status_out, FfiStatusResult { status: StatusCode::Ok as i32, ..FfiStatusResult::default() });
+            StatusCode::Ok as i32
+        }
+        Err(error) => {
+            write_status_out(status_out, status_result_from_error(&error));
+            error.code as i32
+        }
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_vulkanic_gal_atlas_animation_stage_assets(
     context_id: u64,

@@ -41,7 +41,9 @@ public class TntBlock extends Block {
 
 	public TntBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(UNSTABLE, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(UNSTABLE, false));
+		}
 	}
 
 	@Override

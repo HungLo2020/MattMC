@@ -583,7 +583,7 @@ impl FabulousAttachmentSet {
         let mut post_ops = match executor.lower(&bindings) {
             Ok(operations) => operations,
             Err(error) => {
-                let _ = gal.destroy(presentation_pass);
+                let _ = gal.retire(presentation_pass);
                 return Err(error);
             }
         };
@@ -744,16 +744,16 @@ impl FabulousAttachmentSet {
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
         if let Some(pipelines) = self.pipelines {
             for handle in pipelines.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         if let Some(bindings) = self.bindings {
             for handle in bindings.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         for handle in self.final_target.handles_in_destroy_order() {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         for resource in [
             self.optical_hand,
@@ -765,7 +765,7 @@ impl FabulousAttachmentSet {
             self.main,
         ] {
             for handle in resource.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }

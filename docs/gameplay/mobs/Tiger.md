@@ -33,6 +33,10 @@ The effect lasts **12,000 game ticks**, about **10 minutes** at 20 ticks per sec
 
 There is no saved trust list, permanent taming, owner command cycle, or player-riding interaction. The protection resides on the blessed player and expires with the effect.
 
+The effect ID is `minecraft:tigers_blessing`, and dropped food grants **level I**. Another successful pickup refreshes a shorter level-I timer to 12,000 ticks instead of adding another ten minutes. Higher stored levels do not strengthen the Tiger's presence-based targeting checks. [Food grant][custom-tiger-grant] · [Default level][custom-tiger-level] · [Refresh rules][custom-tiger-refresh] · [Target clearing][custom-tiger-clear] · [Player target gate][custom-tiger-gate]
+
+[Milk](../items/MilkBucket.md) removes this blessing along with other active effects, so drinking it can end your protection near Tigers. The blessing does not grant general damage resistance or protect other unblessed animals. [Milk][custom-tiger-milk] · [All-effects removal][custom-tiger-removal] · [Tiger checks][custom-tiger-clear]
+
 ## Hunting and combat
 
 An adult's nearby-player targeting goal has a **4-block range** and excludes Tiger's Blessing. Other targeting and retaliation paths also exist, so do not treat that distance as a universal safe boundary.
@@ -99,3 +103,13 @@ Source-reviewed on **2026-10-01** at `b81c01943c9f3254e713c365a1dd633392929cb2`.
 - [Biome spawn data](https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/worldgen/biome)
 - [Biome-building code](https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/level/biome)
 - [Entity loot tables](https://github.com/HungLo2020/MattMC/tree/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/loot_table/entities)
+
+Tiger's Blessing details additionally source-reviewed on **2026-10-02** at `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`. No in-game blessing or removal test was run.
+
+[custom-tiger-grant]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/alexsmobs/entity/EntityTiger.java#L512-L553
+[custom-tiger-level]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/effect/MobEffectInstance.java#L49-L58
+[custom-tiger-refresh]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/effect/MobEffectInstance.java#L123-L147
+[custom-tiger-clear]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/alexsmobs/entity/EntityTiger.java#L430-L433
+[custom-tiger-gate]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/alexsmobs/entity/EntityTiger.java#L663-L678
+[custom-tiger-milk]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/item/component/Consumables.java#L64
+[custom-tiger-removal]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/entity/LivingEntity.java#L943-L952

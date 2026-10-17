@@ -7,7 +7,8 @@ use crate::render::worldrender::lod::*;
 /// deliberately does not participate in this cache key.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) struct WorldLodSourceProgramKey {
-    pub(in crate::render::worldrender::lod) identity: String,
+    /// Shared, so the per-draw key clones are reference-count bumps.
+    pub(in crate::render::worldrender::lod) identity: std::sync::Arc<str>,
     pub(in crate::render::worldrender::lod) shader_pack_generation: u64,
     pub(in crate::render::worldrender::lod) color_format: TextureFormat,
     pub(in crate::render::worldrender::lod) cull_mode: u32,
@@ -23,7 +24,7 @@ impl WorldLodSourceProgramKey {
         color_format: TextureFormat,
     ) -> GalResult<Self> {
         Ok(Self {
-            identity: program.identity.as_str().to_string(),
+            identity: std::sync::Arc::from(program.identity.as_str()),
             shader_pack_generation: program.shader_pack_generation,
             color_format,
             // This probe is diagnostic-only. It is deliberately part of the
@@ -38,8 +39,10 @@ impl WorldLodSourceProgramKey {
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) struct WorldLodSourceDrawKey {
-    pub(in crate::render::worldrender::lod) program: WorldLodSourceProgramKey,
+    // The column draw orders first: draws of one program then compare
+    // integers instead of the program's identical (string-bearing) key.
     pub(in crate::render::worldrender::lod) draw: WorldLodDrawResourceKey,
+    pub(in crate::render::worldrender::lod) program: WorldLodSourceProgramKey,
 }
 
 /// Stable, semantic set-one identity for one source-derived DH program. The
@@ -69,7 +72,7 @@ pub(super) struct WorldLodSourcePipelineResources {
 impl WorldLodSourcePipelineResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
         if self.shares_base_layouts {
-            let _ = gal.destroy(self.pipeline);
+            let _ = gal.retire(self.pipeline);
             return;
         }
         for handle in [
@@ -80,7 +83,7 @@ impl WorldLodSourcePipelineResources {
             self.fragment_shader,
             self.vertex_shader,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -105,12 +108,12 @@ pub(super) struct WorldLodSourceDrawResources {
 
 impl WorldLodSourceDrawResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
-        let _ = gal.destroy(self.source_data_set);
+        let _ = gal.retire(self.source_data_set);
         if let Some(buffer) = self.scalar_uniform_buffer {
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         }
         if let Some(buffer) = self.column_frame_buffer {
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         }
     }
 }
@@ -325,8 +328,8 @@ impl WorldLodSourcePassResources {
                 .collect::<Vec<_>>();
             for stale_key in stale {
                 if let Some(resources) = self.targets.remove(&stale_key) {
-                    let _ = gal.destroy(resources.pass);
-                    let _ = gal.destroy(resources.target);
+                    let _ = gal.retire(resources.pass);
+                    let _ = gal.retire(resources.target);
                 }
             }
             let target = gal.create_render_target(RenderTargetDesc {
@@ -355,7 +358,7 @@ impl WorldLodSourcePassResources {
             }) {
                 Ok(pass) => pass,
                 Err(error) => {
-                    let _ = gal.destroy(target);
+                    let _ = gal.retire(target);
                     return Err(error);
                 }
             };
@@ -537,15 +540,16 @@ impl WorldLodSourcePassResources {
         Ok(())
     }
 
-    /// Appends a compatible opaque DH range in one render pass.
+    /// Appends an ordered DH draw range in one render pass.
     ///
-    /// Opaque reduced-color and exact-atlas draws write the same named source
-    /// attachments with the same depth domain.  Keeping that attachment open
-    /// across the range preserves draw order and per-draw pipeline/resource
-    /// bindings while avoiding a pass/barrier round trip for every segment.
-    /// The caller still performs the one opaque-depth snapshot after this
-    /// range, before any translucent source work can read it.
-    pub(crate) fn append_opaque_batch(
+    /// The opaque range (reduced-color, exact-atlas and generic draws) and the
+    /// late translucent range each write the same named source attachments
+    /// with one depth domain and nothing reads them mid-range. Keeping the
+    /// attachments open across a range preserves draw (and blend) order and
+    /// per-draw pipeline/resource bindings while avoiding a pass/barrier round
+    /// trip for every segment. The caller still performs the one opaque-depth
+    /// snapshot after the opaque range, before translucent work reads it.
+    pub(crate) fn append_ordered_batch(
         target: &WorldLodPreparedSourceTarget,
         draws: &[(WorldLodPreparedSourceDraw, Handle)],
         fog_color: crate::render::vulkanic::commands::ClearColor,
@@ -562,7 +566,7 @@ impl WorldLodSourcePassResources {
             || depth_before == TextureUsageState::DepthStencilAttachment
         {
             return Err(GalError::invalid_argument(
-                "Distant Horizons source opaque batch cannot begin while a target attachment is already in a pass",
+                "Distant Horizons source batch cannot begin while a target attachment is already in a pass",
             ));
         }
         if color_before == TextureUsageState::Undefined && !clear_primary_color {
@@ -585,17 +589,17 @@ impl WorldLodSourcePassResources {
                 != Some(crate::render::vulkanic::handles::HandleKind::ResourceSet)
             {
                 return Err(GalError::invalid_argument(
-                    "Distant Horizons source opaque batch requires GAL pack resource-set handles",
+                    "Distant Horizons source batch requires GAL pack resource-set handles",
                 ));
             }
             if draw.source_data_dynamic_offset_count > 2 {
                 return Err(GalError::invalid_argument(
-                    "Distant Horizons source opaque batch has an invalid set-zero dynamic-offset count",
+                    "Distant Horizons source batch has an invalid set-zero dynamic-offset count",
                 ));
             }
             if draw.index_count == 0 || draw.index_count % 3 != 0 {
                 return Err(GalError::invalid_argument(
-                    "Distant Horizons source opaque batch requires triangle-aligned indices",
+                    "Distant Horizons source batch requires triangle-aligned indices",
                 ));
             }
         }
@@ -737,12 +741,25 @@ impl WorldLodSourcePassResources {
         )
     }
 
-    /// Releases only the set-one pack bindings (lightmap, voxel volumes,
-    /// named targets, ...). Draw sets, pipelines, and per-frame rings bind
-    /// none of those, so a lightmap or volume change keeps them.
-    pub(crate) fn release_pack_resources(&mut self, gal: &mut VulkanicGal) {
-        for (_, set) in std::mem::take(&mut self.pack_resources) {
-            let _ = gal.destroy(set);
+    /// Releases the set-one pack bindings that bind a role `binds` selects
+    /// (lightmap, voxel volumes, named targets, ...). Draw sets, pipelines and
+    /// per-frame rings bind none of those, and pack sets that bind none of the
+    /// released roles stay valid (a lightmap change must not rebuild them).
+    pub(crate) fn release_pack_resources(
+        &mut self,
+        gal: &mut VulkanicGal,
+        binds: impl Fn(&[(TerrainSourceResourceRole, u64)]) -> bool,
+    ) {
+        let released: Vec<_> = self
+            .pack_resources
+            .keys()
+            .filter(|key| binds(&key.resource_generations))
+            .cloned()
+            .collect();
+        for key in released {
+            if let Some(set) = self.pack_resources.remove(&key) {
+                let _ = gal.retire(set);
+            }
         }
     }
 
@@ -807,7 +824,7 @@ impl WorldLodSourcePassResources {
             }
         }
         if let Some(previous) = self.column_frame_rings.remove(scalar_key) {
-            let _ = gal.destroy(previous.buffer);
+            let _ = gal.retire(previous.buffer);
         }
         let alignment = gal.capabilities().limits.uniform_buffer_offset_alignment.max(1);
         let block = u64::from(program.execution_interface.column_frame_bytes);
@@ -1029,7 +1046,7 @@ impl WorldLodSourcePassResources {
             })();
             if result.is_err() {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
             if alpha_blend {
@@ -1114,7 +1131,7 @@ impl WorldLodSourcePassResources {
             .collect::<Vec<_>>();
         for stale_key in stale {
             if let Some(set) = self.pack_resources.remove(&stale_key) {
-                let _ = gal.destroy(set);
+                let _ = gal.retire(set);
             }
         }
         let layout = self
@@ -1189,18 +1206,18 @@ impl WorldLodSourcePassResources {
         self.retire_generic_draws(gal);
         // Draw sets bound these; they are gone now.
         for (_, buffer) in std::mem::take(&mut self.scalar_buffers) {
-            let _ = gal.destroy(buffer);
+            let _ = gal.retire(buffer);
         }
         for (_, ring) in std::mem::take(&mut self.column_frame_rings) {
-            let _ = gal.destroy(ring.buffer);
+            let _ = gal.retire(ring.buffer);
         }
         self.scalar_written_this_frame.clear();
         for (_, set) in std::mem::take(&mut self.pack_resources) {
-            let _ = gal.destroy(set);
+            let _ = gal.retire(set);
         }
         for (_, resources) in std::mem::take(&mut self.targets) {
-            let _ = gal.destroy(resources.pass);
-            let _ = gal.destroy(resources.target);
+            let _ = gal.retire(resources.pass);
+            let _ = gal.retire(resources.target);
         }
         // Generic-blend variants borrow their base layouts: destroy them first.
         let (shared, owned): (Vec<_>, Vec<_>) = std::mem::take(&mut self.pipelines)
@@ -1351,7 +1368,7 @@ impl WorldLodSourcePassResources {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.pipelines.insert(key.clone(), result?);
@@ -1520,7 +1537,13 @@ impl WorldLodSourceTargets {
                 extent: identity.extent,
                 mip_levels: 1,
                 array_layers: 1,
-                usages: vec![TextureUsage::Sampled, TextureUsage::TransferDst],
+                usages: vec![
+                    TextureUsage::Sampled,
+                    TextureUsage::TransferDst,
+                    // Exact-frame diagnostics read the opaque snapshot, not
+                    // the live depth subsequently changed by translucency.
+                    TextureUsage::TransferSrc,
+                ],
             })?;
             created.push(distant_depth_before_translucency_texture);
             let distant_depth_before_translucency_view =
@@ -1569,7 +1592,7 @@ impl WorldLodSourceTargets {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -1588,7 +1611,7 @@ impl WorldLodSourceTargets {
             self.distant_depth_view,
             self.distant_depth_texture,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 

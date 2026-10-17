@@ -2,7 +2,8 @@
 
 Maintain player-facing coverage on the dedicated `docs/wiki-expansion` branch. Start with the repository's [documentation maintenance conventions](../DOCUMENTATION.md).
 
-- [Coverage plan and checkpoint](coverage-plan.md)
+- [Current article coverage and quality](article-quality.md): practical review priorities and canonical owners
+- [Coverage checkpoint and historical work](coverage-plan.md): source snapshots and preserved batch evidence
 - [Page templates and evidence rules](page-templates.md)
 - [Safe continuation and source synchronization](continuation.md)
 

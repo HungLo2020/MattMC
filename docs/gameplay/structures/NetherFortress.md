@@ -6,7 +6,7 @@ A Nether Fortress (`minecraft:fortress`) is a branching complex of Nether-brick 
 
 With the bundled generation data, fortresses are eligible in all five Nether biomes: Nether Wastes, Soul Sand Valley, Crimson Forest, Warped Forest, and Basalt Deltas. Eligibility applies to the structure's start; it does not promise a fortress in every biome patch.
 
-Fortresses share a placement set with bastion remnants. The set selects between them with fortress weight 2 and bastion weight 3, and can try the remaining choice if one cannot generate. Treat these as placement weights, not a guarantee that exactly two of every five structures you encounter will be fortresses.
+Fortresses share a placement set with [Bastion Remnants](BastionRemnant.md). The set selects between them with fortress weight 2 and bastion weight 3, and can try the remaining choice if one cannot generate. Treat these as placement weights, not a guarantee that exactly two of every five structures you encounter will be fortresses.
 
 Search for connected dark Nether-brick walkways and enclosed corridors. There is no fixed compass direction or guaranteed travel distance in this guide. If you have permission level 2, run `/locate structure minecraft:fortress` in the Nether. Read the [locating cautions](Structures.md#finding-a-structure) before using its coordinates.
 

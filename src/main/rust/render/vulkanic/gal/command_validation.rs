@@ -5,6 +5,13 @@ use super::*;
 impl VulkanicGal {
     pub(super) fn validation_error<T>(&mut self, error: GalError) -> GalResult<T> {
         self.metrics.validation_failures += 1;
+        // Many callers discard teardown errors (`let _ = gal.destroy(..)`).
+        // Log them so a leaked or still-bound resource shows up in the
+        // client log (the lifecycle gate fails on dependency violations).
+        let count = self.metrics.validation_failures;
+        if count <= 32 || count.is_power_of_two() {
+            crate::core::console::stderr(format_args!("rust_gal_validation_failure count={count} {error}"));
+        }
         Err(error)
     }
 
@@ -805,7 +812,7 @@ impl VulkanicGal {
             if std::env::var_os("MATTMC_TRACE_PIPELINE_PASS_COMPAT").is_some() {
                 let pipeline_record = self.graphics_pipelines.get(pipeline)?;
                 let pass_record = self.render_passes.get(pass)?;
-                eprintln!(
+                crate::core::console::stderr(format_args!(
                     "vulkan.pipeline-pass-mismatch pipeline={:?} label={} colors={:?} depth={:?} pass={:?} label={} colors={:?} depth={:?}",
                     pipeline,
                     pipeline_record.desc.label,
@@ -815,7 +822,7 @@ impl VulkanicGal {
                     pass_record.desc.label,
                     pass_record.desc.color_formats,
                     pass_record.desc.depth_format,
-                );
+                ));
             }
             return self.validation_error(GalError::command(
                 StatusCode::InvalidArgument,

@@ -19,7 +19,9 @@ public class BlockCaimanEgg extends Block {
     
     public BlockCaimanEgg(BlockBehaviour.Properties properties) {
         super(properties);
-        this.registerDefaultState(this.stateDefinition.any().setValue(HATCH, Integer.valueOf(0)).setValue(EGGS, Integer.valueOf(1)));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.stateDefinition.any().setValue(HATCH, Integer.valueOf(0)).setValue(EGGS, Integer.valueOf(1)));
+        }
     }
     
     // Delegate to BlockReptileEgg methods at runtime, not during static init

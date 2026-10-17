@@ -1,5 +1,8 @@
 //! Byte and item bounds on every wire payload the bridge accepts.
 
+/// Fixed offset-table capacity mirrored by Java's layout-query allocation.
+pub const FFI_MAX_STRUCT_LAYOUT_FIELDS: usize = 72;
+
 pub const FFI_MAX_LABEL_BYTES: usize = 1024;
 
 pub const FFI_MAX_SHADER_BYTES: usize = 16 * 1024 * 1024;

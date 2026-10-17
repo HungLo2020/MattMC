@@ -4,6 +4,9 @@ use crate::render::shaderpack::source::preprocess::preprocess_terrain_sources;
 use crate::render::shaderpack::source::{ShaderPackSource, ShaderSourceFile};
 use crate::render::shaderpack::contracts::terrain::derive_complementary_terrain_contract;
 
+mod custom_expressions;
+mod builtin_uniforms;
+
 fn source_requirements(
     vertex_uniform: &str,
     vertex_use: &str,

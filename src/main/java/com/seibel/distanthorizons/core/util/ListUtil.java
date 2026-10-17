@@ -2,6 +2,7 @@ package com.seibel.distanthorizons.core.util;
 
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.shorts.ShortArrayList;
 
 import java.util.ArrayList;
@@ -15,7 +16,7 @@ public class ListUtil
 	 * will populate the list with zeros up to the given size 
 	 * so get and set methods won't cause {@link IndexOutOfBoundsException}'s.
 	 */
-	public static void clearAndSetSize(LongArrayList arrayList, int size)
+	public static void clearAndSetSize(LongList arrayList, int size)
 	{
 		arrayList.clear();
 		arrayList.size(size);

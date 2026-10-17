@@ -1,27 +1,9 @@
 package net.minecraft.util.valueproviders;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DataResult;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
 public class ClampedNormalInt extends IntProvider {
-	public static final MapCodec<ClampedNormalInt> CODEC = RecordCodecBuilder.<ClampedNormalInt>mapCodec(
-			instance -> instance.group(
-					Codec.FLOAT.fieldOf("mean").forGetter(clampedNormalInt -> clampedNormalInt.mean),
-					Codec.FLOAT.fieldOf("deviation").forGetter(clampedNormalInt -> clampedNormalInt.deviation),
-					Codec.INT.fieldOf("min_inclusive").forGetter(clampedNormalInt -> clampedNormalInt.minInclusive),
-					Codec.INT.fieldOf("max_inclusive").forGetter(clampedNormalInt -> clampedNormalInt.maxInclusive)
-				)
-				.apply(instance, ClampedNormalInt::new)
-		)
-		.validate(
-			clampedNormalInt -> clampedNormalInt.maxInclusive < clampedNormalInt.minInclusive
-				? DataResult.error(() -> "Max must be larger than min: [" + clampedNormalInt.minInclusive + ", " + clampedNormalInt.maxInclusive + "]")
-				: DataResult.success(clampedNormalInt)
-		);
 	private final float mean;
 	private final float deviation;
 	private final int minInclusive;
@@ -64,5 +46,13 @@ public class ClampedNormalInt extends IntProvider {
 
 	public String toString() {
 		return "normal(" + this.mean + ", " + this.deviation + ") in [" + this.minInclusive + "-" + this.maxInclusive + "]";
+	}
+
+	public float mean() {
+		return this.mean;
+	}
+
+	public float deviation() {
+		return this.deviation;
 	}
 }

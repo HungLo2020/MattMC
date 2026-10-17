@@ -6,7 +6,7 @@ Stone (`minecraft:stone`), Cobblestone (`minecraft:cobblestone`) and their brick
 
 The normal Overworld uses Stone as its base terrain block; caves, ores, surface materials and the deep Deepslate layer interrupt it. Mine exposed Stone or reach it beneath the surface. This is the ordinary terrain route, not a promise about every custom world preset. [Normal preset][presets] · [Terrain settings][overworld] · [Generator][terrain]
 
-Use an **unbroken pickaxe**, including a Wooden Pickaxe, to collect the ordinary construction blocks covered here. They require a correct tool for drops, are in the pickaxe mining tag, and have no Stone-, Iron- or Diamond-tier restriction. Breaking one by hand does not collect it. See [Mining](../mechanics/Mining.md) for the shared tool rules. [Registration][blocks] · [Pickaxe tag][pickaxe] · [Tier tags][stone-tier] [iron-tier] [diamond-tier] · [Wood rules][wood-denials] · [Tool checks][tool-material] [player-tool] [broken-tool] · [Server mining dispatch][break-dispatch]
+Use an **unbroken pickaxe**, including a Wooden Pickaxe, to collect the ordinary construction blocks covered here. They require a correct tool for drops, are in the pickaxe mining tag, and have no Stone-, Iron- or Diamond-tier restriction. Breaking one by hand does not collect it. See [Mining](../mechanics/Mining.md) for the shared tool rules. [Registration][blocks] · [Pickaxe tag][pickaxe] · [Tier tags][stone-tier] [iron-tier][] [diamond-tier][] · [Wood rules][wood-denials] · [Tool checks][tool-material] [player-tool][] [broken-tool][] · [Server mining dispatch][break-dispatch]
 
 ### Mining and drops
 
@@ -18,11 +18,32 @@ Use an **unbroken pickaxe**, including a Wooden Pickaxe, to collect the ordinary
 | A listed stair or wall | 1 matching stair or wall | Same result |
 | A listed single slab / double slab | 1 / 2 matching slabs | Same result |
 
-Fortune does not add a multiplier to these building-block drops. A double slab returns slab items, not a full-block ingredient. Explosion drops have separate survival/decay conditions. **Infested lookalikes follow different rules**, described [below](#infested-stone-variants). [Stone loot][loot-stone] · [Cobblestone][loot-cobblestone] · [Mossy Cobblestone][loot-mossy-cobblestone] · [Smooth Stone][loot-smooth-stone] · [Brick loot][loot-stone-bricks] [loot-mossy-stone-bricks] [loot-cracked-stone-bricks] [loot-chiseled-stone-bricks] · [Stair example][loot-stone-stairs] · [Wall example][loot-cobblestone-wall] · [Slab example][loot-stone-slab]
+Fortune does not add a multiplier to these building-block drops. A double slab returns slab items, not a full-block ingredient. Explosion drops have separate survival/decay conditions. **Infested lookalikes follow different rules**, described [below](#infested-stone-variants). [Stone loot][loot-stone] · [Cobblestone][loot-cobblestone] · [Mossy Cobblestone][loot-mossy-cobblestone] · [Smooth Stone][loot-smooth-stone] · [Brick loot][loot-stone-bricks] [loot-mossy-stone-bricks][] [loot-cracked-stone-bricks][] [loot-chiseled-stone-bricks] · [Stair example][loot-stone-stairs] · [Wall example][loot-cobblestone-wall] · [Slab example][loot-stone-slab]
 
 ### Water and lava
 
 The active liquid callbacks also produce building stone. When water is beside or above a lava block, the checked lava position becomes **Obsidian if it is a source**, or **Cobblestone if it is flowing lava**. When lava spreads downward into a water block, that water block becomes **Stone**. Keep the lava source away from the intended Cobblestone contact point. These are source-verified conversion rules; no generator layout was tested for this guide. [Water contact and update callbacks][liquid] · [Downward lava flow][lava]
+
+### Repeatable cobblestone generator
+
+This small **source-derived, untested layout** keeps the Lava source separate from the block you mine. Build it where ordinary Water can remain liquid; normal Water Bucket placement does not work in the Nether. Use full Cobblestone blocks for the enclosure rather than flammable walls or waterlogged partial blocks. [Bucket dimension check][generator-bucket] · [Fluid passage rules][generator-flow]
+
+1. Make a straight, **four-cell channel**, one block wide, with this left-to-right order at a single height:
+
+    | Cell | What belongs there | Floor |
+    | --- | --- | --- |
+    | **W** | Water source | Solid |
+    | **D** | Water flowing down into a pit | One extra block of depth |
+    | **C** | Initially air; the Cobblestone you collect | Solid |
+    | **L** | Lava source | Solid |
+
+2. Enclose the channel's sides and both ends. Only **D** has the deeper cavity; seal that cavity's bottom and sides too. Keep the floor under **C** intact, and leave the channel open above for access.
+3. Place Water at **W** first and let it flow into **D** and its pit. Do not add a second Water source or fill in the pit. Then place Lava at **L**. Its horizontal flow into **C** meets Water beside it and becomes Cobblestone.
+4. From outside the channel, mine **C** with a pickaxe and wait for fluid updates to replace it. Preserve both source cells, the pit and the enclosure. This produces loose mining drops; it is not a guaranteed collection or production-rate design.
+
+The pit is functional, not just spare water storage. Non-source Water above an open downward path prioritizes that path over horizontal spreading. Even after Water occupies the lower cavity, the same-fluid block below still counts as a downward opening. This keeps **D** from sending Water across **C** toward the Lava source in the specified arrangement. Lava entering **C** is flowing rather than a source, so its adjacent-Water conversion produces Cobblestone without replacing **L**. [Downward priority][generator-priority] · [Water-hole test][generator-hole] · [Flowing-state calculation][generator-state] · [Contact conversion][generator-contact]
+
+If it stops working, check the geometry before adding more buckets. **Obsidian at L** means Water reached the source instead of only its flow; recover the Water and rebuild the separation before replacing the lost Lava source. **Stone at a water position** points to the separate downward-Lava-into-Water route, so restore the level channel and solid floor under **C**. Keep the [Soul Soil/Blue Ice Basalt combination](BlackstoneAndBasalt.md#making-basalt-with-lava) out of the contact cell. An empty **C** can also be waiting for a scheduled fluid update; the guide does not promise a fixed regeneration time. [Source/contact distinction][generator-contact] · [Downward Stone conversion][generator-stone] · [Scheduled fluid dispatch][generator-ticks]
 
 ## Uses
 
@@ -48,7 +69,7 @@ The regular Stone Bricks recipe above is the starting point for brick shapes. Sm
 
 Combine **1 Cobblestone with 1 Vine or 1 Moss Block**, shapeless, for **1 Mossy Cobblestone**. The equivalent recipe with **1 Stone Bricks** makes **1 Mossy Stone Bricks**. Moss Carpet is not the named Moss Block ingredient. Make the mossy full block first, then shape it. [Cobblestone recipes][crafting-mossy-cobblestone-from-vine] [crafting-mossy-cobblestone-from-moss-block] · [Brick recipes][crafting-mossy-stone-bricks-from-vine] [crafting-mossy-stone-bricks-from-moss-block]
 
-All three smelting conversions above take **200 game ticks per item**, nominally **10 seconds at 20 ticks per second**, and specify **0.1 recipe experience**. They are Furnace smelting recipes; experience collection and fuel belong to the [Furnace guide](Furnace.md). [Smelting recipes][smelting-stone] [smelting-smooth-stone] [smelting-cracked-stone-bricks] · [Active Furnace recipe type and ticking][furnace] [furnace-tick]
+All three smelting conversions above take **200 game ticks per item**, nominally **10 seconds at 20 ticks per second**, and specify **0.1 recipe experience**. They are Furnace smelting recipes; experience collection and fuel belong to the [Furnace guide](Furnace.md). [Smelting recipes][smelting-stone] [smelting-smooth-stone][] [smelting-cracked-stone-bricks][] · [Active Furnace recipe type and ticking][furnace] [furnace-tick]
 
 ## Stairs, slabs and walls
 
@@ -95,22 +116,22 @@ A Stonecutter consumes **one input block** per operation. Stairs cost one block 
 - **Stairs:** the stair faces the player's horizontal direction, with its higher end ahead for ordinary bottom stairs. The clicked face and height choose upright or upside-down placement. Suitable neighboring stairs automatically form inner or outer corners, including stairs made from another material when their half and facing fit. Stairs can be waterlogged. [Placement and corner rules][stairs]
 - **Walls:** neighboring walls, sturdy block faces, Iron Bars and suitably aligned Fence Gates determine connections; blocks above can change wall/post shape. Their collision extends **1.5 blocks high**. Walls can be waterlogged. [Connections, shape and water][walls]
 
-These placed forms do not fall or require a supporting block beneath them. Shape and water states affect the placed block; mining returns the corresponding ordinary item, so choose the orientation again on placement. [Block classes][blocks] · [Base survival rules][properties] · [Shape callbacks][slabs] [stairs] [walls]
+These placed forms do not fall or require a supporting block beneath them. Shape and water states affect the placed block; mining returns the corresponding ordinary item, so choose the orientation again on placement. [Block classes][blocks] · [Base survival rules][properties] · [Shape callbacks][slabs] [stairs][] [walls][]
 
 ## Infested stone variants
 
-An infested block can resemble ordinary masonry but release a **Silverfish** when broken. The registered stone-family forms and their Silk Touch outputs are:
+An infested block can resemble ordinary masonry but release a **[Silverfish](../mobs/Silverfish.md)** when broken. The registered stone-family forms and their Silk Touch outputs are:
 
 | Infested ID | Silk Touch output |
 | --- | --- |
-| `minecraft:infested_stone` | 1 ordinary Stone |
-| `minecraft:infested_cobblestone` | 1 ordinary Cobblestone |
-| `minecraft:infested_stone_bricks` | 1 ordinary Stone Bricks |
-| `minecraft:infested_mossy_stone_bricks` | 1 ordinary Mossy Stone Bricks |
-| `minecraft:infested_cracked_stone_bricks` | 1 ordinary Cracked Stone Bricks |
-| `minecraft:infested_chiseled_stone_bricks` | 1 ordinary Chiseled Stone Bricks |
+| [`minecraft:infested_stone`](../items/InfestedStone.md) | 1 ordinary Stone |
+| [`minecraft:infested_cobblestone`](../items/InfestedCobblestone.md) | 1 ordinary Cobblestone |
+| [`minecraft:infested_stone_bricks`](../items/InfestedStoneBricks.md) | 1 ordinary Stone Bricks |
+| [`minecraft:infested_mossy_stone_bricks`](../items/InfestedMossyStoneBricks.md) | 1 ordinary Mossy Stone Bricks |
+| [`minecraft:infested_cracked_stone_bricks`](../items/InfestedCrackedStoneBricks.md) | 1 ordinary Cracked Stone Bricks |
+| [`minecraft:infested_chiseled_stone_bricks`](../items/InfestedChiseledStoneBricks.md) | 1 ordinary Chiseled Stone Bricks |
 
-Without Silk Touch these loot tables give **no block item**, and the active break callback spawns a Silverfish when `doTileDrops` is enabled. **Silk Touch suppresses the Silverfish and gives the ordinary host block**, never the infested item. The spawn suppression uses an enchantment tag containing Silk Touch in the bundled data. Ordinary destructive explosions also reach that break callback with no enchanted tool. [Infested behavior][infested] · [Suppression tag][prevent-infestation] · [Exact loot][loot-infested-stone] [loot-infested-cobblestone] [loot-infested-stone-bricks] [loot-infested-mossy-stone-bricks] [loot-infested-cracked-stone-bricks] [loot-infested-chiseled-stone-bricks] · [Mining dispatch][break-dispatch] [block-destroy] [block-drops] · [Explosion callback][properties]
+Without Silk Touch these loot tables give **no block item**, and the active break callback spawns a Silverfish when `doTileDrops` is enabled. **Silk Touch suppresses the Silverfish and gives the ordinary host block**, never the infested item. The spawn suppression uses an enchantment tag containing Silk Touch in the bundled data. Ordinary destructive explosions also reach that break callback with no enchanted tool. [Infested behavior][infested] · [Suppression tag][prevent-infestation] · [Exact loot][loot-infested-stone] [loot-infested-cobblestone][] [loot-infested-stone-bricks][] [loot-infested-mossy-stone-bricks][] [loot-infested-cracked-stone-bricks][] [loot-infested-chiseled-stone-bricks] · [Mining dispatch][break-dispatch] [block-destroy][] [block-drops][] · [Explosion callback][properties]
 
 These infested registrations **do not require a correct tool for drops**, so breaking them by hand is not a way to avoid the Silverfish. Their hardness is half the ordinary host block's hardness and their blast resistance is **0.75**. Creative breaking takes a separate no-drops path. [Registrations][blocks] · [Infested properties][infested] · [Player tool check][player-tool] · [Creative/mining path][break-dispatch]
 
@@ -136,7 +157,18 @@ The table is for **ordinary full blocks**, not all shape variants or infested bl
 
 ## Sources and verification
 
+The generator subsection was source-reviewed on **2026-10-15** at `599dd6c1dad1c8c7e418eb016c3405f487892f73`, including current fluid registration, placement/contact callbacks, downward priority, same-fluid pit handling and scheduled execution. Its layout is an inference from those paths; no generator, mining-cycle, item-collection or timing test was run. The earlier family-wide review below retains its original scope.
+
 Source-reviewed on **2026-10-02** at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. Checked active registrations, terrain settings and generator use, all covered block loot, tool tags and player break dispatch, exact crafting/smelting/stonecutting recipes, shape placement, and infestation callbacks. No in-game mining, placement, crafting, generation or Silverfish test was run. The guide covers the named stone/cobblestone families; it does not extend these recipes or drops to every block in the stone category.
+
+[generator-bucket]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/item/BucketItem.java#L100-L135
+[generator-flow]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/material/FlowingFluid.java#L203-L235
+[generator-priority]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/material/FlowingFluid.java#L122-L143
+[generator-hole]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/material/FlowingFluid.java#L308-L313
+[generator-state]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/material/FlowingFluid.java#L164-L200
+[generator-contact]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/block/LiquidBlock.java#L140-L192
+[generator-stone]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/world/level/material/LavaFluid.java#L208-L221
+[generator-ticks]: https://github.com/HungLo2020/MattMC/blob/599dd6c1dad1c8c7e418eb016c3405f487892f73/src/main/java/net/minecraft/server/level/ServerLevel.java#L723-L731
 
 [presets]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/java/net/minecraft/world/level/levelgen/presets/WorldPresets.java#L120-L135
 [overworld]: https://github.com/HungLo2020/MattMC/blob/6fe3f1e877707e45ee3159929bb9cd8769d6bda7/src/main/resources/data/minecraft/worldgen/noise_settings/overworld.json

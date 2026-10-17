@@ -1,6 +1,6 @@
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Node {
+pub(crate) struct Node {
     pub axis: i32, // -1: constant
     pub start: u32,
     pub count: u32,
@@ -8,14 +8,14 @@ pub(super) struct Node {
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Knot {
+pub(crate) struct Knot {
     pub location: f32,
     pub derivative: f32,
     pub child: u32,
 }
-pub(super) const MAX_NODES: usize = 4096;
-pub(super) const MAX_KNOTS: usize = 16384;
-pub(super) fn valid(nodes: &[Node], knots: &[Knot]) -> bool {
+pub(crate) const MAX_NODES: usize = 4096;
+pub(crate) const MAX_KNOTS: usize = 16384;
+pub(crate) fn valid(nodes: &[Node], knots: &[Knot]) -> bool {
     if nodes.is_empty() || nodes.len() > MAX_NODES || knots.len() > MAX_KNOTS {
         return false;
     }

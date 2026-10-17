@@ -62,8 +62,9 @@ public final class GuiItemMeshSemanticCollector {
 		Object modelIdentity = item.itemStackRenderState().getModelIdentity();
 		TopologyKey cacheKey = !item.itemStackRenderState().isAnimated()
 			&& modelIdentity instanceof List<?> identityElements && !identityElements.isEmpty()
-			? new TopologyKey(modelIdentity, guiScale) : null;
+			? new TopologyKey(modelIdentity, guiScale, item.itemStackRenderState().hasFoil()) : null;
 		CachedTopology topology = cacheKey == null ? null : cachedTopology(cacheKey);
+		boolean stableTopology = topology != null;
 		if (topology != null) {
 			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
 				"gui.item-topology-cache.hit", 1L
@@ -91,12 +92,13 @@ public final class GuiItemMeshSemanticCollector {
 				if (asset != null && sources.stream().noneMatch(existing -> existing.assetId() == asset.assetId()))
 					sources.add(new GuiItemTextureSource.Raw(asset));
 			}
-			topology = new CachedTopology(layers, sources, atlasUses, blockRaster);
-			// Standard foil carries a frame clock. Keep the entire item frame-local
-			// until that animated material is represented separately from topology.
-			boolean reusable = cacheKey != null && layers.stream().noneMatch(layer -> layer.itemFoil() != null);
+			topology = new CachedTopology(layers, sources, atlasUses, blockRaster, new TemplateSlot());
+			// Standard foil's frame clock is refreshed on every reuse below; the
+			// cached quads (and their resident geometry) stay shared.
+			boolean reusable = cacheKey != null;
 			if (reusable) {
 				cacheTopology(cacheKey, topology);
+				stableTopology = cachedTopology(cacheKey) == topology;
 				net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-topology-cache.miss", 1L);
 			} else {
 				net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample("gui.item-topology-cache.bypass", 1L);
@@ -111,8 +113,9 @@ public final class GuiItemMeshSemanticCollector {
 		return CollectionResult.accepted(new GuiItemMesh(
 			item.name(), item.x(), item.y(), left, top, right, bottom,
 			new float[] {item.pose().m00(), item.pose().m01(), item.pose().m10(), item.pose().m11(), item.pose().m20(), item.pose().m21()},
-			topology.layers(), topology.sources(), topology.atlasUses(), topology.blockRaster()
-		));
+			withCurrentFoil(topology.layers()), topology.sources(), topology.atlasUses(), topology.blockRaster(),
+            stableTopology ? topology.template() : null
+		), stableTopology);
 	}
 
 	private static synchronized CachedTopology cachedTopology(TopologyKey key) {
@@ -123,14 +126,33 @@ public final class GuiItemMeshSemanticCollector {
 		TOPOLOGY_CACHE.putIfAbsent(key, topology);
 	}
 
-	private record TopologyKey(Object modelIdentity, int guiScale) {
+	private record TopologyKey(Object modelIdentity, int guiScale, boolean foil) {
+	}
+
+	/** Standard foil animates with this frame's clock and options; quads stay shared. */
+	private static List<GuiItemMeshLayer> withCurrentFoil(List<GuiItemMeshLayer> layers) {
+		List<GuiItemMeshLayer> result = null;
+		for (int index = 0; index < layers.size(); index++) {
+			GuiItemMeshLayer layer = layers.get(index);
+			if (layer.itemFoil() == null) continue;
+			if (result == null) result = new ArrayList<>(layers);
+			result.set(index, new GuiItemMeshLayer(layer.materialMode(), layer.blockLight(), layer.modelTransform,
+				layer.quads(), currentFoil(), layer.sourceFoilType(), layer.nativeTransform()));
+		}
+		return result == null ? layers : result;
+	}
+
+	private static net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord currentFoil() {
+		return new net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord(Util.getMillis(),
+			Minecraft.getInstance().options.glintSpeed().get(),
+			Minecraft.getInstance().options.glintStrength().get().floatValue());
 	}
 
 	private record CachedTopology(
 		List<GuiItemMeshLayer> layers,
 		List<GuiItemTextureSource> sources,
 		List<GuiItemAtlasUse> atlasUses,
-		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockRaster
+		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockRaster, TemplateSlot template
 	) {
 		private CachedTopology {
 			layers = List.copyOf(layers);
@@ -138,6 +160,22 @@ public final class GuiItemMeshSemanticCollector {
 			atlasUses = List.copyOf(atlasUses);
 		}
 	}
+
+    /** Topology lifetime only; Rust retains the registered rendering input. */
+    static final class TemplateSlot {
+        private net.vulkanic.bridge.NativeGuiItemTemplate owner;
+        private boolean declined;
+        synchronized net.vulkanic.bridge.NativeGuiItemTemplate owner() { return owner; }
+        synchronized boolean canRetain() { return !declined; }
+        synchronized net.vulkanic.bridge.NativeGuiItemTemplate retain(
+            List<net.vulkanic.bridge.VulkanicGalBridge.GuiMeshBatchRecord> batches, int[] selectors, int layers) {
+            if (owner == null && !declined) {
+                owner = net.vulkanic.bridge.VulkanicGalBridge.createGuiItemTemplate(batches, selectors, layers);
+                declined = owner == null;
+            }
+            return owner;
+        }
+    }
 
 	private static String appendLayer(ItemStackRenderState.SemanticLayer layer, List<GuiItemMeshLayer> output,
 		List<GuiItemTextureSource> sources, List<GuiItemAtlasUse> atlasUses) {
@@ -156,9 +194,9 @@ public final class GuiItemMeshSemanticCollector {
 			if (copied == null) return "unsupported-quad";
 			quads.add(copied);
 		}
-		float[] modelTransform = layer.modelTransform();
+		float[] modelTransform = layer.nativeTransform() == null ? layer.modelTransform() : null;
 		int sourceFoilType = layer.foilType() == ItemStackRenderState.FoilType.STANDARD ? 1 : 0;
-		output.add(new GuiItemMeshLayer(mode, layer.usesBlockLight(), modelTransform, quads, null, sourceFoilType));
+		output.add(new GuiItemMeshLayer(mode, layer.usesBlockLight(), modelTransform, quads, null, sourceFoilType, layer.nativeTransform()));
 		if (layer.foilType() == ItemStackRenderState.FoilType.STANDARD) {
 			RustGalGuiRawImageAssets.Asset glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
 			if (glint == null) return "glint-texture-unavailable";
@@ -167,9 +205,7 @@ public final class GuiItemMeshSemanticCollector {
 				glintQuads.add(glintQuad(quad, glint.assetId()));
 			}
 			output.add(new GuiItemMeshLayer(MaterialMode.GLINT, false, modelTransform, glintQuads,
-				new net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord(Util.getMillis(),
-					Minecraft.getInstance().options.glintSpeed().get(),
-					Minecraft.getInstance().options.glintStrength().get().floatValue()), sourceFoilType));
+				currentFoil(), sourceFoilType, layer.nativeTransform()));
 		}
 		return null;
 	}
@@ -309,13 +345,14 @@ public final class GuiItemMeshSemanticCollector {
 		GLINT
 	}
 
-	public record CollectionResult(GuiItemMesh mesh, String rejection) {
-		private static CollectionResult accepted(GuiItemMesh mesh) {
-			return new CollectionResult(mesh, null);
+	/** {@code stableTopology}: the mesh's quad lists are owned by the topology cache. */
+	public record CollectionResult(GuiItemMesh mesh, String rejection, boolean stableTopology) {
+		private static CollectionResult accepted(GuiItemMesh mesh, boolean stableTopology) {
+			return new CollectionResult(mesh, null, stableTopology);
 		}
 
 		private static CollectionResult rejected(String rejection) {
-			return new CollectionResult(null, rejection);
+			return new CollectionResult(null, rejection, false);
 		}
 
 		public boolean accepted() {
@@ -327,8 +364,14 @@ public final class GuiItemMeshSemanticCollector {
 		String itemIdentity, int itemX, int itemY, int left, int top, int right, int bottom,
 		float[] guiPose,
 		List<GuiItemMeshLayer> layers, List<GuiItemTextureSource> sources, List<GuiItemAtlasUse> atlasUses,
-		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockItemRaster
+		net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockItemRaster,
+        TemplateSlot template
 	) {
+        public GuiItemMesh(String itemIdentity, int itemX, int itemY, int left, int top, int right, int bottom,
+            float[] guiPose, List<GuiItemMeshLayer> layers, List<GuiItemTextureSource> sources, List<GuiItemAtlasUse> atlasUses,
+            net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord blockItemRaster) {
+            this(itemIdentity, itemX, itemY, left, top, right, bottom, guiPose, layers, sources, atlasUses, blockItemRaster, null);
+        }
 		public GuiItemMesh(
 			String itemIdentity, int itemX, int itemY, int left, int top, int right, int bottom,
 			float[] guiPose, List<GuiItemMeshLayer> layers, List<GuiItemTextureSource> sources,
@@ -373,7 +416,12 @@ public final class GuiItemMeshSemanticCollector {
 	}
 
 	public record GuiItemMeshLayer(MaterialMode materialMode, boolean blockLight, float[] modelTransform, List<GuiItemMeshQuad> quads,
-		net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord itemFoil, int sourceFoilType) {
+		net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord itemFoil, int sourceFoilType,
+		net.vulkanic.world.NativeItemLayerTransform.Capture nativeTransform) {
+		public GuiItemMeshLayer(MaterialMode materialMode, boolean blockLight, float[] modelTransform, List<GuiItemMeshQuad> quads,
+			net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord itemFoil, int sourceFoilType) {
+			this(materialMode,blockLight,modelTransform,quads,itemFoil,sourceFoilType,null);
+		}
 		public GuiItemMeshLayer(MaterialMode materialMode, boolean blockLight, float[] modelTransform, List<GuiItemMeshQuad> quads,
 			net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord itemFoil) {
 			this(materialMode, blockLight, modelTransform, quads, itemFoil, 0);
@@ -384,13 +432,14 @@ public final class GuiItemMeshSemanticCollector {
 		public GuiItemMeshLayer {
 			if (sourceFoilType < 0 || sourceFoilType > 1) throw new IllegalArgumentException("unsupported source item foil type");
 			if (itemFoil != null && materialMode != MaterialMode.GLINT) throw new IllegalArgumentException("foil requires glint layer");
-			modelTransform = checkedCopy(modelTransform, 16, "GUI item model transform");
+			if (nativeTransform == null) modelTransform = checkedCopy(modelTransform, 16, "GUI item model transform");
+			else if (modelTransform != null) throw new IllegalArgumentException("native item transform conflicts with matrix");
 			quads = List.copyOf(quads);
 		}
 
 		@Override
 		public float[] modelTransform() {
-			return this.modelTransform.clone();
+			return this.nativeTransform == null ? this.modelTransform.clone() : this.nativeTransform.modelTransform();
 		}
 
 		/** See {@link GuiItemMesh#guiPoseOwned()} for the ownership contract. */

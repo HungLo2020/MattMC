@@ -48,7 +48,7 @@ Bone Meal growth does not use the natural-growth brightness threshold. Clear spa
 | --- | --- |
 | Sticks | The [Stick recipe section](../items/Stick.md#crafting) owns the Bamboo-to-Stick recipe |
 | Scaffolding | [String's selected recipes](../items/String.md#selected-crafting-recipes) owns the recipe; [Scaffolding](Scaffolding.md) explains placement and support |
-| Block of Bamboo | Craft **9 Bamboo** in a 3 × 3 Crafting Table grid to make **1 [Block of Bamboo](../items/BlockOfBamboo.md)**; the recipe is shapeless but needs nine ingredient slots |
+| Block of Bamboo | Craft **9 Bamboo** in a 3 × 3 Crafting Table grid to make **1 [Block of Bamboo](BambooBlocks.md#block-of-bamboo)**; the recipe is shapeless but needs nine ingredient slots |
 | Pot display | Add Bamboo to an empty [Flower Pot](FlowerPot.md); the potted form does not grow into a stalk |
 
 [Stick recipe][stick-recipe] · [Scaffolding recipe][scaffold-recipe] · [Block recipe][block-recipe] · [Potted registration][pot]
@@ -57,7 +57,7 @@ Blocks of Bamboo also feed the Bamboo Planks recipe. This page covers the raw pl
 
 One raw Bamboo item provides **50 default Furnace burn ticks**, one quarter of a 200-tick recipe. Four supply one uninterrupted 200-tick operation. Use [Furnace fuel planning](Furnace.md#fuel-planning) for batching and partial progress. Bamboo stalks are also registered as flammable, so fire can destroy a growing supply. [Default fuel][fuel] · [Server fuel setup][fuel-load] · [Fire registration][fire]
 
-Related: [Bamboo item](../items/Bamboo.md) · [Scaffolding](Scaffolding.md) · [Cactus](Cactus.md) · [Flower Pot](FlowerPot.md) · [Blocks](Blocks.md) · [Items](../items/Items.md)
+Related: [Panda care](../mobs/Panda.md) · [Bamboo item](../items/Bamboo.md) · [Scaffolding](Scaffolding.md) · [Cactus](Cactus.md) · [Flower Pot](FlowerPot.md) · [Blocks](Blocks.md) · [Items](../items/Items.md)
 
 ## Sources and verification
 

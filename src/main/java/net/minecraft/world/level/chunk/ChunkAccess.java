@@ -83,6 +83,10 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	protected final Map<BlockPos, BlockEntity> blockEntities = new Object2ObjectOpenHashMap<>();
 	protected final LevelHeightAccessor levelHeightAccessor;
 	protected final LevelChunkSection[] sections;
+	/** {@link DecorationTransaction}'s chunk ownership: a global acquisition order and the lock it orders. */
+	private static final java.util.concurrent.atomic.AtomicLong NATIVE_TX_ORDER = new java.util.concurrent.atomic.AtomicLong();
+	final long nativeTxOrder = NATIVE_TX_ORDER.incrementAndGet();
+	final java.util.concurrent.locks.ReentrantLock nativeTxLock = new java.util.concurrent.locks.ReentrantLock();
 
 	public ChunkAccess(
 		ChunkPos chunkPos,
@@ -92,6 +96,20 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 		long l,
 		@Nullable LevelChunkSection[] levelChunkSections,
 		@Nullable BlendingData blendingData
+	) {
+		this(chunkPos, upgradeData, levelHeightAccessor, palettedContainerFactory, l, levelChunkSections, blendingData, true);
+	}
+
+	/** {@code ownSections} false leaves every slot null for wrappers that never read their own sections. */
+	ChunkAccess(
+		ChunkPos chunkPos,
+		UpgradeData upgradeData,
+		LevelHeightAccessor levelHeightAccessor,
+		PalettedContainerFactory palettedContainerFactory,
+		long l,
+		@Nullable LevelChunkSection[] levelChunkSections,
+		@Nullable BlendingData blendingData,
+		boolean ownSections
 	) {
 		this.chunkPos = chunkPos;
 		this.upgradeData = upgradeData;
@@ -109,13 +127,18 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 			}
 		}
 
-		replaceMissingSections(palettedContainerFactory, this.sections);
+		if (ownSections) replaceMissingSections(palettedContainerFactory, this.sections);
 	}
 
 	private static void replaceMissingSections(PalettedContainerFactory palettedContainerFactory, LevelChunkSection[] levelChunkSections) {
+		int missing = 0;
+		for (LevelChunkSection section : levelChunkSections) if (section == null) missing++;
+		// One native slab for the chunk's fresh sections; same sections, one owner.
+		LevelChunkSection[] fresh = missing > 1 ? NativeChunkSlab.fresh(palettedContainerFactory, missing) : null;
+		int next = 0;
 		for (int i = 0; i < levelChunkSections.length; i++) {
 			if (levelChunkSections[i] == null) {
-				levelChunkSections[i] = new LevelChunkSection(palettedContainerFactory);
+				levelChunkSections[i] = fresh != null ? fresh[next++] : new LevelChunkSection(palettedContainerFactory);
 			}
 		}
 	}
@@ -137,7 +160,7 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	public abstract void addEntity(Entity entity);
 
 	public int getHighestFilledSectionIndex() {
-		LevelChunkSection[] levelChunkSections = this.getSections();
+		LevelChunkSection[] levelChunkSections = this.getSectionsForRead();
 
 		for (int i = levelChunkSections.length - 1; i >= 0; i--) {
 			LevelChunkSection levelChunkSection = levelChunkSections[i];
@@ -160,12 +183,50 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 		return set;
 	}
 
+	private boolean sectionArrayEscaped;
+	private volatile NativeChunkInputs nativeDhInputs;
+	private volatile NativeBiomeChunkInputs nativeBiomeInputs;
+
+	/** Independent biome admission; world color and columns share this binding. */
+	NativeBiomeChunkInputs nativeBiomeSections(@Nullable NativeLiveBiomeSection.Binding<?> expected) {
+		return this.nativeBiomeInputs = NativeBiomeChunkInputs.bind(this, this.nativeBiomeInputs, expected);
+	}
+
+	/** Shared retained CPU bindings; validate escaped/replaced containers on each admission. */
+	NativeChunkInputs nativeDhSections() {
+		return this.nativeDhInputs = NativeChunkInputs.bind(this, this.nativeDhInputs);
+	}
+	/** Stable structural bindings; Rust rejects retired palette owners on demand. */
+	NativeChunkInputs nativeCollisionSections(boolean refresh) {
+		if (!refresh && !this.sectionArrayEscaped && this.nativeDhInputs != null) return this.nativeDhInputs;
+		var sections = this.getSectionsForRead();
+		if (sections == null) return null;
+		for (var section : sections) if (section == null || section.getClass() != LevelChunkSection.class) return null;
+		return this.nativeDhSections();
+	}
+	NativeChunkInputs nativeDhColumnSections() {
+		var inputs = this.nativeDhSections();
+		return inputs == null ? null : (this.nativeDhInputs = inputs.bindBiomes(this));
+	}
+	private Runnable nativeSectionArrayEscapeListener;
+
+	public void setNativeSectionArrayEscapeListener(Runnable listener) { this.nativeSectionArrayEscapeListener = listener; }
+	public boolean hasEscapedSectionArray() { return this.sectionArrayEscaped; }
+
+	/** Existing mutable array API transfers native index authority to compatibility. */
 	public LevelChunkSection[] getSections() {
+		this.sectionArrayEscaped = true;
+		if (this.nativeSectionArrayEscapeListener != null) this.nativeSectionArrayEscapeListener.run();
 		return this.sections;
 	}
 
+	/** Borrow section identities synchronously. Never replace slots or retain the array. */
+	public LevelChunkSection[] getSectionsForRead() {
+		return this.getClass() == LevelChunk.class || this.getClass() == ProtoChunk.class ? this.sections : this.getSections();
+	}
+
 	public LevelChunkSection getSection(int i) {
-		return this.getSections()[i];
+		return this.getSectionsForRead()[i];
 	}
 
 	public Collection<Entry<Heightmap.Types, Heightmap>> getHeightmaps() {
@@ -174,6 +235,11 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 
 	public void setHeightmap(Heightmap.Types types, long[] ls) {
 		this.getOrCreateHeightmapUnprimed(types).setRawData(this, types, ls);
+	}
+
+	/** Native decoration verification: forget a heightmap so the next read primes it again. */
+	public void nativeDropHeightmap(Heightmap.Types types) {
+		this.heightmaps.remove(types);
 	}
 
 	public Heightmap getOrCreateHeightmapUnprimed(Heightmap.Types types) {
@@ -422,6 +488,12 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 	}
 
 	@Deprecated
+	/** {@link #carverBiome}'s cached settings, or null before the first call. */
+	@Nullable
+	public BiomeGenerationSettings cachedCarverBiome() {
+		return this.carverBiomeSettings;
+	}
+
 	public BiomeGenerationSettings carverBiome(Supplier<BiomeGenerationSettings> supplier) {
 		if (this.carverBiomeSettings == null) {
 			this.carverBiomeSettings = (BiomeGenerationSettings)supplier.get();

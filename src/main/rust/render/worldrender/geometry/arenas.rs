@@ -66,19 +66,21 @@ pub(in crate::render::worldrender) struct SourceMeshResources {
 /// vertex stream; indices are rebased to the page's vertex origin at upload.
 pub(in crate::render::worldrender) const SOURCE_TERRAIN_GEOMETRY_PAGE_BYTES: u64 = 128 * 1024 * 1024;
 
-/// Page ranges keep 256-byte alignment (a multiple of the 128-byte source
+/// Page ranges keep 256-byte alignment (a multiple of the 64-byte source
 /// vertex and of the u32 index size).
 pub(in crate::render::worldrender) const SOURCE_TERRAIN_GEOMETRY_ALIGNMENT: u64 = 256;
 
-/// Multi-draw terrain addresses its instance records with `firstInstance`
-/// from stream offset 0, so each batch's instance block must start at a
-/// multiple of the 80-byte record as well as the 256-byte stream alignment.
-pub(in crate::render::worldrender) const SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT: u64 = 1280;
+/// Multi-draw terrain binds the instance stream at offset zero and addresses
+/// records with `firstInstance`. Record offsets require the 80-byte stride;
+/// only descriptor offsets (including uniforms and direct instances) need
+/// 256-byte alignment.
+pub(in crate::render::worldrender) const SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT: u64 =
+    TERRAIN_SOURCE_INSTANCE_BYTES as u64;
 
-const _: () = assert!(
-    SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT % WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64 == 0
-        && SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT % TERRAIN_SOURCE_INSTANCE_BYTES as u64 == 0
-);
+// Retain the existing conservative, descriptor-aligned per-batch capacity
+// budget. Packing changes the staged/uploaded bytes, not slot reservations;
+// concatenated reservations still cover alignment of subsequent uniforms.
+const SOURCE_TERRAIN_MULTIDRAW_RESERVATION_PADDING: u64 = 1280;
 
 /// Whole-slot instance bindings stay within Vulkan's guaranteed storage range.
 pub(in crate::render::worldrender) const SOURCE_TERRAIN_MULTIDRAW_INSTANCE_RANGE_MAX: u64 = 128 * 1024 * 1024;
@@ -110,7 +112,7 @@ impl SourceTerrainGeometryPages {
         gal: &mut VulkanicGal,
         pages: &mut Vec<SourceGeometryPage>,
         bytes: u64,
-        usage: BufferUsage,
+        usages: &[BufferUsage],
         kind: &str,
         device_local: bool,
     ) -> GalResult<SourceGeometryRange> {
@@ -128,21 +130,22 @@ impl SourceTerrainGeometryPages {
         }
         let capacity = SOURCE_TERRAIN_GEOMETRY_PAGE_BYTES.max(bytes);
         let buffer = gal.create_buffer(BufferDesc {
-            label: format!("source-terrain-geometry-page.{kind}.{}", pages.len()),
+            label: format!("{kind}-geometry-page.{}", pages.len()),
             size: capacity,
             memory: if device_local {
                 MemoryDomain::DeviceLocal
             } else {
                 MemoryDomain::Upload
             },
-            usages: vec![
-                usage,
-                if device_local {
+            usages: usages
+                .iter()
+                .copied()
+                .chain([if device_local {
                     BufferUsage::TransferDst
                 } else {
                     BufferUsage::HostWrite
-                },
-            ],
+                }])
+                .collect(),
         })?;
         let mut free_ranges = Vec::new();
         if capacity > bytes {
@@ -158,7 +161,7 @@ impl SourceTerrainGeometryPages {
         bytes: u64,
         device_local: bool,
     ) -> GalResult<SourceGeometryRange> {
-        Self::allocate(gal, &mut self.vertex_pages, bytes, BufferUsage::Storage, "vertices", device_local)
+        Self::allocate(gal, &mut self.vertex_pages, bytes, &[BufferUsage::Storage], "source-terrain.vertices", device_local)
     }
 
     pub(in crate::render::worldrender) fn allocate_index(
@@ -167,7 +170,7 @@ impl SourceTerrainGeometryPages {
         bytes: u64,
         device_local: bool,
     ) -> GalResult<SourceGeometryRange> {
-        Self::allocate(gal, &mut self.index_pages, bytes, BufferUsage::Index, "indices", device_local)
+        Self::allocate(gal, &mut self.index_pages, bytes, &[BufferUsage::Index], "source-terrain.indices", device_local)
     }
 
     pub(in crate::render::worldrender) fn release_now(&mut self, range: SourceGeometryRange) {
@@ -241,7 +244,7 @@ impl SourceTerrainGeometryPages {
 
     pub(in crate::render::worldrender) fn destroy_all(&mut self, gal: &mut VulkanicGal) {
         for page in self.vertex_pages.drain(..).chain(self.index_pages.drain(..)) {
-            let _ = gal.destroy(page.buffer);
+            let _ = gal.retire(page.buffer);
         }
         self.pending_releases.clear();
     }
@@ -297,7 +300,12 @@ impl MeshGeometryArena {
             .map(|page| page.capacity)
     }
 
-    pub(in crate::render::worldrender) fn reclaim_completed(&mut self, gal: &mut VulkanicGal) {
+    /// Releases ranges whose protecting submission completed and returns the
+    /// vertex page buffers left empty, which the next `trim_empty_pages`
+    /// destroys (a completed generation can leave a whole 16 MiB page empty;
+    /// keeping it would accumulate native upload memory forever). Bindings of
+    /// those pages must be retired before that.
+    pub(in crate::render::worldrender) fn release_completed(&mut self, gal: &mut VulkanicGal) -> Vec<Handle> {
         let completed = gal.poll_completed();
         let mut retained = Vec::new();
         for (submission, resources) in std::mem::take(&mut self.pending_releases) {
@@ -317,11 +325,11 @@ impl MeshGeometryArena {
             }
         }
         self.pending_releases = retained;
-        // A completed generation can leave an entire 16 MiB arena page empty.
-        // Return such pages to the GAL immediately; keeping an empty page
-        // resident defeats the completion-gated retirement contract and makes
-        // streamed terrain growth accumulate native upload memory forever.
-        self.trim_empty_pages(gal);
+        self.vertex_pages
+            .iter()
+            .filter(|page| page.free_ranges.len() == 1 && page.free_ranges[0] == (0, page.capacity))
+            .map(|page| page.buffer)
+            .collect()
     }
 
     pub(in crate::render::worldrender) fn defer_release(&mut self, submission: SubmissionId, resources: MeshGeometryResources) {
@@ -420,7 +428,7 @@ impl MeshGeometryArena {
             }) {
                 Ok(staging) => Some(staging),
                 Err(error) => {
-                    let _ = gal.destroy(buffer);
+                    let _ = gal.retire(buffer);
                     return Err(error);
                 }
             }
@@ -503,9 +511,9 @@ impl MeshGeometryArena {
                     // submission completed. GAL still owns the final
                     // completion check and may defer destruction if another
                     // explicit dependency references the page.
-                    let _ = gal.destroy(page.buffer);
+                    let _ = gal.retire(page.buffer);
                     if let Some(staging) = page.staging_buffer {
-                        let _ = gal.destroy(staging);
+                        let _ = gal.retire(staging);
                     }
                 } else {
                     retained.push(page);
@@ -525,9 +533,9 @@ impl MeshGeometryArena {
             .drain(..)
             .chain(self.index_pages.drain(..))
         {
-            let _ = gal.destroy(page.buffer);
+            let _ = gal.retire(page.buffer);
             if let Some(staging) = page.staging_buffer {
-                let _ = gal.destroy(staging);
+                let _ = gal.retire(staging);
             }
         }
     }
@@ -625,7 +633,7 @@ impl WorldPrimitiveFrontend {
                 index_offset,
                 index_range,
             };
-            if capture_layered_geometry
+            if (capture_layered_geometry && layered_geometry_capture_configured())
                 || (crate::core::environment::var_os("MATTMC_GRAPHICS_AUDIT").is_some() && self
                     .mesh_assets
                     .get(&key.mesh_key)
@@ -700,8 +708,16 @@ impl WorldPrimitiveFrontend {
                 grew: false,
             });
         }
+        // Growing rebinds every mesh resource set to the new buffer. Growing to
+        // the exact requirement made streaming terrain regrow every few frames,
+        // each time rebuilding hundreds of resource sets (~30 ms frames). Grow
+        // geometrically so a session regrows only logarithmically often.
+        let previous_capacity = self
+            .mesh_instance_stream_slots
+            .last()
+            .map_or(0, |slot| slot.capacity);
         let capacity = align_up_u64(
-            required_capacity,
+            required_capacity.max(previous_capacity.saturating_mul(2)),
             WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64,
         )?;
         let buffer = gal.create_buffer(BufferDesc {
@@ -742,11 +758,38 @@ impl WorldPrimitiveFrontend {
         }
         for (_, resources) in std::mem::take(&mut self.mesh_resources) {
             self.deferred_mesh_resource_destroys
-                .push(resources.resource_set);
+                .extend(resources.resource_set);
         }
         for (_, resources) in std::mem::take(&mut self.source_mesh_resources) {
             self.deferred_mesh_resource_destroys
                 .push(resources.resource_set);
+        }
+    }
+
+    /// Retires only the page bindings of vertex pages about to be destroyed.
+    pub(in crate::render::worldrender) fn destroy_mesh_page_resource_sets_for_vertex_pages(
+        &mut self,
+        gal: &mut VulkanicGal,
+        vertex_pages: &[Handle],
+    ) {
+        let mut destroyed = Vec::new();
+        self.mesh_page_resource_sets.retain(|key, set| {
+            let retire = vertex_pages.contains(&key.vertex_buffer);
+            if retire {
+                destroyed.push(*set);
+            }
+            !retire
+        });
+        if destroyed.is_empty() {
+            return;
+        }
+        for resources in self.mesh_resources.values_mut() {
+            if resources.page_resource_set.is_some_and(|set| destroyed.contains(&set)) {
+                resources.page_resource_set = None;
+            }
+        }
+        for set in destroyed {
+            let _ = gal.retire(set);
         }
     }
 
@@ -755,7 +798,7 @@ impl WorldPrimitiveFrontend {
             resources.page_resource_set = None;
         }
         for (_, set) in std::mem::take(&mut self.mesh_page_resource_sets) {
-            let _ = gal.destroy(set);
+            let _ = gal.retire(set);
         }
     }
 
@@ -957,7 +1000,9 @@ impl WorldPrimitiveFrontend {
         shared_uniforms: Option<(u64, Option<u64>)>,
         instance_alignment: u64,
     ) -> GalResult<SourceTerrainFrameStreamAllocation> {
-        if legacy_bytes == 0 || instance_bytes == 0 {
+        // A uniform-only allocation (no instance block) stages a pass's
+        // shared blocks; an instance-only one reuses already staged blocks.
+        if legacy_bytes == 0 || (instance_bytes == 0 && shared_uniforms.is_some()) {
             return Err(GalError::invalid_argument(
                 "source terrain frame stream requires non-empty legacy and instance payloads",
             ));
@@ -968,24 +1013,43 @@ impl WorldPrimitiveFrontend {
             ));
         }
         let align = WORLD_MESH_INSTANCE_STREAM_ALIGNMENT as u64;
-        let legacy_offset = 0;
-        let scalar_offset = (scalar_bytes != 0).then_some(align_up_u64(legacy_bytes, align)?);
-        let instance_base = scalar_offset
-            .unwrap_or_else(|| align_up_u64(legacy_bytes, align).expect("validated alignment"));
-        let instance_align = instance_alignment.max(align);
-        let instance_offset = if shared_uniforms.is_some() {
-            0
-        } else {
-            align_up_multiple_u64(
-                instance_base.checked_add(scalar_bytes).ok_or_else(|| {
-                    GalError::invalid_argument("source terrain frame stream scalar range overflow")
-                })?,
-                instance_align,
-            )?
+        if instance_alignment == 0 {
+            return Err(GalError::invalid_argument(
+                "source terrain instance alignment must be non-zero",
+            ));
+        }
+        // Compute absolute offsets independently: a record-aligned batch base
+        // is not necessarily aligned for its uniform descriptors. Shared
+        // uniforms need no new descriptor range, only densely packed records.
+        let layout = |cursor: u64| -> GalResult<(u64, Option<u64>, u64, u64)> {
+            let (legacy, scalar, instance_base) = match shared_uniforms {
+                Some((legacy, scalar)) => (legacy, scalar, cursor),
+                None => {
+                    let legacy = align_up_u64(cursor, align)?;
+                    let legacy_end = legacy.checked_add(legacy_bytes).ok_or_else(|| {
+                        GalError::invalid_argument("source terrain legacy uniform range overflow")
+                    })?;
+                    let scalar = if scalar_bytes != 0 {
+                        Some(align_up_u64(legacy_end, align)?)
+                    } else {
+                        None
+                    };
+                    let end = scalar
+                        .unwrap_or(legacy_end)
+                        .checked_add(scalar_bytes)
+                        .ok_or_else(|| {
+                            GalError::invalid_argument("source terrain scalar uniform range overflow")
+                        })?;
+                    (legacy, scalar, end)
+                }
+            };
+            let instance = align_up_multiple_u64(instance_base, instance_alignment)?;
+            let end = instance.checked_add(instance_bytes).ok_or_else(|| {
+                GalError::invalid_argument("source terrain frame stream range overflow")
+            })?;
+            Ok((legacy, scalar, instance, end))
         };
-        let required = instance_offset.checked_add(instance_bytes).ok_or_else(|| {
-            GalError::invalid_argument("source terrain frame stream range overflow")
-        })?;
+        let required = layout(0)?.3;
         let required_capacity =
             align_up_u64(required, align)?.max(SOURCE_TERRAIN_FRAME_STREAM_MIN_BYTES);
         if required_capacity > LOWERED_SOURCE_FRAME_STREAM_MAX_BYTES {
@@ -1113,7 +1177,7 @@ impl WorldPrimitiveFrontend {
                 ],
             })?;
             self.destroy_lowered_source_terrain_frame_data_resources_for_stream_buffer(gal, old);
-            let _ = gal.destroy(old);
+            let _ = gal.retire(old);
             let slot = &mut self.source_terrain_frame_stream_slots[slot_index];
             slot.buffer = buffer;
             slot.capacity = grown_capacity;
@@ -1127,34 +1191,21 @@ impl WorldPrimitiveFrontend {
             slot.cursor = 0;
             slot.submission = None;
         }
-        let base_offset = if same_frame {
-            align_up_multiple_u64(slot.cursor, instance_align)?
-        } else {
-            0
-        };
-        let allocation_end = base_offset.checked_add(required).ok_or_else(|| {
-            GalError::invalid_argument("source terrain frame stream allocation cursor overflow")
-        })?;
+        let (legacy_transform_offset, scalar_uniform_offset, instance_offset, allocation_end) =
+            layout(slot.cursor)?;
         if allocation_end > slot.capacity {
             return Err(GalError::invalid_argument(format!(
-                "source terrain frame stream allocation exceeds its bounded slot capacity (frame={frame_id} cursor={} required={required} capacity={})",
+                "source terrain frame stream allocation exceeds its bounded slot capacity (frame={frame_id} cursor={} end={allocation_end} capacity={})",
                 slot.cursor, slot.capacity,
             )));
         }
         slot.cursor = allocation_end;
-        let (legacy_transform_offset, scalar_uniform_offset) = match shared_uniforms {
-            Some(shared) => shared,
-            None => (
-                base_offset + legacy_offset,
-                scalar_offset.map(|offset| base_offset + offset),
-            ),
-        };
         Ok(SourceTerrainFrameStreamAllocation {
             buffer: slot.buffer,
             epoch: slot.epoch,
             legacy_transform_offset,
             scalar_uniform_offset,
-            instance_offset: base_offset + instance_offset,
+            instance_offset,
         })
     }
 
@@ -1189,13 +1240,14 @@ impl WorldPrimitiveFrontend {
         Ok(())
     }
 
-    pub(in crate::render::worldrender) fn source_terrain_frame_stream_payload_bytes(
-        program: &LoweredTerrainSourceProgram,
+
+    pub(in crate::render::worldrender) fn validated_source_terrain_frame_stream_payload_bytes(
+        interface: ValidatedSourceInterface<'_>,
         instance_count: u64,
     ) -> GalResult<u64> {
-        // Multi-draw instance blocks may start up to one alignment unit later.
-        Self::source_frame_stream_payload_bytes(&program.execution_interface, instance_count)?
-            .checked_add(SOURCE_TERRAIN_MULTIDRAW_INSTANCE_ALIGNMENT)
+        // Keep the conservative reservation independent of record packing.
+        Self::validated_source_frame_stream_payload_bytes(interface, instance_count)?
+            .checked_add(SOURCE_TERRAIN_MULTIDRAW_RESERVATION_PADDING)
             .ok_or_else(|| GalError::invalid_argument("source terrain frame stream payload overflows"))
     }
 
@@ -1240,7 +1292,7 @@ impl WorldPrimitiveFrontend {
             // The slot is only reused after its previous submission completed;
             // the GAL additionally defers destruction of in-flight buffers.
             if let Some(previous) = slot.indirect_buffer.replace(buffer) {
-                let _ = gal.destroy(previous);
+                let _ = gal.retire(previous);
             }
             slot.indirect_capacity = capacity;
         }
@@ -1270,35 +1322,52 @@ impl WorldPrimitiveFrontend {
         }
         transaction.indirect_buffer = Some(buffer);
         command.append_bytes(&mut transaction.indirect_staging);
-        Ok(TerrainIndexedIndirect { buffer, offset })
+        Ok(TerrainIndexedIndirect { buffer, offset, draw_count: 1 })
     }
 
-    pub(in crate::render::worldrender) fn source_entity_frame_stream_payload_bytes(
-        program: &LoweredEntitySourceProgram,
-        instance_count: u64,
-    ) -> GalResult<u64> {
-        Self::source_local_textured_frame_stream_payload_bytes(program, instance_count)
+    /// Stages a run of consecutive indexed-indirect commands: one draw.
+    pub(in crate::render::worldrender) fn append_source_terrain_multidraw_commands(
+        &mut self,
+        frame_id: u64,
+        commands: &[PageIndexedDrawCommand],
+    ) -> GalResult<TerrainIndexedIndirect> {
+        let draw_count = u32::try_from(commands.len())
+            .ok()
+            .filter(|count| *count != 0)
+            .ok_or_else(|| GalError::invalid_argument("source multi-draw run must hold 1..=u32::MAX commands"))?;
+        let (buffer, capacity) = self
+            .source_terrain_frame_stream_slots
+            .iter()
+            .find(|slot| slot.frame_id == Some(frame_id))
+            .and_then(|slot| slot.indirect_buffer.map(|buffer| (buffer, slot.indirect_capacity)))
+            .ok_or_else(|| GalError::backend("source multi-draw command has no reserved buffer"))?;
+        let transaction = self
+            .pending_source_terrain_frame_transactions
+            .get_mut(&frame_id)
+            .ok_or_else(|| GalError::backend("source multi-draw command has no frame transaction"))?;
+        let offset = transaction.indirect_staging.len() as u64;
+        if offset + u64::from(draw_count) * WORLD_MESH_INDEXED_INDIRECT_COMMAND_BYTES > capacity {
+            return Err(GalError::backend("source multi-draw commands exceed their reservation"));
+        }
+        transaction.indirect_buffer = Some(buffer);
+        transaction
+            .indirect_staging
+            .reserve(commands.len() * WORLD_MESH_INDEXED_INDIRECT_COMMAND_BYTES as usize);
+        for command in commands {
+            command.append_bytes(&mut transaction.indirect_staging);
+        }
+        Ok(TerrainIndexedIndirect { buffer, offset, draw_count })
     }
 
-    pub(in crate::render::worldrender) fn source_hand_frame_stream_payload_bytes(
-        program: &LoweredHandSourceProgram,
-        instance_count: u64,
-    ) -> GalResult<u64> {
-        Self::source_local_textured_frame_stream_payload_bytes(program, instance_count)
-    }
 
-    pub(in crate::render::worldrender) fn source_local_textured_frame_stream_payload_bytes<P: LocalTexturedSourceProgram>(
-        program: &P,
-        instance_count: u64,
-    ) -> GalResult<u64> {
-        Self::source_frame_stream_payload_bytes(program.execution_interface(), instance_count)
-    }
 
-    pub(in crate::render::worldrender) fn source_frame_stream_payload_bytes(
-        interface: &crate::render::shaderpack::programs::TerrainSourceExecutionInterface,
+
+
+    pub(in crate::render::worldrender) fn validated_source_frame_stream_payload_bytes(
+        interface: ValidatedSourceInterface<'_>,
         instance_count: u64,
     ) -> GalResult<u64> {
-        interface.validate()?;
+        let interface = interface.0;
         if instance_count == 0 {
             return Err(GalError::invalid_argument(
                 "source terrain frame stream payload requires at least one instance",
@@ -1472,12 +1541,13 @@ impl WorldPrimitiveFrontend {
         // Source geometry is expanded from the index order (one source quad
         // per original quad), so a resorted mesh must be re-expanded; keeping
         // the old buffers would draw a stale translucent order.
-        let stale_source_geometry = self
+        let mut stale_source_geometry = self
             .lowered_source_terrain_geometry_resources
             .keys()
             .filter(|key| key.mesh_key == update.mesh_key)
             .cloned()
             .collect::<Vec<_>>();
+        stale_source_geometry.sort_unstable();
         self.destroy_lowered_source_terrain_resources_for_keys(gal, stale_source_geometry);
         let matching_keys = self
             .mesh_resources
@@ -1497,13 +1567,13 @@ impl WorldPrimitiveFrontend {
         self.destroy_mesh_page_resource_sets(gal);
         let slots = std::mem::take(&mut self.mesh_instance_stream_slots);
         for slot in slots.into_iter().rev() {
-            let _ = gal.destroy(slot.buffer);
+            let _ = gal.retire(slot.buffer);
         }
         if let Some(slot) = self.mesh_indirect_stream.take() {
-            let _ = gal.destroy(slot.buffer);
+            let _ = gal.retire(slot.buffer);
         }
         if let Some(slot) = self.mesh_sorted_index_stream.take() {
-            let _ = gal.destroy(slot.buffer);
+            let _ = gal.retire(slot.buffer);
         }
     }
 
@@ -1518,7 +1588,7 @@ impl WorldPrimitiveFrontend {
                 gal,
                 slot.buffer,
             );
-            let _ = gal.destroy(slot.buffer);
+            let _ = gal.retire(slot.buffer);
         }
     }
 }
@@ -1540,20 +1610,105 @@ impl WorldPrimitiveFrontend {
         identities: &[MeshBatchInstanceKey],
         terrain_only: bool,
     ) -> GalResult<Arc<Vec<MeshBatch>>> {
-        let camera_dependent = frame.mesh_instances.iter().any(|instance| {
-            instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
-                && selection.includes(instance)
-        });
-        if camera_dependent {
-            return Ok(Arc::new(mesh_batches_filtered(
+        self.cached_mesh_batch_plan_selected(
+            frame,
+            color_format,
+            raster_y_direction,
+            g_buffer,
+            selection,
+            identities,
+            terrain_only,
+            None,
+        )
+    }
+
+    pub(in crate::render::worldrender) fn cached_mesh_batch_plan_selected(
+        &mut self,
+        frame: &WorldPrimitiveFrame,
+        color_format: ColorFormat,
+        raster_y_direction: RasterYDirection,
+        g_buffer: bool,
+        selection: MeshBatchSelection,
+        identities: &[MeshBatchInstanceKey],
+        terrain_only: bool,
+        indices: Option<&[usize]>,
+    ) -> GalResult<Arc<Vec<MeshBatch>>> {
+        if let Some(indices) = indices {
+            if indices.len() != identities.len()
+                || indices
+                    .last()
+                    .is_some_and(|index| *index >= frame.mesh_instances.len())
+                || indices.windows(2).any(|pair| pair[0] >= pair[1])
+            {
+                return Err(GalError::invalid_argument(
+                    "selected batch key requires ordered, in-bounds instance positions",
+                ));
+            }
+        }
+        let build = |frontend: &Self| match indices {
+            Some(indices) => mesh_batches_filtered_indices(
                 frame,
-                self,
+                frontend,
                 color_format,
                 raster_y_direction,
                 g_buffer,
                 selection,
                 terrain_only,
-            )?));
+                indices,
+            ),
+            None => mesh_batches_filtered(
+                frame,
+                frontend,
+                color_format,
+                raster_y_direction,
+                g_buffer,
+                selection,
+                terrain_only,
+            ),
+        };
+        let depends_on_camera = |instance: &WorldMeshInstanceRequest| {
+            instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
+                && selection.includes(instance)
+        };
+        let camera_dependent = match indices {
+            Some(indices) => indices
+                .iter()
+                .any(|&index| depends_on_camera(&frame.mesh_instances[index])),
+            None => frame.mesh_instances.iter().any(depends_on_camera),
+        };
+        // Culled repetitions affect first-seen ordering and translucent batch
+        // boundaries. Cache their complete topology, then filter a copy; the
+        // selected-only identity cannot describe that ordering.
+        // When the indices are every instance the plan admits, nothing is
+        // culled and the selected plan is exactly the filtered full plan.
+        // A culled instance can only change the selected plan by sharing a
+        // mesh with a selected one (first-seen order, translucent adjacency).
+        let repeated_mesh = indices.is_some_and(|indices| {
+            !mesh_batch_indices_cover_selection(frame, selection, terrain_only, indices)
+                && mesh_batch_selection_repeats_selected_mesh(frame, selection, terrain_only, indices)
+        });
+        if camera_dependent {
+            return Ok(Arc::new(build(self)?));
+        }
+        if repeated_mesh {
+            let full_identities = frame.mesh_instances.iter().map(|instance| {
+                if terrain_only {
+                    terrain_batch_instance_key(instance)
+                } else {
+                    mesh_batch_instance_key(instance)
+                }
+            }).collect::<Vec<_>>();
+            let full_batches = self.cached_mesh_batch_plan(
+                frame, color_format, raster_y_direction, g_buffer, selection,
+                &full_identities, terrain_only,
+            )?;
+            let mut batches = full_batches.as_ref().clone();
+            let indices = indices.expect("repeated selected plan has instance indices");
+            for batch in &mut batches {
+                batch.indices.retain(|index| indices.binary_search(index).is_ok());
+            }
+            batches.retain(|batch| !batch.indices.is_empty());
+            return Ok(Arc::new(batches));
         }
         if let Some(entry) = self.mesh_batch_plan_cache.iter().find(|entry| {
             entry.key.color_format == color_format
@@ -1563,18 +1718,11 @@ impl WorldPrimitiveFrontend {
                 && entry.key.selection == selection
                 && entry.key.terrain_only == terrain_only
                 && entry.key.instances == identities
+                && entry.key.instance_indices.as_deref() == indices
         }) {
             return Ok(Arc::clone(&entry.batches));
         }
-        let batches = Arc::new(mesh_batches_filtered(
-            frame,
-            self,
-            color_format,
-            raster_y_direction,
-            g_buffer,
-            selection,
-            terrain_only,
-        )?);
+        let batches = Arc::new(build(self)?);
         const MAX_MESH_BATCH_PLAN_CACHE: usize = 4;
         if self.mesh_batch_plan_cache.len() >= MAX_MESH_BATCH_PLAN_CACHE {
             self.mesh_batch_plan_cache.remove(0);
@@ -1588,9 +1736,59 @@ impl WorldPrimitiveFrontend {
                 selection,
                 terrain_only,
                 instances: identities.to_vec(),
+                instance_indices: indices.map(<[usize]>::to_vec),
             },
             batches: Arc::clone(&batches),
         });
         Ok(batches)
+    }
+
+
+}
+
+/// Layered (view-layering) geometry upload proof exists only for whole-frame
+/// attachment captures. Watching every layered mesh in ordinary play filled the
+/// GAL's diagnostic upload history, and hazard analysis scanned it on every
+/// buffer write. The process-level option is snapshotted at launch.
+fn layered_geometry_capture_configured() -> bool {
+    cfg!(test)
+        || crate::core::environment::var_os("MATTMC_RUST_WHOLE_FRAME_ATTACHMENT_DIR").is_some()
+}
+
+
+/// An execution interface that passed `validate`. Sizing many batches of one
+/// program takes this instead of re-validating the immutable interface (its
+/// scalar field table) once per batch.
+#[derive(Clone, Copy)]
+pub(in crate::render::worldrender) struct ValidatedSourceInterface<'a>(
+    &'a crate::render::shaderpack::programs::TerrainSourceExecutionInterface,
+);
+
+impl<'a> ValidatedSourceInterface<'a> {
+    pub(in crate::render::worldrender) fn new(
+        interface: &'a crate::render::shaderpack::programs::TerrainSourceExecutionInterface,
+    ) -> GalResult<Self> {
+        interface.validate()?;
+        Ok(Self(interface))
+    }
+}
+
+/// Validated interfaces by address for one sizing pass over many batches.
+#[derive(Default)]
+pub(in crate::render::worldrender) struct ValidatedSourceInterfaces<'a>(
+    Vec<ValidatedSourceInterface<'a>>,
+);
+
+impl<'a> ValidatedSourceInterfaces<'a> {
+    pub(in crate::render::worldrender) fn get(
+        &mut self,
+        interface: &'a crate::render::shaderpack::programs::TerrainSourceExecutionInterface,
+    ) -> GalResult<ValidatedSourceInterface<'a>> {
+        if let Some(validated) = self.0.iter().find(|validated| std::ptr::eq(validated.0, interface)) {
+            return Ok(*validated);
+        }
+        let validated = ValidatedSourceInterface::new(interface)?;
+        self.0.push(validated);
+        Ok(validated)
     }
 }

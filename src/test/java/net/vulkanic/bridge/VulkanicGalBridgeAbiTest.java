@@ -36,6 +36,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VulkanicGalBridgeAbiTest {
+    @org.junit.jupiter.api.BeforeAll
+    static void bootstrapRegistries() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+    }
+
 	@Test
 	void packedGuiMeshSemanticsRemainOwnedAndEncodeWithoutRecordExpansion() throws Exception {
 		float[] positions = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -827,7 +833,7 @@ class VulkanicGalBridgeAbiTest {
 	void firstPersonMeshConvenienceRecordUsesExplicitNoScopeIdentity() {
 		assertEquals(67, VulkanicGalBridge.WORLD_MESH_ENTITY_STRATUM);
 		assertEquals(71, VulkanicGalBridge.WORLD_MESH_ORDINARY_BLOCK_STRATUM);
-		VulkanicGalBridge.WorldMeshInstanceRecord firstPerson = new VulkanicGalBridge.WorldMeshInstanceRecord(
+		VulkanicGalBridge.WorldMeshInstance firstPerson = new VulkanicGalBridge.WorldMeshInstanceRecord(
 			VulkanicGalBridge.WORLD_MESH_ENTITY_STRATUM, 41L, 2L, 0,
 			0, 0, 0, 0xffffffff, new float[16], 640, 480
 		);

@@ -5,7 +5,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
-import it.unimi.dsi.fastutil.doubles.DoubleListIterator;
 import java.util.List;
 import net.minecraft.Util;
 import net.minecraft.core.Holder;
@@ -14,8 +13,6 @@ import net.minecraft.resources.RegistryFileCodec;
 import net.minecraft.util.RandomSource;
 
 public class NormalNoise {
-	private static final double TARGET_DEVIATION = 0.3333333333333333;
-	private final double valueFactor;
 	private final PerlinNoise first;
 	private final PerlinNoise second;
 	private final double maxValue;
@@ -34,42 +31,17 @@ public class NormalNoise {
 		return new NormalNoise(randomSource, noiseParameters, true);
 	}
 
-	private NormalNoise(RandomSource randomSource, NormalNoise.NoiseParameters noiseParameters, boolean bl) {
-		int i = noiseParameters.firstOctave;
-		DoubleList doubleList = noiseParameters.amplitudes;
-		this.parameters = noiseParameters;
-		if (bl) {
-			this.first = PerlinNoise.create(randomSource, i, doubleList);
-			this.second = PerlinNoise.create(randomSource, i, doubleList);
-		} else {
-			this.first = PerlinNoise.createLegacyForLegacyNetherBiome(randomSource, i, doubleList);
-			this.second = PerlinNoise.createLegacyForLegacyNetherBiome(randomSource, i, doubleList);
-		}
-
-		int j = Integer.MAX_VALUE;
-		int k = Integer.MIN_VALUE;
-		DoubleListIterator doubleListIterator = doubleList.iterator();
-
-		while (doubleListIterator.hasNext()) {
-			int l = doubleListIterator.nextIndex();
-			double d = doubleListIterator.nextDouble();
-			if (d != 0.0) {
-				j = Math.min(j, l);
-				k = Math.max(k, l);
-			}
-		}
-
-		this.valueFactor = 0.16666666666666666 / expectedDeviation(k - j);
-		this.maxValue = (this.first.maxValue() + this.second.maxValue()) * this.valueFactor;
-	}
+    private final NativeNormal nativePlan;
+    private NormalNoise(RandomSource randomSource,NormalNoise.NoiseParameters noiseParameters,boolean modern){
+        int firstOctave=noiseParameters.firstOctave;DoubleList amplitudes=noiseParameters.amplitudes;
+        this.parameters=noiseParameters;this.nativePlan=new NativeNormal(randomSource,firstOctave,amplitudes,modern);
+        this.first=nativePlan.first;this.second=nativePlan.second;this.maxValue=nativePlan.max;
+    }
 
 	public double maxValue() {
 		return this.maxValue;
 	}
 
-	private static double expectedDeviation(int i) {
-		return 0.1 * (1.0 + 1.0 / (i + 1));
-	}
 
 	public double getValue(double d, double e, double f) {
 		return nativeNoise().sample(d, e, f);
@@ -115,14 +87,12 @@ public class NormalNoise {
 
 	NativeNoise nativeNoise() {
 		NativeNoise value = nativeNoise;
-		if (value == null || !first.matchesAmplitudes(value)) {
+		if (value == null || !nativePlan.matches(parameters.amplitudes,value)) {
 			synchronized (this) {
 				value = nativeNoise;
-				if (value == null || !first.matchesAmplitudes(value)) {
-					var state = NativeNoise.allocate(3, first.octaveCount(), second.octaveCount(), 0,
-						first.inputFactor(), first.valueFactor(), second.inputFactor(), second.valueFactor(), valueFactor);
-					first.writeNative(state, 0);
-					second.writeNative(state, first.octaveCount());
+				if (value == null || !nativePlan.matches(parameters.amplitudes,value)) {
+                    var state=nativePlan.allocate();
+                    nativePlan.write(parameters.amplitudes,state);
 					value = new NativeNoise(state);
 					nativeNoise = value;
 				}

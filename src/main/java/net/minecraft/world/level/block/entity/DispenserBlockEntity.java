@@ -13,10 +13,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
-public class DispenserBlockEntity extends RandomizableContainerBlockEntity {
+public class DispenserBlockEntity extends RandomizableContainerBlockEntity implements NativeRowsContainer {
 	public static final int CONTAINER_SIZE = 9;
 	private static final Component DEFAULT_NAME = Component.translatable("container.dispenser");
-	private NonNullList<ItemStack> items = NonNullList.withSize(9, ItemStack.EMPTY);
+	private NonNullList<ItemStack> items = this.newItems(9);
 
 	protected DispenserBlockEntity(BlockEntityType<?> blockEntityType, BlockPos blockPos, BlockState blockState) {
 		super(blockEntityType, blockPos, blockState);
@@ -35,6 +35,17 @@ public class DispenserBlockEntity extends RandomizableContainerBlockEntity {
 		this.unpackLootTable(null);
 		int i = -1;
 		int j = 1;
+		var rows = this.nativeSlotsForTransfer();
+		long occupied = rows != null ? rows.occupiedMask() : -2;
+		if (occupied != -2) {
+			// The same loop and random draws over native emptiness, without reading the slots' facades.
+			for (int k = 0; k < this.items.size(); k++) {
+				if ((occupied & (1L << k)) != 0 && randomSource.nextInt(j++) == 0) {
+					i = k;
+				}
+			}
+			return i;
+		}
 
 		for (int k = 0; k < this.items.size(); k++) {
 			if (!this.items.get(k).isEmpty() && randomSource.nextInt(j++) == 0) {
@@ -78,7 +89,7 @@ public class DispenserBlockEntity extends RandomizableContainerBlockEntity {
 	@Override
 	protected void loadAdditional(ValueInput valueInput) {
 		super.loadAdditional(valueInput);
-		this.items = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
+		this.items = this.newItems(this.getContainerSize());
 		if (!this.tryLoadLootTable(valueInput)) {
 			ContainerHelper.loadAllItems(valueInput, this.items);
 		}
@@ -95,6 +106,42 @@ public class DispenserBlockEntity extends RandomizableContainerBlockEntity {
 	@Override
 	protected NonNullList<ItemStack> getItems() {
 		return this.items;
+	}
+
+	/** Stock dispensers and droppers keep their slots in native rows (exact classes only). */
+	private boolean exactStock() {
+		return this.getClass() == DispenserBlockEntity.class || this.getClass() == DropperBlockEntity.class;
+	}
+
+	private NonNullList<ItemStack> newItems(int size) {
+		return this.exactStock() ? net.minecraft.world.item.NativeItemSlots.withSize(size) : NonNullList.withSize(size, ItemStack.EMPTY);
+	}
+
+	@org.jetbrains.annotations.Nullable
+	@Override
+	public net.minecraft.world.item.NativeItemSlots nativeSlotsForTransfer() {
+		return this.exactStock() && this.lootTable == null && this.items instanceof net.minecraft.world.item.NativeItemSlots rows ? rows : null;
+	}
+
+	/** Exact loot-free stock dispenser/dropper: emptiness read from the native rows. */
+	@Override
+	public boolean isEmpty() {
+		var rows = this.nativeSlotsForTransfer();
+		return rows != null ? rows.allEmpty() : super.isEmpty();
+	}
+
+	/** The inherited setItem chain; exact native rows discard the previous contents without observing them. */
+	@Override
+	public void setItem(int i, ItemStack itemStack) {
+		if (!this.exactStock()) {
+			super.setItem(i, itemStack);
+			return;
+		}
+		this.unpackLootTable(null);
+		if (this.getItems() instanceof net.minecraft.world.item.NativeItemSlots nativeItems) nativeItems.replace(i, itemStack);
+		else this.getItems().set(i, itemStack);
+		itemStack.limitSize(this.getMaxStackSize(itemStack));
+		this.setChanged();
 	}
 
 	@Override

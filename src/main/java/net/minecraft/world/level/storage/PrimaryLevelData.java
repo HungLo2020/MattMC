@@ -48,16 +48,11 @@ public class PrimaryLevelData implements ServerLevelData, WorldData {
 	private final PrimaryLevelData.SpecialWorldProperty specialWorldProperty;
 	private final Lifecycle worldGenSettingsLifecycle;
 	private LevelData.RespawnData respawnData;
-	private long gameTime;
-	private long dayTime;
+	/** Native owner of time and weather; derived dimensions read it without writing. */
+	private final NativeWeatherTime.Clock clock;
 	@Nullable
 	private final CompoundTag loadedPlayerTag;
 	private final int version;
-	private int clearWeatherTime;
-	private boolean raining;
-	private int rainTime;
-	private boolean thundering;
-	private int thunderTime;
 	private boolean initialized;
 	private boolean difficultyLocked;
 	@Deprecated
@@ -104,14 +99,8 @@ public class PrimaryLevelData implements ServerLevelData, WorldData {
 	) {
 		this.wasModded = bl;
 		this.respawnData = respawnData;
-		this.gameTime = l;
-		this.dayTime = m;
+		this.clock = new NativeWeatherTime.Clock(l, m, j, k, bl2, n, bl3);
 		this.version = i;
-		this.clearWeatherTime = j;
-		this.rainTime = k;
-		this.raining = bl2;
-		this.thunderTime = n;
-		this.thundering = bl3;
 		this.initialized = bl4;
 		this.difficultyLocked = bl5;
 		this.legacyWorldBorderSettings = optional;
@@ -231,16 +220,16 @@ public class PrimaryLevelData implements ServerLevelData, WorldData {
 			.ifPresent(tag -> compoundTag.put("WorldGenSettings", tag));
 		compoundTag.putInt("GameType", this.settings.gameType().getId());
 		compoundTag.store("spawn", LevelData.RespawnData.CODEC, this.respawnData);
-		compoundTag.putLong("Time", this.gameTime);
-		compoundTag.putLong("DayTime", this.dayTime);
+		compoundTag.putLong("Time", this.clock.gameTime());
+		compoundTag.putLong("DayTime", this.clock.dayTime());
 		compoundTag.putLong("LastPlayed", Util.getEpochMillis());
 		compoundTag.putString("LevelName", this.settings.levelName());
 		compoundTag.putInt("version", 19133);
-		compoundTag.putInt("clearWeatherTime", this.clearWeatherTime);
-		compoundTag.putInt("rainTime", this.rainTime);
-		compoundTag.putBoolean("raining", this.raining);
-		compoundTag.putInt("thunderTime", this.thunderTime);
-		compoundTag.putBoolean("thundering", this.thundering);
+		compoundTag.putInt("clearWeatherTime", this.clock.clearWeatherTime());
+		compoundTag.putInt("rainTime", this.clock.rainTime());
+		compoundTag.putBoolean("raining", this.clock.raining());
+		compoundTag.putInt("thunderTime", this.clock.thunderTime());
+		compoundTag.putBoolean("thundering", this.clock.thundering());
 		compoundTag.putBoolean("hardcore", this.settings.hardcore());
 		compoundTag.putBoolean("allowCommands", this.settings.allowCommands());
 		compoundTag.putBoolean("initialized", this.initialized);
@@ -270,6 +259,10 @@ public class PrimaryLevelData implements ServerLevelData, WorldData {
 		return listTag;
 	}
 
+	public NativeWeatherTime.Clock weatherTimeClock() {
+		return this.clock;
+	}
+
 	@Override
 	public LevelData.RespawnData getRespawnData() {
 		return this.respawnData;
@@ -277,12 +270,12 @@ public class PrimaryLevelData implements ServerLevelData, WorldData {
 
 	@Override
 	public long getGameTime() {
-		return this.gameTime;
+		return this.clock.gameTime();
 	}
 
 	@Override
 	public long getDayTime() {
-		return this.dayTime;
+		return this.clock.dayTime();
 	}
 
 	@Nullable
@@ -293,12 +286,12 @@ public class PrimaryLevelData implements ServerLevelData, WorldData {
 
 	@Override
 	public void setGameTime(long l) {
-		this.gameTime = l;
+		this.clock.setGameTime(l);
 	}
 
 	@Override
 	public void setDayTime(long l) {
-		this.dayTime = l;
+		this.clock.setDayTime(l);
 	}
 
 	@Override
@@ -318,52 +311,52 @@ public class PrimaryLevelData implements ServerLevelData, WorldData {
 
 	@Override
 	public int getClearWeatherTime() {
-		return this.clearWeatherTime;
+		return this.clock.clearWeatherTime();
 	}
 
 	@Override
 	public void setClearWeatherTime(int i) {
-		this.clearWeatherTime = i;
+		this.clock.setClearWeatherTime(i);
 	}
 
 	@Override
 	public boolean isThundering() {
-		return this.thundering;
+		return this.clock.thundering();
 	}
 
 	@Override
 	public void setThundering(boolean bl) {
-		this.thundering = bl;
+		this.clock.setThundering(bl);
 	}
 
 	@Override
 	public int getThunderTime() {
-		return this.thunderTime;
+		return this.clock.thunderTime();
 	}
 
 	@Override
 	public void setThunderTime(int i) {
-		this.thunderTime = i;
+		this.clock.setThunderTime(i);
 	}
 
 	@Override
 	public boolean isRaining() {
-		return this.raining;
+		return this.clock.raining();
 	}
 
 	@Override
 	public void setRaining(boolean bl) {
-		this.raining = bl;
+		this.clock.setRaining(bl);
 	}
 
 	@Override
 	public int getRainTime() {
-		return this.rainTime;
+		return this.clock.rainTime();
 	}
 
 	@Override
 	public void setRainTime(int i) {
-		this.rainTime = i;
+		this.clock.setRainTime(i);
 	}
 
 	@Override

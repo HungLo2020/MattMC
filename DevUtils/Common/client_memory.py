@@ -6,6 +6,7 @@ and the actual client main class. Never records command lines or credentials.
 from pathlib import Path
 from collections import deque
 import re
+import artifact_retention
 
 CLIENT_MAINS = {"net.fabricmc.loader.impl.launch.knot.KnotClient", "net.minecraft.client.main.Main",
                 "net.fabricmc.devlaunchinjector.Main"}
@@ -89,7 +90,14 @@ class ClientMemoryObserver:
             raw=values.get('isolated_game_dir')
             if not raw:return
             game_dir=Path(raw).resolve(strict=True)
-            if game_dir.name!='game_dir_'+run_id or not game_dir.is_relative_to(self.artifact_root):
+            # The Python runner puts managed copies beside the capture tree,
+            # under its nearest marked root. Accept only that exact run path;
+            # resolving the supplied path must not permit symlink escapes.
+            marker_root=artifact_retention.nearest_marked_root(self.capture_dir)
+            managed_game=(marker_root/'.tmp'/run_id/('game_dir_'+run_id)
+                          if marker_root is not None else None)
+            if (game_dir.name!='game_dir_'+run_id
+                    or not (game_dir.is_relative_to(self.artifact_root) or game_dir==managed_game)):
                 self.errors.add('unowned-game-directory');return
             if self.game_dir is not None and (game_dir!=self.game_dir or meta!=self.metadata):
                 self.errors.add('capture-identity-changed');return

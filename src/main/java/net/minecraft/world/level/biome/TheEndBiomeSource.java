@@ -55,6 +55,11 @@ public class TheEndBiomeSource extends BiomeSource {
 		return CODEC;
 	}
 
+	/** End, highlands, midlands, islands and barrens, in native leaf order. */
+	public java.util.List<Holder<Biome>> nativeBiomes() {
+		return java.util.List.of(this.end, this.highlands, this.midlands, this.islands, this.barrens);
+	}
+
 	@Override
 	public Holder<Biome> getNoiseBiome(int i, int j, int k, Climate.Sampler sampler) {
 		int l = QuartPos.toBlock(i);

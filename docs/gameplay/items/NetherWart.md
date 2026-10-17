@@ -1,30 +1,39 @@
 # Nether Wart
 
-Nether Wart is a plantable brewing ingredient registered as `minecraft:nether_wart`.
+**Nether Wart** (`minecraft:nether_wart`) is a plantable brewing ingredient. Keep a replanting supply before spending your crop on potions or building materials. [Item registration][item]
 
 ## Obtaining and growing
 
-Collect it from [Nether Wart crops](../blocks/NetherWart.md). The fortress stalk-room generator provides a source; mature crops have a base 2–4 item drop before Fortune and explosion rules.
-
-Plant on Soul Sand to grow more. It uses a separate crop class from Wheat, so consult its block guide before assuming bone meal, Farmland, or hoe area harvesting will work.
+The [Nether Wart crop guide](../blocks/NetherWart.md#finding-and-planting) owns fortress beds, fortress chest loot, Bastion housing gardens and planting on **Soul Sand**. Its [harvest table](../blocks/NetherWart.md#harvest) covers maturity, Fortune and replanting yield. Soul Soil is not an interchangeable support, and Wheat's Bone Meal and custom hoe-harvest controls do not apply. [Crop support and behavior][crop]
 
 ## Brewing
 
-Adding Nether Wart to a Water Bottle in a fueled [Brewing Stand](../blocks/BrewingStand.md) produces an **Awkward Potion**. Awkward Potion is a starting stage for many effect-potion transformations, not an effect by itself in this guide.
+Adding Nether Wart to a Water Bottle in a fueled [Brewing Stand](../blocks/BrewingStand.md) produces an **Awkward Potion**. This is the starting stage for many effect-potion transformations; the Awkward Potion itself has no potion effect. Use the [brewing guide](../brewing/Brewing.md) for stand operation and ingredient chains. [Water-to-Awkward mix][awkward] · [Awkward registration][potions]
 
-Not every potion starts with Nether Wart: the current registry includes a direct Water + Fermented Spider Eye route to Weakness. Follow a verified potion chain rather than adding ingredients blindly.
+Not every potion starts with Nether Wart: **Water + Fermented Spider Eye → Weakness** is a direct registered route. Check the intended potion chain before adding ingredients. [Weakness exception][weakness]
+
+## Crafting and surplus
+
+- Use loose wart with small Nether Brick items for [Red Nether Bricks](../blocks/NetherBricks.md#crafting-and-cracking). The recipe does not accept a Nether Wart Block in its place. [Exact recipe][red-bricks]
+- [Nether Wart Blocks](../blocks/NetherGroundAndVegetation.md#nether-and-warped-wart-blocks) consume loose wart, but have **no bundled reverse recipe**. Their guide owns the crafting quantity and the distinction from huge-fungus caps; do not treat them as recoverable storage for your planting or brewing supply. [Block recipe][wart-block]
+- Spare wart is an accepted [Composter ingredient](../blocks/Composter.md#complete-accepted-item-list). Composting consumes it; keep the plants you need for the next harvest first. [Accepted item][compost]
 
 ## Related pages
 
 - [Nether Wart crop](../blocks/NetherWart.md)
 - [Brewing guide](../brewing/Brewing.md)
+- [Nether Wart Block item](NetherWartBlock.md)
 - [Items](Items.md)
 
 ## Sources and verification
 
-Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No in-game brewing, growth, or collection test was run.
+Source-reviewed on **2026-10-09** at `4246f4e7bfc1f3ab7862272ebba5f1f38aa16953`. Item registration, brewing mixes, crop behavior, crafting recipes and the compost map were inspected. No in-game brewing, growth, crafting or collection test was run. Recipe statements describe bundled data; data packs can change the available conversions.
 
-- [Water-to-Awkward mix](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/alchemy/PotionBrewing.java#L139-L142)
-- [Weakness exception](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/alchemy/PotionBrewing.java#L187-L188)
-- [Crop loot](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/loot_table/blocks/nether_wart.json)
-- [Fortress planting](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/levelgen/structure/structures/NetherFortressPieces.java#L989-L992)
+[item]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/item/Items.java#L1765
+[crop]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/block/NetherWartBlock.java#L19-L70
+[awkward]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/item/alchemy/PotionBrewing.java#L139-L142
+[potions]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/item/alchemy/Potions.java
+[weakness]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/item/alchemy/PotionBrewing.java#L187-L188
+[red-bricks]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/resources/data/minecraft/recipe/crafting/red_nether_bricks.json
+[wart-block]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/resources/data/minecraft/recipe/crafting/nether_wart_block.json
+[compost]: https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/block/ComposterBlock.java#L142

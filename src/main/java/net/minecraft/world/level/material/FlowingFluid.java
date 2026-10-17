@@ -25,7 +25,6 @@ import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.IceBlock;
 import net.minecraft.world.level.block.LiquidBlockContainer;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
@@ -52,9 +51,8 @@ public abstract class FlowingFluid extends Fluid {
 	);
 	private final Map<FluidState, VoxelShape> shapes = Maps.<FluidState, VoxelShape>newIdentityHashMap();
 
-	@Override
-	protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder) {
-		builder.add(FALLING);
+	protected FlowingFluid(NativeFluidDefinitions.Definition definition) {
+		super(definition);
 	}
 
 	@Override
@@ -454,7 +452,7 @@ public abstract class FlowingFluid extends Fluid {
 	}
 
 	protected static int getLegacyLevel(FluidState fluidState) {
-		return fluidState.isSource() ? 0 : 8 - Math.min(fluidState.getAmount(), 8) + (fluidState.getValue(FALLING) ? 8 : 0);
+		return fluidState.legacyLevel();
 	}
 
 	private static boolean hasSameAbove(FluidState fluidState, BlockGetter blockGetter, BlockPos blockPos) {
@@ -465,14 +463,6 @@ public abstract class FlowingFluid extends Fluid {
 	public float getHeight(FluidState fluidState, BlockGetter blockGetter, BlockPos blockPos) {
 		return hasSameAbove(fluidState, blockGetter, blockPos) ? 1.0F : fluidState.getOwnHeight();
 	}
-
-	@Override
-	public float getOwnHeight(FluidState fluidState) {
-		return fluidState.getAmount() / 9.0F;
-	}
-
-	@Override
-	public abstract int getAmount(FluidState fluidState);
 
 	@Override
 	public VoxelShape getShape(FluidState fluidState, BlockGetter blockGetter, BlockPos blockPos) {

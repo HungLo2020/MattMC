@@ -1,30 +1,21 @@
 # Bookshelf
 
-Bookshelf is a placeable block item registered as `minecraft:bookshelf`. Properly arranged ordinary Bookshelves increase Enchanting Table offer strength.
+**Bookshelf** is the placeable item for `minecraft:bookshelf`. Properly arranged ordinary Bookshelves contribute to Enchanting Table offer strength; their displayed books are not an inventory. [Registration][items]
 
-## Crafting
+## Obtaining
 
-Put **three Books across the middle row**, with a full row of planks-tag items above and below, to craft **one Bookshelf**. The recipe needs six planks and three books; generic planks-tag membership matters for imported woods.
+Use the canonical [Bookshelf recipe](../blocks/Bookshelves.md#crafting-and-buying): **6 planks and 3 Books produce 1 Bookshelf**. A novice Librarian may also sell one. Mining the block with **Silk Touch** returns a Bookshelf; without it the normal loot is **3 Books**, with no planks returned. An axe is faster, but a particular tool tier is not required. [Recipe][recipe] · [Loot][loot] · [Mining rules](../blocks/Bookshelves.md#mining-and-block-properties)
 
-## Collecting and enchanting use
+## Uses
 
-The loot table selects the Bookshelf block with **Silk Touch**. Otherwise it selects **three Books**, with explosion decay; it does not return the crafting planks.
+Place it for building or use the existing [Enchanting Table setup](../blocks/EnchantingTable.md#bookshelf-setup) for valid enchanting-power positions. [Chiseled Bookshelf](ChiseledBookshelf.md) is a separate storage block and does not supply that power. Ordinary Bookshelf is also the center ingredient in the [Lectern recipe](../blocks/Lectern.md#crafting-placement-and-collection).
 
-Ordinary Bookshelf is the bundled enchanting-power provider. [Chiseled Bookshelf](ChiseledBookshelf.md) is a different block and is not in that provider tag. For valid spacing, heights, gap blocks, and the 15-effective-shelf cap, use the [Enchanting Table setup guide](../blocks/EnchantingTable.md#bookshelf-setup).
+## Verification
 
-A shelf directly touching the table is not automatically useful. Placement rules, not simply the number of shelves in a room, determine the counted power.
+Source-reviewed on **2026-10-02** at `3c39e8cc456e3c76eac84ae45b12020c4b08a7a7`; the [block guide](../blocks/Bookshelves.md#bookshelf) contains current acquisition and behavior evidence. No in-game test was run.
 
-## Related pages
+[Book](Book.md) · [Bookshelves](../blocks/Bookshelves.md) · [Items](Items.md)
 
-- [Book](Book.md)
-- [Enchanting Table](../blocks/EnchantingTable.md)
-- [Items](Items.md)
-
-## Sources and verification
-
-Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No in-game enchanting, anvil, mining, or crafting test was run.
-
-- [Crafting recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/bookshelf.json)
-- [Silk Touch and normal loot](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/loot_table/blocks/bookshelf.json)
-- [Power provider tag](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/tags/block/enchantment_power_provider.json)
-- [Shelf offsets and transmitter checks](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/EnchantingTableBlock.java)
+[items]: https://github.com/HungLo2020/MattMC/blob/3c39e8cc456e3c76eac84ae45b12020c4b08a7a7/src/main/java/net/minecraft/world/item/Items.java
+[recipe]: https://github.com/HungLo2020/MattMC/blob/3c39e8cc456e3c76eac84ae45b12020c4b08a7a7/src/main/resources/data/minecraft/recipe/crafting/bookshelf.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/3c39e8cc456e3c76eac84ae45b12020c4b08a7a7/src/main/resources/data/minecraft/loot_table/blocks/bookshelf.json

@@ -1,4 +1,5 @@
 use crate::render::shaderpack::resources::color_targets::*;
+mod clears;
     use crate::render::vulkanic::commands::{CommandList, CommandListDesc, SubmissionBatch};
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::shaderpack::lowering::lower_fullscreen_source_pair;
@@ -186,23 +187,17 @@ fn manifest_preserves_literal_source_clear_colors_without_backend_identity() {
     let mut cache = ShaderPackColorTargetCache::default();
     let targets = cache.stage(&mut gal, identity, &manifest).unwrap();
     let mut frame = cache.begin_frame(&targets).unwrap();
-    let bootstrap = frame
-        .stage_full_clear(
-            &mut gal,
-            &targets,
-            ShaderPackColorBootstrapClearValues {
+    let clear_values = ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.7,
                     g: 0.6,
                     b: 0.5,
                     a: 1.0,
                 },
-            },
-        )
-        .unwrap();
+            };
     let mut operations = Vec::new();
     frame
-        .append_full_clear(&bootstrap, &mut operations)
+        .append_frame_start_clears(&targets, clear_values, &mut operations)
         .unwrap();
     assert!(operations.iter().any(|operation| matches!(
         operation,
@@ -210,7 +205,6 @@ fn manifest_preserves_literal_source_clear_colors_without_backend_identity() {
             if colors.first().and_then(|attachment| attachment.clear_color)
                 == Some(ClearColor { r: 0.125, g: 0.25, b: 0.5, a: 1.0 })
     )));
-    bootstrap.destroy(&mut gal);
     cache.destroy(&mut gal);
 }
 
@@ -287,7 +281,7 @@ fn private_targets_use_exact_formats_and_feedback_pairs_without_route_selection(
     let mut cache = ShaderPackColorTargetCache::default();
 
     let targets = cache.stage(&mut gal, identity.clone(), &manifest).unwrap();
-    assert_eq!(18, gal.metrics().resource_creates);
+    assert_eq!(36, gal.metrics().resource_creates);
     let primary = targets.target("primary").unwrap();
     assert_eq!(TextureFormat::R11fG11fB10f, primary.format);
     assert!(primary.previous_texture.is_some());
@@ -301,10 +295,10 @@ fn private_targets_use_exact_formats_and_feedback_pairs_without_route_selection(
     cache.confirm_submission(&mut gal);
     let reused = cache.stage(&mut gal, identity, &manifest).unwrap();
     assert_eq!(primary, reused.target("primary").unwrap());
-    assert_eq!(18, gal.metrics().resource_creates);
+    assert_eq!(36, gal.metrics().resource_creates);
 
     cache.destroy(&mut gal);
-    assert_eq!(18, gal.metrics().resource_destroys);
+    assert_eq!(36, gal.metrics().resource_destroys);
 }
 
 #[test]
@@ -487,23 +481,17 @@ fn full_clear_bootstraps_current_and_feedback_images_before_source_execution() {
     let mut cache = ShaderPackColorTargetCache::default();
     let targets = cache.stage(&mut gal, identity, &manifest).unwrap();
     let mut frame = cache.begin_frame(&targets).unwrap();
-    let bootstrap = frame
-        .stage_full_clear(
-            &mut gal,
-            &targets,
-            ShaderPackColorBootstrapClearValues {
+    let clear_values = ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.2,
                     g: 0.3,
                     b: 0.4,
                     a: 0.0,
                 },
-            },
-        )
-        .unwrap();
+            };
     let mut operations = Vec::new();
     frame
-        .append_full_clear(&bootstrap, &mut operations)
+        .append_frame_start_clears(&targets, clear_values, &mut operations)
         .unwrap();
     let clears = operations
         .iter()
@@ -547,7 +535,6 @@ fn full_clear_bootstraps_current_and_feedback_images_before_source_execution() {
         })],
     })
     .expect("the source bootstrap clear must be a valid backend-neutral submission");
-    bootstrap.destroy(&mut gal);
     cache
         .confirm_frame_submission(&mut gal, frame)
         .expect("only the submitted full clear may seed source color history");
@@ -583,45 +570,25 @@ fn source_color_bootstrap_is_required_only_for_a_fresh_generation() {
 
     let mut first = cache.begin_frame(&targets).unwrap();
     assert!(first.requires_initial_clear().unwrap());
-    let bootstrap = first
-        .stage_full_clear(
-            &mut gal,
-            &targets,
-            ShaderPackColorBootstrapClearValues {
+    let clear_values = ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.1,
                     g: 0.2,
                     b: 0.3,
                     a: 1.0,
                 },
-            },
-        )
-        .unwrap();
+            };
     let mut operations = Vec::new();
     first
-        .append_full_clear(&bootstrap, &mut operations)
+        .append_frame_start_clears(&targets, clear_values, &mut operations)
         .unwrap();
-    bootstrap.destroy(&mut gal);
     cache.confirm_frame_submission(&mut gal, first).unwrap();
 
-    let second = cache.begin_frame(&targets).unwrap();
+    let mut second = cache.begin_frame(&targets).unwrap();
     assert!(!second.requires_initial_clear().unwrap());
-    assert!(second
-        .stage_full_clear(
-            &mut gal,
-            &targets,
-            ShaderPackColorBootstrapClearValues {
-                fog_color: ClearColor {
-                    r: 0.1,
-                    g: 0.2,
-                    b: 0.3,
-                    a: 1.0,
-                },
-            },
-        )
-        .unwrap_err()
-        .to_string()
-        .contains("only valid for an uninitialized target generation"));
+    let mut warm_ops = Vec::new();
+    second.append_frame_start_clears(&targets, clear_values, &mut warm_ops).unwrap();
+    assert_eq!(3, warm_ops.iter().filter(|op| matches!(op, CommandOp::BeginPass { .. })).count());
     cache.destroy(&mut gal);
 }
 
@@ -646,24 +613,18 @@ fn mipmapped_source_sampling_requires_and_records_explicit_generation() {
     let mut cache = ShaderPackColorTargetCache::default();
     let targets = cache.stage(&mut gal, identity, &manifest).unwrap();
     let mut frame = cache.begin_frame(&targets).unwrap();
-    let bootstrap = frame
-        .stage_full_clear(
-            &mut gal,
-            &targets,
-            ShaderPackColorBootstrapClearValues {
+    let clear_values = ShaderPackColorClearValues {
                 fog_color: ClearColor {
                     r: 0.0,
                     g: 0.0,
                     b: 0.0,
                     a: 1.0,
                 },
-            },
-        )
-        .unwrap();
+            };
     let primary = TerrainSourceResourceRole::ShaderPackColor("primary".to_string());
     let mut operations = Vec::new();
     frame
-        .append_full_clear(&bootstrap, &mut operations)
+        .append_frame_start_clears(&targets, clear_values, &mut operations)
         .unwrap();
     assert!(frame
         .require_sample_with_mips(&primary, false, true)
@@ -680,6 +641,32 @@ fn mipmapped_source_sampling_requires_and_records_explicit_generation() {
             if *texture == targets.target("primary").unwrap().current_texture
                 && subresources.mip_count > 1
     )));
+    let generations = |operations: &[CommandOp]| {
+        operations
+            .iter()
+            .filter(|operation| matches!(operation, CommandOp::GenerateMipmaps { .. }))
+            .count()
+    };
+    let before_repeat = generations(&operations);
+    frame
+        .append_mipmaps(&targets, std::slice::from_ref(&primary), &mut operations)
+        .unwrap();
+    assert_eq!(
+        before_repeat,
+        generations(&operations),
+        "unchanged level zero must keep its existing chain"
+    );
+    frame
+        .record_external_outputs(std::slice::from_ref(&primary))
+        .unwrap();
+    frame
+        .append_mipmaps(&targets, std::slice::from_ref(&primary), &mut operations)
+        .unwrap();
+    assert_eq!(
+        before_repeat + 1,
+        generations(&operations),
+        "a level-zero write must regenerate the chain"
+    );
     gal.submit(SubmissionBatch {
         label: "shader-pack-color-mips".to_string(),
         command_lists: vec![CommandList::from(CommandListDesc {
@@ -688,7 +675,6 @@ fn mipmapped_source_sampling_requires_and_records_explicit_generation() {
         })],
     })
     .expect("the explicit source mip transaction must validate");
-    bootstrap.destroy(&mut gal);
     cache.confirm_frame_submission(&mut gal, frame).unwrap();
     cache.destroy(&mut gal);
 }
@@ -1224,4 +1210,80 @@ fn feedback_target_must_be_declared_before_any_private_resource_is_created() {
 
     assert!(cache.stage(&mut gal, identity, &manifest).is_err());
     assert_eq!(0, gal.metrics().resource_creates);
+}
+
+#[test]
+fn feedback_copies_skip_clear_enabled_targets_once_their_history_is_cleared() {
+    let source = source(settings());
+    let bindings = TerrainSourceResourceBindings::from_source(&source).unwrap();
+    let manifest = ShaderPackColorTargetManifest::from_source(&source, &bindings).unwrap();
+    let identity = ShaderPackColorTargetIdentity::new(
+        41,
+        source.generation(),
+        Extent3d {
+            width: 320,
+            height: 180,
+            depth: 1,
+        },
+        ["primary".to_string(), "temporal_aa".to_string()],
+        std::iter::empty::<String>(),
+    )
+    .unwrap();
+    let mut gal = gal();
+    let mut cache = ShaderPackColorTargetCache::default();
+    let targets = cache.stage(&mut gal, identity, &manifest).unwrap();
+    let primary = targets.target("primary").unwrap();
+    let temporal = targets.target("temporal_aa").unwrap();
+    assert!(primary.clear_each_frame && !temporal.clear_each_frame);
+    let clear_values = ShaderPackColorClearValues {
+        fog_color: ClearColor {
+            r: 0.2,
+            g: 0.3,
+            b: 0.4,
+            a: 0.0,
+        },
+    };
+    let copies = |operations: &[CommandOp]| {
+        operations
+            .iter()
+            .filter_map(|operation| match operation {
+                CommandOp::CopyTexture(copy) => Some((copy.src_texture, copy.dst_texture)),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let mut frame = cache.begin_frame(&targets).unwrap();
+    let mut operations = Vec::new();
+    frame
+        .append_frame_start_clears(&targets, clear_values, &mut operations)
+        .unwrap();
+    operations.clear();
+    frame
+        .append_feedback_copies(&targets, &mut operations)
+        .unwrap();
+    // The next frame clears both primary images before any stage samples
+    // them, so only clear=false history needs its end-of-frame copy.
+    assert_eq!(
+        vec![(temporal.current_texture, temporal.previous_texture.unwrap())],
+        copies(&operations)
+    );
+    cache.confirm_frame_submission(&mut gal, frame).unwrap();
+
+    let mut next = cache.begin_frame(&targets).unwrap();
+    let mut operations = Vec::new();
+    next.append_frame_start_clears(&targets, clear_values, &mut operations)
+        .unwrap();
+    assert!(operations.iter().any(|operation| matches!(
+        operation,
+        CommandOp::BeginPass { colors, .. }
+            if colors.first().map(|color| color.view)
+                == Some(primary.previous_attachment_view.or(primary.previous_view).unwrap())
+    )));
+    next.require_sample(
+        &TerrainSourceResourceRole::ShaderPackColor("primary".to_string()),
+        true,
+    )
+    .expect("the cleared feedback image remains valid history");
+    cache.destroy(&mut gal);
 }

@@ -95,6 +95,18 @@ pub(super) fn derive_simple_varying_contract(
         insert_stage_varying(&mut fragment_inputs, field, "fragment input")?;
     }
 
+    if glsl_identifiers(vertex).contains("gl_FogFragCoord")
+        || glsl_identifiers(fragment).contains("gl_FogFragCoord") {
+        let field = SourceVaryingDeclaration {
+            name: "vulkanic_source_fog_frag_coord".to_owned(),
+            type_name: "float".to_owned(), interpolation: String::new(),
+        };
+        insert_stage_varying(&mut vertex_outputs, field.clone(), "legacy fog output")?;
+        if glsl_identifiers(fragment).contains("gl_FogFragCoord") {
+            insert_stage_varying(&mut fragment_inputs, field, "legacy fog input")?;
+        }
+    }
+
     for (name, fragment_field) in &fragment_inputs {
         let Some(vertex_field) = vertex_outputs.get(name) else {
             return Err(GalError::invalid_argument(format!(
@@ -114,18 +126,34 @@ pub(super) fn derive_simple_varying_contract(
         }
     }
 
-    Ok(TerrainSourceVaryingContract {
-        fields: vertex_outputs
-            .into_values()
-            .enumerate()
-            .map(|(location, field)| TerrainSourceVaryingField {
-                name: field.name,
-                type_name: field.type_name,
-                interpolation: field.interpolation,
-                location: location as u32,
-            })
-            .collect(),
-    })
+    let mut fields = Vec::with_capacity(vertex_outputs.len());
+    let mut location = 0u32;
+    for field in vertex_outputs.into_values() {
+        let slots = varying_location_count(&field.type_name)?;
+        let next = location.checked_add(slots).ok_or_else(||
+            GalError::invalid_argument("source varying location count overflow"))?;
+        fields.push(TerrainSourceVaryingField {
+            name: field.name, type_name: field.type_name,
+            interpolation: field.interpolation, location,
+        });
+        location = next;
+    }
+    Ok(TerrainSourceVaryingContract { fields })
+}
+
+fn varying_location_count(type_name: &str) -> GalResult<u32> {
+    match type_name {
+        "float" | "vec2" | "vec3" | "vec4" | "int" | "ivec2" | "ivec3" | "ivec4"
+        | "uint" | "uvec2" | "uvec3" | "uvec4" => Ok(1),
+        // Matrix varyings occupy one location per column, independently of
+        // their row count. Later fields must not overlap those locations.
+        "mat2" | "mat2x2" | "mat2x3" | "mat2x4" => Ok(2),
+        "mat3" | "mat3x2" | "mat3x3" | "mat3x4" => Ok(3),
+        "mat4" | "mat4x2" | "mat4x3" | "mat4x4" => Ok(4),
+        _ => Err(GalError::unsupported_feature(format!(
+            "source varying type '{type_name}' has no explicit location contract"
+        ))),
+    }
 }
 
 pub(super) fn insert_stage_varying(
@@ -151,7 +179,8 @@ pub(super) fn collect_stage_varyings(
     storage: VaryingStorage,
 ) -> GalResult<Vec<SourceVaryingDeclaration>> {
     let mut fields = Vec::new();
-    for line in source.lines() {
+    let stripped = crate::render::shaderpack::source::dialect::strip_comments(source);
+    for line in stripped.lines() {
         let Some(declarations) = parse_varying_declaration(line.trim(), storage)? else {
             continue;
         };
@@ -164,14 +193,21 @@ pub(super) fn parse_varying_declaration(
     line: &str,
     storage: VaryingStorage,
 ) -> GalResult<Option<Vec<SourceVaryingDeclaration>>> {
-    if !line.ends_with(';') || line.contains('(') || line.starts_with("layout") {
+    if !line.ends_with(';') || line.contains('(') || line.starts_with("layout")
+        || line.trim_end_matches(';').contains(';')
+    {
         return Ok(None);
     }
     let words = line
         .trim_end_matches(';')
         .split_whitespace()
         .collect::<Vec<_>>();
-    let Some(storage_index) = words.iter().position(|word| *word == storage.keyword()) else {
+    // Legacy `varying` is an output in the vertex stage and an input in
+    // the fragment stage. Discover it before either stage is rewritten so
+    // both receive the same explicit locations and type checks.
+    let Some(storage_index) = words.iter().position(|word|
+        *word == storage.keyword() || *word == "varying"
+    ) else {
         return Ok(None);
     };
     if storage_index > 1 || words.len() < storage_index + 3 {
@@ -216,8 +252,9 @@ pub(super) fn apply_varying_locations(
     contract: &TerrainSourceVaryingContract,
 ) -> GalResult<String> {
     let mut output = String::with_capacity(source.len());
-    for line in source.lines() {
-        let Some(fields) = parse_varying_declaration(line.trim(), storage)? else {
+    let stripped = crate::render::shaderpack::source::dialect::strip_comments(source);
+    for (line, semantic_line) in source.lines().zip(stripped.lines()) {
+        let Some(fields) = parse_varying_declaration(semantic_line.trim(), storage)? else {
             output.push_str(line);
             output.push('\n');
             continue;
@@ -227,6 +264,7 @@ pub(super) fn apply_varying_locations(
             output.push('\n');
             continue;
         }
+        let mut declarations = String::new();
         for field in fields {
             let Some(location) = contract.location_for(&field.name) else {
                 return Err(GalError::invalid_argument(format!(
@@ -236,20 +274,35 @@ pub(super) fn apply_varying_locations(
                 )));
             };
             if field.interpolation.is_empty() {
-                output.push_str(&format!(
+                declarations.push_str(&format!(
                     "layout(location = {location}) {} {} {};\n",
                     storage.keyword(),
                     field.type_name,
                     field.name
                 ));
             } else {
-                output.push_str(&format!(
+                declarations.push_str(&format!(
                     "layout(location = {location}) {} {} {} {};\n",
                     field.interpolation,
                     storage.keyword(),
                     field.type_name,
                     field.name
                 ));
+            }
+        }
+        append_rewritten_declaration_line(&mut output, line, semantic_line, declarations.trim_end());
+    }
+    if let Some(location) = contract.location_for("vulkanic_source_fog_frag_coord") {
+        if storage == VaryingStorage::Out || glsl_identifiers(source).contains("gl_FogFragCoord") {
+            output = replace_identifier(&output, "gl_FogFragCoord", "vulkanic_source_fog_frag_coord");
+            output = insert_after_version(&output, &format!(
+                "layout(location = {location}) {} float vulkanic_source_fog_frag_coord;\n", storage.keyword()))?;
+            if storage == VaryingStorage::Out {
+                // Frozen CommonTransformer initializes the implicit output
+                // before pack main; the pack's own distance writes survive.
+                let (opening, _) = text::main_function_body_range(&output)
+                    .ok_or_else(|| GalError::invalid_argument("legacy fog output requires a vertex main body"))?;
+                output.insert_str(opening + 1, "\n    vulkanic_source_fog_frag_coord = 0.0;\n");
             }
         }
     }

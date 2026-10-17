@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class WorldDecalFoilEncodingTest {
     private static float[] model() { return new float[]{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1}; }
     private static float[] normal() { return new float[]{2,0,0,0,3,0,0,0,-4}; }
-    private static WorldMeshInstanceRecord instance() {
+    private static WorldMeshInstance instance() {
         return new WorldMeshInstanceRecord(WORLD_MESH_ENTITY_STRATUM,17,1,0,2,1,0,-1,
             model(),128,128,0,0,0,0,-1);
     }

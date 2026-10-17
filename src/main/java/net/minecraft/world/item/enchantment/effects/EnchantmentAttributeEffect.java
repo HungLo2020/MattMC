@@ -18,15 +18,9 @@ import net.minecraft.world.phys.Vec3;
 
 public record EnchantmentAttributeEffect(ResourceLocation id, Holder<Attribute> attribute, LevelBasedValue amount, AttributeModifier.Operation operation)
 	implements EnchantmentLocationBasedEffect {
-	public static final MapCodec<EnchantmentAttributeEffect> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				ResourceLocation.CODEC.fieldOf("id").forGetter(EnchantmentAttributeEffect::id),
-				Attribute.CODEC.fieldOf("attribute").forGetter(EnchantmentAttributeEffect::attribute),
-				LevelBasedValue.CODEC.fieldOf("amount").forGetter(EnchantmentAttributeEffect::amount),
-				AttributeModifier.Operation.CODEC.fieldOf("operation").forGetter(EnchantmentAttributeEffect::operation)
-			)
-			.apply(instance, EnchantmentAttributeEffect::new)
-	);
+	/** The native codec's `attribute` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<EnchantmentAttributeEffect> CODEC = (MapCodec<EnchantmentAttributeEffect>)(MapCodec<?>)EnchantmentLocationBasedEffect.CODEC.dispatchCase("minecraft:attribute");
 
 	private ResourceLocation idForSlot(StringRepresentable stringRepresentable) {
 		return this.id.withSuffix("/" + stringRepresentable.getSerializedName());

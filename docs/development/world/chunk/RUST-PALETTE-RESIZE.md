@@ -1,11 +1,19 @@
 # Rust block-section palette resizing
 
-Local block palettes grow through `PalettedContainer.onResize()`. Rust collects
+Current canonical storage uses the [Rust live section owner](RUST-LIVE-SECTIONS.md).
+The helper path and historical acceptance below are narrower verification;
+historical pinned-body drivers reject the new container ownership changes.
+Use the live-section guide's current Gradle checks; the older driver commands
+below describe the historical helper acceptance, not current-owner verification.
+
+
+Compatibility block palettes grow through `PalettedContainer.onResize()`. Rust collects
 used source IDs and repacks 4,096 entries into the new storage. Java assigns
 object identities to the new palette and publishes the completed data. This
 covers normal 0→4→5→6→7→8→global growth and direct jumps from local to global.
-Ordinary individual block reads/writes, biome resizing and custom compatibility
-paths retain their existing implementation.
+Compatibility biome resizing and custom paths retain their existing implementation.
+Canonical live block palettes and admitted [live biome palettes](../biome/RUST-LIVE-BIOMES.md)
+grow inside their separate Rust owners.
 
 The kernel is in
 [`palette/resize/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/palette/resize).
@@ -79,6 +87,10 @@ JIT compilation during measured rounds, matching output checksums, and at least
 5% less time in every pair and at the upper 95% bootstrap ratio bound for each
 workload. Evidence goes in `build/palette-resize-migration/acceptance/`.
 This measures palette growth, not complete world generation or all block writes.
+
+The container source audit additionally permits only the separately pinned
+[ordered-value dispatch](RUST-PALETTE-DISTINCT.md); the original reference bodies
+remain unchanged.
 
 ## Verified status
 

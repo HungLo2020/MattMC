@@ -9,9 +9,9 @@ import net.minecraft.world.item.enchantment.LevelBasedValue;
 import net.minecraft.world.phys.Vec3;
 
 public record Ignite(LevelBasedValue duration) implements EnchantmentEntityEffect {
-	public static final MapCodec<Ignite> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(LevelBasedValue.CODEC.fieldOf("duration").forGetter(ignite -> ignite.duration)).apply(instance, Ignite::new)
-	);
+	/** The native codec's `ignite` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<Ignite> CODEC = (MapCodec<Ignite>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:ignite");
 
 	@Override
 	public void apply(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3) {

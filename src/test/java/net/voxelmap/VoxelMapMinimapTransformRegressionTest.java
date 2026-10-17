@@ -28,7 +28,8 @@ public class VoxelMapMinimapTransformRegressionTest {
         String mapSource = Files.readString(SRC_MAIN_JAVA.resolve("net/voxelmap/Map.java"));
         assertTrue(mapSource.contains("if (this.fullscreenMap)"),
                 "Fullscreen VoxelMap must have an explicit Rust semantic branch");
-        assertTrue(mapSource.contains("RustGalGuiRawImageAssets.registerDynamicTexture(mapTexture, dynamicMap)"),
+        assertTrue(mapSource.contains("this.publishRustMapImage(mapTexture, dynamicMap)")
+                        && mapSource.contains("RustGalGuiRawImageAssets.registerDynamicTexture(identity, texture, changed)"),
                 "Fullscreen VoxelMap must publish its CPU dynamic map texture to Rust-owned GUI assets");
         assertTrue(mapSource.contains("drawContext.submitRustSemanticBlit(mapTexture"),
                 "Fullscreen VoxelMap must submit a semantic blit instead of reopening Java GPU rendering");

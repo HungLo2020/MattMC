@@ -22,6 +22,8 @@ On each fishing update, rain at the position above the bobber has a 25% chance t
 
 Neither enchantment bypasses treasure's open-water condition. [Lure][lure] · [Luck of the Sea][luck] · [Effect evaluation][enchant-helper] · [Loot weights][fishing-loot]
 
+See [Luck and Unluck](../effects/LuckAndUnluck.md) for the separate status effects, combined fishing weights, and the limits of luck in other loot contexts.
+
 ## Open water for treasure
 
 The bobber checks a **5 × 5 horizontal area**, centered on its block, across four layers from **one block below through two blocks above**. Every layer must be uniform under this classification:
@@ -68,7 +70,7 @@ Two matching rods can be repaired by crafting, a Grindstone, or an Anvil under t
 
 Source-reviewed on 2026-10-01 at `4285adff2e35307c277a3a5bf54ebd064aa5e64b`. No gameplay test of casts, waits, open-water eligibility, loot distribution, entity pulling, or repairs was run. Timings assume 20 TPS, and data packs/components can change the reviewed defaults.
 
-Related: [Fishing Rod](../items/FishingRod.md) · [Enchanting](../enchanting/Enchanting.md) · [Mechanics](Mechanics.md)
+Related: [Fishing Rod](../items/FishingRod.md) · [Enchanting](../enchanting/Enchanting.md) · [Mechanics](Mechanics.md) · [Local rain and weather](TimeWeatherAndSleep.md#rain-thunder-and-the-place-you-stand)
 
 [rod]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/java/net/minecraft/world/item/FishingRodItem.java
 [hook]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/java/net/minecraft/world/entity/projectile/FishingHook.java

@@ -231,10 +231,10 @@ impl WorldPrimitiveFrontend {
                     crate::core::environment::var("MATTMC_RUST_DH_ASSET_PHASE_TRACE").as_deref(),
                     Ok("1" | "true" | "TRUE")
                 ) {
-                    println!(
+                    crate::core::console::stdout(format_args!(
                         "world-lod.asset-phase generation={generation} columns={asset_count} inner_nanos={inner_nanos} reconcile_nanos={}",
                         elapsed_nanos_u64(reconcile_started),
-                    );
+                    ));
                 }
                 Ok(())
             }
@@ -443,10 +443,10 @@ impl WorldPrimitiveFrontend {
             crate::core::environment::var("MATTMC_RUST_DH_ASSET_PHASE_TRACE").as_deref(),
             Ok("1" | "true" | "TRUE")
         ) {
-            println!(
+            crate::core::console::stdout(format_args!(
                 "world-lod.asset-inner generation={generation} columns={asset_count} validate_nanos={validate_nanos} provenance_nanos={provenance_nanos} prepare_nanos={prepare_nanos} expand_nanos={expand_nanos} pack_nanos={pack_nanos} commit_nanos={}",
                 elapsed_nanos_u64(commit_started),
-            );
+            ));
         }
         Ok(())
     }
@@ -751,11 +751,14 @@ impl WorldPrimitiveFrontend {
         }
         if !deferred {
             self.lod_forward_opaque_pass_resources.begin_frame();
+            self.lod_forward_opaque_pass_resources.prune_idle_page_sets(gal);
         }
         // Transparent/water owners serve both routes and may pack per-frame
         // uniforms in either; reset their per-frame slots every frame.
         self.lod_transparent_pass_resources.begin_frame();
         self.lod_water_pass_resources.begin_frame();
+        self.lod_transparent_pass_resources.prune_idle_page_sets(gal);
+        self.lod_water_pass_resources.prune_idle_page_sets(gal);
         // Deferred DH alpha still lands in the graph's one-color translucent
         // attachment. Keep its exact-atlas owners on that attachment format;
         // the acquired target format is only valid for the direct forward
@@ -1686,8 +1689,8 @@ impl WorldPrimitiveFrontend {
         self.pending_lod_direct_composition_written = false;
         self.lod_ssao_initialized = false;
         self.pending_lod_ssao_written = false;
-        self.lod_vanilla_snapshot_initialized = false;
-        self.pending_lod_vanilla_snapshot_written = false;
+        self.lod_vanilla_sample_state_initialized = false;
+        self.pending_lod_vanilla_sample_state_established = false;
         self.lod_direct_composition_resources =
             Some(lod::WorldLodDirectCompositionResources::create(
                 gal,
@@ -2312,7 +2315,7 @@ impl WorldPrimitiveFrontend {
             }) {
                 Ok(handle) => handle,
                 Err(error) => {
-                    let _ = gal.destroy(vertex_buffer);
+                    let _ = gal.retire(vertex_buffer);
                     return Err(error);
                 }
             };
@@ -2409,8 +2412,8 @@ impl WorldPrimitiveFrontend {
     pub(in crate::render::worldrender) fn discard_distant_horizons_generic_source_buffers(&mut self, gal: &mut VulkanicGal) {
         self.lod_source_pass_resources.retire_generic_draws(gal);
         if let Some(previous) = self.dh_generic_source_buffers.take() {
-            let _ = gal.destroy(previous.vertex_buffer);
-            let _ = gal.destroy(previous.index_buffer);
+            let _ = gal.retire(previous.vertex_buffer);
+            let _ = gal.retire(previous.index_buffer);
         }
     }
 }
@@ -2447,6 +2450,9 @@ pub(in crate::render::worldrender) fn distant_horizons_generic_source_geometry(
     boxes: &[WorldDistantHorizonsGenericBoxRequest],
 ) -> GalResult<DistantHorizonsGenericSourceGeometry> {
     let mut geometry = DistantHorizonsGenericSourceGeometry::default();
+    // Six faces of four vertices and six indices per box.
+    geometry.vertices.reserve(boxes.len() * 24);
+    geometry.indices.reserve(boxes.len() * 36);
     // DH draws SSAO groups before non-SSAO groups; keep that order.
     for ssao in [true, false] {
         let mut bucket_order = Vec::<u32>::new();
@@ -2491,11 +2497,12 @@ pub(in crate::render::worldrender) fn distant_horizons_generic_source_geometry(
             let first_index = geometry.indices.len() as u32;
             for &index in members {
                 let item = &boxes[index];
+                // Both corners are validated above to lie within 1e-3 of whole blocks.
                 let a = [0, 1, 2].map(|axis| {
-                    (item.min[axis] - fraction[axis]).round() as i32 - anchor[axis]
+                    round_near_integer(item.min[axis] - fraction[axis]) - anchor[axis]
                 });
                 let b = [0, 1, 2].map(|axis| {
-                    (item.max[axis] - fraction[axis]).round() as i32 - anchor[axis]
+                    round_near_integer(item.max[axis] - fraction[axis]) - anchor[axis]
                 });
                 if a.iter().chain(b.iter()).any(|value| value.abs() > 32767) {
                     return Err(GalError::unsupported_feature(
@@ -2549,6 +2556,11 @@ pub(in crate::render::worldrender) fn distant_horizons_generic_source_geometry(
         }
     }
     Ok(geometry)
+}
+
+/// Rounds a value known to lie within 1e-3 of an integer, without a libm call.
+fn round_near_integer(value: f32) -> i32 {
+    (value + 0.5f32.copysign(value)) as i32
 }
 
 /// Admission check for [`distant_horizons_generic_source_geometry`] without

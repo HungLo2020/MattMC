@@ -151,10 +151,10 @@ pub(in crate::render::worldrender) struct HandSourceDepthResources {
 impl HandSourceDepthResources {
     pub(in crate::render::worldrender) fn destroy(self, gal: &mut VulkanicGal) {
         if let Some(combined_sampler) = self.combined_sampler {
-            let _ = gal.destroy(combined_sampler);
+            let _ = gal.retire(combined_sampler);
         }
-        let _ = gal.destroy(self.view);
-        let _ = gal.destroy(self.texture);
+        let _ = gal.retire(self.view);
+        let _ = gal.retire(self.texture);
     }
 }
 
@@ -276,10 +276,10 @@ pub(in crate::render::worldrender) struct CachedColorOnlyPass {
 impl WorldPrimitiveFrontend {
     pub fn clear_frame_pass(&mut self, gal: &mut VulkanicGal) {
         for pass in self.cached_passes.drain(..) {
-            let _ = gal.destroy(pass.pass);
+            let _ = gal.retire(pass.pass);
         }
         for pass in self.cached_color_only_passes.drain(..) {
-            let _ = gal.destroy(pass.pass);
+            let _ = gal.retire(pass.pass);
         }
         let retired = self.destroy_g_buffer_final_bindings(gal);
         self.pending_g_buffer_resources_retired = self
@@ -292,7 +292,7 @@ impl WorldPrimitiveFrontend {
             .retire_frame_targets(gal, targets);
         self.cached_passes.retain(|pass| {
             if targets.contains(&pass.frame_target) {
-                let _ = gal.destroy(pass.pass);
+                let _ = gal.retire(pass.pass);
                 false
             } else {
                 true
@@ -300,7 +300,7 @@ impl WorldPrimitiveFrontend {
         });
         self.cached_color_only_passes.retain(|pass| {
             if targets.contains(&pass.frame_target) {
-                let _ = gal.destroy(pass.pass);
+                let _ = gal.retire(pass.pass);
                 false
             } else {
                 true
@@ -345,7 +345,7 @@ impl WorldPrimitiveFrontend {
             // resource or silently substitute one.
             if let Some(depth) = self.depth_attachment.take() {
                 for handle in depth.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 self.pending_depth_attachment_retires =
                     self.pending_depth_attachment_retires.saturating_add(1);
@@ -356,7 +356,7 @@ impl WorldPrimitiveFrontend {
         if let Some((texture, view)) = gal.pass_target_depth_attachment(pass_target)? {
             if let Some(depth) = self.depth_attachment.take() {
                 for handle in depth.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 self.pending_depth_attachment_retires =
                     self.pending_depth_attachment_retires.saturating_add(1);
@@ -372,7 +372,7 @@ impl WorldPrimitiveFrontend {
         let mut retired = 0;
         if let Some(depth) = self.depth_attachment.take() {
             for handle in depth.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
             retired = 1;
         }
@@ -398,7 +398,7 @@ impl WorldPrimitiveFrontend {
         }) {
             Ok(view) => view,
             Err(error) => {
-                let _ = gal.destroy(texture);
+                let _ = gal.retire(texture);
                 return Err(error);
             }
         };
@@ -482,6 +482,7 @@ impl WorldPrimitiveFrontend {
         height: u32,
         frame_color_format: ColorFormat,
         final_depth_format: Option<TextureFormat>,
+        source_scope: Option<TerrainProgramScope>,
         profile: &mut WholeFrameProfile,
     ) -> GalResult<()> {
         let extent = Extent3d {
@@ -493,7 +494,7 @@ impl WorldPrimitiveFrontend {
         // The vanilla graph retains its existing viewport-sized attachment.
         let shadow_extent = self
             .shader_pack_sources
-            .active_shadow_policy()
+            .active_shadow_policy_for_scope(source_scope.unwrap_or(TerrainProgramScope::Default))?
             .map(|policy| Extent3d {
                 width: policy.resolution(),
                 height: policy.resolution(),
@@ -1110,7 +1111,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.g_buffer_resources = Some(result?);
@@ -1200,7 +1201,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.g_buffer_final_bindings.insert(key, result?);
@@ -1254,7 +1255,7 @@ impl WorldPrimitiveFrontend {
         if let Some(resources) = self.g_buffer_resources.take() {
             retired = retired.saturating_add(1);
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         retired
@@ -1288,7 +1289,7 @@ pub(in crate::render::worldrender) fn destroy_g_buffer_final_binding_handles(
     binding: GBufferFinalBindingResources,
 ) {
     for handle in binding.handles_in_destroy_order() {
-        let _ = gal.destroy(handle);
+        let _ = gal.retire(handle);
     }
 }
 
@@ -1544,6 +1545,8 @@ pub(in crate::render::worldrender) fn terrain_runtime_targets(
 ) -> TerrainRuntimeTargets {
     TerrainRuntimeTargets {
         shadow_depth_texture: resources.shadow_depth_texture,
+        shadow_depth_opaque_texture: resources.shadow_depth_opaque_texture,
+        shadow_extent: resources.shadow_extent,
         shadow_depth_view: resources.shadow_depth_view,
         shadow_color_texture: resources.shadow_color_texture,
         shadow_color_view: resources.shadow_color_view,

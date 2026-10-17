@@ -65,6 +65,7 @@ public class CanyonWorldCarver extends WorldCarver<CanyonCarverConfiguration> {
 	) {
 		RandomSource randomSource = RandomSource.create(l);
 		float[] fs = this.initWidthFactors(carvingContext, canyonCarverConfiguration, randomSource);
+		WorldCarver.CarveSkipChecker nativeChecker = NativeCanyonGeometry.canyon(fs, (carvingContextx, dx, ex, fx, ix) -> this.shouldSkip(carvingContextx, fs, dx, ex, fx, ix));
 		float n = 0.0F;
 		float o = 0.0F;
 
@@ -102,7 +103,7 @@ public class CanyonWorldCarver extends WorldCarver<CanyonCarverConfiguration> {
 					q,
 					r,
 					carvingMask,
-					(carvingContextx, dx, ex, fx, ix) -> this.shouldSkip(carvingContextx, fs, dx, ex, fx, ix)
+					nativeChecker
 				);
 			}
 		}

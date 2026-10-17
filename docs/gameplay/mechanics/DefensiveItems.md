@@ -23,6 +23,8 @@ These rules describe source behavior, not a guarantee of surviving a specific co
 
 ## Related pages
 
+- [Combat timing and Shield counterattacks](Combat.md#raise-a-shield-before-the-hit)
+
 - [Shield details](../items/Shield.md)
 - [Totem effects and exclusions](../items/TotemOfUndying.md)
 - [Hunger and healing](Hunger.md)

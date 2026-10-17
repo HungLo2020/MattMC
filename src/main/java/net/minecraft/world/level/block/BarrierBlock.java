@@ -33,7 +33,9 @@ public class BarrierBlock extends Block implements SimpleWaterloggedBlock {
 
 	public BarrierBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override

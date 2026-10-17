@@ -79,6 +79,8 @@ pub(crate) struct TerrainMeshDraw {
 pub(crate) struct TerrainIndexedIndirect {
     pub buffer: Handle,
     pub offset: u64,
+    /// Consecutive 20-byte commands starting at `offset`.
+    pub draw_count: u32,
 }
 
 /// A direct world-material batch which must be composed after deferred terrain
@@ -231,6 +233,9 @@ pub(crate) struct TerrainTranslucentCaptureTargets {
 #[derive(Clone, Copy)]
 pub(crate) struct TerrainRuntimeTargets {
     pub shadow_depth_texture: Handle,
+    /// Opaque/cutout snapshot, initialized even when no shadow casters draw.
+    pub shadow_depth_opaque_texture: Handle,
+    pub shadow_extent: Extent3d,
     pub shadow_depth_view: Handle,
     pub shadow_color_texture: Handle,
     pub shadow_color_view: Handle,
@@ -313,8 +318,8 @@ impl From<TerrainRuntimeTargets> for TerrainSourceShadowPassTargets {
     fn from(targets: TerrainRuntimeTargets) -> Self {
         Self {
             shadow_depth_texture: targets.shadow_depth_texture,
-            shadow_depth_opaque_texture: Handle::NULL,
-            shadow_extent: Extent3d { width: 0, height: 0, depth: 1 },
+            shadow_depth_opaque_texture: targets.shadow_depth_opaque_texture,
+            shadow_extent: targets.shadow_extent,
             shadow_depth_view: targets.shadow_depth_view,
             shadow_color_texture: targets.shadow_color_texture,
             shadow_color_view: targets.shadow_color_view,
@@ -343,7 +348,7 @@ pub(crate) struct TerrainSourceColorPassTargets {
     /// Per-frame semantic clear inputs. The named attachment retains the
     /// source declaration; this supplies only dynamic fog for its portable
     /// primary-color default.
-    pub clear_values: ShaderPackColorBootstrapClearValues,
+    pub clear_values: ShaderPackColorClearValues,
     pub depth_texture: Handle,
     pub depth_view: Handle,
     pub target: Handle,
@@ -357,11 +362,10 @@ pub(crate) struct TerrainSourceColorPassTargets {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) enum TerrainSourceColorPassPhase {
     Bootstrap,
-    /// A source-defined sky initializer has already written the pack's named
-    /// primary color. Opaque/cutout terrain must load that attachment while
-    /// preserving the normal bootstrap behavior for every other target and
-    /// for depth.
-    BootstrapAfterSky,
+    /// Source initialization may have written any named color slot. The
+    /// transaction records frame-start clears before terrain records this
+    /// pass; already written colors load while main depth still clears.
+    BootstrapAfterInitialization,
     /// The distinct source-derived `gbuffers_textured` writer runs after
     /// opaque/cutout terrain against the same named color/depth generation.
     /// It always loads existing attachments: generic material cannot
@@ -419,7 +423,7 @@ impl TerrainSourceColorPassPhase {
         matches!(
             (self, Self::for_program(program)),
             (Self::Bootstrap, Self::Bootstrap)
-                | (Self::BootstrapAfterSky, Self::Bootstrap)
+                | (Self::BootstrapAfterInitialization, Self::Bootstrap)
                 | (Self::Translucent, Self::Translucent)
                 | (Self::TranslucentFirst, Self::Translucent)
         )
@@ -427,7 +431,7 @@ impl TerrainSourceColorPassPhase {
 
     pub(super) fn accepts_material(self, material_mode: TerrainMaterialPassMode) -> bool {
         match self {
-            Self::Bootstrap | Self::BootstrapAfterSky => matches!(
+            Self::Bootstrap | Self::BootstrapAfterInitialization => matches!(
                 material_mode,
                 TerrainMaterialPassMode::Opaque | TerrainMaterialPassMode::Cutout
             ),
@@ -453,7 +457,7 @@ impl TerrainSourceColorPassPhase {
             Self::Bootstrap => TextureUsageState::Undefined,
             // The sky can sample the previous main depth before terrain clears
             // it. Clearing contents does not discard that read dependency.
-            Self::BootstrapAfterSky => TextureUsageState::ShaderRead,
+            Self::BootstrapAfterInitialization => TextureUsageState::ShaderRead,
             Self::TexturedMaterial
             | Self::Weather
             | Self::Clouds
@@ -472,15 +476,9 @@ impl TerrainSourceColorPassPhase {
 
     pub(super) fn color_load_op(self, attachment: &TerrainSourceColorAttachment) -> AttachmentLoadOp {
         match self {
-            Self::Bootstrap if attachment.clear_each_frame => AttachmentLoadOp::Clear,
-            Self::BootstrapAfterSky
-                if attachment.role.shader_pack_color_name() == Some("primary") =>
-            {
-                AttachmentLoadOp::Load
-            }
-            Self::BootstrapAfterSky if attachment.clear_each_frame => AttachmentLoadOp::Clear,
+            Self::Bootstrap | Self::BootstrapAfterInitialization if attachment.clear_each_frame => AttachmentLoadOp::Clear,
             Self::Bootstrap
-            | Self::BootstrapAfterSky
+            | Self::BootstrapAfterInitialization
             | Self::TexturedMaterial
             | Self::Weather
             | Self::Clouds
@@ -498,7 +496,7 @@ impl TerrainSourceColorPassPhase {
 
     pub(super) fn depth_load_op(self) -> AttachmentLoadOp {
         match self {
-            Self::Bootstrap | Self::BootstrapAfterSky => AttachmentLoadOp::Clear,
+            Self::Bootstrap | Self::BootstrapAfterInitialization => AttachmentLoadOp::Clear,
             Self::TexturedMaterial
             | Self::Weather
             | Self::Clouds

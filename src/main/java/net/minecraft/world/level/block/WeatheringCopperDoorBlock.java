@@ -2,6 +2,7 @@ package net.minecraft.world.level.block;
 
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.world.level.block.state.properties.NativeBlockFamilies;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -24,6 +25,10 @@ public class WeatheringCopperDoorBlock extends DoorBlock implements WeatheringCo
 	@Override
 	public MapCodec<WeatheringCopperDoorBlock> codec() {
 		return CODEC;
+	}
+
+	public WeatheringCopperDoorBlock(WeatheringCopper.WeatherState weatherState, BlockBehaviour.Properties properties) {
+		this(NativeBlockFamilies.set(properties, NativeBlockFamilies.Kind.DOOR), weatherState, properties);
 	}
 
 	public WeatheringCopperDoorBlock(BlockSetType blockSetType, WeatheringCopper.WeatherState weatherState, BlockBehaviour.Properties properties) {

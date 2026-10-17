@@ -10,7 +10,7 @@ pub struct FfiStructLayout {
     pub byte_size: u32,
     pub alignment: u32,
     pub field_count: u32,
-    pub field_offsets: [u32; 64],
+    pub field_offsets: [u32; FFI_MAX_STRUCT_LAYOUT_FIELDS],
 }
 
 impl Default for FfiStructLayout {
@@ -21,7 +21,7 @@ impl Default for FfiStructLayout {
             byte_size: 0,
             alignment: 0,
             field_count: 0,
-            field_offsets: [0; 64],
+            field_offsets: [0; FFI_MAX_STRUCT_LAYOUT_FIELDS],
         }
     }
 }

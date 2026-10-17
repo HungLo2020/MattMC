@@ -648,6 +648,101 @@ pub unsafe extern "C" fn mattmc_region_close(
     }
 }
 
+fn read_chunk_tape(
+    handle: u64, chunk_x: i32, chunk_z: i32,
+    max_compressed_bytes: u64, max_decompressed_bytes: u64,
+    max_depth: u32, max_collection_len: u32, max_alloc_bytes: u64, max_total_bytes: u64,
+    fingerprint: bool,
+) -> (NativeRegionTapeResult, Vec<u8>) {
+    let compression_limits =
+        CompressionLimits::from_ffi(max_compressed_bytes, max_decompressed_bytes);
+    let nbt_limits = NbtLimits::from_ffi(
+        max_depth,
+        max_collection_len,
+        max_alloc_bytes,
+        max_total_bytes,
+    );
+    let payload = match with_open_region(handle, |region| region.read_payload(chunk_x, chunk_z)) {
+        Ok(payload) => payload,
+        Err(error) => {
+            let (status, domain) = nbt_status_and_domain(&error);
+            let handle_status = status_for_handle_error(&error);
+            let status = if handle_status == STATUS_INVALID_HANDLE {
+                handle_status
+            } else {
+                status
+            };
+            let result = tape_error_result(status, domain, error);
+            return (result, Vec::new());
+        }
+    };
+    let Some(payload) = payload else {
+        let result = NativeRegionTapeResult {
+            status: STATUS_OK,
+            error_domain: ERROR_DOMAIN_NONE,
+            ..NativeRegionTapeResult::default()
+        };
+        return (result, Vec::new());
+    };
+    let decoded = match decompress_region_payload(
+        payload.compression_id,
+        &payload.payload,
+        compression_limits,
+    ) {
+        Ok(decoded) => decoded,
+        Err(error) => {
+            let result = tape_error_result(
+                STATUS_DECOMPRESSION_ERROR,
+                ERROR_DOMAIN_DECOMPRESSION,
+                error,
+            );
+            return (result, Vec::new());
+        }
+    };
+    let document = match read_document(&decoded, nbt_limits) {
+        Ok(document) => document,
+        Err(error) => {
+            let error = RegionError::new(
+                RegionErrorKind::NbtParseError,
+                error.offset as u64,
+                format!("{:?}", error.kind),
+            );
+            let result = tape_error_result(STATUS_NBT_ERROR, ERROR_DOMAIN_NBT, error);
+            return (result, Vec::new());
+        }
+    };
+    let tape = match document_to_tape(&document, nbt_limits) {
+        Ok(tape) => tape,
+        Err(error) => {
+            let error = RegionError::new(
+                RegionErrorKind::NbtParseError,
+                error.offset as u64,
+                format!("{:?}", error.kind),
+            );
+            let result = tape_error_result(STATUS_NBT_ERROR, ERROR_DOMAIN_NBT, error);
+            return (result, Vec::new());
+        }
+    };
+    let fingerprint = if fingerprint { fingerprint_document(&document) } else { 0 };
+    let result = NativeRegionTapeResult {
+        status: STATUS_OK,
+        error_domain: ERROR_DOMAIN_NONE,
+        error_kind: 0,
+        present: 1,
+        compression_id: payload.compression_id as i32,
+        external: i32::from(payload.external),
+        reserved0: 0,
+        reserved1: 0,
+        timestamp: payload.timestamp as u64,
+        compressed_len: payload.payload.len() as u64,
+        decompressed_len: decoded.len() as u64,
+        fingerprint,
+        error_offset: 0,
+        output_len: tape.len() as u64,
+    };
+    (result, tape)
+}
+
 /// # Safety
 ///
 /// `output_ptr` may be null only when `output_capacity` is zero; in that mode
@@ -823,97 +918,13 @@ pub unsafe extern "C" fn mattmc_region_handle_read_chunk_nbt_tape(
         write_tape_result(output_result, result);
         return result.status;
     }
-    let compression_limits =
-        CompressionLimits::from_ffi(max_compressed_bytes, max_decompressed_bytes);
-    let nbt_limits = NbtLimits::from_ffi(
-        max_depth,
-        max_collection_len,
-        max_alloc_bytes,
-        max_total_bytes,
-    );
-    let payload = match with_open_region(handle, |region| region.read_payload(chunk_x, chunk_z)) {
-        Ok(payload) => payload,
-        Err(error) => {
-            let (status, domain) = nbt_status_and_domain(&error);
-            let handle_status = status_for_handle_error(&error);
-            let status = if handle_status == STATUS_INVALID_HANDLE {
-                handle_status
-            } else {
-                status
-            };
-            let result = tape_error_result(status, domain, error);
-            write_tape_result(output_result, result);
-            return result.status;
-        }
-    };
-    let Some(payload) = payload else {
-        let result = NativeRegionTapeResult {
-            status: STATUS_OK,
-            error_domain: ERROR_DOMAIN_NONE,
-            ..NativeRegionTapeResult::default()
-        };
+    let (mut result, tape) = read_chunk_tape(handle, chunk_x, chunk_z,
+        max_compressed_bytes, max_decompressed_bytes, max_depth, max_collection_len,
+        max_alloc_bytes, max_total_bytes, true);
+    if result.status != STATUS_OK || result.present == 0 {
         write_tape_result(output_result, result);
-        return STATUS_OK;
-    };
-    let decoded = match decompress_region_payload(
-        payload.compression_id,
-        &payload.payload,
-        compression_limits,
-    ) {
-        Ok(decoded) => decoded,
-        Err(error) => {
-            let result = tape_error_result(
-                STATUS_DECOMPRESSION_ERROR,
-                ERROR_DOMAIN_DECOMPRESSION,
-                error,
-            );
-            write_tape_result(output_result, result);
-            return result.status;
-        }
-    };
-    let document = match read_document(&decoded, nbt_limits) {
-        Ok(document) => document,
-        Err(error) => {
-            let error = RegionError::new(
-                RegionErrorKind::NbtParseError,
-                error.offset as u64,
-                format!("{:?}", error.kind),
-            );
-            let result = tape_error_result(STATUS_NBT_ERROR, ERROR_DOMAIN_NBT, error);
-            write_tape_result(output_result, result);
-            return result.status;
-        }
-    };
-    let tape = match document_to_tape(&document, nbt_limits) {
-        Ok(tape) => tape,
-        Err(error) => {
-            let error = RegionError::new(
-                RegionErrorKind::NbtParseError,
-                error.offset as u64,
-                format!("{:?}", error.kind),
-            );
-            let result = tape_error_result(STATUS_NBT_ERROR, ERROR_DOMAIN_NBT, error);
-            write_tape_result(output_result, result);
-            return result.status;
-        }
-    };
-    let fingerprint = fingerprint_document(&document);
-    let mut result = NativeRegionTapeResult {
-        status: STATUS_OK,
-        error_domain: ERROR_DOMAIN_NONE,
-        error_kind: 0,
-        present: 1,
-        compression_id: payload.compression_id as i32,
-        external: i32::from(payload.external),
-        reserved0: 0,
-        reserved1: 0,
-        timestamp: payload.timestamp as u64,
-        compressed_len: payload.payload.len() as u64,
-        decompressed_len: decoded.len() as u64,
-        fingerprint,
-        error_offset: 0,
-        output_len: tape.len() as u64,
-    };
+        return result.status;
+    }
     if output_capacity < tape.len() as u64 {
         result.status = STATUS_OUTPUT_TOO_SMALL;
         result.error_kind = RegionErrorKind::OutputTooSmall as i32;
@@ -1525,4 +1536,27 @@ pub unsafe extern "C" fn mattmc_region_flush(
             result.status
         }
     }
+}
+
+/// Read a production chunk once using the same default compression/NBT limits.
+/// The optional fingerprint is requested only by region validation.
+/// # Safety
+/// Live region handle; aligned writable owner pointer and metadata. The unique
+/// returned CPU tape owner is cleared when consumed and released once after use.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_region_handle_read_owned_tape(
+    handle: u64, chunk_x: i32, chunk_z: i32, fingerprint: i32,
+    owner: *mut *mut crate::storage::nbt::owned::OwnedTape,
+    output: *mut NativeRegionTapeResult,
+) -> i32 {
+    if owner.is_null() || owner as usize % 8 != 0 || output.is_null() {
+        return STATUS_INVALID_ARGUMENT;
+    }
+    *owner = ptr::null_mut();
+    let (result, tape) = read_chunk_tape(handle, chunk_x, chunk_z, 0, 0, 0, 0, 0, 0, fingerprint != 0);
+    if result.status == STATUS_OK && result.present != 0 {
+        *owner = crate::storage::nbt::owned::OwnedTape::new(tape);
+    }
+    write_tape_result(output, result);
+    result.status
 }

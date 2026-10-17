@@ -4,6 +4,8 @@
 
 ## Collecting and moving it
 
+For a supply to collect, follow [natural root systems and planted-Azalea ground conversion](../blocks/SoilSandAndGravel.md#rooted-dirt-from-natural-roots-or-planted-azalea). The shared guide also lists [optional Wandering Trader purchases](../blocks/SoilSandAndGravel.md#optional-wandering-trader-supplies). Growing Hanging Roots beneath an existing block is a different route from producing more Rooted Dirt.
+
 Mine a Rooted Dirt block with any tool or by hand to receive **1 Rooted Dirt**. Its loot does not require Silk Touch. [Block loot][loot]
 
 A shovel is the efficient mining tool. No tool material tier is required for this block’s ordinary loot. [Mining tag][shovel-tag] · [Player harvest gate][player]
@@ -15,6 +17,8 @@ A shovel is the efficient mining tool. No tool material tier is required for thi
 Follow the shared guide for the exact conditions and recipe sources. [Soil, Sand, and Gravel](../blocks/SoilSandAndGravel.md) · [Blocks](../blocks/Blocks.md) · [Items](Items.md)
 
 ## Sources and verification
+
+Acquisition links added on **2026-10-10**, following the shared guide’s source review at `f86206767dadde696adfed4e04c5ee97cd0d0885`. The shared guide owns the new generation, replenishment, and trade evidence; the earlier collection review below remains in place. No new in-game acquisition or growth test was run.
 
 Source-reviewed on **2026-10-02** at `6fe3f1e877707e45ee3159929bb9cd8769d6bda7`. No in-game placement, mining, spread, or conversion test was run. This page covers the checked collection route and links the shared placed-block mechanics; it is not an exhaustive acquisition or world-generation inventory.
 

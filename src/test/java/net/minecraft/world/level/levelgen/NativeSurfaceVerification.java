@@ -19,7 +19,7 @@ import net.minecraft.world.level.levelgen.blending.Blender;
  * SurfaceSystem/SurfaceRules classes extracted from Git, or production Rust. */
 public final class NativeSurfaceVerification {
     private static volatile long sink;
-    private static final int[][] POSITIONS={{0,0},{-2,1},{1,-2},{64,128},{-1024,-2048},{1874998,-1874998}};
+    static final int[][] POSITIONS={{0,0},{-2,1},{1,-2},{64,128},{-1024,-2048},{1874998,-1874998}};
     private static void put(MessageDigest d,long value) {for(int i=0;i<8;i++)d.update((byte)(value>>>(8*i)));}
     public static String fingerprint(ChunkAccess chunk) throws Exception {
         var digest=MessageDigest.getInstance("SHA-256");var pos=new BlockPos.MutableBlockPos();
@@ -31,12 +31,12 @@ public final class NativeSurfaceVerification {
         for(var list:chunk.getPostProcessing()) {put(digest,list==null?-1:list.size());if(list!=null)for(short v:list)put(digest,v);}
         return HexFormat.of().formatHex(digest.digest());
     }
-    private record Fixture(ProtoChunk chunk, NoiseChunk noise, NoiseBasedChunkGenerator generator, BiomeManager manager,
+    record Fixture(ProtoChunk chunk, NoiseChunk noise, NoiseBasedChunkGenerator generator, BiomeManager manager,
                            WorldGenerationContext context, RandomState random, Registry<Biome> biomes, NoiseGeneratorSettings settings) {
         void run() {random.surfaceSystem().buildSurface(random,manager,biomes,settings.useLegacyRandomSource(),context,chunk,noise,settings.surfaceRule());}
         void run(SurfaceRules.RuleSource rule) {random.surfaceSystem().buildSurface(random,manager,biomes,settings.useLegacyRandomSource(),context,chunk,noise,rule);}
     }
-    private static List<SurfaceRules.RuleSource> customRules() {
+    static List<SurfaceRules.RuleSource> customRules() {
         var keys = new ArrayList<>(List.of(Biomes.PLAINS));
         var frozenBiome = new SurfaceRules.BiomeConditionSource(keys);
         keys.clear(); // Evaluation must retain the original predicate snapshot.
@@ -59,7 +59,7 @@ public final class NativeSurfaceVerification {
             },SurfaceRules.state(Blocks.CLAY.defaultBlockState()))
         );
     }
-    private static Fixture fixture(RegistryAccess registries, NoiseGeneratorSettings config, RandomState random, long seed, int variant, int[] location, boolean mixed) {
+    static Fixture fixture(RegistryAccess registries, NoiseGeneratorSettings config, RandomState random, long seed, int variant, int[] location, boolean mixed) {
         var biomes=registries.lookupOrThrow(Registries.BIOME);var available=biomes.listElements().sorted(Comparator.comparing(h->h.key().location().toString())).toList();
         var height=LevelHeightAccessor.create(config.noiseSettings().minY(),config.noiseSettings().height());
         var chunk=new ProtoChunk(new ChunkPos(location[0],location[1]),UpgradeData.EMPTY,height,PalettedContainerFactory.create(registries),null);

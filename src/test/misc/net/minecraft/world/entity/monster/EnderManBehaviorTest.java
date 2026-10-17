@@ -85,7 +85,7 @@ class EnderManBehaviorTest {
 
         // This registry belongs to the test, so its damage tags never mutate global state.
         MappedRegistry<DamageType> damageTypes = new MappedRegistry<>(Registries.DAMAGE_TYPE, Lifecycle.stable());
-        DamageTypes.bootstrap(new BootstrapContext<>() {
+        net.minecraft.resources.NativeData.bootstrap(net.minecraft.resources.NativeData.Kind.DAMAGE_TYPE, DamageType.DIRECT_CODEC).run(new BootstrapContext<>() {
             @Override
             public Holder.Reference<DamageType> register(ResourceKey<DamageType> key, DamageType value, Lifecycle lifecycle) {
                 return damageTypes.register(key, value, RegistrationInfo.BUILT_IN);
@@ -402,6 +402,7 @@ class EnderManBehaviorTest {
     }
 
     private static void configureLevel(Level level) {
+        when(level.nativeEntityGeometry()).thenCallRealMethod();
         when(level.enabledFeatures()).thenReturn(FeatureFlags.DEFAULT_FLAGS);
         when(level.registryAccess()).thenReturn(registries);
         when(level.damageSources()).thenReturn(damageSources);

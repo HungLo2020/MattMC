@@ -52,7 +52,9 @@ public class HopperBlock extends BaseEntityBlock {
 
 	public HopperBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.DOWN).setValue(ENABLED, true));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.DOWN).setValue(ENABLED, true));
+		}
 		VoxelShape voxelShape = Block.column(12.0, 11.0, 16.0);
 		this.shapes = this.makeShapes(voxelShape);
 		this.interactionShapes = ImmutableMap.<Direction, VoxelShape>builderWithExpectedSize(5)

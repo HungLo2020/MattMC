@@ -25,10 +25,13 @@ import net.minecraft.world.level.block.BaseFireBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class LavaFluid extends FlowingFluid {
+	protected LavaFluid(NativeFluidDefinitions.Definition definition) {
+		super(definition);
+	}
+
 	public static final float MIN_LEVEL_CUTOFF = 0.44444445F;
 
 	@Override
@@ -224,42 +227,19 @@ public abstract class LavaFluid extends FlowingFluid {
 	}
 
 	@Override
-	protected float getExplosionResistance() {
-		return 100.0F;
-	}
-
-	@Override
 	public Optional<SoundEvent> getPickupSound() {
 		return Optional.of(SoundEvents.BUCKET_FILL_LAVA);
 	}
 
 	public static class Flowing extends LavaFluid {
-		@Override
-		protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder) {
-			super.createFluidStateDefinition(builder);
-			builder.add(LEVEL);
-		}
-
-		@Override
-		public int getAmount(FluidState fluidState) {
-			return (Integer)fluidState.getValue(LEVEL);
-		}
-
-		@Override
-		public boolean isSource(FluidState fluidState) {
-			return false;
+		Flowing(NativeFluidDefinitions.Definition definition) {
+			super(definition);
 		}
 	}
 
 	public static class Source extends LavaFluid {
-		@Override
-		public int getAmount(FluidState fluidState) {
-			return 8;
-		}
-
-		@Override
-		public boolean isSource(FluidState fluidState) {
-			return true;
+		Source(NativeFluidDefinitions.Definition definition) {
+			super(definition);
 		}
 	}
 }

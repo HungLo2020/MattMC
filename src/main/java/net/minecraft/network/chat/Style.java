@@ -1,15 +1,12 @@
 package net.minecraft.network.chat;
 
-import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Objects;
 import java.util.Optional;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.util.ExtraCodecs;
 import org.jetbrains.annotations.Nullable;
 
 public final class Style {
@@ -37,7 +34,7 @@ public final class Style {
 	@Nullable
 	final FontDescription font;
 
-	private static Style create(
+	static Style create(
 		Optional<TextColor> optional,
 		Optional<Integer> optional2,
 		Optional<Boolean> optional3,
@@ -143,6 +140,50 @@ public final class Style {
 
 	public FontDescription getFont() {
 		return (FontDescription)(this.font != null ? this.font : FontDescription.DEFAULT);
+	}
+
+	/** A style from Rust's decoded fields (`content/data/text.rs` {@code STYLE}), as the codec built it. */
+	static Style project(Object[] f, net.minecraft.resources.NativeData.Context context) {
+		if (f.length == 0) {
+			// Rust's empty style: no fields.
+			return EMPTY;
+		}
+		return create(
+			Optional.ofNullable(f[0]).map(c -> TextColor.parseColor((String)c).getOrThrow()),
+			Optional.ofNullable(f[1]).map(net.minecraft.resources.NativeValueTypes::color),
+			Optional.ofNullable((Boolean)f[2]),
+			Optional.ofNullable((Boolean)f[3]),
+			Optional.ofNullable((Boolean)f[4]),
+			Optional.ofNullable((Boolean)f[5]),
+			Optional.ofNullable((Boolean)f[6]),
+			Optional.ofNullable(f[7]).map(e -> NativeEvents.click((net.minecraft.resources.NativeData.Variant)e, context)),
+			Optional.ofNullable(f[8]).map(e -> NativeEvents.hover((net.minecraft.resources.NativeData.Variant)e, context)),
+			Optional.ofNullable((String)f[9]),
+			Optional.ofNullable(f[10]).map(id -> new FontDescription.Resource(net.minecraft.resources.NativeData.location(id)))
+		);
+	}
+
+	/** A style's decoded fields, for Rust to check and encode. */
+	static Object[] unproject(Style style, net.minecraft.resources.NativeData.Builder builder) {
+		if (style.isEmpty()) {
+			return new Object[0];
+		}
+		if (style.font != null && !(style.font instanceof FontDescription.Resource)) {
+			throw new IllegalArgumentException("Unsupported font description type: " + style.font);
+		}
+		return new Object[]{
+			style.color == null ? null : style.color.serialize(),
+			style.shadowColor == null ? null : net.minecraft.resources.NativeValueTypes.color(style.shadowColor.intValue()),
+			style.bold,
+			style.italic,
+			style.underlined,
+			style.strikethrough,
+			style.obfuscated,
+			style.clickEvent == null ? null : NativeEvents.click(style.clickEvent, builder),
+			style.hoverEvent == null ? null : NativeEvents.hover(style.hoverEvent, builder),
+			style.insertion,
+			style.font == null ? null : ((FontDescription.Resource)style.font).id().toString()
+		};
 	}
 
 	private static <T> Style checkEmptyAfterChange(Style style, @Nullable T object, @Nullable T object2) {
@@ -604,23 +645,11 @@ public final class Style {
 	}
 
 	public static class Serializer {
-		public static final MapCodec<Style> MAP_CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					TextColor.CODEC.optionalFieldOf("color").forGetter(style -> Optional.ofNullable(style.color)),
-					ExtraCodecs.ARGB_COLOR_CODEC.optionalFieldOf("shadow_color").forGetter(style -> Optional.ofNullable(style.shadowColor)),
-					Codec.BOOL.optionalFieldOf("bold").forGetter(style -> Optional.ofNullable(style.bold)),
-					Codec.BOOL.optionalFieldOf("italic").forGetter(style -> Optional.ofNullable(style.italic)),
-					Codec.BOOL.optionalFieldOf("underlined").forGetter(style -> Optional.ofNullable(style.underlined)),
-					Codec.BOOL.optionalFieldOf("strikethrough").forGetter(style -> Optional.ofNullable(style.strikethrough)),
-					Codec.BOOL.optionalFieldOf("obfuscated").forGetter(style -> Optional.ofNullable(style.obfuscated)),
-					ClickEvent.CODEC.optionalFieldOf("click_event").forGetter(style -> Optional.ofNullable(style.clickEvent)),
-					HoverEvent.CODEC.optionalFieldOf("hover_event").forGetter(style -> Optional.ofNullable(style.hoverEvent)),
-					Codec.STRING.optionalFieldOf("insertion").forGetter(style -> Optional.ofNullable(style.insertion)),
-					FontDescription.CODEC.optionalFieldOf("font").forGetter(style -> Optional.ofNullable(style.font))
-				)
-				.apply(instance, Style::create)
+		/** Rust decodes, validates and encodes styles (`content/data/text.rs`). */
+		public static final net.minecraft.resources.NativeValues.ValueCodec<Style> CODEC = net.minecraft.resources.NativeValues.codec(
+			net.minecraft.resources.NativeValues.Kind.STYLE, (value, context) -> project(net.minecraft.resources.NativeData.record(value), context), Style::unproject
 		);
-		public static final Codec<Style> CODEC = MAP_CODEC.codec();
+		public static final MapCodec<Style> MAP_CODEC = CODEC.mapCodec();
 		public static final StreamCodec<RegistryFriendlyByteBuf, Style> TRUSTED_STREAM_CODEC = ByteBufCodecs.fromCodecWithRegistriesTrusted(CODEC);
 	}
 }

@@ -13,6 +13,12 @@ import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
 
 public interface CollisionContext {
+	/** Exact stock lookup dispatch; contextual block providers are still handled separately. */
+	static boolean hasDefaultShapeLookup(CollisionContext context) {
+		return context != null && (context.getClass() == EntityCollisionContext.class
+			|| context.getClass() == EntityCollisionContext.Empty.class);
+	}
+
 	static CollisionContext empty() {
 		return EntityCollisionContext.Empty.WITHOUT_FLUID_COLLISIONS;
 	}

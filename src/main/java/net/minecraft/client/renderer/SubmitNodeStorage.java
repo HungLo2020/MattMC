@@ -125,6 +125,12 @@ public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNode
 	}
 
 	@Override
+	public boolean submitMapTexturedQuadSemantic(PoseStack poseStack, ResourceLocation textureIdentity,
+		float[] vertices, float[] uvs, int color, int lightCoords) {
+		return this.order(0).submitMapTexturedQuadSemantic(poseStack, textureIdentity, vertices, uvs, color, lightCoords);
+	}
+
+	@Override
 	public boolean submitTranslucentTexturedQuad(PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords) {
 		return this.order(0).submitTranslucentTexturedQuad(poseStack, renderType, textureIdentity, vertices, uvs, color, lightCoords);
 	}

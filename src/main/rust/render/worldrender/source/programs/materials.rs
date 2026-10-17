@@ -246,7 +246,7 @@ impl WorldPrimitiveFrontend {
         let pack_resources = match gal.create_resource_layout(layouts.pack_resources) {
             Ok(layout) => layout,
             Err(error) => {
-                let _ = gal.destroy(source_data);
+                let _ = gal.retire(source_data);
                 return Err(error);
             }
         };
@@ -337,18 +337,28 @@ impl WorldPrimitiveFrontend {
         Option<(u32, u64)>,
         Option<[i32; 2]>,
     )> {
+        let local_role = if program.opaque_resource_bindings.bindings().iter()
+            .any(|binding| binding.role() == TerrainSourceResourceRole::MaterialTexture) {
+            TerrainSourceResourceRole::MaterialTexture
+        } else {
+            TerrainSourceResourceRole::MaterialAtlas
+        };
         match batch.source_uv_space {
             WORLD_MATERIAL_SOURCE_UV_MINECRAFT_BLOCK_ATLAS => {
+                if local_role == TerrainSourceResourceRole::MaterialTexture {
+                    return Err(GalError::invalid_argument("world glyph local-texture writer cannot inherit the terrain atlas"));
+                }
                 Ok((base_resources.clone(), None, None))
             }
             WORLD_MATERIAL_SOURCE_UV_LOCAL_TEXTURE => {
                 let (resources, identity, extent) = self
-                    .source_resources_with_local_material_texture(
+                    .source_resources_with_local_material_texture_for_role(
                         gal,
                         program.shader_pack_generation,
                         base_resources,
                         batch.texture_id,
                         frame_id,
+                        local_role,
                     )?;
                 Ok((resources, Some(identity), Some(extent)))
             }
@@ -370,6 +380,19 @@ impl WorldPrimitiveFrontend {
         base_resources: &TerrainSourceOwnedResourceSet,
         texture_id: u32,
         frame_id: u64,
+    ) -> GalResult<(TerrainSourceOwnedResourceSet, (u32, u64), [i32; 2])> {
+        self.source_resources_with_local_material_texture_for_role(gal, shader_pack_generation,
+            base_resources, texture_id, frame_id, TerrainSourceResourceRole::MaterialAtlas)
+    }
+
+    fn source_resources_with_local_material_texture_for_role(
+        &mut self,
+        gal: &mut VulkanicGal,
+        shader_pack_generation: u64,
+        base_resources: &TerrainSourceOwnedResourceSet,
+        texture_id: u32,
+        frame_id: u64,
+        role: TerrainSourceResourceRole,
     ) -> GalResult<(TerrainSourceOwnedResourceSet, (u32, u64), [i32; 2])> {
         if shader_pack_generation == 0
             || shader_pack_generation != base_resources.availability().shader_pack_generation()
@@ -423,11 +446,20 @@ impl WorldPrimitiveFrontend {
                     "source material local sampler vanished after successful creation",
                 )
             })?;
-        let resources = base_resources.with_combined_sampler_override(
-            TerrainSourceResourceRole::MaterialAtlas,
-            combined_sampler,
-            key.texture_generation,
-        )?;
+        let resources = if role == TerrainSourceResourceRole::MaterialAtlas {
+            base_resources.with_combined_sampler_override(role, combined_sampler, key.texture_generation)?
+        } else {
+            let local = TerrainSourceOwnedResourceSet::new(
+                TerrainSourceResourceAvailabilitySet::new(shader_pack_generation, key.world_generation,
+                    [TerrainSourceResourceAvailability { role: role.clone(), shape: role.expected_sampled_resource_shape(),
+                        resource_generation: key.texture_generation }])?,
+                [TerrainSourceOwnedResource { role: role.clone(), combined_sampler }],
+            )?;
+            let base = if base_resources.availability().resource_for(role.clone()).is_some() {
+                base_resources.excluding_roles([role])?
+            } else { base_resources.clone() };
+            TerrainSourceOwnedResourceSet::merge([&base, &local])?
+        };
         let width = i32::try_from(width).map_err(|_| {
             GalError::invalid_argument("local source material width exceeds source ivec2")
         })?;
@@ -569,7 +601,7 @@ impl WorldPrimitiveFrontend {
         let group = groups.iter().find(|group| {
             group.shader_pack_generation == shader_pack_generation
                 && &group.program == program
-                && &group.base == base
+                && group.base.same_snapshot(base)
         })?;
         let (resources, local_texture, combined_sampler) =
             group.entries.get(&(texture_id, texture_generation))?;
@@ -607,7 +639,7 @@ impl WorldPrimitiveFrontend {
         let index = match groups.iter().position(|group| {
             group.shader_pack_generation == shader_pack_generation
                 && &group.program == program
-                && &group.base == base
+                && group.base.same_snapshot(base)
         }) {
             Some(index) => index,
             None => {
@@ -837,7 +869,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.lowered_entity_source_pipeline_resources
@@ -869,6 +901,7 @@ impl WorldPrimitiveFrontend {
                 WORLD_MATERIAL_MODE_OPAQUE,
                 WORLD_MATERIAL_MODE_CUTOUT,
                 WORLD_MATERIAL_MODE_TRANSLUCENT,
+                WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
                 WORLD_MATERIAL_MODE_GLINT,
             ],
             "textured material",
@@ -1019,7 +1052,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.lowered_textured_material_source_pipeline_resources
@@ -1386,12 +1419,16 @@ impl WorldPrimitiveFrontend {
         _program: &P,
         mesh: &SourceEntityMeshAsset,
     ) -> GalResult<LoweredSourceTerrainDataKey> {
-        mesh.validate()?;
         let key = LoweredSourceTerrainDataKey {
             mesh_key: mesh.mesh_key,
             mesh_generation: mesh.mesh_generation,
             abi: SourceGeometryAbi::LocalTextured,
         };
+        // Constructors validate assets; re-check only before the one upload
+        // instead of scanning every index on every draw.
+        if !self.lowered_source_terrain_geometry_resources.contains_key(&key) {
+            mesh.validate()?;
+        }
         self.ensure_lowered_source_mesh_geometry_resources(
             gal,
             key,
@@ -1421,7 +1458,11 @@ impl WorldPrimitiveFrontend {
         SourceTerrainFrameStreamAllocation,
     )> {
         let interface = program.execution_interface();
-        interface.validate()?;
+        let validated_key = (program as *const P as *const () as usize, program.shader_pack_generation());
+        if self.local_source_validated_interfaces.get(frame_id, &validated_key).is_none() {
+            interface.validate()?;
+            self.local_source_validated_interfaces.insert(frame_id, validated_key, ());
+        }
         // `mesh` is an immutable asset validated by its constructor.
         let geometry_key =
             self.ensure_lowered_local_source_geometry_resources(gal, program, mesh)?;
@@ -1531,7 +1572,7 @@ impl WorldPrimitiveFrontend {
             })();
             if result.is_err() {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
             self.lowered_source_terrain_frame_data_resources
@@ -1618,6 +1659,7 @@ impl WorldPrimitiveFrontend {
         frame_id: u64,
         mesh: &Arc<SourceEntityMeshAsset>,
         section_index: u32,
+        section_count: u32,
         texture_id: u32,
         material_mode: u32,
         depth_policy: u32,
@@ -1650,18 +1692,41 @@ impl WorldPrimitiveFrontend {
                 "source entity draw preparation requires at least one instance",
             ));
         }
-        let section = mesh.sections.get(section_index as usize).ok_or_else(|| {
-            GalError::invalid_argument("source entity draw selects a missing section")
-        })?;
-        if section.texture_id != texture_id
-            || section.material_mode != material_mode
-            || section.cull_policy != cull_policy
-            || section.winding != winding
-        {
+        let section_end = section_index
+            .checked_add(section_count)
+            .filter(|_| section_count != 0)
+            .ok_or_else(|| GalError::invalid_argument("source entity draw selects an empty section run"))?;
+        let sections = mesh
+            .sections
+            .get(section_index as usize..section_end as usize)
+            .ok_or_else(|| GalError::invalid_argument("source entity draw selects a missing section"))?;
+        if sections.iter().any(|section| {
+            section.texture_id != texture_id
+                || section.material_mode != material_mode
+                || section.cull_policy != cull_policy
+                || section.winding != winding
+        }) {
             return Err(GalError::invalid_argument(
                 "source entity draw semantic group no longer matches its immutable mesh section",
             ));
         }
+        let index_offset = sections[0].index_offset;
+        if crate::render::worldrender::source::frames::source_entity_section_run_end(
+            mesh,
+            section_index,
+            section_count,
+        )?
+        .is_none()
+        {
+            return Err(GalError::invalid_argument(
+                "source entity draw section run is not index-contiguous",
+            ));
+        }
+        let index_count = sections.iter().try_fold(0u32, |total, section| {
+            total
+                .checked_add(section.index_count)
+                .ok_or_else(|| GalError::invalid_argument("source entity section run index count overflows"))
+        })?;
         let (resources, local_texture) = self.source_resources_for_local_material(
             gal,
             program,
@@ -1679,15 +1744,12 @@ impl WorldPrimitiveFrontend {
                 scalar_uniforms,
                 instance_transforms,
             )?;
-        let pack_key = self.ensure_lowered_local_source_pack_resources(
+        let pack_resource_set =
+            self.resolve_lowered_local_source_pack(gal, program, frame_id, resources, local_texture)?;
+        let (pipeline, pipeline_layout) = self.resolve_lowered_local_source_pipeline(
             gal,
             program,
-            &resources,
-            local_texture,
-        )?;
-        let pipeline_key = self.ensure_lowered_local_source_pipeline_resources(
-            gal,
-            program,
+            frame_id,
             material_mode,
             depth_policy,
             cull_policy,
@@ -1706,16 +1768,6 @@ impl WorldPrimitiveFrontend {
             .get(&frame_data_key)
             .map(|resources| resources.resource_set)
             .ok_or_else(|| GalError::backend("source entity frame data resources vanished"))?;
-        let pack_resource_set = self
-            .lowered_entity_source_pack_resources
-            .get(&pack_key)
-            .map(|resources| resources.resource_set)
-            .ok_or_else(|| GalError::backend("source entity pack resources vanished"))?;
-        let (pipeline, pipeline_layout) = self
-            .lowered_entity_source_pipeline_resources
-            .get(&pipeline_key)
-            .map(|resources| (resources.pipeline, resources.pipeline_layout))
-            .ok_or_else(|| GalError::backend("source entity pipeline resources vanished"))?;
         let mut dynamic_offsets = vec![stream.legacy_transform_offset];
         if stream.scalar_uniform_offset.is_some() {
             dynamic_offsets.push(stream.scalar_uniform_offset.expect("checked scalar offset"));
@@ -1731,11 +1783,95 @@ impl WorldPrimitiveFrontend {
                 set: pack_resource_set,
             },
             index_buffer,
-            index_offset: section.index_offset,
+            index_offset,
             index_type: IndexType::U32,
-            index_count: section.index_count,
+            index_count,
             instance_count,
         })
+    }
+
+    /// Set-one bindings for one resource snapshot and local texture, shared
+    /// by every draw of the frame that uses them.
+    pub(crate) fn resolve_lowered_local_source_pack<P: LocalTexturedSourceProgram>(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &P,
+        frame_id: u64,
+        resources: TerrainSourceOwnedResourceSet,
+        local_texture: (u32, u64),
+    ) -> GalResult<Handle> {
+        let memo_key = LocalSourcePackMemoKey {
+            program: program as *const P as *const () as usize,
+            shader_pack_generation: program.shader_pack_generation(),
+            resources,
+            local_texture,
+        };
+        if let Some(set) = self.local_source_pack_memo.get(frame_id, &memo_key) {
+            return Ok(set);
+        }
+        let key = self.ensure_lowered_local_source_pack_resources(
+            gal,
+            program,
+            &memo_key.resources,
+            local_texture,
+        )?;
+        let set = self
+            .lowered_entity_source_pack_resources
+            .get(&key)
+            .map(|resources| resources.resource_set)
+            .ok_or_else(|| GalError::backend("source entity pack resources vanished"))?;
+        self.local_source_pack_memo.insert(frame_id, memo_key, set);
+        Ok(set)
+    }
+
+    /// Pipeline and layout for one local-textured draw configuration,
+    /// resolved once per frame.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn resolve_lowered_local_source_pipeline<P: LocalTexturedSourceProgram>(
+        &mut self,
+        gal: &mut VulkanicGal,
+        program: &P,
+        frame_id: u64,
+        material_mode: u32,
+        depth_policy: u32,
+        cull_policy: u32,
+        winding: u32,
+        depth_format: TextureFormat,
+        color_formats: Vec<TextureFormat>,
+        shadow_caster: Option<Option<f32>>,
+    ) -> GalResult<(Handle, Handle)> {
+        let memo_key = LocalSourcePipelineMemoKey {
+            program: program as *const P as *const () as usize,
+            shader_pack_generation: program.shader_pack_generation(),
+            material_mode,
+            depth_policy,
+            cull_policy,
+            winding,
+            depth_format,
+            color_formats: color_formats.iter().copied().collect(),
+            shadow_caster: shadow_caster.map(|cutoff| cutoff.map(f32::to_bits)),
+        };
+        if let Some(resolved) = self.local_source_pipeline_memo.get(frame_id, &memo_key) {
+            return Ok(resolved);
+        }
+        let key = self.ensure_lowered_local_source_pipeline_resources(
+            gal,
+            program,
+            material_mode,
+            depth_policy,
+            cull_policy,
+            winding,
+            depth_format,
+            color_formats,
+            shadow_caster,
+        )?;
+        let resolved = self
+            .lowered_entity_source_pipeline_resources
+            .get(&key)
+            .map(|resources| (resources.pipeline, resources.pipeline_layout))
+            .ok_or_else(|| GalError::backend("source entity pipeline resources vanished"))?;
+        self.local_source_pipeline_memo.insert(frame_id, memo_key, resolved);
+        Ok(resolved)
     }
 
     pub(crate) fn ensure_lowered_local_source_program_layouts<P: LocalTexturedSourceProgram>(
@@ -1941,7 +2077,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.source_material_texture_resources
@@ -2067,6 +2203,7 @@ pub(in crate::render::worldrender) fn source_material_batches_for_program(
             .last()
             .is_some_and(|batch: &SourceTexturedMaterialBatch| {
                 batch.start + batch.count == index
+                    && batch.material_id == quad.material_id
                     && batch.texture_id == quad.texture_id
                     && batch.source_uv_space == quad.source_uv_space
                     && batch.material_mode == quad.material_mode
@@ -2082,6 +2219,7 @@ pub(in crate::render::worldrender) fn source_material_batches_for_program(
             batches.last_mut().expect("checked source batch").count += 1;
         } else {
             batches.push(SourceTexturedMaterialBatch {
+                material_id: quad.material_id,
                 start: index,
                 count: 1,
                 texture_id: quad.texture_id,
@@ -2107,6 +2245,7 @@ pub(in crate::render::worldrender) fn source_textured_material_batches(
             WORLD_MATERIAL_MODE_OPAQUE,
             WORLD_MATERIAL_MODE_CUTOUT,
             WORLD_MATERIAL_MODE_TRANSLUCENT,
+            WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT,
         ],
     )
 }
@@ -2157,10 +2296,7 @@ pub(crate) fn source_textured_material_blend(material_mode: u32) -> GalResult<Bl
 /// fixed-function alpha-test state.
 /// `SkyRenderer.renderDarkDisc` as copied by the Java sky producer.
 pub(crate) fn is_vanilla_dark_disc_quad(quad: &WorldMaterialQuadRequest) -> bool {
-    quad.material_id == WORLD_MATERIAL_ID_OPAQUE_TEXTURED
-        && quad.texture_id == WORLD_MATERIAL_TEXTURE_GENERATED_WHITE
-        && quad.depth_policy == WORLD_DEPTH_POLICY_DISABLED
-        && quad.source_program == WORLD_MATERIAL_SOURCE_TEXTURED
+    quad.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC
 }
 
 pub(crate) fn source_entity_alpha_cutoff(material_mode: u32) -> GalResult<Option<f32>> {

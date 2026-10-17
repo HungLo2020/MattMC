@@ -8,6 +8,27 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GuiRawImageDecodeParityTest {
+    @Test void cleanDynamicSourceReusesPixelsAndReplacementGetsANewSnapshot() {
+        var id = ResourceLocation.withDefaultNamespace("test/clean-dynamic");
+        try (var first = new net.minecraft.client.renderer.texture.DynamicTexture("fixture", 2, 2, true);
+             var replacement = new net.minecraft.client.renderer.texture.DynamicTexture("replacement", 2, 2, true)) {
+            RustGalGuiRawImageAssets.registerDynamicTextureUnstaged(id, first);
+            var original = RustGalGuiRawImageAssets.prepareDynamicTexture(first, false);
+            first.getPixels().setPixel(0, 0, 0xFF123456);
+            assertSame(original, RustGalGuiRawImageAssets.prepareDynamicTexture(first, false));
+            var changed = RustGalGuiRawImageAssets.prepareDynamicTexture(first, true);
+            assertNotSame(original, changed);
+            assertFalse(java.util.Arrays.equals(original.pixels(), changed.pixels()));
+            RustGalGuiRawImageAssets.invalidate();
+            assertSame(changed, RustGalGuiRawImageAssets.prepareDynamicTexture(first, false),
+                "reload must restage the existing immutable dynamic snapshot without recopying");
+            RustGalGuiRawImageAssets.registerDynamicTextureUnstaged(id, replacement);
+            assertNotSame(changed, RustGalGuiRawImageAssets.prepareDynamicTexture(replacement, false));
+            assertNull(RustGalGuiRawImageAssets.prepareDynamicTexture(first, false));
+            RustGalGuiRawImageAssets.unregisterDynamicTexture(id, replacement);
+            assertNull(RustGalGuiRawImageAssets.prepareDynamicTexture(replacement, false));
+        }
+    }
     @Test void immutableSnapshotsWithIdenticalPixelsDoNotRequireAnotherUpload() {
         byte[] pixels = {1, 2, 3, 4};
         var first = new RustGalGuiRawImageAssets.Asset(7L, "dynamic:test", 1, 1, pixels, 2, 1);

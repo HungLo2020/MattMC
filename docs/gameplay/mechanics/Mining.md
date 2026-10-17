@@ -4,6 +4,10 @@ Breaking a block, breaking it quickly, and receiving its expected drop are separ
 
 Use [Pickaxes and Shovels](PickaxesAndShovels.md) for exact per-item recipes, material repair, path/campfire actions, and recycling.
 
+Use [Haste and Mining Fatigue](../effects/MiningEffects.md) for effect multipliers, their interaction with Conduit Power, and separate attack-recharge changes.
+
+Choose where to search with [Finding ores](FindingOres.md), including biome bonuses, height distributions and buried deposits.
+
 ## Choose the tool family first
 
 Tools have rules for their intended block groups, such as pickaxe-mineable stone or axe-mineable wood. A block that requires a correct tool can fail its drop check even when its loot table names an item. If no matching correct-for-drops rule is found, the tool rule returns false.
@@ -39,6 +43,8 @@ Examples of the requirement tags include Iron/Copper/Lapis Ores at Stone tier; D
 
 ## Loot and enchantments
 
+Use [Efficiency, Fortune and Silk Touch](../enchanting/MiningEnchantments.md) for supported tools, the active mining-speed bonus and source-specific loot choices.
+
 [Stone](../blocks/Stone.md) illustrates Silk Touch selecting Stone instead of Cobblestone. [Coal](../items/Coal.md) illustrates Silk Touch selecting ore and Fortune modifying the ordinary coal branch. Do not generalize those exact drop counts or enchantment rules to every block.
 
 When a drop surprises you, check tool family, material restriction, correct-tool requirement, loot conditions, and current data-pack changes separately. A missing integration tag is a documentation caveat until the gameplay code/data is actually repaired.
@@ -51,6 +57,8 @@ See [Durability and repair](Durability.md) when a previously suitable tool stops
 - [Coal](../items/Coal.md)
 - [Pewen tool caveats](../blocks/Pewen.md#recipes-and-tools-that-need-caution)
 - [Mechanics](Mechanics.md)
+
+For reward conditions across other acquisition routes, see [Loot and drops](LootAndDrops.md).
 
 ## Sources and verification
 

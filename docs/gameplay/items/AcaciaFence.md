@@ -1,26 +1,41 @@
 # Acacia Fence
 
+**Acacia Fence** (`minecraft:acacia_fence`) forms railings and barriers. The [Wood construction fence guide](../blocks/WoodConstruction.md#fences) covers its shared connection and collision rules. [Item registration][item]
+
 ## Obtaining
 
-Acacia Fences are crafted from Acacia Planks and Sticks. They can also be obtained from MattMC's JEI-style combined creative menu.
+At a [Crafting Table](../blocks/CraftingTable.md), fill **2 rows with Acacia Planks–Stick–Acacia Planks**: **4 [Acacia Planks](AcaciaPlanks.md) + 2 [Sticks](Stick.md) → 3 Acacia Fences**. Every plank slot requires Acacia Planks; other plank materials cannot substitute in this recipe. [Recipe][recipe]
+
+Ordinary Survival mining returns **1 Acacia Fence**, including by hand. No tool or material tier is required for that drop; an **unbroken axe** is faster. Silk Touch and Fortune do not change the bundled loot result. See [mining and drops](../blocks/WoodConstruction.md#mining-and-drops) for shared tool and explosion rules. [Loot][loot] · [Block registration][block]
 
 ## Usage
 
-Acacia Fences are used as barriers, railings, animal pens, and decorative trim.
+Use Acacia Fences for railings, pens, or decorative trim. Use a matching [Acacia Fence Gate](AcaciaFenceGate.md) where you need a passage.
 
-Fences can also be used as lead anchors. Use a lead on a fence to tie a compatible mob to it.
+To anchor nearby eligible entities **already leashed to you**, use the fence with an empty hand. This transfers their connections to a fence knot without consuming another Lead. See [Lead: fence knots](Lead.md#fence-knots) for attaching, releasing, and cutting connections. [Fence interaction][fence] · [Binding action][lead-bind]
 
 ## Behavior
 
-Fence blocks connect to nearby fences, fence gates, and many solid blocks. Wooden fences connect to other wooden fences, but not to Nether brick fences.
+Acacia Fence connects horizontally to the other tagged wooden fences, including Crimson and Warped, suitable sturdy side faces, and correctly oriented fence gates. See [fence connections](../blocks/WoodConstruction.md#fences) for exceptions and the separate Nether Brick Fence group. [Connection checks][fence] · [Wooden-fence tag][fence-tag]
 
-Although a fence visually occupies one block of height, its entity collision is 1.5 blocks tall. This prevents most mobs from jumping over it under normal conditions.
-
-Players can see through the gaps in a fence, and light passes through it. Spiders can climb fences like other vertical surfaces, and some mobs with special movement can bypass normal fence containment.
-
-Placing carpet, moss carpet, or a trapdoor on top of a fence can let players cross it while most mobs still cannot.
+Its collision reaches **1.5 blocks high**, above the visible one-block post. It can be waterlogged, and losing a rail connection changes the shape without removing the fence. See [waterlogging](../blocks/WoodConstruction.md#waterlogging-and-power) for placement and bucket rules. [Fence dimensions and updates][fence] · [Collision and water state][cross]
 
 ## Notes
 
-* This item is the item form of the `minecraft:acacia_fence` block.
-* In MattMC, the creative tab menu has been replaced with a JEI-style combined menu.
+A placed Acacia Fence can burn when it is not waterlogged. Its item supplies **300 default furnace burn ticks**. See [fire and furnace fuel](../blocks/WoodConstruction.md#fire-and-furnace-fuel) for the waterlogging and fuel details. [Fire rules][fire] · [Fuel rules][fuel] · [Fence fire entries][fire-entry]
+
+Related: [Acacia Planks](AcaciaPlanks.md) · [Acacia Fence Gate](AcaciaFenceGate.md) · [Items](Items.md)
+
+Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. No in-game crafting, mining, placement, leashing, fire, or furnace test was run.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L497-L497
+[block]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Blocks.java#L4053-L4062
+[recipe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/acacia_fence.json
+[loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/acacia_fence.json
+[fence]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/FenceBlock.java#L37-L124
+[fence-tag]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/tags/block/wooden_fences.json
+[cross]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/CrossCollisionBlock.java#L23-L80
+[lead-bind]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/LeadItem.java#L35-L58
+[fire]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/FireBlock.java#L223-L243
+[fuel]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/entity/FuelValues.java#L38-L108
+[fire-entry]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/FireBlock.java#L342-L351

@@ -8,6 +8,14 @@ impl WorldPrimitiveFrontend {
         update: ShaderPackSourceUpdate,
     ) -> GalResult<()> {
         self.shader_pack_sources.apply_update(update)?;
+        let overworld_policy = self
+            .shader_pack_sources
+            .active_shadow_policy_for_scope(TerrainProgramScope::Overworld)
+            .ok()
+            .flatten();
+        if let Ok(mut policy) = self.entity_shadow_policy.lock() {
+            *policy = overworld_policy;
+        }
         self.post_effect_source_cache.get_mut().clear();
         // Converted source streams embed the pack's block-state material
         // mapping; a new source generation must not reuse them.
@@ -16,12 +24,19 @@ impl WorldPrimitiveFrontend {
         self.validated_source_terrain_meshes.clear();
         self.source_terrain_validated_identities.clear();
         self.source_terrain_range_memo.clear();
+        self.clear_retained_source_terrain_meshes();
         self.reset_candidate_source_occupancy_stability();
         self.source_execution_armed = false;
         self.source_execution_activation_reported = false;
         self.source_execution_distant_horizons_reported = false;
         self.observe_shader_pack_source_candidate();
         Ok(())
+    }
+
+    /// A standalone handle answering shadow-pass entity admission without
+    /// access to this frontend (see [`EntityShadowQuery`]).
+    pub(crate) fn entity_shadow_query(&self) -> EntityShadowQuery {
+        EntityShadowQuery::new(self.entity_shadow_policy.clone())
     }
 
     /// A prepared source mesh contains source-generation material identities.
@@ -141,7 +156,11 @@ impl WorldPrimitiveFrontend {
         if has_matching_runtime {
             return Ok(());
         }
+        if self.shader_runtime.as_ref().is_some_and(|runtime| runtime.generation() != generation) {
+            self.release_cached_source_consumers(gal);
+        }
         if let Some(previous) = self.shader_runtime.take() {
+            self.release_source_color_consumers(gal);
             // The LOD pass caches resource sets that reference the runtime's
             // lightmap view. Runtime replacement owns that view's retirement,
             // so remove its consumers before destroying the previous runtime.
@@ -648,20 +667,12 @@ impl WorldPrimitiveFrontend {
         let weather_batches = source_weather_material_batches(frame)?;
         let cloud_batches = source_cloud_material_batches(frame)?;
         let clouds_suppressed = runtime.suppresses_vanilla_cloud_faces();
-        if !textured_batches.is_empty() {
-            let material = runtime
-                .prepared_lowered_textured_material_source_program()?
-                .ok_or_else(|| {
-                    GalError::unsupported_feature(
-                        "selected source scalar admission has material work but no admitted gbuffers_textured program",
-                    )
-                })?;
-            for batch in textured_batches {
-                let mut material_uniforms = base_uniforms.clone();
-                material_uniforms.render_stage =
-                    Some(self.source_render_stage_for_material_mode(batch.material_mode)?);
-                material.pack_scalar_uniforms(&material_uniforms)?;
-            }
+        for batch in textured_batches {
+            let material = self.source_program_for_material_batch(frame, batch)?;
+            let mut material_uniforms = base_uniforms.clone();
+            material_uniforms.render_stage = Some(self.source_render_stage_for_material_mode(batch.material_mode)?);
+            self.apply_material_producer_source_uniforms(frame, batch, &mut material_uniforms)?;
+            material.pack_scalar_uniforms(&material_uniforms)?;
         }
         if !weather_batches.is_empty() {
             let weather = runtime
@@ -719,9 +730,9 @@ impl WorldPrimitiveFrontend {
         Ok(())
     }
 
-    /// A complete source plan must be prepared and confirmed by prior Rust
-    /// frames before it can replace the internal Rust graph. In particular,
-    /// source discovery alone is never enough to arm the route.
+    /// A complete source plan requires confirmed Rust-owned prerequisites.
+    /// World entry may prepare those offscreen before the same frame's source
+    /// execution; source discovery alone is never enough to arm the route.
     pub(crate) fn arm_runtime_source_execution_if_ready(&mut self, frame: &WorldPrimitiveFrame) {
         self.arm_runtime_source_execution_if_ready_inner(frame);
         // Keep the decision for the user-facing route report: mesh updates
@@ -862,18 +873,46 @@ impl WorldPrimitiveFrontend {
     /// A frame carrying a Java feature family without a source writer is not
     /// admissible: presenting it would silently omit visible work. Keep the
     /// source route unarmed until that family has a real semantic writer.
+    /// The first visible mesh uploaded without retained source semantics
+    /// (built while shaders were off). No source frame can be admitted until
+    /// its rebuild arrives.
+    pub(crate) fn visible_mesh_lacking_source_semantics(
+        &self,
+        frame: &WorldPrimitiveFrame,
+    ) -> Option<(u64, u32, String)> {
+        let lacking = &self.mesh_assets_lacking_source_semantics;
+        if lacking.is_empty() {
+            return None;
+        }
+        let compact_terrain = frame
+            .static_terrain_sections
+            .sections
+            .iter()
+            .map(|section| section.mesh_key)
+            .chain(frame.static_terrain_shadow_casters.casters.iter().map(|caster| caster.mesh_key))
+            .map(|mesh_key| (mesh_key, WORLD_STRATUM_TERRAIN));
+        frame
+            .mesh_instances
+            .iter()
+            .map(|instance| (instance.mesh_key, instance.stratum))
+            .chain(compact_terrain)
+            .find_map(|(mesh_key, stratum)| {
+                lacking.contains(&mesh_key).then(|| {
+                    let identity = self
+                        .mesh_assets
+                        .get(&mesh_key)
+                        .map(|asset| asset.entity_identity.clone())
+                        .unwrap_or_default();
+                    (mesh_key, stratum, identity)
+                })
+            })
+    }
+
     pub(crate) fn validate_selected_source_frame_coverage(
         &mut self,
         frame: &WorldPrimitiveFrame,
     ) -> GalResult<()> {
-        if let Some((mesh_key, stratum, identity)) =
-            frame.mesh_instances.iter().find_map(|instance| {
-                self.mesh_assets.get(&instance.mesh_key).and_then(|asset| {
-                    (source_mesh_layout_has_shader_semantics(asset.vertex_layout_version)
-                        && asset.source_input.is_none())
-                    .then(|| (instance.mesh_key, instance.stratum, asset.entity_identity.clone()))
-                })
-            })
+        if let Some((mesh_key, stratum, identity)) = self.visible_mesh_lacking_source_semantics(frame)
         {
             // Uploaded while shaders were off; the rebuild requested when the
             // source route activated will resend it with source semantics.
@@ -1050,30 +1089,9 @@ impl WorldPrimitiveFrontend {
                 ));
             }
         }
-        if !textured_batches.is_empty() {
-            let staged = stage_source_material_primitives_for_indices(
-                frame,
-                textured_batches.iter().flat_map(|batch| batch.indices()),
-            )?;
-            let runtime = self
-                .shader_runtime
-                .as_ref()
-                .ok_or_else(|| {
-                    GalError::unsupported_feature(
-                        "selected source frame has source-textured material work but no Rust shader runtime",
-                    )
-                })?;
-            let program = runtime
-                .prepared_lowered_textured_material_source_program()?
-                .ok_or_else(|| {
-                    GalError::unsupported_feature(
-                        "selected source frame has source-textured material work but no lowered gbuffers_textured writer",
-                    )
-                })?;
-            // This validates the semantic material stream and source program
-            // ABI at admission time. Per-batch atlas/local resource binding
-            // is staged in the one combined submission below, where a
-            // generation or resource failure remains explicit.
+        for batch in textured_batches {
+            let staged = stage_source_material_primitives_for_indices(frame, batch.indices())?;
+            let program = self.source_program_for_material_batch(frame, batch)?;
             program.pack_material_primitives(&staged)?;
         }
         if !weather_batches.is_empty() {
@@ -1340,6 +1358,68 @@ impl WorldPrimitiveFrontend {
     /// would consume. The source route has one Rust-owned presenter, so it
     /// cannot be armed for a frame that contains an unsupported mesh and then
     /// delegate that mesh to the ordinary graph or Java.
+    /// Validates one source terrain mesh identity `(stratum, key, generation)`
+    /// not yet in the validated memo, and records whether it is translucent.
+    fn validate_source_terrain_identity(
+        &mut self,
+        key: (u32, u64, u64),
+        translucent_stage_status: &mut Option<Option<String>>,
+        any_translucent: &mut bool,
+    ) -> GalResult<()> {
+        self.validate_source_terrain_mesh(key.1, key.2)?;
+        // Scan without allocating; the section list is only needed for
+        // the rejection message.
+        let translucent_asset = self
+            .mesh_assets
+            .get(&key.1)
+            .filter(|asset| asset.mesh_generation == key.2)
+            .filter(|asset| {
+                asset
+                    .sections
+                    .iter()
+                    .any(|section| section.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT)
+            });
+        let is_translucent = translucent_asset.is_some();
+        if let Some(asset) = translucent_asset {
+            *any_translucent = true;
+            let stage_status = translucent_stage_status.get_or_insert_with(|| {
+                match self.shader_runtime.as_ref() {
+                    Some(runtime) => {
+                        match runtime.prepared_lowered_translucent_terrain_source_program() {
+                            Ok(Some(_)) => None,
+                            Ok(None) => Some(
+                                "translucent source contract has not been discovered"
+                                    .to_string(),
+                            ),
+                            Err(reason) => Some(reason.to_string()),
+                        }
+                    }
+                    None => Some("shader runtime is unavailable".to_string()),
+                }
+            });
+            let Some(stage_status) = stage_status else {
+                self.source_terrain_validated_identities.insert(key, true);
+                return Ok(());
+            };
+            let translucent_sections = asset
+                .sections
+                .iter()
+                .enumerate()
+                .filter_map(|(index, section)| {
+                    (section.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT).then_some(index)
+                })
+                .collect::<Vec<_>>();
+            return Err(GalError::unsupported_feature(format!(
+                "selected source terrain mesh {} generation {} has unsupported translucent section ranges {:?}; {stage_status}",
+                key.1, key.2, translucent_sections
+            )));
+        }
+        if !is_translucent {
+            self.source_terrain_validated_identities.insert(key, false);
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate_source_meshes_for_frame(&mut self, frame: &WorldPrimitiveFrame) -> GalResult<()> {
         let material_ids = self
             .shader_runtime
@@ -1352,19 +1432,15 @@ impl WorldPrimitiveFrontend {
                 && instance.stratum != WORLD_STRATUM_ENTITY_SHADOW_CASTER
                 && instance.stratum != WORLD_STRATUM_ENTITY_MESH
         };
-        let identities = frame
-            .mesh_instances
-            .iter()
-            .filter(|instance| is_terrain(instance))
-            .map(|instance| (instance.stratum, instance.mesh_key, instance.mesh_generation))
-            .collect::<Vec<_>>();
+        let mut terrain_identity_count = 0usize;
         let stamp = (material_ids, pack_generation);
         if self.source_terrain_validated_stamp != Some(stamp) {
             self.source_terrain_validated_identities.clear();
             self.source_terrain_validated_stamp = Some(stamp);
         }
         let mut any_translucent = false;
-        let mut seen = BTreeSet::new();
+        // Only identities missing from the validated memo need deduplication.
+        let mut seen = MeshKeySet::default();
         // The translucent writer's availability is frame-invariant; resolve it
         // at most once instead of per translucent mesh.
         let mut translucent_stage_status: Option<Option<String>> = None;
@@ -1382,14 +1458,15 @@ impl WorldPrimitiveFrontend {
                 instance.mesh_key,
                 instance.mesh_generation,
             );
-            if !seen.insert(key) {
-                continue;
-            }
             if is_terrain(instance) {
+                terrain_identity_count += 1;
                 if let Some(translucent) = self.source_terrain_validated_identities.get(&key) {
                     any_translucent |= *translucent;
                     continue;
                 }
+            }
+            if !seen.insert(key) {
+                continue;
             }
             if instance.stratum == WORLD_STRATUM_ENTITY_SHADOW_CASTER {
                 // Shadow-only casters (Iris `shadowPlayer`) never reach a
@@ -1438,57 +1515,29 @@ impl WorldPrimitiveFrontend {
                 }
                 continue;
             }
-            self.validate_source_terrain_mesh(instance.mesh_key, instance.mesh_generation)?;
-            // Scan without allocating; the section list is only needed for
-            // the rejection message.
-            let translucent_asset = self
-                .mesh_assets
-                .get(&instance.mesh_key)
-                .filter(|asset| asset.mesh_generation == instance.mesh_generation)
-                .filter(|asset| {
-                    asset
-                        .sections
-                        .iter()
-                        .any(|section| section.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT)
-                });
-            let is_translucent = translucent_asset.is_some();
-            if let Some(asset) = translucent_asset {
-                any_translucent = true;
-                let stage_status = translucent_stage_status.get_or_insert_with(|| {
-                    match self.shader_runtime.as_ref() {
-                        Some(runtime) => {
-                            match runtime.prepared_lowered_translucent_terrain_source_program() {
-                                Ok(Some(_)) => None,
-                                Ok(None) => Some(
-                                    "translucent source contract has not been discovered"
-                                        .to_string(),
-                                ),
-                                Err(reason) => Some(reason.to_string()),
-                            }
-                        }
-                        None => Some("shader runtime is unavailable".to_string()),
-                    }
-                });
-                let Some(stage_status) = stage_status else {
-                    self.source_terrain_validated_identities.insert(key, true);
-                    continue;
-                };
-                let translucent_sections = asset
-                    .sections
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, section)| {
-                        (section.material_mode == WORLD_MATERIAL_MODE_TRANSLUCENT).then_some(index)
-                    })
-                    .collect::<Vec<_>>();
-                return Err(GalError::unsupported_feature(format!(
-                    "selected source terrain mesh {} generation {} has unsupported translucent section ranges {:?}; {stage_status}",
-                    instance.mesh_key, instance.mesh_generation, translucent_sections
-                )));
+            self.validate_source_terrain_identity(key, &mut translucent_stage_status, &mut any_translucent)?;
+        }
+        // Compact static terrain the shader route's scene draws.
+        for mesh_key in frame
+            .static_terrain_sections
+            .sections
+            .iter()
+            .map(|section| section.mesh_key)
+            .chain(frame.static_terrain_shadow_casters.casters.iter().map(|caster| caster.mesh_key))
+        {
+            let Some(mesh_generation) = self.static_terrain_resident_generation(mesh_key) else {
+                continue;
+            };
+            let key = (WORLD_STRATUM_TERRAIN, mesh_key, mesh_generation);
+            terrain_identity_count += 1;
+            if let Some(translucent) = self.source_terrain_validated_identities.get(&key) {
+                any_translucent |= *translucent;
+                continue;
             }
-            if !is_translucent {
-                self.source_terrain_validated_identities.insert(key, false);
+            if !seen.insert(key) {
+                continue;
             }
+            self.validate_source_terrain_identity(key, &mut translucent_stage_status, &mut any_translucent)?;
         }
         // Retained translucent meshes still need a translucent writer now.
         if any_translucent
@@ -1504,8 +1553,17 @@ impl WorldPrimitiveFrontend {
             ));
         }
         // Bound the cache to identities still visible.
-        if self.source_terrain_validated_identities.len() > identities.len().saturating_mul(2).max(4096) {
-            let visible = identities.iter().copied().collect::<std::collections::HashSet<_>>();
+        if self.source_terrain_validated_identities.len() > terrain_identity_count.saturating_mul(2).max(4096) {
+            let visible = frame
+                .mesh_instances
+                .iter()
+                .filter(|instance| is_terrain(instance))
+                .map(|instance| (instance.stratum, instance.mesh_key, instance.mesh_generation))
+                .chain(
+                    self.compact_static_terrain_identities(frame)
+                        .map(|(mesh_key, generation)| (WORLD_STRATUM_TERRAIN, mesh_key, generation)),
+                )
+                .collect::<MeshKeySet<_>>();
             self.source_terrain_validated_identities.retain(|key, _| visible.contains(key));
         }
         Ok(())
@@ -1515,8 +1573,8 @@ impl WorldPrimitiveFrontend {
     /// drawn by the vanilla Rust renderer. Say so (and why) on stderr each
     /// time the outcome changes, so a fallback is never silent.
     /// A resized frame cannot reuse the armed source route's extent-bound
-    /// resources. Disarm so this frame renders through the ordinary graph,
-    /// which prepares resources at the new extent; admission re-arms later.
+    /// resources. Disarm so private entry preparation can rebuild resources
+    /// at the new extent before this frame's selected-source execution.
     pub(crate) fn disarm_source_route_on_extent_change(&mut self, frame: &WorldPrimitiveFrame) {
         let extent = (frame.viewport_width, frame.viewport_height);
         if self
@@ -1532,6 +1590,11 @@ impl WorldPrimitiveFrontend {
             ));
         }
         self.last_source_route_extent = Some(extent);
+    }
+
+    /// The active pack's packed cloud directives (see `ShaderPackCloudPolicy::packed`).
+    pub fn shader_pack_cloud_settings(&self) -> u32 {
+        self.shader_pack_sources.active_cloud_policy().map_or(0, |policy| policy.packed())
     }
 
     /// Admits an armed frame before any source work is recorded. A frame the
@@ -1604,13 +1667,13 @@ impl WorldPrimitiveFrontend {
             return;
         }
         match &outcome {
-            Some(text) => eprintln!(
+            Some(text) => crate::core::console::stderr(format_args!(
                 "[MattMC shaders] frame {} shader route {}",
                 frame.frame_id,
                 text
-            ),
+            )),
             None if self.last_reported_shader_route_outcome.is_some() => {
-                eprintln!("[MattMC shaders] frame {} shader route off", frame.frame_id)
+                crate::core::console::stderr(format_args!("[MattMC shaders] frame {} shader route off", frame.frame_id))
             }
             None => {}
         }

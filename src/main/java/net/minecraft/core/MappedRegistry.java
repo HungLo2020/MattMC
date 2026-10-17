@@ -43,6 +43,9 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
 	private final Map<TagKey<T>, HolderSet.Named<T>> frozenTags = new IdentityHashMap();
 	MappedRegistry.TagSet<T> allTags = MappedRegistry.TagSet.unbound();
 	private boolean frozen;
+
+	/** Whether registry values and their numeric IDs are sealed for native consumers. */
+	public boolean isFrozen() { return this.frozen; }
 	@Nullable
 	private Map<T, Holder.Reference<T>> unregisteredIntrusiveHolders;
 
@@ -268,6 +271,11 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
 		return this.byKey.containsKey(resourceKey);
 	}
 
+	/** Binds registered values to their holders ahead of {@link #freeze}, which binds them again. */
+	public void bindRegisteredValues() {
+		this.byValue.forEach((object, reference) -> reference.bindValue(object));
+	}
+
 	@Override
 	public Registry<T> freeze() {
 		if (this.frozen) {
@@ -356,6 +364,7 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
 			}
 		});
 		map.forEach(Holder.Reference::bindTags);
+		NativeRegistrySnapshot.tagsChanged(this);
 	}
 
 	public void bindAllTagsToEmpty() {

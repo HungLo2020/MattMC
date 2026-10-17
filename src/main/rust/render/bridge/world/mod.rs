@@ -4,16 +4,24 @@
 mod exports;
 mod whole_frame;
 mod meshes;
+mod item_poses;
 mod first_person;
 mod lod;
 mod dh_boxes;
+mod dh_generic_groups;
 mod environment;
 mod assets;
 mod background;
+mod stars;
 mod mesh_assets;
+mod entity_shadow_query;
+mod model_rigs;
+mod terrain_intake;
+mod terrain_publication;
 
 pub(crate) use self::whole_frame::*;
 pub(crate) use self::meshes::*;
+pub(crate) use self::item_poses::resolve_item_pose;
 use self::first_person::*;
 pub(crate) use self::lod::*;
 use self::dh_boxes::*;

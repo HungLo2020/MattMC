@@ -21,7 +21,7 @@ Oak planks belong to the broad **planks** ingredient tag and, through it, the **
 - [Sticks](Stick.md#crafting): handles, torches, and other small components
 - [Wooden Pickaxe](WoodenPickaxe.md): the recipe accepts oak planks for its head and sticks for its handle
 
-Use the linked pages and recipe book for layouts. These are selected recipes, not a complete list of furniture, tools, or oak building forms. [Planks tag][planks-tag] · [Tool-material tag][tool-tag] · [Crafting Table recipe][table] · [Stick recipe][sticks] · [Wooden Pickaxe recipe][pickaxe]
+Use the linked pages for layouts. These are selected recipes, not a complete list of furniture, tools, or oak building forms. [Planks tag][planks-tag] · [Tool-material tag][tool-tag] · [Crafting Table recipe][table] · [Stick recipe][sticks] · [Wooden Pickaxe recipe][pickaxe]
 
 ## Fuel
 

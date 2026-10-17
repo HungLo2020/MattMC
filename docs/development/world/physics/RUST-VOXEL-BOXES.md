@@ -130,3 +130,20 @@ all workloads, raw-artifact locations and scope. `results.json` and the four
 matching final source/library hashes. Early failed timings were corrected and
 are separately labeled historical. These results describe this caller after
 warmup, not arbitrary user callbacks, cold startup or whole-game performance.
+
+The source audit also permits the separately pinned
+[closest-point dispatch](RUST-VOXEL-CLOSEST-POINT.md). Its Java reference caller
+and the established extraction/rotation algorithms remain unchanged.
+It also permits the separately pinned
+[outside-ray dispatch](RUST-VOXEL-RAYCAST.md).
+
+The ray/shape migration adds an occupancy-derived shortcut for full grids and
+single strictly interior rectangular cavities. It proves every word and emits
+the original one/six ordered boxes. Arbitrary occupancy keeps the established
+visitor; the Rust per-cell oracle verifies shortcuts and changed-cell rejection.
+Earlier timings above precede this shared optimization.
+
+The admitted [DH height-field owner](../chunk/RUST-DH-HEIGHTMAPS.md) also
+admits exact built-in shape/grid classes for a one-time intrinsic geometry
+export. It does not transfer GPU state or replace contextual collision queries.
+Its CPU and runtime verification are recorded separately from the timings above.

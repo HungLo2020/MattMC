@@ -30,8 +30,7 @@ class StandardItemFoilResourceTest {
         assertTrue(ground.contains("\"minecraft:item_entity/ground-glint\", true)"));
         assertTrue(ground.contains("glintInstance.withItemFoil(standardFoil)"));
         assertFalse(ground.contains("standardItemFoilUv"));
-        int first = source.indexOf("private static BlockMeshExtraction extractItemQuadMesh(");
-        int body = source.indexOf("private static BlockMeshExtraction extractItemQuadMesh(", first + 1);
+        int body = source.indexOf("private static BlockMeshExtraction extractItemQuadMeshUncached(");
         var extraction = source.substring(body, source.indexOf("\n\tprivate static", body + 1));
         assertFalse(extraction.contains("ticks % 110000L"));
         assertFalse(extraction.contains("specialFoilInversePose"));
@@ -87,7 +86,7 @@ class StandardItemFoilResourceTest {
         assertTrue(start >= 0 && end > start);
         var extraction = source.substring(start, end);
         assertTrue(extraction.contains("if (glint) {"));
-        assertTrue(extraction.contains("semanticFoilTexture = copyStandardItemFoilTexture("));
+        assertTrue(extraction.contains("semanticFoilTexture = cachedStandardItemFoilTexture("));
         assertTrue(extraction.contains("textures.add(semanticFoilTexture)"));
         assertFalse(extraction.contains("if (nativeStandardFoil)"),
             "shared resource identity must not alternate explicit and unspecified sampling between producers");

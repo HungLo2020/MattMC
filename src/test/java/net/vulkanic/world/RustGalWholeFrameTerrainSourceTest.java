@@ -1,50 +1,17 @@
 package net.vulkanic.world;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Selection policy inputs of the whole-frame terrain source. The selection
+ * itself (Frozen's occlusion culler and section tree) is Rust's and is tested
+ * in {@code render/chunk/section_graph}.
+ */
 class RustGalWholeFrameTerrainSourceTest {
-    private static final Path ROOT = Path.of(System.getProperty("user.dir"));
-
-
-
-
-
-
-
-	private static void assertViewDistanceActionInvalidatesSettledReceipt(String source, int actionStart, int actionEnd) {
-		int renderDistance = source.indexOf("minecraft.options.renderDistance().set", actionStart);
-		int simulationDistance = source.indexOf("minecraft.options.simulationDistance().set", renderDistance);
-		int invalidation = source.indexOf("invalidateRustWholeFrameTerrainReadiness();", simulationDistance);
-		assertTrue(renderDistance >= actionStart
-			&& simulationDistance > renderDistance
-			&& invalidation > simulationDistance
-			&& invalidation < actionEnd,
-			"a view-distance action must invalidate the pre-change settled receipt");
-	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 	@Test
 	void terrainSelectionDistanceMatchesFrozensOpaqueFogRule() {
 		assertEquals(128.0f,
@@ -57,5 +24,11 @@ class RustGalWholeFrameTerrainSourceTest {
 			RustGalWholeFrameTerrainSource.terrainSelectionDistance(128.0f, 1.0f, 48.0f, false));
 	}
 
-
+	@Test
+	void spectatorInsideSolidTerrainAndSmartCullOffBypassPortalOcclusion() {
+		assertTrue(RustGalWholeFrameTerrainSource.terrainOcclusionCullingEnabled(true, false));
+		assertFalse(RustGalWholeFrameTerrainSource.terrainOcclusionCullingEnabled(true, true));
+		assertFalse(RustGalWholeFrameTerrainSource.terrainOcclusionCullingEnabled(false, false));
+		assertFalse(RustGalWholeFrameTerrainSource.terrainOcclusionCullingEnabled(false, true));
+	}
 }

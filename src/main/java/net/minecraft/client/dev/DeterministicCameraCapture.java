@@ -1063,9 +1063,9 @@ public final class DeterministicCameraCapture {
 			return -1L;
 		}
 		wholeFrameAttachmentCaptureDeterministicFrame = currentInProgressRenderedFrameIndex();
-		MODEL_CAPTURE_HISTORY.retain(wholeFrameAttachmentCaptureDeterministicFrame,
+		MODEL_CAPTURE_HISTORY.stage(wholeFrameAttachmentCaptureDeterministicFrame,
 			RustGalWorldPrimitiveRenderer.modelMeshDiagnostics());
-		MODEL_ROUTE_CAPTURE_HISTORY.retain(wholeFrameAttachmentCaptureDeterministicFrame,
+		MODEL_ROUTE_CAPTURE_HISTORY.stage(wholeFrameAttachmentCaptureDeterministicFrame,
 			RustGalWorldPrimitiveRenderer.modelMeshRouteDecisions());
 		captureSurfaceObservations();
 		wholeFrameGuiFoilTiming = GraphicsAuditGuiFoilTiming.snapshot();
@@ -1242,6 +1242,8 @@ public final class DeterministicCameraCapture {
 	 * external desktop capture against later swapchain presentations.
 	 */
 	private static boolean captureWholeFrameFinalOutput() {
+		MODEL_CAPTURE_HISTORY.commit(wholeFrameAttachmentCaptureDeterministicFrame);
+		MODEL_ROUTE_CAPTURE_HISTORY.commit(wholeFrameAttachmentCaptureDeterministicFrame);
 		MODEL_EXECUTION_CAPTURE_HISTORY.retain(wholeFrameAttachmentCaptureDeterministicFrame,
 			RustGalWorldPrimitiveRenderer.movingMeshExecutionDiagnostics());
 		net.sodium.client.render.StaticTerrainParityDiagnostics.recordRustFinalOutputCaptureCoverage(
@@ -1920,7 +1922,10 @@ public final class DeterministicCameraCapture {
 				captureCurrentPoseInternally(minecraft);
 			} else {
 				try {
-					if (!GraphicsAuditBlockDisplayFixture.readyForCapture(minecraft)) {
+					if (!GraphicsAuditBlockDisplayFixture.readyForCapture(minecraft)
+						|| !GraphicsAuditGuiFoilTiming.readyForCapture()
+						|| !GraphicsAuditEquipmentFoilTiming.readyForCapture(poseIndex)
+						|| !GraphicsAuditWolfInputs.readyForCapture(minecraft, poseIndex)) {
 						// The pose is already settled. Observe the next normally
 						// rendered frame, not every eighth frame of an animation.
 						// Discard this candidate's readback and arm a fresh one so
@@ -1977,9 +1982,16 @@ public final class DeterministicCameraCapture {
 	 * gate. It never influences source routing or a producer's render decision.
 	 */
 	public static boolean requiresSourceEntityMeshCapture() {
-		return !MODEL_MESH_SCENARIO.isEmpty()
-			&& !"hidden".equals(MODEL_MESH_SCENARIO)
-			&& !"wind-charge".equals(MODEL_MESH_SCENARIO);
+		return requiresSourceEntityMeshCapture(MODEL_MESH_SCENARIO);
+	}
+
+	static boolean requiresSourceEntityMeshCapture(String scenario) {
+		return !scenario.isEmpty()
+			&& !"hidden".equals(scenario)
+			&& !"wind-charge".equals(scenario)
+			// Item-frame backing uses opaque source geometry. Exact source-frame
+			// producer matching still requires its backing and content at capture.
+			&& !isItemFrameScenario(scenario);
 	}
 
 	private static boolean captureStaticTerrainWaterAnimationFrameIfNeeded(Minecraft minecraft) {
@@ -2758,9 +2770,16 @@ public final class DeterministicCameraCapture {
 			&& (!DISTANT_HORIZONS_REQUIRE_WATER || waterExecuted)
 			&& diagnostics.semanticUnpublishedCandidates() == 0;
 		if (requiredStreamsExecuted) {
+			boolean stageChanged = !"real-world-dh-executed".equals(distantHorizonsTexturePaletteStage);
 			distantHorizonsTexturePaletteSourceReady = true;
 			distantHorizonsTexturePaletteStage = "real-world-dh-executed";
-			writeMetadata(minecraft, "distant_horizons_real_world_executed");
+			// Keep checking the live route on every frame, but serialize the full
+			// terrain history only when this stage changes. The settled-work gate
+			// already writes periodic progress and the screenshot writes its receipt.
+			// Rewriting that history every ready DH frame can dominate capture time.
+			if (stageChanged) {
+				writeMetadata(minecraft, "distant_horizons_real_world_executed");
+			}
 			return true;
 		}
 		if (distantHorizonsTexturePaletteWaitFrames > SETTLED_READY_MAX_WAIT_FRAMES) {
@@ -5974,9 +5993,9 @@ public final class DeterministicCameraCapture {
 			// The selected-source entity fixture is spawned from this exact camera
 			// pose. Rotating the camera afterwards turns a valid producer-specific
 			// readback into unrelated world/entity work, which the source receipt
-			// must reject. It needs one exact final frame, not a synthetic pose
-			// sweep. Ordinary model coverage retains its existing multi-pose path.
-			fullSequence = selectedSourceCaptureRequested() && isModelMeshEntityScenario()
+			// must reject. Item frames retain the repeated, fixed-camera sequence:
+			// their backing/content correlation requires separately completed frames.
+			fullSequence = selectedSourceCaptureRequested() && isModelMeshEntityScenario() && !isItemFrameScenario()
 				? new Pose[] { initialPose }
 				: movingMeshPoseSequence(MODEL_MESH_SCENARIO, initialPose, 5);
 		} else if (!PRIMED_TNT_SCENARIO.isEmpty() && !"hidden".equals(PRIMED_TNT_SCENARIO)) {
@@ -6329,8 +6348,16 @@ public final class DeterministicCameraCapture {
 		if (REQUIRED_RUST_SOURCE_EXECUTION_DIR.isEmpty()) {
 			return true;
 		}
-		Path directory = Path.of(REQUIRED_RUST_SOURCE_EXECUTION_DIR);
+		return hasSourceExecutionReceiptForFrame(Path.of(REQUIRED_RUST_SOURCE_EXECUTION_DIR), gameplayFrameId);
+	}
+
+	static boolean hasSourceExecutionReceiptForFrame(Path directory, long gameplayFrameId) {
+		// Per-frame files record activations, not every steady-state frame.
+		// The bounded latest receipt still has to match this exact gameplay id.
 		return sourceExecutionReceiptMatchesGameplayFrame(
+			directory.resolve("selected-source-execution-latest.json"),
+			gameplayFrameId
+		) || sourceExecutionReceiptMatchesGameplayFrame(
 			directory.resolve("selected-source-execution-frame-" + gameplayFrameId + ".json"),
 			gameplayFrameId
 		) || sourceExecutionReceiptMatchesGameplayFrame(
@@ -7066,6 +7093,7 @@ public final class DeterministicCameraCapture {
 		net.minecraft.client.particle.GraphicsAuditAtlasParticleFixture.install(Minecraft.getInstance());
 		net.minecraft.client.particle.GraphicsAuditShriekParticleFixture.install(Minecraft.getInstance());
 		net.minecraft.client.particle.GraphicsAuditVibrationParticleFixture.install(Minecraft.getInstance());
+		net.minecraft.client.particle.GraphicsAuditLeafParticleFixture.install(Minecraft.getInstance());
 	}
 
 	private static ForcedBlockOutlineTarget findForcedBlockOutlineTarget(ClientLevel level, LocalPlayer player) {
@@ -10700,16 +10728,20 @@ if ("horse-dark-brown-black-dots-marked-saddled".equals(MODEL_MESH_SCENARIO)) co
 	}
 
 	private static boolean isItemFrameScenario() {
-		return "item-frame".equals(MODEL_MESH_SCENARIO) || "item-frame-invisible".equals(MODEL_MESH_SCENARIO)
-			|| "glow-item-frame".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-invisible".equals(MODEL_MESH_SCENARIO)
-			|| "item-frame-item".equals(MODEL_MESH_SCENARIO) || "item-frame-map".equals(MODEL_MESH_SCENARIO)
-			|| "item-frame-item-rotated".equals(MODEL_MESH_SCENARIO) || "item-frame-map-rotated".equals(MODEL_MESH_SCENARIO)
-			|| "item-frame-map-decorated".equals(MODEL_MESH_SCENARIO)
-			|| "item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
-			|| "glow-item-frame-item-invisible".equals(MODEL_MESH_SCENARIO)
-			|| "glow-item-frame-item".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-map".equals(MODEL_MESH_SCENARIO)
-			|| "glow-item-frame-item-rotated".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-map-rotated".equals(MODEL_MESH_SCENARIO)
-			|| "item-frame-map-invisible".equals(MODEL_MESH_SCENARIO) || "glow-item-frame-map-invisible".equals(MODEL_MESH_SCENARIO);
+		return isItemFrameScenario(MODEL_MESH_SCENARIO);
+	}
+
+	private static boolean isItemFrameScenario(String scenario) {
+		return "item-frame".equals(scenario) || "item-frame-invisible".equals(scenario)
+			|| "glow-item-frame".equals(scenario) || "glow-item-frame-invisible".equals(scenario)
+			|| "item-frame-item".equals(scenario) || "item-frame-map".equals(scenario)
+			|| "item-frame-item-rotated".equals(scenario) || "item-frame-map-rotated".equals(scenario)
+			|| "item-frame-map-decorated".equals(scenario)
+			|| "item-frame-item-invisible".equals(scenario)
+			|| "glow-item-frame-item-invisible".equals(scenario)
+			|| "glow-item-frame-item".equals(scenario) || "glow-item-frame-map".equals(scenario)
+			|| "glow-item-frame-item-rotated".equals(scenario) || "glow-item-frame-map-rotated".equals(scenario)
+			|| "item-frame-map-invisible".equals(scenario) || "glow-item-frame-map-invisible".equals(scenario);
 	}
 
 	private static boolean isSpawnerModelScenario() {
@@ -17747,6 +17779,7 @@ json.append("  \"horseChestnutBlackDotsMarkedSaddleFixture\": ").append(horseChe
 		json.append("\"semanticColumnsReplaced\": ").append(route.semanticColumnsReplaced()).append(", ");
 		appendField(json, "lastPayloadDifference", route.lastPayloadDifference(), 0).append(", ");
 		json.append("\"lifecycleResetCount\": ").append(route.lifecycleResetCount()).append(", ");
+		json.append("\"staleRouteExecutionReceipts\": ").append(net.vulkanic.world.DistantHorizonsSemanticCollector.staleRouteExecutionReceipts()).append(", ");
 		json.append("\"resourceReloadResetCount\": ").append(route.resourceReloadResetCount()).append(", ");
 		json.append("\"worldUnloadResetCount\": ").append(route.worldUnloadResetCount()).append(", ");
 		appendField(json, "lastLifecycleResetReason", route.lastLifecycleResetReason(), 0).append(", ");

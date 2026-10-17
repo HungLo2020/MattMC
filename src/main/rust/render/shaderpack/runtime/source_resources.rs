@@ -111,6 +111,7 @@ pub(super) struct TerrainSourceShadowDepthResources {
     pub(super) primary_combined_sampler: Handle,
     pub(super) secondary_combined_sampler: Handle,
     pub(super) raw_combined_sampler: Option<Handle>,
+    pub(super) raw_secondary_combined_sampler: Option<Handle>,
 }
 
 #[derive(Debug)]
@@ -171,6 +172,11 @@ impl TerrainSourceShadowDepthResources {
                     shape: TerrainSourceSampledResourceShape::Texture2d,
                     resource_generation: self.shader_graph_generation,
                 }
+            }))
+            .chain(self.raw_secondary_combined_sampler.map(|_| TerrainSourceResourceAvailability {
+                role: TerrainSourceResourceRole::ShadowDepthRawSecondary,
+                shape: TerrainSourceSampledResourceShape::Texture2d,
+                resource_generation: self.shader_graph_generation,
             })),
         )?;
         TerrainSourceOwnedResourceSet::new(
@@ -191,12 +197,19 @@ impl TerrainSourceShadowDepthResources {
                     role: TerrainSourceResourceRole::ShadowDepthRaw,
                     combined_sampler,
                 }
+            }))
+            .chain(self.raw_secondary_combined_sampler.map(|combined_sampler| {
+                crate::render::shaderpack::resources::bindings::TerrainSourceOwnedResource {
+                    role: TerrainSourceResourceRole::ShadowDepthRawSecondary,
+                    combined_sampler,
+                }
             })),
         )
     }
 
     pub(super) fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
         for handle in [
+            self.raw_secondary_combined_sampler,
             self.raw_combined_sampler,
             Some(self.secondary_combined_sampler),
             Some(self.primary_combined_sampler),
@@ -207,7 +220,8 @@ impl TerrainSourceShadowDepthResources {
         .into_iter()
         .flatten()
         {
-            gal.destroy(handle)?;
+            // Frontend pack sets of the old generation may still bind these.
+            gal.retire(handle)?;
         }
         Ok(())
     }
@@ -256,7 +270,7 @@ impl TerrainSourceShadowColorResources {
 
     pub(super) fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
         for (_, combined_sampler) in self.combined_samplers.into_iter().rev() {
-            gal.destroy(combined_sampler)?;
+            gal.retire(combined_sampler)?;
         }
         Ok(())
     }
@@ -314,7 +328,8 @@ impl TerrainSourceMainDepthResources {
 
     pub(super) fn destroy(self, gal: &mut VulkanicGal) -> GalResult<()> {
         for (_, handle) in self.combined_samplers.into_iter().rev() {
-            gal.destroy(handle)?;
+            // Frontend pack sets of the old generation may still bind these.
+            gal.retire(handle)?;
         }
         Ok(())
     }
@@ -371,6 +386,7 @@ impl ShaderPackRuntimeExecutor {
             &resource_binding_plans,
         )?;
         if let Some(previous) = self.source_asset_resources.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(true)
@@ -394,6 +410,7 @@ impl ShaderPackRuntimeExecutor {
         self.clear_candidate_source_shadow_color_resources(gal)?;
         self.clear_candidate_source_material_texture_resources(gal)?;
         if let Some(previous) = self.source_asset_resources.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())
@@ -463,7 +480,8 @@ impl ShaderPackRuntimeExecutor {
     ) -> Vec<TerrainSourceResourceRole> {
         let declared_outputs = declared_outputs.into_iter().collect::<BTreeSet<_>>();
         self.source_required_resource_roles_for_frame(includes_distant_horizons)
-            .into_iter()
+            .iter()
+            .cloned()
             .filter(|role| {
                 !declared_outputs.contains(role)
                     && prepared
@@ -711,6 +729,9 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         let resources = std::mem::take(&mut self.source_material_texture_resources);
+        if !resources.is_empty() {
+            self.release_parked_fullscreen_plans(gal);
+        }
         for (_, resource) in resources {
             gal.destroy(resource.combined_sampler)?;
         }
@@ -732,7 +753,8 @@ impl ShaderPackRuntimeExecutor {
             .candidate_source_requires_resource(TerrainSourceResourceRole::ShadowDepthSecondary);
         let requires_raw =
             self.candidate_source_requires_resource(TerrainSourceResourceRole::ShadowDepthRaw);
-        if !requires_primary && !requires_secondary && !requires_raw {
+        let requires_raw_secondary = self.candidate_source_requires_resource(TerrainSourceResourceRole::ShadowDepthRawSecondary);
+        if !requires_primary && !requires_secondary && !requires_raw && !requires_raw_secondary {
             self.clear_candidate_source_shadow_depth_resources(gal)?;
             return Ok(None);
         }
@@ -752,7 +774,9 @@ impl ShaderPackRuntimeExecutor {
         if self
             .source_shadow_depth_resources
             .as_ref()
-            .is_some_and(|resources| resources.compatible_with(input))
+            .is_some_and(|resources| resources.compatible_with(input)
+                && (!requires_raw || resources.raw_combined_sampler.is_some())
+                && (!requires_raw_secondary || resources.raw_secondary_combined_sampler.is_some()))
         {
             return self
                 .source_shadow_depth_resources
@@ -783,7 +807,7 @@ impl ShaderPackRuntimeExecutor {
             let secondary_sampler =
                 gal.create_sampler(compare_desc(format!("{label_prefix}.secondary")))?;
             created.push(secondary_sampler);
-            let raw_sampler = if requires_raw {
+            let raw_sampler = if requires_raw || requires_raw_secondary {
                 let sampler = gal.create_sampler(SamplerDesc {
                     label: format!("{label_prefix}.raw"),
                     min_filter: SamplerFilter::Nearest,
@@ -828,6 +852,18 @@ impl ShaderPackRuntimeExecutor {
             } else {
                 None
             };
+            let raw_secondary_combined_sampler = if requires_raw_secondary {
+                if input.shadow_depth_secondary_view == Handle::NULL {
+                    return Err(GalError::unsupported_feature("raw secondary shadow depth requires the distinct opaque-only snapshot"));
+                }
+                let combined = gal.create_combined_texture_sampler(CombinedTextureSamplerDesc {
+                    label: format!("{label_prefix}.raw-secondary.combined"),
+                    texture_view: input.shadow_depth_secondary_view,
+                    sampler: raw_sampler.expect("raw secondary requires a non-comparison sampler"),
+                })?;
+                created.push(combined);
+                Some(combined)
+            } else { None };
             Ok(TerrainSourceShadowDepthResources {
                 shader_pack_generation: input.shader_pack_generation,
                 world_generation: input.world_generation,
@@ -838,18 +874,20 @@ impl ShaderPackRuntimeExecutor {
                 primary_combined_sampler,
                 secondary_combined_sampler,
                 raw_combined_sampler,
+                raw_secondary_combined_sampler,
             })
         })();
         let replacement = match result {
             Ok(resources) => resources,
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 return Err(error);
             }
         };
         if let Some(previous) = self.source_shadow_depth_resources.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         self.source_shadow_depth_resources
@@ -863,6 +901,7 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         if let Some(previous) = self.source_shadow_depth_resources.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())
@@ -951,12 +990,13 @@ impl ShaderPackRuntimeExecutor {
             Ok(resources) => resources,
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 return Err(error);
             }
         };
         if let Some(previous) = self.source_shadow_color_resources.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         self.source_shadow_color_resources
@@ -970,6 +1010,7 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         if let Some(previous) = self.source_shadow_color_resources.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())
@@ -1178,12 +1219,13 @@ impl ShaderPackRuntimeExecutor {
             Ok(resources) => resources,
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 return Err(error);
             }
         };
         if let Some(previous) = self.source_main_depth_resources.replace(replacement) {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         self.source_main_depth_resources
@@ -1197,6 +1239,7 @@ impl ShaderPackRuntimeExecutor {
         gal: &mut VulkanicGal,
     ) -> GalResult<()> {
         if let Some(previous) = self.source_main_depth_resources.take() {
+            self.release_parked_fullscreen_plans(gal);
             previous.destroy(gal)?;
         }
         Ok(())

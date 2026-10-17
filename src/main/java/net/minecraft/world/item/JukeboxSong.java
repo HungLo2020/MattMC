@@ -1,7 +1,6 @@
 package net.minecraft.world.item;
 
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Optional;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
@@ -14,19 +13,10 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.RegistryFixedCodec;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraft.util.ExtraCodecs;
 import net.minecraft.util.Mth;
 
 public record JukeboxSong(Holder<SoundEvent> soundEvent, Component description, float lengthInSeconds, int comparatorOutput) {
-	public static final Codec<JukeboxSong> DIRECT_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				SoundEvent.CODEC.fieldOf("sound_event").forGetter(JukeboxSong::soundEvent),
-				ComponentSerialization.CODEC.fieldOf("description").forGetter(JukeboxSong::description),
-				ExtraCodecs.POSITIVE_FLOAT.fieldOf("length_in_seconds").forGetter(JukeboxSong::lengthInSeconds),
-				ExtraCodecs.intRange(0, 15).fieldOf("comparator_output").forGetter(JukeboxSong::comparatorOutput)
-			)
-			.apply(instance, JukeboxSong::new)
-	);
+	public static final Codec<JukeboxSong> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.JUKEBOX_SONG, false, net.minecraft.resources.NativeDataProjections::jukeboxSong, net.minecraft.resources.NativeDataProjections::jukeboxSongOut);
 	public static final StreamCodec<RegistryFriendlyByteBuf, JukeboxSong> DIRECT_STREAM_CODEC = StreamCodec.composite(
 		SoundEvent.STREAM_CODEC,
 		JukeboxSong::soundEvent,

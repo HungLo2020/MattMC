@@ -1,18 +1,49 @@
-﻿# Waxed Copper Grate
+# Waxed Copper Grate
+
+Waxed Copper Grate (`minecraft:waxed_copper_grate`) is the **Unaffected, waxed** item for a waterloggable building block. [Item registration][item-registration] · [Block registration][registration]
 
 ## Obtaining
 
-Waxed Copper Grate can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+- **Stonecutter:** 1 [Waxed Block of Copper](WaxedBlockofCopper.md) → **4 Waxed Copper Grates**. This uses the plain full copper block in exactly this stage and wax state. [Stonecutting recipe][stonecutting]
+- **Crafting Table:** place 4 of those same full blocks at top-center, middle-left, middle-right and bottom-center, leaving the center and corners empty → **4 Waxed Copper Grates**. [Crafting recipe][crafting]
+
+Stonecutting therefore gives four times as many grates per full block as crafting. The complete [conversion table](../blocks/CopperConstruction.md#stonecutter-conversions) compares the other copper shapes.
+
+Combine **1 [Copper Grate](CopperGrate.md) + 1 [Honeycomb](Honeycomb.md)** in any arrangement to make **1 Waxed Copper Grate**. This preserves the Unaffected finish. [Waxing recipe][wax-recipe]
+
+You can also use one Honeycomb on the placed [Copper Grate](CopperGrate.md) and collect the waxed result. [Waxing interaction][waxing]
+
+To collect **1 matching Waxed Copper Grate** from the placed block in Survival, use an **unbroken Stone, Copper, Iron, Diamond or Netherite Pickaxe**. Wooden and Golden Pickaxes do not qualify. An axe changes the finish but is not the harvesting tool; see [copper mining and collection](../blocks/CopperConstruction.md#mining-and-collection). [Exact variant loot][loot] · [Block registration][registration]
 
 ## Usage
 
-Waxed Copper Grate is a copper-family block item used for building, decoration, storage, redstone, or lighting depending on the block type.
+One item places one grate. It can hold water, but its visible grid still has full-block collision. It is not a redstone conductor. See [grates](../blocks/CopperConstruction.md#grates) for water handling, light behavior and collision. [Waterlogged grate implementation][water] · [Block registration][registration]
 
 ## Behavior
 
-When placed, it creates the `minecraft:waxed_copper_grate` block. Waxed variants keep their oxidation state, while unwaxed weathered variants represent their current copper age.
+The placed block stays at the **Unaffected** stage while waxed. One use of an **unbroken axe** removes the wax and produces [Copper Grate](CopperGrate.md), keeping that stage; removing wax does not return Honeycomb. [Wax removal][axe]
+
+The unwaxed result has no earlier oxidation stage to scrape. To let it age, leave that unwaxed block placed; see [oxidation and spacing](../blocks/CopperConstruction.md#oxidation-and-spacing).
+
+Waxing and scraping preserve stored water. See [waxing and scraping](../blocks/CopperConstruction.md#waxing-and-scraping) for conversion controls and axe durability.
 
 ## Notes
 
-* This item is the item form of the `minecraft:waxed_copper_grate` block.
+- This item and [Copper Grate](CopperGrate.md) use the **same bundled item-display model**. Check the item name or ID to distinguish wax status; the model alone does not determine the placed block’s mechanics. [This item definition][display] · [Paired item definition][paired-display]
+- See [Copper construction](../blocks/CopperConstruction.md) for shared placed-block rules, complete recipe comparisons and collection details. [Items](Items.md) lists the individual inventory entries.
 
+## Sources and verification
+
+Source-reviewed at `f5473e41dc4af8ced756db517fada27288df07a3` on **2026-10-04**. Recipes and loot describe bundled data; data packs can replace them, and resource packs can change presentation. No in-game crafting, mining, oxidation, redstone or rendering test was run.
+
+[registration]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/level/block/Blocks.java#L6314-L6354
+[item-registration]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/Items.java#L2610-L2617
+[crafting]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/recipe/crafting/waxed_copper_grate.json
+[stonecutting]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/recipe/stonecutting/waxed_copper_grate_from_waxed_copper_block_stonecutting.json
+[wax-recipe]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/recipe/crafting/waxed_copper_grate_from_honeycomb.json
+[waxing]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/HoneycombItem.java#L29-L114
+[loot]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/loot_table/blocks/waxed_copper_grate.json
+[water]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/level/block/WaterloggedTransparentBlock.java
+[axe]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/AxeItem.java#L62-L118
+[display]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/assets/minecraft/items/waxed_copper_grate.json
+[paired-display]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/assets/minecraft/items/copper_grate.json

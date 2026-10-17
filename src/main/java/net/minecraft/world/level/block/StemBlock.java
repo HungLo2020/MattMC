@@ -53,7 +53,9 @@ public class StemBlock extends VegetationBlock implements BonemealableBlock {
 		this.fruit = resourceKey;
 		this.attachedStem = resourceKey2;
 		this.seed = resourceKey3;
-		this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		}
 	}
 
 	@Override

@@ -21,7 +21,6 @@ import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
 
 public class CherryTrunkPlacer extends TrunkPlacer {
 	private static final Codec<UniformInt> BRANCH_START_CODEC = UniformInt.CODEC
-		.codec()
 		.validate(
 			uniformInt -> uniformInt.getMaxValue() - uniformInt.getMinValue() < 1
 				? DataResult.error(() -> "Need at least 2 blocks variation for the branch starts to fit both branches")

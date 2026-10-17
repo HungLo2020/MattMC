@@ -64,6 +64,13 @@ public interface IMinecraftRenderWrapper extends IBindable
 	ILightMapWrapper getLightmapWrapper(@NotNull ILevelWrapper level);
 	
 	float getShade(EDhDirection lodDirection);
+
+	/** Immutable CPU shade facts for the Rust DH build. */
+	interface NativeShadeFacts {
+		/** AUTO/ENABLED/DISABLED in bits 0..1, then world, constant-ambient and flat-shading bits. */
+		int getNativeShadeFacts();
+	}
+
 	
 	
 	

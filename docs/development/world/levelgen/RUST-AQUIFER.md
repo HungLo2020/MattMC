@@ -3,16 +3,71 @@
 ## Ownership and boundary
 
 `levelgen/aquifer/` owns nearest-center selection, pressure/material decisions,
-fluid-level calculations, and fluid-update decisions. Java owns seeded random
-sources, density-graph bindings, block-state identity, and chunk writes.
+fluid-level calculations, and fluid-update decisions. For the built-in Xoroshiro
+and Legacy positional factories it also draws each grid cell's random centre
+(`aquifer/locations.rs` over [`levelgen/random.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/levelgen/random.rs));
+custom factories keep Java's `location()`. Java owns density-graph bindings and
+block-state identity. The [native NOISE fill](RUST-NOISE-FILL.md) owns chunk
+writes for eligible chunks; the remaining Java loop keeps them otherwise.
+
+Built-in factories expose their canonical native allocation to these consumers.
+NOISE aquifers, column caches and carver substance evaluators retain that actual
+`Factory` Arc instead of copying seeds through Java. Local centre draws read its
+immutable data directly; they do not allocate a VM random-source facade. Scalar
+centre preparation borrows the factory synchronously and pins its VM owner.
+Factory admission and column-height calls use ordinary FFM with off-heap
+transport. Scalar preparation copies locations back even on a failed call to
+preserve the filled prefix. Custom factory subclasses retain the original
+ordered Java callbacks.
 
 For the built-in fluid picker and known pure density sources, Rust consumes the
 already-filled density cell and returns block choices plus update flags. Material calls
 process at most 128 positions before yielding. Missing aquifer statuses are
-resolved lazily; repeated preliminary-surface lookups stay in a native cache.
+resolved lazily; repeated preliminary-surface lookups stay in a native cache,
+and misses are computed by the [native surface program](RUST-PRELIMINARY-SURFACE.md).
 Barrier noise uses the existing native synthesis kernel directly.
 Native buffers are created only when a query needs aquifer sampling. Single-column
 height queries retain ordered requests instead of evaluating an entire cell.
+
+### Native fluid sources
+
+With pure sources and native [preliminary surface levels](RUST-PRELIMINARY-SURFACE.md),
+a fluid status is one native call: Rust also evaluates the aquifer's noise
+sources (erosion, depth, fluid level floodedness, fluid level spread, lava)
+instead of yielding each request to Java.
+[`NativeFluidSources`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/levelgen/NativeFluidSources.java)
+compiles them once per `RandomState` with the [noise router](RUST-NOISE-ROUTER.md)
+compiler. Java evaluates the chunk-wrapped sources at point contexts, where a
+`FlatCache` returns its quart-corner value (input at Y 0) inside the chunk's
+grid and its input at the point outside it; the router's FLAT_POINT node does
+the same through a per-chunk binding that `NativeAquifer` owns, computing each
+corner once. Before the first native status, `NativeAquifer` copies the
+chunk's cached surface levels into its surface window. On this per-status
+request path Java owns the status cache and its callers. Eligible
+[NOISE traversals](RUST-NOISE-FILL.md#rust-owned-aquifer-materials) and
+[carvers](carver/RUST-CARVERS.md) instead copy the aquifer caches into a
+Rust-owned binding for the stage and copy the resulting memos back afterwards. `NativeFluidSourcesTest` compares every status
+of the fill's aquifer centres and points across the chunk grid's edge with
+Java's request path for every aquifer-enabled vanilla setting.
+
+A verification-only entry point also compares each source's value bit for bit
+(43,200 values across the grid edge); mutations of corner position, memo
+layout, the grid test, source order, surface quantization and the surface
+window seed each fail it.
+
+```sh
+python3 DevUtils/tests/worldgen/VerifyRustFluidSources.py --parity-only
+python3 DevUtils/tests/worldgen/VerifyRustFluidSources.py --forks 3 --cpu 5 --background-cpus 0,1
+```
+
+The driver audits every production edit since `da1109de6` and benchmarks
+`NoiseFillVerification` in `javasources` against `native` mode. Measured
+2026-10-05 (laptop as below): overworld 41.9 → 41.1 ms and amplified 40.5 →
+40.8 ms per eight fills (paired ratios 0.89–1.10, intervals spanning 1);
+same-JVM interleaved fills also measured no change (5.80 vs 5.81 ms, 5.32 vs
+5.33 ms). Rust computes FlatCache corners that Java reads from tables the chunk
+already holds. The move replaces about 180 Java request round trips per
+overworld chunk with one call per status.
 
 Custom sources, nonstandard contexts, and blended chunks use the ordered native
 request path. Java answers requests in the original order. Unknown block states
@@ -29,12 +84,47 @@ and `NoiseChunk` subclasses retain eager updates.
   floating-point operation order, NaN behavior, and signed zero.
 - Preserve conditional noise sampling, fluid-source calls, random draws, and
   fluid-update flags. Matching block states alone is insufficient.
+- Propagate the original checked `Throwable` object from a custom factory,
+  random draw or density callback. Native-call adapters must not wrap these
+  genuine VM effects in a new exception. Preserve partial cache writes and
+  the original retry/reentry prefix as well as the final value.
 - Batch eligibility must reject unknown callbacks, including ore callbacks that
   interleave with aquifer decisions. Cell results expire at the next cell epoch.
 - Keep chunk writes, heightmap changes, and postprocessing entries in their
-  existing Java order. Rendering is outside this subsystem.
+  existing order (the native fill reproduces it). Rendering is outside this subsystem.
+- Native centre draws must stay bit-identical to `location()`: `Mth.getSeed`,
+  the factory seeds and `nextInt(10)`, `nextInt(9)`, `nextInt(10)` in that order.
 
 ## Verification
+
+Before changing positional-factory consumers, compare the actual public aquifer
+effects against original Frozen with a complete immutable pre-change runtime:
+
+```sh
+python3 DevUtils/tests/worldgen/random_source/VerifyAquiferFactoryEffects.py \
+  --pre-runtime build/worldgen/factory-consumers/pre-2c-runtime \
+  --output build/worldgen/<new-aquifer-effects-directory> --controls
+```
+
+This compiles its observer once against original Frozen and runs those same
+bytes on Frozen, pre-change and Current. Its 22 rows cover real custom factories,
+built-in factory subclasses, ordered bounded draws, cache retries, reentry and
+checked exception identity. Only surface/context resources use a test fixture;
+the aquifer, its caches and its callbacks are production. Both safe VM overlays
+restore an actual faulty exception wrapper and must fail the original comparison.
+The guarded Objenesis jar is test support, not a production dependency.
+
+The initial published `2c3bbc299` baseline differs from Frozen in three checked
+exception rows, wrapping the original object. The working correction passes all
+22 original rows, with two aquifer and seven NOISE-fill checks passing. The
+pre-change mismatch remains diagnostic; it is not regenerated from Current.
+See `build/worldgen/factory-consumers/{original-effects-2,effects-fix-focused,
+effects-fix-original-2}`. The earlier control harness expected only two failures
+from the outer wrapper; its actual three-row rejection and failed receipt are
+retained. The corrected controls reject three outer-wrapper and one fluid-wrapper
+row without changing observer traces. These historical checks predate native
+factory retention; they do not verify the later owner integration or establish
+a performance result.
 
 ```sh
 # Focused integration and Rust world-generation tests:
@@ -126,3 +216,17 @@ other machines.
 The repository-wide Rust suite encountered 80 renderer failures, beginning with
 an OpenGL shader compilation error and followed by poisoned graphics locks.
 Rendering was not changed; the focused world-generation suite passed separately.
+
+## Native stage decisions
+
+The NOISE fill's cell traversal prepares cell materials with the same path
+([Rust-owned aquifer materials](RUST-NOISE-FILL.md#rust-owned-aquifer-materials)).
+
+### Carver substance decisions
+
+The [Rust carvers stage](carver/RUST-CARVERS.md) decides
+`computeSubstance(SinglePointContext, 0.0)` entirely in Rust
+([`aquifer/substance.rs`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/levelgen/aquifer/substance.rs))
+for aquifers on the fully native route: native centres, ranking and decision,
+fluid statuses from the native sources and surface programs, and the barrier
+noise, over the aquifer's own caches (`NativeAquifer.nativeBinding`).

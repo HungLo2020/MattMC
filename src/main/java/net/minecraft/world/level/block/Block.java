@@ -56,6 +56,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.NativeBlockDefinitions;
 import net.minecraft.world.level.block.state.StateHolder;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.gameevent.GameEvent;
@@ -101,6 +102,8 @@ public class Block extends BlockBehaviour implements ItemLike {
 	public static final float INSTANT = 0.0F;
 	public static final int UPDATE_LIMIT = 512;
 	protected final StateDefinition<Block, BlockState> stateDefinition;
+	@Nullable
+	private final NativeBlockDefinitions.Definition nativeDefinition;
 	private BlockState defaultBlockState;
 	@Nullable
 	private Item item;
@@ -228,10 +231,17 @@ public class Block extends BlockBehaviour implements ItemLike {
 
 	public Block(BlockBehaviour.Properties properties) {
 		super(properties);
-		StateDefinition.Builder<Block, BlockState> builder = new StateDefinition.Builder<>(this);
-		this.createBlockStateDefinition(builder);
-		this.stateDefinition = builder.create(Block::defaultBlockState, BlockState::new);
-		this.registerDefaultState(this.stateDefinition.any());
+		this.nativeDefinition = properties.nativeDefinition();
+		if (this.nativeDefinition != null) {
+			this.stateDefinition = this.nativeDefinition.createStates(this);
+			this.defaultBlockState = this.stateDefinition.getPossibleStates().get(this.nativeDefinition.defaultLocalState());
+		} else {
+			// Temporary construction path for unregistered codec/test objects.
+			StateDefinition.Builder<Block, BlockState> builder = new StateDefinition.Builder<>(this);
+			this.createBlockStateDefinition(builder);
+			this.stateDefinition = builder.create(Block::defaultBlockState, BlockState::new);
+			this.defaultBlockState = this.stateDefinition.any();
+		}
 		if (SharedConstants.IS_RUNNING_IN_IDE) {
 			String string = this.getClass().getSimpleName();
 			if (!string.endsWith("Block")) {
@@ -501,9 +511,16 @@ public class Block extends BlockBehaviour implements ItemLike {
 		return this.stateDefinition;
 	}
 
+	/** Only unregistered compatibility objects may select their default in Java. */
 	protected final void registerDefaultState(BlockState blockState) {
+		if (this.nativeDefinition != null) throw new IllegalStateException("Cannot override native block default: " + this.nativeDefinition.name);
 		this.defaultBlockState = blockState;
 	}
+
+	protected final boolean hasNativeStateDefinition() { return this.nativeDefinition != null; }
+
+	@Nullable
+	public final NativeBlockDefinitions.Definition nativeDefinition() { return this.nativeDefinition; }
 
 	public final BlockState defaultBlockState() {
 		return this.defaultBlockState;

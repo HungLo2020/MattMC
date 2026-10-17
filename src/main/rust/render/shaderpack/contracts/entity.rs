@@ -181,17 +181,20 @@ pub fn derive_entity_contract(
     let fragment = preprocess_stage(source, &stages.fragment.path, &stages.fragment.defines)?;
 
     require_any(&vertex, &["gl_Vertex", "ftransform"])?;
-    require(&vertex, "GetLightMapCoordinates()")?;
-    require(&vertex, "gl_Normal")?;
-    require(&vertex, "gl_Color")?;
-    require(&fragment, "texture2D(tex, texCoord)")?;
-    require(&fragment, "color *= glColor")?;
-    require(&fragment, "DoLighting(")?;
-    require(&fragment, "gl_FragData[0] = color")?;
-    require(&fragment, "gl_FragData[1]")?;
-
     let slots = parse_draw_buffers_slots(&fragment)?;
+    require(&fragment, "gl_FragData[0]")?;
+    if slots.len() != 1 {
+        require(&vertex, "GetLightMapCoordinates()")?;
+        require(&vertex, "gl_Normal")?;
+        require(&vertex, "gl_Color")?;
+        require(&fragment, "texture2D(tex, texCoord)")?;
+        require(&fragment, "color *= glColor")?;
+        require(&fragment, "DoLighting(")?;
+        require(&fragment, "gl_FragData[0] = color")?;
+        require(&fragment, "gl_FragData[1]")?;
+    }
     let outputs = match slots.as_slice() {
+        [_] => vec![EntitySourceOutput::LitColor],
         [0, 6] => vec![
             EntitySourceOutput::LitColor,
             EntitySourceOutput::MaterialAuxiliary,
@@ -203,7 +206,7 @@ pub fn derive_entity_contract(
         ],
         _ => {
             return Err(GalError::unsupported_feature(format!(
-                "selected entity source requires unsupported DRAWBUFFERS schema {slots:?}; expected [0, 6] or [0, 6, 5]"
+                "selected entity source requires unsupported DRAWBUFFERS schema {slots:?}; expected one color slot, [0, 6] or [0, 6, 5]"
             )));
         }
     };
@@ -371,7 +374,9 @@ pub fn prepare_entity_glint_source_program(
 ) -> GalResult<crate::render::shaderpack::programs::LoweredEntitySourceProgram> {
     let contract = derive_entity_glint_contract(source, scope)?;
     let lowered = lower_entity_source_pair(source, &contract)?;
-    let declarations = TerrainSourceResourceBindings::from_source(source)?;
+    let declarations = TerrainSourceResourceBindings::from_source_stage(
+        source, &contract.stages.fragment,
+    )?;
     let bindings = bind_entity_source_resources(&lowered, &declarations)?;
     let mut program =
         crate::render::shaderpack::programs::prepare_lowered_entity_source_program(&contract, &lowered, &bindings)?;
@@ -408,6 +413,11 @@ pub fn lower_entity_source_pair(
     )?;
     let lowered = lower_entity_source_stages(&vertex, &fragment)?;
     lowered.require_backend_neutral_lowering()?;
+    if contract.outputs.len() == 1 && lowered.fragment().outputs().len() != 1 {
+        return Err(GalError::invalid_argument(
+            "single-color entity source writes undeclared auxiliary outputs",
+        ));
+    }
     Ok(lowered)
 }
 
@@ -446,7 +456,9 @@ pub fn prepare_entity_shadow_source_program(
 ) -> GalResult<crate::render::shaderpack::programs::LoweredEntitySourceProgram> {
     let contract = derive_entity_shadow_contract(source, scope)?;
     let lowered = lower_entity_shadow_source_pair(source, &contract)?;
-    let declarations = crate::render::shaderpack::resources::bindings::TerrainSourceResourceBindings::from_source(source)?;
+    let declarations = crate::render::shaderpack::resources::bindings::TerrainSourceResourceBindings::from_source_stage(
+        source, &contract.stages.fragment,
+    )?;
     let bindings = bind_entity_source_resources(&lowered, &declarations)?;
     crate::render::shaderpack::programs::prepare_lowered_entity_shadow_source_program(&contract, &lowered, &bindings)
 }

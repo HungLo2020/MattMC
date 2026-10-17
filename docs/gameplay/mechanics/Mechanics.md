@@ -2,13 +2,47 @@
 
 Understand the systems behind everyday gameplay. Guides here explain current MattMC rules and point out which conditions depend on game rules, difficulty, or incomplete integration.
 
+- [World types](WorldTypes.md): generation presets, customization, Superflat choices and Debug Mode
+- [Local worlds, saving, and backups](LocalWorlds.md): creation choices, difficulty, normal quit, backup archives and Re-Create
+- [Region Editor](RegionEditor.md): saved terrain selection, direct disk writes, clipboard and limited undo
+- [Multiplayer and LAN](MultiplayerAndLAN.md): joining, local hosting, session permissions, mode selection and keeping the host world running
+- [Dedicated servers](DedicatedServers.md): current launch routes, save locations, permissions and normal shutdown
+- [Game rules](GameRules.md): creation editing, loaded-world queries, value limits and shared-world persistence
+- [World data packs](WorldDataPacks.md): creation selection, loaded-world commands and reload limits
+- [Graphics settings and packs](GraphicsAndPacks.md): menu routes, Apply/Undo, resource ordering, shader choices and current rendering limits
+- [Chat and closed captions](ChatAndCaptions.md): visibility, readable text, sound cues and their timing controls
+- [Advancements and statistics](AdvancementsAndStatistics.md): progress screens, reward conditions and recorded counters
+- [Locator Bar](LocatorBar.md): built-in tracked-entity directions, display priorities and transmission controls
+- [Minimap and waypoints](MinimapAndWaypoints.md): map controls, named places, local data and current limitations
+
+- [Ticks and chunk activity](TicksAndChunkActivity.md): update types, simulation distance, unloading and paused-server limits
+- [Light](Light.md): propagation, block light, skylight and the value each mechanic checks
+- [Loot and drops](LootAndDrops.md): reward conditions, player credit, generated storage and item recovery
+- [Time, weather, and sleep](TimeWeatherAndSleep.md): shared clocks, local rain and snow, independent cycle rules, multiplayer rest and timer limits
+- [Natural spawning and despawning](NaturalSpawning.md): category caps, player distance, active terrain, persistence and troubleshooting
+- [TaCZ firearms](TaCZFirearms.md): controls, firing, magazine and reserve ammunition, reloads, refitting, and current limits
+- [Inventory item browser](InventoryBrowser.md): catalog visibility, Creative insertion and protocol/operator gates
+- [Inventory controls](InventoryControls.md): stack splitting, Shift transfers, dragging, hotbar/offhand swaps and dropping
+- [Recipe Viewer](RecipeViewer.md): opening and navigating recipe displays, search focus and missing-result limits
+- [Movement and controls](Movement.md): configurable keys, sprint conditions, crouching, crawling, ledge limits and swimming
 - [Hunger, saturation, and healing](Hunger.md): food values, exhaustion, sprinting, healing, and starvation
+- [Health, damage, and recovery](Health.md): health units, defenses, difficulty and recovery
+- [Death and respawn](DeathAndRespawn.md): inventory/experience loss, recovery and saved-point fallback
+- [Experience points, levels, and Mending](Experience.md): level costs, orb collection, equipment repairs and spending
+- [Combat](Combat.md): attack charge, criticals, sweeps, Shields and projectile differences
+- [Fireworks](Fireworks.md): star and rocket recipes, launching, Elytra boosts, flight, damage, and effect data
+- [Villager breeding and population](../mobs/Villager.md#breeding-and-population): food, sharing, reachable beds, birth and growth
+- [Raids](Raid.md): omen conversion, village recognition, waves, outcomes and stopping
+- [Swords](Swords.md): material values, sweeping, fixed mining rules, enchantments and repair
+- [Spears](Spears.md): all seven materials, release thrusts, moving contact, Lunge, target conditions, and upkeep
 - [Axes and Hoes](AxesAndHoes.md): all seven materials, combat values, wood/copper conversions, tilling, and crop harvesting
 - [Pickaxes and Shovels](PickaxesAndShovels.md): all seven materials, exact recipes, tool actions, upkeep, and recycling
 - [Mining tools and drops](Mining.md): tool families, material values, copper tier, and loot conditions
+- [Finding ores](FindingOres.md): source-derived heights, biome bonuses, host and exposure checks, and separate large-vein routes
 - [Anvil operations](AnvilMechanics.md): repairs, names, combining, prior work, and MattMC's 40-level payment cap
 - [Shields and death protection](DefensiveItems.md): active blocking, cooldowns, held Totems, and exclusions
 - [Armor and damage reduction](Armor.md): Copper-inclusive material values, toughness, durability, and repairs
+- [Armor trims](ArmorTrims.md): pattern acquisition, template copying, accepted materials, and smithing conditions
 - [Durability and repair](Durability.md): retained broken items, function guards, and repair-method data retention
 - [Fishing](Fishing.md): bite timing, open-water treasure, loot weights, and rod wear
 - [Boats and rail transport](Transport.md): passengers, chest storage, rail construction, powered launches, and braking

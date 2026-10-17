@@ -15,6 +15,10 @@ pub(crate) struct PreparedSourceEntityFrame {
     pub frame_id: u64,
     pub mesh: Arc<SourceEntityMeshAsset>,
     pub section_index: u32,
+    /// Consecutive sections `section_index..section_index + section_count`
+    /// that share every draw state, uniform and instance and whose index
+    /// ranges are contiguous; they draw as one indexed range in index order.
+    pub section_count: u32,
     pub texture_id: u32,
     pub material_mode: u32,
     pub depth_policy: u32,
@@ -24,8 +28,9 @@ pub(crate) struct PreparedSourceEntityFrame {
     pub entity_id: i32,
     pub entity_id_generation: u64,
     pub entity_color: [f32; 4],
-    pub legacy_texture_transforms: Vec<u8>,
-    pub scalar_uniforms: Vec<u8>,
+    /// Shared by every group with the same uniform inputs.
+    pub legacy_texture_transforms: Arc<[u8]>,
+    pub scalar_uniforms: Arc<[u8]>,
     pub instance_transforms: Vec<u8>,
 }
 
@@ -154,19 +159,18 @@ impl WorldPrimitiveFrontend {
                 "source decal glint mesh is not aligned to the fixed source ABI",
             ));
         }
-        let read = |bytes: &[u8], offset: usize| {
-            f32::from_ne_bytes([bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]])
+        let word = |bytes: &[u8], offset: usize| {
+            u32::from_ne_bytes([bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]])
         };
+        let uv_offset = crate::render::shaderpack::programs::TERRAIN_SOURCE_VERTEX_UV_OFFSET;
+        let normal_offset = crate::render::shaderpack::programs::TERRAIN_SOURCE_VERTEX_NORMAL_OFFSET;
         for vertex in vertex_bytes.chunks_exact_mut(TERRAIN_SOURCE_VERTEX_BYTES) {
-            let position = [read(vertex, 0), read(vertex, 4), read(vertex, 8)];
-            // The record holds the exact signed-byte normal divided by 127.
-            let packed_normal = (0..3).fold(0u32, |packed, lane| {
-                let value = (read(vertex, 32 + lane * 4).clamp(-1.0, 1.0) * 127.0).round() as i8;
-                packed | u32::from(value as u8) << (lane * 8)
-            });
+            let position = [0, 4, 8].map(|offset| f32::from_bits(word(vertex, offset)));
+            // The record holds the exact signed-byte normal.
+            let packed_normal = word(vertex, normal_offset);
             let [u, v] = projection.texture_uv(position, packed_normal)?;
-            vertex[48..52].copy_from_slice(&u.to_ne_bytes());
-            vertex[52..56].copy_from_slice(&v.to_ne_bytes());
+            vertex[uv_offset..uv_offset + 4].copy_from_slice(&u.to_ne_bytes());
+            vertex[uv_offset + 4..uv_offset + 8].copy_from_slice(&v.to_ne_bytes());
         }
         let derived = Arc::new(SourceEntityMeshAsset {
             mesh_key: key,
@@ -291,15 +295,11 @@ impl WorldPrimitiveFrontend {
             // (Arc-owned) asset; re-scanning its indices per instance was a
             // hot-path cost with ~1k entity draws per frame.
             let section_indices = if instance.mesh_section_index == WORLD_MESH_SECTION_ALL {
-                (0..mesh.sections.len())
-                    .map(|index| {
-                        u32::try_from(index).map_err(|_| {
-                            GalError::invalid_argument("source entity section ordinal exceeds u32")
-                        })
-                    })
-                    .collect::<GalResult<Vec<_>>>()?
+                0..u32::try_from(mesh.sections.len()).map_err(|_| {
+                    GalError::invalid_argument("source entity section ordinal exceeds u32")
+                })?
             } else {
-                vec![instance.mesh_section_index]
+                instance.mesh_section_index..instance.mesh_section_index.saturating_add(1)
             };
             for section_index in section_indices {
                 let section = mesh.sections.get(section_index as usize).ok_or_else(|| {
@@ -377,7 +377,36 @@ impl WorldPrimitiveFrontend {
             }
         }
 
-        let mut prepared = Vec::with_capacity(grouped.len());
+        let requires_field = |semantic: TerrainSourceUniformSemantic| {
+            program
+                .scalar_uniform_requirements
+                .fields()
+                .iter()
+                .any(|requirement| requirement.semantic == Some(semantic))
+        };
+        // Enabled gameplay always needs the derived frame (celestial,
+        // smoothed light, custom expressions), even without atlasSize.
+        // Complementary's entity program shares the pack-global `atlasSize`
+        // uniform with terrain even though this writer binds a draw-local
+        // entity texture for `tex`. Supply that global from the Rust-owned
+        // block-atlas resource only when the selected source declares it;
+        // entity-local material ownership remains separate.
+        let needs_derived_uniforms = frame.shader_environment.enabled
+            || render_stage.is_some()
+            || glint
+            || requires_field(TerrainSourceUniformSemantic::MaterialAtlasSize);
+        let requires_render_stage = requires_field(TerrainSourceUniformSemantic::RenderStage);
+        let requires_current_item_id =
+            requires_field(TerrainSourceUniformSemantic::CurrentRenderedItemId);
+        let mut base_uniforms: Option<TerrainSourceUniformFrame> = None;
+        #[allow(clippy::type_complexity)]
+        let mut packed_uniforms: Vec<(
+            (i32, i32, [u32; 4], Option<i32>, Option<(u8, u64, u64, u32)>),
+            Arc<[u8]>,
+            Arc<[u8]>,
+        )> = Vec::new();
+        let mut prepared: Vec<PreparedSourceEntityFrame> = Vec::with_capacity(grouped.len());
+        let mut previous_group = None;
         for (
             (
                 _,
@@ -389,74 +418,100 @@ impl WorldPrimitiveFrontend {
                 cull_policy,
                 entity_color_argb,
                 block_entity_id,
-                _packed_light,
-                _foil_key,
+                packed_light,
+                foil_key,
             ),
             (mesh, instances, foil),
         ) in grouped
         {
-            let winding = mesh
-                .sections
-                .get(section_index as usize)
-                .ok_or_else(|| {
-                    GalError::backend("source entity grouping retained a missing mesh section")
-                })?
-                .winding;
+            let section = mesh.sections.get(section_index as usize).ok_or_else(|| {
+                GalError::backend("source entity grouping retained a missing mesh section")
+            })?;
+            let winding = section.winding;
+            // Groups are ordered by mesh, then section: a section continuing
+            // the previous group's contiguous index range with identical
+            // state, uniforms and instances extends that draw instead of
+            // issuing another one with a duplicate uniform block.
+            let merge_key = (
+                mesh.mesh_key,
+                mesh.mesh_generation,
+                texture_id,
+                material_mode,
+                depth_policy,
+                cull_policy,
+                entity_color_argb,
+                block_entity_id,
+                packed_light,
+                foil_key,
+            );
+            if let (Some(last), Some((previous_key, previous_instances))) =
+                (prepared.last_mut(), previous_group.as_ref())
+            {
+                if *previous_key == merge_key
+                    && *previous_instances == instances
+                    && Arc::ptr_eq(&last.mesh, &mesh)
+                    && last.winding == winding
+                    && section_index == last.section_index + last.section_count
+                    && source_entity_section_run_end(&mesh, last.section_index, last.section_count)?
+                        == Some(section.index_offset)
+                {
+                    last.section_count += 1;
+                    continue;
+                }
+            }
             let semantics =
                 program.resolve_draw_semantics(&mesh.entity_identity, entity_color_argb)?;
-            // Complementary's entity program shares the pack-global
-            // `atlasSize` uniform with terrain even though this writer binds a
-            // draw-local entity texture for `tex`.  Supply that global from
-            // the Rust-owned block-atlas resource only when the selected
-            // source actually declares it; entity-local material ownership
-            // remains separate below.
-            let mut uniforms =
-                if render_stage.is_some()
-                    || glint
-                    || program
-                    .scalar_uniform_requirements
-                    .fields()
-                    .iter()
-                    .any(|requirement| {
-                        requirement.semantic
-                            == Some(TerrainSourceUniformSemantic::MaterialAtlasSize)
-                    })
-                {
-                    self.source_uniform_frame_for_owned_resources(frame)?
-                } else {
-                    frame.source_uniform_frame()?
-                };
-            if program
-                .scalar_uniform_requirements
-                .fields()
+            let current_rendered_item_id = if requires_current_item_id {
+                Some(self.source_entity_current_item_id(&mesh.entity_identity)?)
+            } else {
+                None
+            };
+            // Sections of one entity (and identical entities) share every
+            // varying uniform input; pack each distinct combination once.
+            let uniform_key = (
+                semantics.entity_id,
+                block_entity_id,
+                semantics.entity_color.map(f32::to_bits),
+                current_rendered_item_id,
+                foil.map(|foil| (foil.kind as u8, foil.clock_millis, foil.speed.to_bits(), foil.strength.to_bits())),
+            );
+            let (legacy_texture_transforms, scalar_uniforms) = match packed_uniforms
                 .iter()
-                .any(|requirement| {
-                    requirement.semantic == Some(TerrainSourceUniformSemantic::RenderStage)
-                })
+                .find(|(key, _, _)| *key == uniform_key)
             {
-                uniforms.render_stage = Some(match render_stage {
-                    Some(stage) => stage,
-                    None => self.source_entity_render_stage()?,
-                });
-            }
-            uniforms.entity_id = Some(semantics.entity_id);
-            uniforms.block_entity_id = Some(block_entity_id);
-            uniforms.entity_color = Some(semantics.entity_color);
-            if program
-                .scalar_uniform_requirements
-                .fields()
-                .iter()
-                .any(|requirement| {
-                    requirement.semantic
-                        == Some(TerrainSourceUniformSemantic::CurrentRenderedItemId)
-                })
-            {
-                uniforms.current_rendered_item_id =
-                    Some(self.source_entity_current_item_id(&mesh.entity_identity)?);
-            }
-            let legacy_texture_transforms = program
-                .pack_legacy_texture_transforms(&source_glint_texture_transforms(foil)?)?;
-            let scalar_uniforms = program.pack_scalar_uniforms(&uniforms)?;
+                Some((_, legacy, scalar)) => (Arc::clone(legacy), Arc::clone(scalar)),
+                None => {
+                    if base_uniforms.is_none() {
+                        // Resolved on first use so a call without entity
+                        // groups never asks for the derived uniform frame.
+                        let mut uniforms = if needs_derived_uniforms {
+                            self.source_uniform_frame_for_owned_resources(frame)?
+                        } else {
+                            frame.source_uniform_frame()?
+                        };
+                        if requires_render_stage {
+                            uniforms.render_stage = Some(match render_stage {
+                                Some(stage) => stage,
+                                None => self.source_entity_render_stage()?,
+                            });
+                        }
+                        base_uniforms = Some(uniforms);
+                    }
+                    let mut uniforms = base_uniforms.clone().expect("base uniforms resolved above");
+                    uniforms.entity_id = Some(semantics.entity_id);
+                    uniforms.block_entity_id = Some(block_entity_id);
+                    uniforms.entity_color = Some(semantics.entity_color);
+                    if current_rendered_item_id.is_some() {
+                        uniforms.current_rendered_item_id = current_rendered_item_id;
+                    }
+                    let legacy: Arc<[u8]> = program
+                        .pack_legacy_texture_transforms(&source_glint_texture_transforms(foil)?)?
+                        .into();
+                    let scalar: Arc<[u8]> = program.pack_scalar_uniforms(&uniforms)?.into();
+                    packed_uniforms.push((uniform_key, Arc::clone(&legacy), Arc::clone(&scalar)));
+                    (legacy, scalar)
+                }
+            };
             let instance_transforms = pack_source_terrain_instances(&instances)?;
             let expected_instance_bytes = instances
                 .len()
@@ -473,6 +528,7 @@ impl WorldPrimitiveFrontend {
                 frame_id: frame.frame_id,
                 mesh,
                 section_index,
+                section_count: 1,
                 texture_id,
                 material_mode,
                 depth_policy,
@@ -486,6 +542,7 @@ impl WorldPrimitiveFrontend {
                 scalar_uniforms,
                 instance_transforms,
             });
+            previous_group = Some((merge_key, instances));
         }
         Ok(prepared)
     }
@@ -753,8 +810,9 @@ impl WorldPrimitiveFrontend {
             // The owned shader-environment builder resolves the selected
             // pack's held-item IDs and held-light policy from copied gameplay
             // inputs. Use it whenever the selected source names any of those
-            // semantics; tiny conformance sources that name none stay usable
-            // without inventing a terrain atlas dependency.
+            // semantics. Enabled gameplay also uses derived frame semantics;
+            // disabled conformance frames that name none stay usable without
+            // inventing a terrain atlas dependency.
             let requires_owned_hand_uniforms = program
                 .scalar_uniform_requirements
                 .fields()
@@ -772,7 +830,7 @@ impl WorldPrimitiveFrontend {
                         )
                     )
                 });
-            let mut uniforms = if requires_owned_hand_uniforms || glint {
+            let mut uniforms = if frame.shader_environment.enabled || requires_owned_hand_uniforms || glint {
                 self.source_uniform_frame_for_owned_resources(frame)?
             } else {
                 frame.source_uniform_frame()?
@@ -845,4 +903,27 @@ impl WorldPrimitiveFrontend {
         }
         Ok(prepared)
     }
+}
+
+/// Byte offset just past the last index of a section run, or `None` when the
+/// run's own sections are not contiguous.
+pub(crate) fn source_entity_section_run_end(
+    mesh: &SourceEntityMeshAsset,
+    first: u32,
+    count: u32,
+) -> GalResult<Option<u64>> {
+    let last = first
+        .checked_add(count)
+        .ok_or_else(|| GalError::invalid_argument("source entity section run overflows"))?;
+    let mut end = None;
+    for index in first..last {
+        let section = mesh.sections.get(index as usize).ok_or_else(|| {
+            GalError::invalid_argument("source entity section run selects a missing section")
+        })?;
+        if end.is_some_and(|end| end != section.index_offset) {
+            return Ok(None);
+        }
+        end = Some(section.index_offset + u64::from(section.index_count) * 4);
+    }
+    Ok(end)
 }

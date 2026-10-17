@@ -26,6 +26,7 @@ fn contract(
         operations: vec![TerrainPassOperation::AtlasSample],
         required_resources,
         voxel_light_volume_requirements: None,
+        normal_alpha_test: Default::default(),
         translucent_raster_state: None,
         unsupported: BTreeSet::<UnsupportedTerrainFeature>::new(),
     }
@@ -688,4 +689,31 @@ fn semantic_resource_subsets_merge_only_with_exact_generations_and_roles() {
         .unwrap_err()
         .to_string()
         .contains("conflicts with an earlier source-stage binding"));
+}
+
+#[test]
+fn stage_color_binding_replacement_preserves_non_colors_and_rejects_foreign_generations() {
+    let resource = |role: TerrainSourceResourceRole, pack, world, handle_index| {
+        TerrainSourceOwnedResourceSet::new(
+            TerrainSourceResourceAvailabilitySet::new(pack, world, [TerrainSourceResourceAvailability {
+                role: role.clone(), shape: role.expected_sampled_resource_shape(), resource_generation: 3,
+            }]).unwrap(),
+            [TerrainSourceOwnedResource { role, combined_sampler: Handle::new(HandleKind::CombinedTextureSampler, handle_index, 1).unwrap() }],
+        ).unwrap()
+    };
+    let role = TerrainSourceResourceRole::ShaderPackColor("auxiliary_h".into());
+    let old_color = resource(role.clone(), 7, 12, 1);
+    let new_color = resource(role.clone(), 7, 12, 2);
+    let noise = resource(TerrainSourceResourceRole::Noise, 7, 12, 3);
+    let base = TerrainSourceOwnedResourceSet::merge([&old_color, &noise]).unwrap();
+    let merged = base.with_stage_color_resources(&new_color).unwrap();
+    assert_eq!(new_color.combined_sampler_for(role.clone()), merged.combined_sampler_for(role.clone()));
+    assert_eq!(noise.combined_sampler_for(TerrainSourceResourceRole::Noise), merged.combined_sampler_for(TerrainSourceResourceRole::Noise));
+    assert_eq!(old_color.combined_sampler_for(role.clone()), base.combined_sampler_for(role.clone()));
+    assert!(base.with_stage_color_resources(&noise).is_err());
+    for (pack, world) in [(8, 12), (7, 13)] {
+        assert!(base.with_stage_color_resources(&resource(role.clone(), pack, world, 4)).is_err());
+    }
+    // This scoped operation does not relax the normal duplicate-role guard.
+    assert!(new_color.excluding_roles_already_owned_by(&old_color).is_err());
 }

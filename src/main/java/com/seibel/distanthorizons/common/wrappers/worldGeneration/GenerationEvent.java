@@ -8,6 +8,7 @@ import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGenerat
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
 import com.seibel.distanthorizons.common.wrappers.worldGeneration.params.ThreadWorldGenParams;
 import com.seibel.distanthorizons.core.util.ExceptionUtil;
+import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhChunkPos;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
@@ -68,8 +69,9 @@ public final class GenerationEvent
 		
 		try
 		{
-			worldGeneratorThreadPool.execute(() ->
+			Runnable generate = () ->
 			{
+				if (genEvent.future.isDone()) return;
 				try
 				{
 					BatchGenerationEnvironment.isDhWorldGenThreadRef.set(true);
@@ -82,7 +84,10 @@ public final class GenerationEvent
 					}
 					else
 					{
-						try
+						// The event's chunks are local copies whose results are merged into LOD
+						// sources before it returns: free their native section storage now,
+						// instead of when the GC next finds them (NativeReleaseScope).
+						try (var release = net.minecraft.world.level.chunk.NativeReleaseScope.open())
 						{
 							genEnvironment.generateEvent(genEvent);
 						}
@@ -104,11 +109,19 @@ public final class GenerationEvent
 				{
 					BatchGenerationEnvironment.isDhWorldGenThreadRef.remove();
 				}
-			});
+			};
+			if (worldGeneratorThreadPool instanceof PriorityTaskPicker.Executor pickerExecutor)
+			{
+				pickerExecutor.execute(generate, () -> genEvent.future.cancel(false));
+			}
+			else
+			{
+				worldGeneratorThreadPool.execute(generate);
+			}
 		}
 		catch (RejectedExecutionException e)
 		{
-			genEvent.future.completeExceptionally(e);
+			genEvent.future.cancel(false);
 		}
 		
 		return genEvent;
@@ -122,15 +135,12 @@ public final class GenerationEvent
 			throwable = throwable.getCause();
 		}
 		
-		boolean isShutdownException = ExceptionUtil.isShutdownException(throwable);
+		boolean isShutdownException = ExceptionUtil.isShutdownException(throwable) || throwable instanceof CancellationException;
 		if (isShutdownException)
 		{
-			// these exceptions can be ignored, generally they just mean
-			// the thread is busy so it'll need to try again later.
-			// FIXME this should cause the world gen task to be re-queued so we can try again later
-			//  however, currently it can cause large gaps in the world gen instead.
-			//  These gaps will generate correctly if the level is reloaded and the world gen is re-queued,
-			//  however this is makes it look like the generator isn't working or skipped something.
+			// Expected shutdown is still terminal. It must never leave an event pending
+			// or report successful generation for chunks that were not produced.
+			generationEvent.future.cancel(false);
 		}
 		else
 		{

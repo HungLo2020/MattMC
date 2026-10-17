@@ -40,7 +40,9 @@ public abstract class LeavesBlock extends Block implements SimpleWaterloggedBloc
 	public LeavesBlock(float f, BlockBehaviour.Properties properties) {
 		super(properties);
 		this.leafParticleChance = f;
-		this.registerDefaultState(this.stateDefinition.any().setValue(DISTANCE, 7).setValue(PERSISTENT, false).setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(DISTANCE, 7).setValue(PERSISTENT, false).setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override

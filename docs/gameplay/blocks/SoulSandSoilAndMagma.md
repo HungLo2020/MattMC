@@ -10,7 +10,7 @@ Choose **Soul Sand** for a rising bubble column or Nether Wart bed, **Soul Soil*
 | <span id="soul-soil">Soul Soil, `minecraft:soul_soil`</span> | 0.5 / 0.5 | One block, including by hand; shovel is faster | Full-height collision; no special slowdown |
 | <span id="magma-block">Magma Block, `minecraft:magma_block`</span> | 0.5 / 0.5 | One block with an unbroken pickaxe, including Wood | Full-height collision, light level 3, hot-floor damage callback |
 
-Soul Sand and Soul Soil do not require a correct tool for drops. Magma Block does; it is in the pickaxe tag without a higher-tier requirement. The three loot tables have no Silk Touch or Fortune alternative, so neither enchantment multiplies their ordinary block drops. Explosion survival is a separate loot condition. [Properties][blocks] [properties] · [Tool tags][shovel] [pickaxe] [wood] [stone] [iron] [diamond] · [Harvest gate][player] [gate] · [Loot][loot-sand] [loot-soil] [loot-magma]
+Soul Sand and Soul Soil do not require a correct tool for drops. Magma Block does; it is in the pickaxe tag without a higher-tier requirement. The three loot tables have no Silk Touch or Fortune alternative, so neither enchantment multiplies their ordinary block drops. Explosion survival is a separate loot condition. [Properties][blocks] [properties] · [Tool tags][shovel] [pickaxe][] [wood][] [stone][] [iron][] [diamond] · [Harvest gate][player] [gate] · [Loot][loot-sand] [loot-soil][] [loot-magma][]
 
 All three stay in place without support; none uses falling-sand behavior. Soul Sand's reduced collision height does not mean its top support shape is empty: it supplies a full support shape. Its name alone does not give Soul Soil the same column or crop behavior. [Soul Sand shapes][sand] · [Registered classes][blocks]
 
@@ -25,6 +25,8 @@ Craft **four Magma Cream in a 2 × 2 square → one Magma Block**. This fits the
 There is also a conversion route from Soul Sand to Soul Soil: craft a **Soul Campfire** using three Sticks, three log-tag ingredients and one Soul Sand or Soul Soil, then break it **without Silk Touch** to receive one Soul Soil. Silk Touch instead preserves the Soul Campfire. This spends the other crafting materials; it is not a free one-for-one crafting-grid conversion. [Campfire pattern][campfire] · [Accepted central ingredient][campfire-tag] · [Campfire loot][campfire-loot]
 
 ## Walking and Soul Speed
+
+The [Soul Speed guide](../enchanting/MobilityEnchantments.md#soul-speed-terrain-boost-and-wear) covers levels, equipment conditions, wear and acquisition.
 
 Ordinary Soul Sand movement applies its **0.4 speed factor to horizontal motion**. That is a factor in the active movement calculation, not a promise of a particular walking speed or a fixed percentage change under every effect. Soul Soil has no corresponding custom factor. Living entities blend this block factor toward 1 using their movement-efficiency attribute. [Movement application][entity] · [Living movement efficiency][living]
 

@@ -4,6 +4,12 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RustGalGuiItemRasterContractTest {
+    @org.junit.jupiter.api.BeforeAll
+    static void bootstrapRegistries() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+    }
+
     @Test void redstoneFixtureUsesUnblendedCutoutLayersNotTranslucentItemLayers() {
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();

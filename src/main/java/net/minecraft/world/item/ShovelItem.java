@@ -29,8 +29,8 @@ public class ShovelItem extends Item {
 			.build()
 	);
 
-	public ShovelItem(ToolMaterial toolMaterial, float f, float g, Item.Properties properties) {
-		super(properties.shovel(toolMaterial, f, g));
+	public ShovelItem(Item.Properties properties) {
+		super(properties);
 	}
 
 	@Override

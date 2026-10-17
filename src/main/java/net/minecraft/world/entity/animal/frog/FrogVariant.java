@@ -1,7 +1,6 @@
 package net.minecraft.world.entity.animal.frog;
 
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.List;
 import net.minecraft.core.ClientAsset;
 import net.minecraft.core.Holder;
@@ -17,22 +16,10 @@ import net.minecraft.world.entity.variant.SpawnPrioritySelectors;
 
 public record FrogVariant(ClientAsset.ResourceTexture assetInfo, SpawnPrioritySelectors spawnConditions)
 	implements PriorityProvider<SpawnContext, SpawnCondition> {
-	public static final Codec<FrogVariant> DIRECT_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				ClientAsset.ResourceTexture.DEFAULT_FIELD_CODEC.forGetter(FrogVariant::assetInfo),
-				SpawnPrioritySelectors.CODEC.fieldOf("spawn_conditions").forGetter(FrogVariant::spawnConditions)
-			)
-			.apply(instance, FrogVariant::new)
-	);
-	public static final Codec<FrogVariant> NETWORK_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(ClientAsset.ResourceTexture.DEFAULT_FIELD_CODEC.forGetter(FrogVariant::assetInfo)).apply(instance, FrogVariant::new)
-	);
+	public static final Codec<FrogVariant> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.FROG_VARIANT, false, net.minecraft.resources.NativeDataProjections::frog, net.minecraft.resources.NativeDataProjections::frogOut);
+	public static final Codec<FrogVariant> NETWORK_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.FROG_VARIANT, true, net.minecraft.resources.NativeDataProjections::frog, net.minecraft.resources.NativeDataProjections::frogOut);
 	public static final Codec<Holder<FrogVariant>> CODEC = RegistryFixedCodec.create(Registries.FROG_VARIANT);
 	public static final StreamCodec<RegistryFriendlyByteBuf, Holder<FrogVariant>> STREAM_CODEC = ByteBufCodecs.holderRegistry(Registries.FROG_VARIANT);
-
-	private FrogVariant(ClientAsset.ResourceTexture resourceTexture) {
-		this(resourceTexture, SpawnPrioritySelectors.EMPTY);
-	}
 
 	@Override
 	public List<PriorityProvider.Selector<SpawnContext, SpawnCondition>> selectors() {

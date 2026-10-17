@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -125,6 +126,28 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 					IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites
 						.computeIfAbsent(chunkPos, chunkPosxx -> new IOWorker.PendingStore(compoundTag));
 					pendingStore.data = compoundTag;
+					pendingStore.tape = null;
+					pendingStore.lazyData = null;
+					pendingStore.failure = null;
+					return pendingStore.result;
+				}
+			)
+			.thenCompose(Function.identity());
+	}
+
+	/** {@link #store(ChunkPos, Supplier)} for a chunk already encoded to tape:
+	 * the region write uses the tape, and the tag is built only if a pending
+	 * read needs it. */
+	public CompletableFuture<Void> storeEncoded(ChunkPos chunkPos, Supplier<SerializableChunkData.Encoded> supplier) {
+		return this.submitTask(
+				() -> {
+					SerializableChunkData.Encoded encoded = supplier.get();
+					IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites
+						.computeIfAbsent(chunkPos, chunkPosxx -> new IOWorker.PendingStore(null));
+					pendingStore.data = null;
+					pendingStore.tape = encoded.tape();
+					pendingStore.lazyData = encoded.tag();
+					pendingStore.failure = encoded.failure();
 					return pendingStore.result;
 				}
 			)
@@ -137,6 +160,37 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 
 	public CompletableFuture<NativePoiStorage.DecodeResult> loadPoiTapeAsync(ChunkPos chunkPos) {
 		return this.submitThrowingTask(() -> this.storage.readPoiChunk(chunkPos));
+	}
+
+	/** A chunk {@link #loadForParse} found: its tape (from the region file or a
+	 * pending encoded write) or a pending write's tag copy. */
+	public record Loaded(@Nullable byte[] tape, @Nullable CompoundTag tag, @Nullable NativeChunkTape nativeTape) implements AutoCloseable {
+        public Loaded(byte[] tape, CompoundTag tag) { this(tape, tag, null); }
+        @Override public void close() { if (this.nativeTape != null) this.nativeTape.close(); }
+		/** The tag {@link #loadAsync} would have returned. */
+		public CompoundTag fullTag() throws java.io.IOException {
+			return this.tag != null ? this.tag : net.minecraft.nbt.NativeNbtRegionAccess.readTape(this.nativeTape != null ? this.nativeTape.copy() : this.tape);
+		}
+	}
+
+	/** {@link #loadAsync}, leaving region and encoded pending chunks as tape so
+	 * loading can decode them directly. */
+	public CompletableFuture<Optional<Loaded>> loadForParse(ChunkPos chunkPos) {
+		return this.submitThrowingTask(() -> {
+			IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites.get(chunkPos);
+			if (pendingStore != null) {
+				if (pendingStore.tape != null) return Optional.of(new Loaded(pendingStore.tape, null));
+				return Optional.ofNullable(pendingStore.copyData()).map(tag -> new Loaded(null, tag));
+			} else {
+				try {
+					NativeChunkTape tape = this.storage.readOwnedTape(chunkPos);
+					return Optional.ofNullable(tape).map(bytes -> new Loaded(null, null, bytes));
+				} catch (Exception var4) {
+					LOGGER.warn("Failed to read chunk {}", chunkPos, var4);
+					throw var4;
+				}
+			}
+		}, result -> result.ifPresent(Loaded::close));
 	}
 
 	public CompletableFuture<Optional<CompoundTag>> loadAsync(ChunkPos chunkPos) {
@@ -180,8 +234,9 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 			try {
 				IOWorker.PendingStore pendingStore = (IOWorker.PendingStore)this.pendingWrites.get(chunkPos);
 				if (pendingStore != null) {
-					if (pendingStore.data != null) {
-						pendingStore.data.acceptAsRoot(streamTagVisitor);
+					CompoundTag data = pendingStore.data();
+					if (data != null) {
+						data.acceptAsRoot(streamTagVisitor);
 					}
 				} else {
 					this.storage.scanChunk(chunkPos, streamTagVisitor);
@@ -196,27 +251,32 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 	}
 
 	private <T> CompletableFuture<T> submitThrowingTask(IOWorker.ThrowingSupplier<T> throwingSupplier) {
-		return this.consecutiveExecutor.scheduleWithResult(IOWorker.Priority.FOREGROUND.ordinal(), completableFuture -> {
-			if (!this.shutdownRequested.get()) {
-				try {
-					completableFuture.complete(throwingSupplier.get());
-				} catch (Exception var4) {
-					completableFuture.completeExceptionally(var4);
-				}
-			}
+		return this.submitThrowingTask(throwingSupplier, discarded -> {});
+	}
 
-			this.tellStorePending();
-		});
+	private <T> CompletableFuture<T> submitThrowingTask(IOWorker.ThrowingSupplier<T> throwingSupplier,
+		java.util.function.Consumer<T> discard) {
+		// Serialize admission with close so no task can be queued behind shutdown.
+		synchronized (this.shutdownRequested) {
+			if (this.shutdownRequested.get()) {
+				return CompletableFuture.failedFuture(new RejectedExecutionException("IOWorker is closed"));
+			}
+			return this.consecutiveExecutor.scheduleWithResult(IOWorker.Priority.FOREGROUND.ordinal(), completableFuture -> {
+				// Admitted work drains before the lower-priority shutdown barrier.
+				try {
+					T result = throwingSupplier.get();
+					if (!completableFuture.complete(result)) discard.accept(result);
+				} catch (Exception exception) {
+					completableFuture.completeExceptionally(exception);
+				} finally {
+					this.tellStorePending();
+				}
+			});
+		}
 	}
 
 	private <T> CompletableFuture<T> submitTask(Supplier<T> supplier) {
-		return this.consecutiveExecutor.scheduleWithResult(IOWorker.Priority.FOREGROUND.ordinal(), completableFuture -> {
-			if (!this.shutdownRequested.get()) {
-				completableFuture.complete(supplier.get());
-			}
-
-			this.tellStorePending();
-		});
+		return this.submitThrowingTask(supplier::get);
 	}
 
 	private void storePendingChunk() {
@@ -233,7 +293,14 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 
 	private void runStore(ChunkPos chunkPos, IOWorker.PendingStore pendingStore) {
 		try {
-			this.storage.write(chunkPos, pendingStore.data);
+			if (pendingStore.failure != null) {
+				// The tape could not be written: the store fails as the original region write did.
+				throw pendingStore.failure;
+			} else if (pendingStore.tape != null) {
+				this.storage.writeTape(chunkPos, pendingStore.tape);
+			} else {
+				this.storage.write(chunkPos, pendingStore.data);
+			}
 			pendingStore.result.complete(null);
 		} catch (Exception var4) {
 			LOGGER.error("Failed to store chunk {}", chunkPos, var4);
@@ -242,7 +309,11 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 	}
 
 	public void close() throws IOException {
-		if (this.shutdownRequested.compareAndSet(false, true)) {
+		boolean close;
+		synchronized (this.shutdownRequested) {
+			close = this.shutdownRequested.compareAndSet(false, true);
+		}
+		if (close) {
 			this.waitForShutdown();
 			this.consecutiveExecutor.close();
 
@@ -265,6 +336,14 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 	static class PendingStore {
 		@Nullable
 		CompoundTag data;
+		// An encoded chunk: the tape to write and the tag, built on first read.
+		@Nullable
+		byte[] tape;
+		@Nullable
+		Supplier<CompoundTag> lazyData;
+		// An encoded chunk whose tape could not be written; the store reports it.
+		@Nullable
+		Exception failure;
 		final CompletableFuture<Void> result = new CompletableFuture();
 
 		public PendingStore(@Nullable CompoundTag compoundTag) {
@@ -272,8 +351,17 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 		}
 
 		@Nullable
+		CompoundTag data() {
+			if (this.data == null && this.lazyData != null) {
+				this.data = this.lazyData.get();
+				this.lazyData = null;
+			}
+			return this.data;
+		}
+
+		@Nullable
 		CompoundTag copyData() {
-			CompoundTag compoundTag = this.data;
+			CompoundTag compoundTag = this.data();
 			return compoundTag == null ? null : compoundTag.copy();
 		}
 	}

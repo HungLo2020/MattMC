@@ -6,74 +6,45 @@ import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import net.minecraft.SharedConstants;
-import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.HolderSet;
 import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.DependantName;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.DamageTypeTags;
-import net.minecraft.tags.EntityTypeTags;
-import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.SlotAccess;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.flag.FeatureElement;
-import net.minecraft.world.flag.FeatureFlag;
 import net.minecraft.world.flag.FeatureFlagSet;
-import net.minecraft.world.flag.FeatureFlags;
-import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.inventory.ClickAction;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.tooltip.TooltipComponent;
 import net.minecraft.world.item.component.BlocksAttacks;
 import net.minecraft.world.item.component.Consumable;
-import net.minecraft.world.item.component.Consumables;
-import net.minecraft.world.item.component.DamageResistant;
-import net.minecraft.world.item.component.ItemAttributeModifiers;
-import net.minecraft.world.item.component.ProvidesTrimMaterial;
 import net.minecraft.world.item.component.Tool;
 import net.minecraft.world.item.component.TooltipDisplay;
-import net.minecraft.world.item.component.TypedEntityData;
-import net.minecraft.world.item.component.UseCooldown;
-import net.minecraft.world.item.component.UseRemainder;
 import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.item.enchantment.Enchantable;
-import net.minecraft.world.item.enchantment.Repairable;
-import net.minecraft.world.item.equipment.ArmorMaterial;
-import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.item.equipment.Equippable;
-import net.minecraft.world.item.equipment.trim.TrimMaterial;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.Level;
@@ -100,7 +71,8 @@ public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.Iris
 	public static final int MAX_BAR_WIDTH = 13;
 	protected static final int APPROXIMATELY_INFINITE_USE_DURATION = 72000;
 	private final Holder.Reference<Item> builtInRegistryHolder = BuiltInRegistries.ITEM.createIntrusiveHolder(this);
-	private final DataComponentMap components;
+	@Nullable
+	private DataComponentMap components;
 	@Nullable
 	private final Item craftingRemainingItem;
 	protected final String descriptionId;
@@ -120,8 +92,7 @@ public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.Iris
 	}
 
 	public Item(Item.Properties properties) {
-		this.descriptionId = properties.effectiveDescriptionId();
-		this.components = properties.buildAndValidateComponents(Component.translatable(this.descriptionId), properties.effectiveModel());
+		this.descriptionId = properties.descriptionId;
 		this.craftingRemainingItem = properties.craftingRemainingItem;
 		this.requiredFeatures = properties.requiredFeatures;
 		if (SharedConstants.IS_RUNNING_IN_IDE) {
@@ -137,12 +108,46 @@ public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.Iris
 		return this.builtInRegistryHolder;
 	}
 
+	private boolean nativeTransferCopyPure;
+
+	/** Bootstrap dispatch metadata, never a default-component or count cache. */
+	public final boolean nativeTransferCopyIsPure() { return this.nativeTransferCopyPure; }
+
 	public DataComponentMap components() {
-		return this.components;
+		DataComponentMap components = this.components;
+		if (components == null) {
+			throw new UnboundComponentsException(this.descriptionId);
+		}
+		return components;
+	}
+
+	/** Reading an item's components before {@link NativeItems#bindComponents} binds them. */
+	public static final class UnboundComponentsException extends IllegalStateException {
+		UnboundComponentsException(String descriptionId) {
+			super("Default components of " + descriptionId + " are bound when built-in registries finish bootstrapping");
+		}
+	}
+
+	/** Sets the default components decoded from the Rust definition, once; see {@link NativeItems#bindComponents}. */
+	void bindComponents(DataComponentMap components) {
+		if (this.components != null) {
+			throw new IllegalStateException("Default components of " + this.descriptionId + " are already bound");
+		}
+		this.components = components;
+		try { this.nativeTransferCopyPure = this.getClass().getMethod("asItem").getDeclaringClass() == Item.class; }
+		catch (ReflectiveOperationException | SecurityException unavailable) { this.nativeTransferCopyPure = false; }
+		if (this.nativeTransferCopyPure) NativeItemState.markPureCopy(this);
+		// Shulker boxes refuse these through every face (canPlaceItemThroughFace); native hopper plans need the set.
+		if (this instanceof BlockItem blockItem && blockItem.getBlock() instanceof net.minecraft.world.level.block.ShulkerBoxBlock) NativeItemState.markShulkerItem(this);
+		// An inherited (empty) inventoryTick lets the native inventory tick run without a Java call.
+		boolean tickNoop;
+		try { tickNoop = this.getClass().getMethod("inventoryTick", ItemStack.class, ServerLevel.class, Entity.class, EquipmentSlot.class).getDeclaringClass() == Item.class; }
+		catch (ReflectiveOperationException | SecurityException unavailable) { tickNoop = false; }
+		if (tickNoop) NativeItemState.markInventoryTickNoop(this);
 	}
 
 	public int getDefaultMaxStackSize() {
-		return this.components.getOrDefault(DataComponents.MAX_STACK_SIZE, 1);
+		return this.components().getOrDefault(DataComponents.MAX_STACK_SIZE, 1);
 	}
 
 	public void onUseTick(Level level, LivingEntity livingEntity, ItemStack itemStack, int i) {
@@ -313,7 +318,7 @@ public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.Iris
 	}
 
 	public final Component getName() {
-		return this.components.getOrDefault(DataComponents.ITEM_NAME, CommonComponents.EMPTY);
+		return this.components().getOrDefault(DataComponents.ITEM_NAME, CommonComponents.EMPTY);
 	}
 
 	public Component getName(ItemStack itemStack) {
@@ -351,226 +356,22 @@ public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.Iris
 		return false;
 	}
 
-	public static class Properties {
-		private static final DependantName<Item, String> BLOCK_DESCRIPTION_ID = resourceKey -> Util.makeDescriptionId("block", resourceKey.location());
-		private static final DependantName<Item, String> ITEM_DESCRIPTION_ID = resourceKey -> Util.makeDescriptionId("item", resourceKey.location());
-		private final DataComponentMap.Builder components = DataComponentMap.builder().addAll(DataComponents.COMMON_ITEM_COMPONENTS);
+	/**
+	 * An item's Rust definition, resolved for its constructor: see
+	 * {@link NativeItems}. Subclasses receive it from their registration
+	 * factory. Default components bind later, once every registry they
+	 * reference exists.
+	 */
+	public static final class Properties {
+		final String descriptionId;
 		@Nullable
-		Item craftingRemainingItem;
-		FeatureFlagSet requiredFeatures = FeatureFlags.VANILLA_SET;
-		@Nullable
-		private ResourceKey<Item> id;
-		private DependantName<Item, String> descriptionId = ITEM_DESCRIPTION_ID;
-		private DependantName<Item, ResourceLocation> model = ResourceKey::location;
+		final Item craftingRemainingItem;
+		final FeatureFlagSet requiredFeatures;
 
-		public Item.Properties food(FoodProperties foodProperties) {
-			return this.food(foodProperties, Consumables.DEFAULT_FOOD);
-		}
-
-		public Item.Properties food(FoodProperties foodProperties, Consumable consumable) {
-			return this.component(DataComponents.FOOD, foodProperties).component(DataComponents.CONSUMABLE, consumable);
-		}
-
-		public Item.Properties usingConvertsTo(Item item) {
-			return this.component(DataComponents.USE_REMAINDER, new UseRemainder(new ItemStack(item)));
-		}
-
-		public Item.Properties useCooldown(float f) {
-			return this.component(DataComponents.USE_COOLDOWN, new UseCooldown(f));
-		}
-
-		public Item.Properties stacksTo(int i) {
-			return this.component(DataComponents.MAX_STACK_SIZE, i);
-		}
-
-		public Item.Properties durability(int i) {
-			this.component(DataComponents.MAX_DAMAGE, i);
-			this.component(DataComponents.MAX_STACK_SIZE, 1);
-			this.component(DataComponents.DAMAGE, 0);
-			return this;
-		}
-
-		public Item.Properties craftRemainder(Item item) {
-			this.craftingRemainingItem = item;
-			return this;
-		}
-
-		public Item.Properties rarity(Rarity rarity) {
-			return this.component(DataComponents.RARITY, rarity);
-		}
-
-		public Item.Properties fireResistant() {
-			return this.component(DataComponents.DAMAGE_RESISTANT, new DamageResistant(DamageTypeTags.IS_FIRE));
-		}
-
-		public Item.Properties jukeboxPlayable(ResourceKey<JukeboxSong> resourceKey) {
-			return this.component(DataComponents.JUKEBOX_PLAYABLE, new JukeboxPlayable(new EitherHolder<>(resourceKey)));
-		}
-
-		public Item.Properties enchantable(int i) {
-			return this.component(DataComponents.ENCHANTABLE, new Enchantable(i));
-		}
-
-		public Item.Properties repairable(Item item) {
-			return this.component(DataComponents.REPAIRABLE, new Repairable(HolderSet.direct(item.builtInRegistryHolder())));
-		}
-
-		public Item.Properties repairable(TagKey<Item> tagKey) {
-			HolderGetter<Item> holderGetter = BuiltInRegistries.acquireBootstrapRegistrationLookup(BuiltInRegistries.ITEM);
-			return this.component(DataComponents.REPAIRABLE, new Repairable(holderGetter.getOrThrow(tagKey)));
-		}
-
-		public Item.Properties equippable(EquipmentSlot equipmentSlot) {
-			return this.component(DataComponents.EQUIPPABLE, Equippable.builder(equipmentSlot).build());
-		}
-
-		public Item.Properties equippableUnswappable(EquipmentSlot equipmentSlot) {
-			return this.component(DataComponents.EQUIPPABLE, Equippable.builder(equipmentSlot).setSwappable(false).build());
-		}
-
-		public Item.Properties tool(ToolMaterial toolMaterial, TagKey<Block> tagKey, float f, float g, float h) {
-			return toolMaterial.applyToolProperties(this, tagKey, f, g, h);
-		}
-
-		public Item.Properties pickaxe(ToolMaterial toolMaterial, float f, float g) {
-			return this.tool(toolMaterial, BlockTags.MINEABLE_WITH_PICKAXE, f, g, 0.0F);
-		}
-
-		public Item.Properties axe(ToolMaterial toolMaterial, float f, float g) {
-			return this.tool(toolMaterial, BlockTags.MINEABLE_WITH_AXE, f, g, 5.0F);
-		}
-
-		public Item.Properties hoe(ToolMaterial toolMaterial, float f, float g) {
-			return this.tool(toolMaterial, BlockTags.MINEABLE_WITH_HOE, f, g, 0.0F);
-		}
-
-		public Item.Properties shovel(ToolMaterial toolMaterial, float f, float g) {
-			return this.tool(toolMaterial, BlockTags.MINEABLE_WITH_SHOVEL, f, g, 0.0F);
-		}
-
-		public Item.Properties sword(ToolMaterial toolMaterial, float f, float g) {
-			return toolMaterial.applySwordProperties(this, f, g);
-		}
-
-		public Item.Properties spawnEgg(EntityType<?> entityType) {
-			return this.component(DataComponents.ENTITY_DATA, TypedEntityData.of(entityType, new CompoundTag()));
-		}
-
-		public Item.Properties humanoidArmor(ArmorMaterial armorMaterial, ArmorType armorType) {
-			return this.durability(armorType.getDurability(armorMaterial.durability()))
-				.attributes(armorMaterial.createAttributes(armorType))
-				.enchantable(armorMaterial.enchantmentValue())
-				.component(
-					DataComponents.EQUIPPABLE, Equippable.builder(armorType.getSlot()).setEquipSound(armorMaterial.equipSound()).setAsset(armorMaterial.assetId()).build()
-				)
-				.repairable(armorMaterial.repairIngredient());
-		}
-
-		public Item.Properties wolfArmor(ArmorMaterial armorMaterial) {
-			return this.durability(ArmorType.BODY.getDurability(armorMaterial.durability()))
-				.attributes(armorMaterial.createAttributes(ArmorType.BODY))
-				.repairable(armorMaterial.repairIngredient())
-				.component(
-					DataComponents.EQUIPPABLE,
-					Equippable.builder(EquipmentSlot.BODY)
-						.setEquipSound(armorMaterial.equipSound())
-						.setAsset(armorMaterial.assetId())
-						.setAllowedEntities(HolderSet.direct(EntityType.WOLF.builtInRegistryHolder()))
-						.setCanBeSheared(true)
-						.setShearingSound(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(SoundEvents.ARMOR_UNEQUIP_WOLF))
-						.build()
-				)
-				.component(DataComponents.BREAK_SOUND, SoundEvents.WOLF_ARMOR_BREAK)
-				.stacksTo(1);
-		}
-
-		public Item.Properties horseArmor(ArmorMaterial armorMaterial) {
-			HolderGetter<EntityType<?>> holderGetter = BuiltInRegistries.acquireBootstrapRegistrationLookup(BuiltInRegistries.ENTITY_TYPE);
-			return this.attributes(armorMaterial.createAttributes(ArmorType.BODY))
-				.component(
-					DataComponents.EQUIPPABLE,
-					Equippable.builder(EquipmentSlot.BODY)
-						.setEquipSound(SoundEvents.HORSE_ARMOR)
-						.setAsset(armorMaterial.assetId())
-						.setAllowedEntities(holderGetter.getOrThrow(EntityTypeTags.CAN_WEAR_HORSE_ARMOR))
-						.setDamageOnHurt(false)
-						.setCanBeSheared(true)
-						.setShearingSound(SoundEvents.HORSE_ARMOR_UNEQUIP)
-						.build()
-				)
-				.stacksTo(1);
-		}
-
-		public Item.Properties nautilusArmor(ArmorMaterial armorMaterial) {
-			HolderGetter<EntityType<?>> holderGetter = BuiltInRegistries.acquireBootstrapRegistrationLookup(BuiltInRegistries.ENTITY_TYPE);
-			return this.attributes(armorMaterial.createAttributes(ArmorType.BODY))
-				.component(
-					DataComponents.EQUIPPABLE,
-					Equippable.builder(EquipmentSlot.BODY)
-						.setEquipSound(SoundEvents.ARMOR_EQUIP_NAUTILUS)
-						.setAsset(armorMaterial.assetId())
-						.setAllowedEntities(holderGetter.getOrThrow(EntityTypeTags.CAN_WEAR_NAUTILUS_ARMOR))
-						.setDamageOnHurt(false)
-						.setCanBeSheared(true)
-						.setShearingSound(SoundEvents.ARMOR_UNEQUIP_NAUTILUS)
-						.build()
-				)
-				.stacksTo(1);
-		}
-
-		public Item.Properties trimMaterial(ResourceKey<TrimMaterial> resourceKey) {
-			return this.component(DataComponents.PROVIDES_TRIM_MATERIAL, new ProvidesTrimMaterial(resourceKey));
-		}
-
-		public Item.Properties requiredFeatures(FeatureFlag... featureFlags) {
-			this.requiredFeatures = FeatureFlags.REGISTRY.subset(featureFlags);
-			return this;
-		}
-
-		public Item.Properties setId(ResourceKey<Item> resourceKey) {
-			this.id = resourceKey;
-			return this;
-		}
-
-		public Item.Properties overrideDescription(String string) {
-			this.descriptionId = DependantName.fixed(string);
-			return this;
-		}
-
-		public Item.Properties useBlockDescriptionPrefix() {
-			this.descriptionId = BLOCK_DESCRIPTION_ID;
-			return this;
-		}
-
-		public Item.Properties useItemDescriptionPrefix() {
-			this.descriptionId = ITEM_DESCRIPTION_ID;
-			return this;
-		}
-
-		protected String effectiveDescriptionId() {
-			return this.descriptionId.get((ResourceKey<Item>)Objects.requireNonNull(this.id, "Item id not set"));
-		}
-
-		public ResourceLocation effectiveModel() {
-			return this.model.get((ResourceKey<Item>)Objects.requireNonNull(this.id, "Item id not set"));
-		}
-
-		public <T> Item.Properties component(DataComponentType<T> dataComponentType, T object) {
-			this.components.set(dataComponentType, object);
-			return this;
-		}
-
-		public Item.Properties attributes(ItemAttributeModifiers itemAttributeModifiers) {
-			return this.component(DataComponents.ATTRIBUTE_MODIFIERS, itemAttributeModifiers);
-		}
-
-		DataComponentMap buildAndValidateComponents(Component component, ResourceLocation resourceLocation) {
-			DataComponentMap dataComponentMap = this.components.set(DataComponents.ITEM_NAME, component).set(DataComponents.ITEM_MODEL, resourceLocation).build();
-			if (dataComponentMap.has(DataComponents.DAMAGE) && dataComponentMap.getOrDefault(DataComponents.MAX_STACK_SIZE, 1) > 1) {
-				throw new IllegalStateException("Item cannot have both durability and be stackable");
-			} else {
-				return dataComponentMap;
-			}
+		Properties(String descriptionId, @Nullable Item craftingRemainingItem, FeatureFlagSet requiredFeatures) {
+			this.descriptionId = descriptionId;
+			this.craftingRemainingItem = craftingRemainingItem;
+			this.requiredFeatures = requiredFeatures;
 		}
 	}
 

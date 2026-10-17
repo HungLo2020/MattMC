@@ -2,7 +2,11 @@
 
 Survival is MattMC's default game mode. It grants ordinary building ability but does not grant Creative instant-build, flight, or invulnerable abilities. Resources, tools, food, and safe movement matter.
 
+MattMC's [inventory item browser](../mechanics/InventoryBrowser.md#mode-and-permission-limits) is visible in Survival, but ordinary Survival insertion requests are skipped by the server protocol. A catalog entry is not a substitute for a verified crafting, loot or other acquisition route. Item-use rules and additional operator permissions remain separate.
+
 ## A practical start
+
+Use [Local worlds](../mechanics/LocalWorlds.md) for creation, difficulty and backups, or [Multiplayer and LAN](../mechanics/MultiplayerAndLAN.md) when sharing or joining a world.
 
 1. Collect materials that match current recipe tags. Familiar integrated materials can have missing tag wiring; ordinary oak planks are in the bundled planks tag.
 2. Make a [Crafting Table](../blocks/CraftingTable.md), then a [Furnace](../blocks/Furnace.md) and [Chest](../blocks/Chest.md).
@@ -18,6 +22,8 @@ Survival is not a difficulty setting. Starvation behavior depends on difficulty,
 Creative availability also is not proof of Survival availability. Several integrated mobs and blocks have explicit acquisition or wiring limitations documented in the [content guide](../ContentGuide.md).
 
 ## Related pages
+
+- [Death and respawn](../mechanics/DeathAndRespawn.md)
 
 - [All game modes](Gamemodes.md)
 - [Crafting](../crafting/Crafting.md)

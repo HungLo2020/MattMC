@@ -28,6 +28,18 @@ public class NetherFortressStructure extends Structure {
 	}
 
 	@Override
+	public int[] nativeStub() {
+		return new int[]{8, 64, 0};
+	}
+
+	@Override
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext,
+		net.minecraft.core.BlockPos stub, net.minecraft.world.level.block.Rotation rotation, long[] extra, int[] pieces) {
+		// Rust planned the pieces (structure/fortress_plan.rs).
+		NetherFortressPieces.addNativePieces(structurePiecesBuilder, pieces);
+	}
+
+	@Override
 	public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext) {
 		ChunkPos chunkPos = generationContext.chunkPos();
 		BlockPos blockPos = new BlockPos(chunkPos.getMinBlockX(), 64, chunkPos.getMinBlockZ());

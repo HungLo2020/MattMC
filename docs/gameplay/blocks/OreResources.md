@@ -4,7 +4,7 @@ Ores supply fuel, metals, gems and redstone. **Use a suitable pickaxe before bre
 
 ## Bring a suitable pickaxe
 
-All 19 blocks require the correct tool and belong to the pickaxe mining group. The table lists the ordinary unbroken pickaxe materials accepted by the bundled tags. [Harvest gate][player] · [Mining dispatch][mining] · [Pickaxe group][pickaxe] · [Tier groups][stone-tier] [iron-tier] [diamond-tier]
+All 19 blocks require the correct tool and belong to the pickaxe mining group. The table lists the ordinary unbroken pickaxe materials accepted by the bundled tags. [Harvest gate][player] · [Mining dispatch][mining] · [Pickaxe group][pickaxe] · [Tier groups][stone-tier] [iron-tier][] [diamond-tier][]
 
 | Ore family, including its Deepslate form where present | Suitable pickaxes | Base ordinary drop | Base mining XP |
 | --- | --- | --- | ---: |
@@ -83,9 +83,13 @@ Redstone Ore and its Deepslate variant have a temporary **lit state with light l
 
 ## Storage and availability
 
+Use [Resource Storage Blocks](ResourceStorageBlocks.md) for the non-Copper blocks' exact packing/unpacking recipes, harvesting tiers and placed uses.
+
 Raw-metal storage recipes are described under [processing](#processing-raw-metal). Storage blocks and ore blocks are separate items; processing rules for one do not imply processing rules for the other.
 
 ### Generation examples and limits
+
+For the joined biome and height comparison, use [Finding ores](../mechanics/FindingOres.md). It separates origin sampling and attempts from successful ore placement.
 
 In the normal preset, the bundled **Forest** feature list includes Coal, Iron, Copper, Gold, Redstone, Diamond and Lapis ore placements. **Windswept Hills** additionally provides an Emerald ore route. Their configured features target the stone/deepslate replacement groups to choose the corresponding ore form. These are checked examples, not a complete biome or best-height chart. [Normal preset wiring][presets] · [Forest features][forest] · [Windswept Hills features][hills] · [Emerald targets][configured-ore_emerald] · [Ore placement implementation][ore-feature]
 

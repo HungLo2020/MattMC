@@ -75,10 +75,7 @@ impl WorldPrimitiveFrontend {
             color_targets,
         );
         if staged.is_err() {
-            self.shader_runtime
-                .as_mut()
-                .expect("shader runtime remains installed while discarding failed DH color staging")
-                .discard_source_color_targets_submission(gal);
+            self.discard_source_color_submission(gal);
         }
         staged
     }
@@ -137,10 +134,7 @@ impl WorldPrimitiveFrontend {
                 }))
             }
             Err(error) => {
-                self.shader_runtime
-                    .as_mut()
-                    .expect("shader runtime remains installed while staging DH source targets")
-                    .discard_source_color_targets_submission(gal);
+                self.discard_source_color_submission(gal);
                 Err(error)
             }
         }
@@ -173,9 +167,7 @@ impl WorldPrimitiveFrontend {
     /// leak a mixed color/depth target pair into a later frame.
     pub(crate) fn discard_distant_horizons_source_targets(&mut self, gal: &mut VulkanicGal) {
         self.lod_source_targets.discard_submission(gal);
-        if let Some(runtime) = self.shader_runtime.as_mut() {
-            runtime.discard_source_color_targets_submission(gal);
-        }
+        self.discard_source_color_submission(gal);
         self.pending_distant_horizons_source_targets = None;
     }
 
@@ -487,12 +479,7 @@ impl WorldPrimitiveFrontend {
                 )
             })?
             .stage_distant_horizons_source_color_resources(gal, program, color_targets)?;
-        let unique_color_resources = color_resources.excluding_roles_already_owned_by(&base)?;
-        let merged = if unique_color_resources.len() == 0 {
-            base
-        } else {
-            TerrainSourceOwnedResourceSet::merge([&base, &unique_color_resources])?
-        };
+        let merged = base.with_stage_color_resources(&color_resources)?;
         let depth_resources = targets.semantic_resources()?;
         let unique_depth_resources = depth_resources.excluding_roles_already_owned_by(&merged)?;
         let merged = if unique_depth_resources.len() == 0 {

@@ -109,7 +109,7 @@ impl TerrainVoxelLightSamplingResources {
             }) {
                 Ok(handle) => handle,
                 Err(error) => {
-                    let _ = gal.destroy(occupancy_sampler);
+                    let _ = gal.retire(occupancy_sampler);
                     return Err(error);
                 }
             };
@@ -121,8 +121,8 @@ impl TerrainVoxelLightSamplingResources {
             }) {
                 Ok(handle) => handle,
                 Err(error) => {
-                    let _ = gal.destroy(even_light_sampler);
-                    let _ = gal.destroy(occupancy_sampler);
+                    let _ = gal.retire(even_light_sampler);
+                    let _ = gal.retire(occupancy_sampler);
                     return Err(error);
                 }
             };
@@ -157,9 +157,9 @@ impl TerrainVoxelLightSamplingResources {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(odd_light_sampler);
-                let _ = gal.destroy(even_light_sampler);
-                let _ = gal.destroy(occupancy_sampler);
+                let _ = gal.retire(odd_light_sampler);
+                let _ = gal.retire(even_light_sampler);
+                let _ = gal.retire(occupancy_sampler);
                 return Err(error);
             }
         };
@@ -171,10 +171,10 @@ impl TerrainVoxelLightSamplingResources {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(resource_layout);
-                let _ = gal.destroy(odd_light_sampler);
-                let _ = gal.destroy(even_light_sampler);
-                let _ = gal.destroy(occupancy_sampler);
+                let _ = gal.retire(resource_layout);
+                let _ = gal.retire(odd_light_sampler);
+                let _ = gal.retire(even_light_sampler);
+                let _ = gal.retire(occupancy_sampler);
                 return Err(error);
             }
         };
@@ -216,23 +216,23 @@ impl TerrainVoxelLightSamplingResources {
         let even_resource_set = match create_set(gal, "even", even_light_sampler) {
             Ok(set) => set,
             Err(error) => {
-                let _ = gal.destroy(mapping_buffer);
-                let _ = gal.destroy(resource_layout);
-                let _ = gal.destroy(odd_light_sampler);
-                let _ = gal.destroy(even_light_sampler);
-                let _ = gal.destroy(occupancy_sampler);
+                let _ = gal.retire(mapping_buffer);
+                let _ = gal.retire(resource_layout);
+                let _ = gal.retire(odd_light_sampler);
+                let _ = gal.retire(even_light_sampler);
+                let _ = gal.retire(occupancy_sampler);
                 return Err(error);
             }
         };
         let odd_resource_set = match create_set(gal, "odd", odd_light_sampler) {
             Ok(set) => set,
             Err(error) => {
-                let _ = gal.destroy(even_resource_set);
-                let _ = gal.destroy(mapping_buffer);
-                let _ = gal.destroy(resource_layout);
-                let _ = gal.destroy(odd_light_sampler);
-                let _ = gal.destroy(even_light_sampler);
-                let _ = gal.destroy(occupancy_sampler);
+                let _ = gal.retire(even_resource_set);
+                let _ = gal.retire(mapping_buffer);
+                let _ = gal.retire(resource_layout);
+                let _ = gal.retire(odd_light_sampler);
+                let _ = gal.retire(even_light_sampler);
+                let _ = gal.retire(occupancy_sampler);
                 return Err(error);
             }
         };
@@ -681,9 +681,10 @@ impl TerrainColoredLightRuntime {
         frame_counter: u64,
         mapping: VoxelLightVolumeMapping,
         view_direction: Option<VoxelLightVolumeViewDirection>,
-        meshes: impl IntoIterator<Item = TerrainVoxelSourceMesh>,
+        meshes: impl Into<Arc<[TerrainVoxelSourceMesh]>>,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<TerrainOccupancyUpdateStats> {
+        let meshes: Arc<[TerrainVoxelSourceMesh]> = meshes.into();
         if self.submission_pending {
             return Err(GalError::invalid_argument(
                 "colored-light runtime already has a submission awaiting confirmation",

@@ -17,7 +17,7 @@ pub(in crate::render::chunk::meshing) fn native_fluid_diag_enabled() -> bool {
 
 pub(in crate::render::chunk::meshing) fn native_fluid_diag_log(message: impl std::fmt::Display) {
     if native_fluid_diag_enabled() {
-        eprintln!("MATTMC_NATIVE_FLUID_DIAG {message}");
+        crate::core::console::stderr(format_args!("MATTMC_NATIVE_FLUID_DIAG {message}"));
     }
 }
 
@@ -42,7 +42,7 @@ pub(in crate::render::chunk::meshing) fn native_fluid_flush_diag(
     if index >= 80 {
         return;
     }
-    eprintln!(
+    crate::core::console::stderr(format_args!(
         "MATTMC_NATIVE_FLUID_DIAG #{index} flush facing={} analyzer={} quads={} valid={} committed={} first_pos={},{},{} first_face={} first_flip={} first_light=0x{:08x} first_color=0x{:08x}",
         facing,
         has_analyzer,
@@ -56,7 +56,7 @@ pub(in crate::render::chunk::meshing) fn native_fluid_flush_diag(
         record.flip,
         record.lights[0],
         record.colors[0] as u32,
-    );
+    ));
 }
 
 pub(in crate::render::chunk::meshing) fn fluid_diag(
@@ -87,7 +87,7 @@ pub(in crate::render::chunk::meshing) fn fluid_diag(
         return;
     }
     let color_u = color as u32;
-    eprintln!(
+    crate::core::console::stderr(format_args!(
         "MATTMC_NATIVE_FLUID_DIAG #{index} {phase} pos={},{},{} state={} fluid_block_id={} state_fluid_block_id={} pass={} material={} cull_up={} top_exposed={} heights={:.4},{:.4},{:.4},{:.4} color=0x{color_u:08x} alpha={} light=0x{:08x} facing={:?} sprite_still=({:.5},{:.5},{:.5},{:.5}) flow=({:.4},{:.4})",
         block.absolute_x,
         block.absolute_y,
@@ -112,7 +112,7 @@ pub(in crate::render::chunk::meshing) fn fluid_diag(
         state.fluid_still.v1,
         block.fluid_flow_x,
         block.fluid_flow_z,
-    );
+    ));
 }
 
 pub(in crate::render::chunk::meshing) fn fluid_record_diag(
@@ -136,7 +136,7 @@ pub(in crate::render::chunk::meshing) fn fluid_record_diag(
     }
     let color = record.colors[0] as u32;
     let encoded_textures = encoded_fluid_record_textures(record);
-    eprintln!(
+    crate::core::console::stderr(format_args!(
         "MATTMC_NATIVE_FLUID_DIAG #{index} {phase} pos={},{},{} facing={} flip={} face={} origin={:.1},{:.1},{:.1} heights={:.4},{:.4},{:.4},{:.4} uv0={:.5},{:.5} uv1={:.5},{:.5} uv2={:.5},{:.5} uv3={:.5},{:.5} tex=0x{:08x},0x{:08x},0x{:08x},0x{:08x} color0=0x{color:08x} ao0={:.4} light=0x{:08x},0x{:08x},0x{:08x},0x{:08x} normal=0x{:08x} material={} pass={}",
         block.absolute_x,
         block.absolute_y,
@@ -171,7 +171,7 @@ pub(in crate::render::chunk::meshing) fn fluid_record_diag(
         record.packed_normal,
         record.material_bits,
         record.render_type,
-    );
+    ));
 }
 
 pub(in crate::render::chunk::meshing) fn encoded_fluid_record_textures(

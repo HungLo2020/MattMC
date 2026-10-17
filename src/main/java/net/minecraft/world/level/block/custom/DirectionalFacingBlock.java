@@ -20,7 +20,9 @@ public class DirectionalFacingBlock extends DirectionalBlock {
 
     public DirectionalFacingBlock(Properties properties, boolean facesPlayer) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(FACING, Direction.NORTH));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(FACING, Direction.NORTH));
+        }
         this.facesPlayer = facesPlayer;
     }
 

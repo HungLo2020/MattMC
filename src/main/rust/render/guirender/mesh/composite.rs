@@ -142,7 +142,7 @@ impl GuiMeshCompositeResources {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -425,7 +425,7 @@ impl GuiMeshCompositeResources {
     }
 
     pub fn destroy(self, gal: &mut VulkanicGal) {
-        let _ = gal.destroy(self.resource_set);
+        let _ = gal.retire(self.resource_set);
         if !self.owns_shared {
             return;
         }
@@ -438,7 +438,7 @@ impl GuiMeshCompositeResources {
             self.sampler,
             self.uniform_buffer,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }

@@ -1,4 +1,10 @@
 use crate::render::shaderpack::runtime::fullscreen::*;
+mod legacy_transform;
+mod sky_transform;
+mod sky_lightmap;
+mod horizon_transform;
+mod stage_colors;
+mod coordinate_domains;
 use crate::render::vulkanic::test_support::{presentation_capabilities, vulkan_capabilities};
 
 use crate::render::vulkanic::commands::{
@@ -208,7 +214,7 @@ fn rejects_feedback_execution_before_a_confirmed_source_history_frame() {
                 scalar_uniforms: Vec::new(),
                 texture_transform_before: TextureUsageState::Undefined,
                 scalar_uniform_before: None,
-                clear_values: ShaderPackColorBootstrapClearValues {
+                clear_values: ShaderPackColorClearValues {
                     fog_color: crate::render::vulkanic::commands::ClearColor {
                         r: 0.0,
                         g: 0.0,
@@ -784,7 +790,7 @@ fn nonclearing_source_output_records_dont_care_on_first_write() {
             scalar_uniforms: Vec::new(),
             texture_transform_before: TextureUsageState::Undefined,
             scalar_uniform_before: None,
-            clear_values: ShaderPackColorBootstrapClearValues {
+            clear_values: ShaderPackColorClearValues {
                 fog_color: crate::render::vulkanic::commands::ClearColor {
                     r: 0.0,
                     g: 0.0,
@@ -851,7 +857,7 @@ fn clearing_source_output_clears_again_after_a_prior_frame() {
             scalar_uniforms: Vec::new(),
             texture_transform_before: TextureUsageState::ShaderRead,
             scalar_uniform_before: None,
-            clear_values: ShaderPackColorBootstrapClearValues {
+            clear_values: ShaderPackColorClearValues {
                 fog_color: crate::render::vulkanic::commands::ClearColor {
                     r: 0.0,
                     g: 0.0,
@@ -913,7 +919,7 @@ fn clearing_primary_source_output_uses_the_semantic_fog_clear() {
             scalar_uniforms: Vec::new(),
             texture_transform_before: TextureUsageState::Undefined,
             scalar_uniform_before: None,
-            clear_values: ShaderPackColorBootstrapClearValues { fog_color },
+            clear_values: ShaderPackColorClearValues { fog_color },
             color_attachment_before: vec![TextureUsageState::Undefined],
             clear_targets_this_pass: None,
         },
@@ -962,7 +968,7 @@ fn source_sky_disc_records_its_owned_twenty_four_vertex_geometry() {
             scalar_uniforms: Vec::new(),
             texture_transform_before: TextureUsageState::Undefined,
             scalar_uniform_before: None,
-            clear_values: ShaderPackColorBootstrapClearValues {
+            clear_values: ShaderPackColorClearValues {
                 fog_color: crate::render::vulkanic::commands::ClearColor {
                     r: 0.0,
                     g: 0.0,
@@ -1019,7 +1025,7 @@ fn source_celestial_quad_records_owned_sky_box_capacity_geometry() {
             scalar_uniforms: Vec::new(),
             texture_transform_before: TextureUsageState::Undefined,
             scalar_uniform_before: None,
-            clear_values: ShaderPackColorBootstrapClearValues {
+            clear_values: ShaderPackColorClearValues {
                 fog_color: crate::render::vulkanic::commands::ClearColor {
                     r: 0.0,
                     g: 0.0,
@@ -1083,4 +1089,107 @@ fn rejects_sparse_source_output_locations_before_staging() {
     let error = lower_fullscreen_source_pair(&artifacts.vertex, &artifacts.fragment, &bindings)
         .unwrap_err();
     assert!(error.to_string().contains("sparse gl_FragData locations"));
+}
+
+#[test]
+fn stage_cache_reuses_frame_invariant_objects_for_one_live_plan_at_a_time() {
+    let source = source(
+        "#version 130\nin vec2 uv;\nuniform sampler2D colortex0;\nvoid main() { gl_FragData[0] = texture2D(colortex0, uv); }",
+    );
+    let program = program(&source);
+    let mut gal = crate::render::vulkanic::test_support::mock_gal();
+    let (manifest, targets, mut targets_cache) = staged(&source, &mut gal, true);
+    let pipelines = FullscreenPipelineCache::default();
+    let extent = Extent3d { width: 16, height: 16, depth: 1 };
+    let mut stage = |gal: &mut VulkanicGal| {
+        FullscreenSourceExecutionPlan::stage_cached(
+            gal,
+            &program,
+            &manifest,
+            &targets,
+            std::iter::once(empty_source_resource_snapshot(&source)),
+            extent,
+            Some((&pipelines, (1, 1))),
+        )
+        .unwrap()
+    };
+
+    let first = stage(&mut gal);
+    // A second plan while the first is live must not share its uniforms.
+    let concurrent = stage(&mut gal);
+    assert_ne!(first.compiled.target, concurrent.compiled.target);
+    assert_ne!(first.bound.texture_transform_buffer, concurrent.bound.texture_transform_buffer);
+    let (target, uniforms, source_set, pack_set) = (
+        first.compiled.target,
+        first.bound.texture_transform_buffer,
+        first.bound.source_data_set,
+        first.bound.pack_resources_set,
+    );
+    first.destroy(&mut gal);
+    concurrent.destroy(&mut gal);
+
+    // Identical inputs reuse the parked plan whole, inputs set included.
+    let next = stage(&mut gal);
+    assert!(next.stage_lease.is_some());
+    assert_eq!(target, next.compiled.target);
+    assert_eq!(uniforms, next.bound.texture_transform_buffer);
+    assert_eq!(source_set, next.bound.source_data_set);
+    assert_eq!(pack_set, next.bound.pack_resources_set);
+    let next_pack_set = next.bound.pack_resources_set;
+
+    // Released while leased: destroyed only once the plan returns it.
+    pipelines.release_stages(&mut gal);
+    assert_eq!(1, pipelines.retired_stages.borrow().len());
+    next.destroy(&mut gal);
+    assert!(gal.destroy(next_pack_set).is_err());
+    pipelines.retire_stages(&mut gal, []);
+    assert!(pipelines.retired_stages.borrow().is_empty());
+    assert!(gal.destroy(target).is_err());
+    assert!(gal.destroy(source_set).is_err());
+
+    pipelines.destroy(&mut gal);
+    targets_cache.destroy(&mut gal);
+}
+
+#[test]
+fn destroying_parked_plans_releases_their_input_sets_before_inputs_retire() {
+    // A parked plan's pack-resources set binds the frame's inputs (voxel
+    // volumes, source depth samplers). Runtime input teardown on world
+    // unload drops parked plans first so those inputs can be destroyed.
+    let source = source(
+        "#version 130\nin vec2 uv;\nuniform sampler2D colortex0;\nvoid main() { gl_FragData[0] = texture2D(colortex0, uv); }",
+    );
+    let program = program(&source);
+    let mut gal = crate::render::vulkanic::test_support::mock_gal();
+    let (manifest, targets, mut targets_cache) = staged(&source, &mut gal, true);
+    let pipelines = FullscreenPipelineCache::default();
+    let extent = Extent3d { width: 16, height: 16, depth: 1 };
+    let stage = |gal: &mut VulkanicGal| {
+        FullscreenSourceExecutionPlan::stage_cached(
+            gal,
+            &program,
+            &manifest,
+            &targets,
+            std::iter::once(empty_source_resource_snapshot(&source)),
+            extent,
+            Some((&pipelines, (1, 1))),
+        )
+        .unwrap()
+    };
+
+    let first = stage(&mut gal);
+    let parked_pack_set = first.bound.pack_resources_set;
+    first.destroy(&mut gal);
+
+    pipelines.destroy_parked(&mut gal);
+    assert!(gal.destroy(parked_pack_set).is_err(), "the parked plan's input set is already destroyed");
+
+    // The stage itself stays cached; the next frame binds fresh inputs.
+    let next = stage(&mut gal);
+    assert!(next.stage_lease.is_some());
+    assert_ne!(parked_pack_set, next.bound.pack_resources_set);
+    next.destroy(&mut gal);
+
+    pipelines.destroy(&mut gal);
+    targets_cache.destroy(&mut gal);
 }

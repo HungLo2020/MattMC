@@ -36,6 +36,6 @@ including when that target is the existing slab itself.
 
 ## Sources
 
-- [Wand behavior](https://github.com/HungLo2020/MattMC/blob/fix/issue-720-wand-slab-placement/src/main/java/net/minecraft/world/item/BuildingWandItem.java)
-- [Crafting recipe](https://github.com/HungLo2020/MattMC/blob/fix/issue-720-wand-slab-placement/src/main/resources/data/minecraft/recipe/crafting/building_wand.json)
-- [Normal slab placement](https://github.com/HungLo2020/MattMC/blob/fix/issue-720-wand-slab-placement/src/main/java/net/minecraft/world/level/block/SlabBlock.java)
+- [Wand behavior](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/item/BuildingWandItem.java)
+- [Crafting recipe](https://github.com/HungLo2020/MattMC/blob/master/src/main/resources/data/minecraft/recipe/crafting/building_wand.json)
+- [Normal slab placement](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/block/SlabBlock.java)

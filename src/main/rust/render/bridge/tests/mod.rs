@@ -14,6 +14,7 @@ use crate::render::scene::lod::WORLD_LOD_LAYER_OPAQUE;
 use crate::render::scene::lod::WORLD_LOD_VARIANT_EXACT;
 use crate::render::scene::lod::WORLD_LOD_VERTEX_LAYOUT_V1;
 use crate::render::scene::material::WORLD_MATERIAL_ID_OPAQUE_TEXTURED;
+use crate::render::scene::material::{WORLD_MATERIAL_ID_MAP_TEXT, WORLD_MATERIAL_ID_ITEM_FRAME_MAP, WORLD_MATERIAL_ID_GLOW_ITEM_FRAME_MAP, WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT};
 use crate::render::scene::material::WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED;
 use crate::render::scene::material::WORLD_MATERIAL_SOURCE_CLOUDS;
 use crate::render::scene::material::WORLD_MATERIAL_SOURCE_ENTITY_MODEL;
@@ -111,6 +112,12 @@ fn semantic_particle_record() -> FfiWorldParticleQuadRequest {
 
 fn semantic_orb_instance() -> FfiWorldExperienceOrbInstanceRecord {
     FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
         byte_size: size_of::<FfiWorldExperienceOrbInstanceRecord>() as u32,
         mesh_index: 0,
         mesh_key: 0x0b01,
@@ -136,16 +143,37 @@ fn experience_orb_frame_transport_lowers_placement_and_preserves_mesh_order() {
     let mut orbs = [
         semantic_orb_instance(),
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_key: 0x0b02,
             mesh_index: 1,
             ..semantic_orb_instance()
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_key: 0x0b03,
             mesh_index: 1,
             ..semantic_orb_instance()
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_key: 0x0b04,
             mesh_index: 2,
             ..semantic_orb_instance()
@@ -178,7 +206,7 @@ fn experience_orb_frame_transport_lowers_placement_and_preserves_mesh_order() {
     assert_eq!(instance.transform[12], 1.25);
     assert_eq!(orbs[0].entity_transform[12], 999.0);
     let layout = crate::render::bridge::layout::layout_for_struct(110).unwrap();
-    assert_eq!(layout.byte_size, 112);
+    assert_eq!(layout.byte_size, 248);
     assert_eq!(&layout.field_offsets[..8], &[0, 4, 8, 16, 24, 88, 104, 108]);
     let layout = crate::render::bridge::layout::layout_for_struct(53).unwrap();
     assert_eq!(
@@ -192,26 +220,68 @@ fn experience_orb_frame_transport_rejects_bad_placement_order_and_bounds() {
     let good = semantic_orb_instance();
     for bad in [
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             byte_size: 0,
             ..good
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_key: 0,
             ..good
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_index: 1,
             ..good
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             reserved0: 1,
             ..good
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             camera_orientation: [0.0; 4],
             ..good
         },
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             entity_transform: [f32::NAN; 16],
             ..good
         },
@@ -228,6 +298,13 @@ fn experience_orb_frame_transport_rejects_bad_placement_order_and_bounds() {
     let meshes = [mesh_instance()];
     let descending = [
         FfiWorldExperienceOrbInstanceRecord {
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0;6],
+        entity_culling_leash_bounds: [0.0;6],
+        entity_culling_camera: [0.0;3],
+        shadow_only: 0,
+
             mesh_index: 1,
             ..good
         },
@@ -1011,6 +1088,10 @@ fn gui_mesh_batch_request(
     FfiGuiMeshBatchRequest {
         item_cache_identity: 0,
         item_cache_mode: 0,
+        native_item_transform: 0,
+        native_item_transform_mode: 0,
+        native_item_template: 0,
+        item_layer_foils: FfiSlice { ptr: std::ptr::null(), count: 0 },
         decal_foil_mode: 0,
         decal_model_pose: [0.; 16],
         decal_normal_pose: [0.; 9],
@@ -1113,7 +1194,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         mesh_vertex.field_offsets[2]
     );
     let mesh_batch = crate::render::bridge::layout::layout_for_struct(97).expect("GUI mesh batch layout");
-    assert_eq!(40, mesh_batch.field_count);
+    assert_eq!(44, mesh_batch.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiGuiMeshBatchRequest, item_cache_identity) as u32,
         mesh_batch.field_offsets[38]
@@ -1208,7 +1289,7 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWorldMeshTextureAssetPayload, requested_mip_levels) as u32,
         texture.field_offsets[15]
     );
-    assert_eq!(47, whole_frame.field_count);
+    assert_eq!(58, whole_frame.field_count);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_experience_orbs) as u32,
         whole_frame.field_offsets[45]
@@ -1220,6 +1301,43 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         ) as u32,
         whole_frame.field_offsets[46]
     );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_static_terrain_shadow_casters) as u32,
+        whole_frame.field_offsets[47]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, static_terrain_camera) as u32,
+        whole_frame.field_offsets[48]
+    );
+    assert_eq!(size_of::<FfiStaticTerrainShadowCaster>(), 32);
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_static_terrain_sections) as u32,
+        whole_frame.field_offsets[49]
+    );
+    assert_eq!(size_of::<FfiStaticTerrainSection>(), 40);
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_model_rig_poses) as u32,
+        whole_frame.field_offsets[50]
+    );
+    assert_eq!(size_of::<FfiModelRigNode>(), 24);
+    assert_eq!(size_of::<FfiModelRigPose>(), 40);
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_dh_generic_group_instances) as u32,
+        whole_frame.field_offsets[51]
+    );
+    assert_eq!(
+        std::mem::offset_of!(FfiWholeFrameSubmitRequest, dh_generic_camera) as u32,
+        whole_frame.field_offsets[52]
+    );
+    for (field, offset) in [
+        (53, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_lod_frame_id)),
+        (54, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_lod_frame_lifecycle)),
+        (55, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_lod_frame_count)),
+        (56, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_terrain_frame_owner)),
+        (57, std::mem::offset_of!(FfiWholeFrameSubmitRequest, world_terrain_frame_id)),
+    ] { assert_eq!(offset as u32, whole_frame.field_offsets[field]); }
+    assert_eq!(size_of::<FfiDhGenericGroupBox>(), 56);
+    assert_eq!(size_of::<FfiDhGenericGroupInstance>(), 88);
     assert_eq!(
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, engine_globals_present) as u32,
         whole_frame.field_offsets[37]
@@ -1288,6 +1406,83 @@ fn gui_layout_exports_cover_whole_frame_sequence_and_clip_fields() {
         std::mem::offset_of!(FfiWholeFrameSubmitRequest, post_effect_id) as u32,
         whole_frame.field_offsets[33]
     );
+}
+
+#[test]
+fn gui_native_item_pose_is_copied_and_conflicting_or_invalid_modes_decline() {
+    let vertices = gui_mesh_vertices();
+    let indices = [0_u32,1,2];
+    let owner = Box::new(crate::render::items::Owner::new([0.,0.,0.,2.,3.,4.,1.,1.,1.],false).unwrap());
+    let mut request = gui_mesh_batch_request(&vertices,&indices);
+    let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
+        crate::render::bridge::gui::decode_gui_mesh_batches(FfiSlice {ptr:request,count:1},320,180)
+    };
+    request.native_item_transform = (&*owner as *const crate::render::items::Owner) as u64;
+    request.native_item_transform_mode = 1;
+    assert!(decode(&request).is_err(), "conflicting inline pose");
+    request.model_transform = [0.;16];
+    let right = decode(&request).unwrap().remove(0);
+    request.native_item_transform_mode = 2;
+    let left = decode(&request).unwrap().remove(0);
+    request.native_item_transform_mode = 3;
+    assert!(decode(&request).is_err());
+    request.native_item_transform_mode = 0;
+    assert!(decode(&request).is_err());
+    request.native_item_transform=0;
+    request.native_item_transform_mode=1;
+    assert!(decode(&request).is_err());
+    drop(owner);
+    assert_eq!(&right.model_transform[12..], &[1.5,2.5,3.5,1.]);
+    assert_eq!(&left.model_transform[12..], &[-2.5,2.5,3.5,1.]);
+}
+
+#[test]
+fn gui_mesh_persistent_decode_reuses_geometry_but_revalidates_new_raster_state() {
+    let vertices = gui_mesh_vertices();
+    let indices = [0_u32, 1, 2];
+    let mut request = gui_mesh_batch_request(&vertices, &indices);
+    // A generation no other test uses keeps this thread's cache entry private.
+    request.reserved0 = 1 | (991 << 1);
+    let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
+        crate::render::bridge::gui::decode_gui_mesh_batches(FfiSlice { ptr: request, count: 1 }, 320, 180)
+    };
+    let first = decode(&request).unwrap().remove(0);
+    let cached = decode(&request).unwrap().remove(0);
+    assert_eq!(first.vertices, cached.vertices);
+    assert_eq!(first.indices, cached.indices);
+    // Geometry valid only with a native block raster must still be rejected
+    // when the cached content arrives without one.
+    let mut faced = gui_mesh_vertices();
+    for vertex in &mut faced {
+        vertex.source_face = 3;
+    }
+    let mut faced_request = gui_mesh_batch_request(&faced, &indices);
+    faced_request.reserved0 = 1 | (991 << 1);
+    assert!(decode(&faced_request).is_err());
+    assert!(decode(&faced_request).is_err(), "a cached entry must not skip failed checks");
+}
+
+#[test]
+fn gui_mesh_persistent_geometry_flag_carries_source_identity() {
+    let vertices = gui_mesh_vertices();
+    let indices = [0_u32, 1, 2];
+    let mut request = gui_mesh_batch_request(&vertices, &indices);
+    let decode = |request: &FfiGuiMeshBatchRequest| unsafe {
+        crate::render::bridge::gui::decode_gui_mesh_batches(
+            FfiSlice { ptr: request, count: 1 },
+            320,
+            180,
+        )
+    };
+    assert!(decode(&request).unwrap()[0].persistent_geometry.is_none());
+    request.reserved0 = 1 | (7 << 1);
+    let persistent = decode(&request).unwrap()[0].persistent_geometry.unwrap();
+    assert_eq!(persistent.vertices, vertices.as_ptr() as u64);
+    assert_eq!(persistent.indices, indices.as_ptr() as u64);
+    assert_eq!(persistent.generation, 7);
+    // A generation without the persistent flag is a malformed reserved field.
+    request.reserved0 = 7 << 1;
+    assert!(decode(&request).is_err());
 }
 
 #[test]
@@ -1565,7 +1760,7 @@ fn gui_mesh_transport_copies_and_rejects_malformed_payloads() {
     .expect("valid copied GUI mesh batch");
     assert_eq!(1, decoded.len());
     assert_eq!([0.0, 0.0], decoded[0].vertices[0].local_uv);
-    assert_eq!(vec![0, 1, 2], decoded[0].indices);
+    assert_eq!(vec![0, 1, 2], *decoded[0].indices);
 
     let mut panorama = gui_mesh_batch_request(&vertices, &indices);
     panorama.material_mode = crate::render::bridge::gui::GUI_MESH_MATERIAL_PANORAMA;
@@ -1928,6 +2123,8 @@ fn whole_frame_request(
             sky_end_flash_x_angle: 0.0,
             sky_end_flash_y_angle: 0.0,
             sky_color_argb: 0,
+            sky_native_stars: 0,
+            sky_star_transform: [0.0; 16],
         },
         world_segments: FfiSlice {
             ptr: segments.as_ptr(),
@@ -2006,6 +2203,7 @@ fn whole_frame_request(
             eye_submersion: 0,
             screen_brightness: 0.0,
             far_plane: 0.0,
+            configured_shadow_distance_chunks: 0,
             relative_eye_x: 0.0,
             relative_eye_y: 0.0,
             relative_eye_z: 0.0,
@@ -2099,6 +2297,29 @@ fn whole_frame_request(
             count: 0,
         },
         world_distant_horizons_generic_boxes: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
+        world_static_terrain_shadow_casters: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
+        static_terrain_camera: [0.0; 3],
+        world_static_terrain_sections: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
+        world_dh_generic_group_instances: FfiSlice {
+            ptr: std::ptr::null(),
+            count: 0,
+        },
+        dh_generic_camera: [0.0; 3],
+        world_lod_frame_id: 0,
+        world_lod_frame_lifecycle: 0,
+        world_lod_frame_count: 0,
+        world_terrain_frame_owner: 0,
+        world_terrain_frame_id: 0,
+        world_model_rig_poses: FfiSlice {
             ptr: std::ptr::null(),
             count: 0,
         },
@@ -2692,6 +2913,13 @@ fn mesh_asset<'a>(
 
 fn mesh_instance() -> FfiWorldMeshInstanceRecord {
     FfiWorldMeshInstanceRecord {
+        native_item_transform:0, native_item_transform_mode:0, native_item_parent_properties:0, native_item_parent_normal:[0.;9], native_item_parent_trusted:0,
+
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0; 6],
+        entity_culling_leash_bounds: [0.0; 6],
+        entity_culling_camera: [0.0;3],
         model_submission_order_mode: 0,
         model_submission_order: 0,
         packed_light: 0,
@@ -2725,6 +2953,92 @@ fn mesh_instance() -> FfiWorldMeshInstanceRecord {
         transform: [
             1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
+    }
+}
+
+#[test]
+fn entity_shadow_culling_bridge_preserves_full_precision_and_rejects_bad_domains() {
+    use crate::render::worldrender::frame::entity_culling::*;
+    let mut input = mesh_instance();
+    input.stratum = WORLD_STRATUM_ENTITY_MESH;
+    input.entity_culling_mode = 1;
+    input.entity_culling_flags = ENTITY_CULL_ELIGIBLE | ENTITY_CULL_LEASH_HOLDER;
+    input.entity_culling_bounds = [40.0+1e-10,-0.5,-0.5,41.0,0.5,0.5];
+    input.entity_culling_leash_bounds = [-1.0;6];
+    let request = whole_frame_request_with_mesh_instances(std::slice::from_ref(&input));
+    let (_,_,frame,_) = unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities()).unwrap()};
+    let copied = frame.mesh_instances[0].entity_culling.unwrap();
+    assert_eq!(copied.bounds,input.entity_culling_bounds);
+    assert_eq!(copied.leash_holder_bounds,Some(input.entity_culling_leash_bounds));
+    for bad in 0..7 {
+        let mut invalid = input;
+        match bad {
+            0 => invalid.entity_culling_bounds[0] = f64::NAN,
+            1 => invalid.entity_culling_bounds[0] = 42.0,
+            2 => invalid.entity_culling_flags = 64,
+            3 => invalid.entity_culling_flags = ENTITY_CULL_PLAYER_ONLY_VARIANT,
+            4 => invalid.entity_culling_mode = 0,
+            5 => invalid.block_entity_id = 1,
+            6 => invalid.stratum = WORLD_STRATUM_TERRAIN,
+            _ => unreachable!(),
+        }
+        let request = whole_frame_request_with_mesh_instances(std::slice::from_ref(&invalid));
+        assert!(unsafe {decode_whole_frame_submit(&request,test_vulkan_capabilities())}.is_err());
+    }
+}
+
+#[test]
+fn entity_shadow_culling_orb_transport_keeps_shadow_role_outside_camera_domain() {
+    use crate::render::worldrender::frame::entity_culling::*;
+    let mut orb = semantic_orb_instance();
+    orb.entity_culling_mode = 1;
+    orb.entity_culling_flags = ENTITY_CULL_ELIGIBLE;
+    orb.entity_culling_bounds = [0.0;6];
+    orb.shadow_only = 1;
+    let merged = merge_experience_orb_instances(Vec::new(),&[orb],[128,128]).unwrap();
+    assert_eq!(merged[0].stratum,crate::render::scene::strata::WORLD_STRATUM_ENTITY_SHADOW_CASTER);
+    assert_eq!(merged[0].entity_culling.unwrap().flags,ENTITY_CULL_ELIGIBLE);
+    orb.shadow_only = 2;
+    assert!(merge_experience_orb_instances(Vec::new(),&[orb],[128,128]).is_err());
+    orb.shadow_only = 1;
+    orb.entity_culling_mode = 0;
+    orb.entity_culling_flags = 0;
+    assert!(merge_experience_orb_instances(Vec::new(),&[orb],[128,128]).is_err());
+}
+
+#[test]
+fn orb_merge_in_place_matches_ordered_reference_merge() {
+    let template = merge_experience_orb_instances(Vec::new(), &[semantic_orb_instance()], [128, 128])
+        .unwrap()
+        .remove(0);
+    for (mesh_count, indices) in [
+        (0usize, vec![0usize, 0]),
+        (5, vec![0, 0, 2, 5, 5]),
+        (6, vec![6]),
+        (6, vec![3]),
+        (4, vec![1, 1, 1]),
+    ] {
+        let meshes: Vec<_> = (0..mesh_count).map(|i| {
+            let mut mesh = template.clone();
+            mesh.mesh_key = 1_000 + i as u64;
+            mesh
+        }).collect();
+        let orbs: Vec<_> = indices.iter().enumerate().map(|(n, &index)| {
+            let mut orb = semantic_orb_instance();
+            orb.mesh_index = index as u32;
+            orb.mesh_key = 2_000 + n as u64;
+            orb
+        }).collect();
+        let mut expected = Vec::new();
+        let mut cursor = 0;
+        for (n, &index) in indices.iter().enumerate() {
+            expected.extend((cursor..index).map(|i| 1_000 + i as u64));
+            cursor = index;
+            expected.push(2_000 + n as u64);
+        }
+        expected.extend((cursor..mesh_count).map(|i| 1_000 + i as u64));
+        let merged = merge_experience_orb_instances(meshes, &orbs, [128, 128]).unwrap();
+        assert_eq!(merged.iter().map(|m| m.mesh_key).collect::<Vec<_>>(), expected, "{indices:?}");
     }
 }
 
@@ -3425,6 +3739,13 @@ fn whole_frame_first_person_mesh_stream_is_copied_and_requires_its_own_domain() 
         translucent_hand_mask: 0,
     };
     let mut hands = vec![FfiWorldMeshInstanceRecord {
+        native_item_transform:0, native_item_transform_mode:0, native_item_parent_properties:0, native_item_parent_normal:[0.;9], native_item_parent_trusted:0,
+        entity_culling_mode: 0,
+        entity_culling_flags: 0,
+        entity_culling_bounds: [0.0; 6],
+        entity_culling_leash_bounds: [0.0; 6],
+        entity_culling_camera: [0.0;3],
+
         model_submission_order_mode: 0,
         model_submission_order: 0,
         packed_light: 0,
@@ -3633,7 +3954,7 @@ fn world_and_hand_decal_foil_transport_copies_context_and_rejects_malformed_requ
         );
     }
     let layout = crate::render::bridge::layout::layout_for_struct(69).unwrap();
-    assert_eq!(layout.field_count, 31);
+    assert_eq!(layout.field_count, 41);
     assert_eq!(
         layout.field_offsets[24],
         std::mem::offset_of!(FfiWorldMeshInstanceRecord, decal_foil_mode) as u32
@@ -4082,6 +4403,7 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
         eye_submersion: 1,
         screen_brightness: 0.5,
         far_plane: 192.0,
+        configured_shadow_distance_chunks: 32,
         relative_eye_x: 0.25,
         relative_eye_y: -0.5,
         relative_eye_z: 0.75,
@@ -4160,6 +4482,7 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
             eye_submersion: 1,
             screen_brightness: 0.5,
             far_plane: 192.0,
+            configured_shadow_distance_chunks: 32,
             distant_horizons_render_distance: 256,
             relative_eye_position: [0.25, -0.5, 0.75],
             sky_color: [0.2, 0.4, 0.6],
@@ -4201,6 +4524,14 @@ fn whole_frame_shader_environment_semantics_decode_and_reject_malformed_state() 
         }
     );
 
+    for distance in [0, 2, 32, -1, i32::MIN, i32::MAX] {
+        request.shader_environment_frame.configured_shadow_distance_chunks = distance;
+        let (_, _, decoded, _) = unsafe {
+            decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap()
+        };
+        assert_eq!(decoded.shader_environment.configured_shadow_distance_chunks, distance);
+    }
+    request.shader_environment_frame.configured_shadow_distance_chunks = 32;
     request.shader_environment_frame.lightmap_generation = 0;
     let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }
         .expect_err("enabled lightmap must require a nonzero generation");
@@ -4568,6 +4899,59 @@ fn compact_world_material_ffi_decodes_copies_and_deduplicates_table() {
 }
 
 #[test]
+fn compact_world_material_ffi_admits_map_text_and_rejects_mismatched_modes() {
+    let mut table = vec![material_table_record()];
+    table[0].material_id = WORLD_MATERIAL_ID_MAP_TEXT;
+    table[0].texture_id = 0xf000_1002;
+    table[0].material_mode = WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT;
+    table[0].depth_policy = WORLD_DEPTH_POLICY_TEST_NO_WRITE;
+    table[0].cull_policy = WORLD_CULL_NONE;
+    table[0].source_program = WORLD_MATERIAL_SOURCE_TEXTURED;
+    let compact = [compact_material_quad_request()];
+    for identity in [WORLD_MATERIAL_ID_MAP_TEXT, WORLD_MATERIAL_ID_ITEM_FRAME_MAP, WORLD_MATERIAL_ID_GLOW_ITEM_FRAME_MAP] {
+        table[0].material_id = identity;
+        let request = whole_frame_request_with_compact_materials(&table, &compact);
+        let (_, _, frame, _) = unsafe {
+            decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap()
+        };
+        let quad = &frame.material_quads[0];
+        assert_eq!(identity, quad.material_id);
+        assert_eq!(WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT, quad.material_mode);
+        assert_eq!(WORLD_MATERIAL_SOURCE_TEXTURED, quad.source_program);
+        assert_eq!(0xf000_1002, quad.texture_id);
+
+        // Vertex-modulated quads use the ordinary frame lane rather than the
+        // compact table. Both production decoders must admit this material.
+        let mut raw = material_quad_request();
+        raw.material_id = table[0].material_id;
+        raw.texture_id = table[0].texture_id;
+        raw.material_mode = table[0].material_mode;
+        raw.source_program = table[0].source_program;
+        raw.depth_policy = table[0].depth_policy;
+        raw.cull_policy = table[0].cull_policy;
+        raw.vertex0_color_argb = 0xff80_4020;
+        let raw = [raw];
+        let request = whole_frame_request_with_materials(&raw);
+        let (_, _, frame, _) = unsafe {
+            decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap()
+        };
+        assert_eq!(identity, frame.material_quads[0].material_id);
+        assert_eq!(0xff80_4020, frame.material_quads[0].vertex_color_argb[0]);
+
+    }
+    table[0].material_mode = WORLD_MATERIAL_MODE_OPAQUE;
+    let request = whole_frame_request_with_compact_materials(&table, &compact);
+    assert_eq!(StatusCode::InvalidArgument, unsafe {
+        decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap_err()
+    }.code);
+    table[0].material_mode = 8;
+    let request = whole_frame_request_with_compact_materials(&table, &compact);
+    assert_eq!(StatusCode::UnknownEnum, unsafe {
+        decode_whole_frame_submit(&request, test_vulkan_capabilities()).unwrap_err()
+    }.code);
+}
+
+#[test]
 fn compact_world_material_ffi_preserves_private_dh_generic_stratum() {
     let mut table = vec![material_table_record()];
     table[0].stratum = WORLD_STRATUM_DH_GENERIC;
@@ -4909,6 +5293,7 @@ fn semantic_raw_gui_image_ffi_copies_and_validates_pixels() {
             count: assets.len() as u64,
         },
         negotiated_feature_bits: 0,
+        retained_asset_ids: FfiSlice { ptr: std::ptr::null(), count: 0 },
     };
     let (generation, owned) =
         unsafe { decode_gui_raw_image_update(&request, test_capabilities()).unwrap() };
@@ -4999,9 +5384,10 @@ fn semantic_raw_gui_image_ffi_preserves_frozen_rgba8_metadata() {
             count: assets.len() as u64,
         },
         negotiated_feature_bits: 0,
+        retained_asset_ids: FfiSlice { ptr: std::ptr::null(), count: 0 },
     };
     let (_, owned) = unsafe { decode_gui_raw_image_update(&request, test_capabilities()).unwrap() };
-    assert_eq!(GuiRawImageFormat::Rgba8, owned[0].format);
+    assert_eq!(GuiRawImageSourceFormat::Rgba8, owned[0].format);
     assert_eq!(pixels, owned[0].pixels.as_slice());
 }
 
@@ -5032,6 +5418,7 @@ fn semantic_raw_gui_image_ffi_rejects_oversized_dimensions_before_copying() {
             count: 1,
         },
         negotiated_feature_bits: 0,
+        retained_asset_ids: FfiSlice { ptr: std::ptr::null(), count: 0 },
     };
     let error = unsafe { decode_gui_raw_image_update(&request, test_capabilities()) }
         .expect_err("oversized raw GUI dimensions must fail before pixel copying");
@@ -5995,6 +6382,23 @@ fn world_lod_asset_ffi_accepts_the_bounded_packed_dh_vertex_stream() {
 }
 
 #[test]
+fn whole_frame_ffi_rejects_incomplete_oversized_and_mixed_native_lod_references() {
+    for (id, lifecycle, count, inline_count) in [
+        (0, 1, 0, 0), (0, 0, 1, 0), (1, 0, 0, 0),
+        (1, 0, crate::render::worldrender::WORLD_LOD_MAX_VISIBLE_SEGMENTS as u64 + 1, 0), (1, 0, 1, 1),
+    ] {
+        let mut request = whole_frame_request(&[], &[]);
+        request.world_lod_frame_id = id;
+        request.world_lod_frame_lifecycle = lifecycle;
+        request.world_lod_frame_count = count;
+        // Mixed references reject without dereferencing the inline pointer.
+        request.world_lod_instances.count = inline_count;
+        let error = unsafe { decode_whole_frame_submit(&request, test_vulkan_capabilities()) }.unwrap_err();
+        assert!(format!("{error}").contains("native DH frame"), "{error}");
+    }
+}
+
+#[test]
 fn whole_frame_ffi_copies_bounded_lod_segment_references() {
     let instances = [FfiWorldLodColumnInstanceRecord {
         byte_size: size_of::<FfiWorldLodColumnInstanceRecord>() as u32,
@@ -6295,3 +6699,123 @@ fn shader_pack_asset_ffi_rejects_malformed_file_records() {
 }
 
 mod gal_abi;
+mod gui_item_templates;
+
+#[test]
+fn indexed_map_ffi_copies_indices_and_bounds_expanded_residency() {
+    let mut pixels: Vec<u8> = (0..=255).collect();
+    let mut asset = FfiGuiRawImageAssetPayload {
+        byte_size: size_of::<FfiGuiRawImageAssetPayload>() as u32, format: 3,
+        asset_id: 993, width: 256, height: 1,
+        pixels: FfiBytes { ptr: pixels.as_ptr(), len: pixels.len() as u64 },
+        sampling_filter: 0, sampling_address: 0,
+    };
+    let request = FfiGuiRawImageUpdateRequest {
+        header: FfiHeader { version: FFI_ABI_VERSION, byte_size: size_of::<FfiGuiRawImageUpdateRequest>() as u32 },
+        generation: 1, assets: FfiSlice { ptr: &asset, count: 1 }, negotiated_feature_bits: 0,
+        retained_asset_ids: FfiSlice { ptr: std::ptr::null(), count: 0 },
+    };
+    let (_, owned) = unsafe { decode_gui_raw_image_update(&request, test_capabilities()).unwrap() };
+    pixels.fill(0);
+    assert_eq!(GuiRawImageSourceFormat::MapColor8, owned[0].format);
+    assert_eq!(255, owned[0].pixels[255]);
+
+    // Five compact 16 MiB inputs would expand to 320 MiB. Reject before the
+    // frontend can allocate those resident images, although wire bytes fit.
+    let large = vec![0; 4096 * 4096];
+    asset.width = 4096; asset.height = 4096;
+    asset.pixels = FfiBytes { ptr: large.as_ptr(), len: large.len() as u64 };
+    let assets: Vec<_> = (1..=5).map(|id| FfiGuiRawImageAssetPayload { asset_id: id, ..asset }).collect();
+    let excessive = FfiGuiRawImageUpdateRequest {
+        assets: FfiSlice { ptr: assets.as_ptr(), count: assets.len() as u64 }, ..request
+    };
+    let error = unsafe { decode_gui_raw_image_update(&excessive, test_capabilities()) }.unwrap_err();
+    assert_eq!(StatusCode::LengthOverflow, error.code);
+    assert!(error.message.contains("aggregate"));
+}
+
+#[test]
+fn native_world_item_decode_copies_pose_and_rejects_conflicting_inputs() {
+    let owner=Box::new(crate::render::items::Owner::new([0.,0.,0.,2.,3.,4.,1.,2.,3.],false).unwrap());
+    let mut instance=mesh_instance();instance.stratum=WORLD_STRATUM_ENTITY_MESH;
+    instance.native_item_transform=(&*owner as *const crate::render::items::Owner) as u64;
+    instance.native_item_transform_mode=3;instance.native_item_parent_properties=30;
+    instance.native_item_parent_normal=[1.,0.,0.,0.,1.,0.,0.,0.,1.];instance.native_item_parent_trusted=1;
+    instance.item_foil_mode=1;instance.item_foil_strength=1.;instance.item_foil_speed=1.;instance.decal_foil_mode=2;
+    let copied=unsafe {crate::render::bridge::world::resolve_item_pose(&instance,true)}.unwrap().into_owned();
+    assert_eq!(copied.transform[12..],[1.5,2.,2.5,1.]);
+    assert_eq!(copied.decal_model_pose,copied.transform);
+    assert_eq!(copied.decal_normal_pose,[1.,0.,0.,0.,0.5,0.,0.,0.,1./3.]);
+    assert_eq!(copied.decal_normal_mode,1);assert_eq!(copied.native_item_transform,0);
+    assert!(unsafe {crate::render::bridge::world::resolve_item_pose(&instance,false)}.is_err());
+    for bad in 0..9 {
+        let mut invalid=instance;
+        match bad {
+            0=>invalid.native_item_transform_mode=5,
+            1=>invalid.native_item_parent_properties=0,
+            2=>invalid.native_item_parent_trusted=2,
+            3=>invalid.native_item_parent_normal[0]=f32::NAN,
+            4=>invalid.terrain_placement_mode=1,
+            5=>invalid.flags=0x4000_0000,
+            6=>invalid.decal_model_pose[0]=1.,
+            7=>invalid.decal_normal_pose[0]=-0.,
+            8=>invalid.native_item_transform+=1,
+            _=>unreachable!(),
+        }
+        assert!(unsafe {crate::render::bridge::world::resolve_item_pose(&invalid,true)}.is_err(),"case{bad}");
+    }
+    drop(owner);
+    assert_eq!(copied.transform[12..],[1.5,2.,2.5,1.]);
+    let mut inline=mesh_instance();inline.native_item_parent_normal[0]=-0.;
+    assert!(unsafe {crate::render::bridge::world::resolve_item_pose(&inline,false)}.is_err());
+}
+
+#[test]
+fn whole_frame_native_terrain_acquires_shared_arrays_and_rejects_mixed_expired_or_wrong_camera_inputs() {
+    use crate::render::chunk::{terrain_frames, terrain_selection::TerrainSelection};
+    use std::sync::Arc;
+    let owner = terrain_frames::TerrainFrames::new();
+    let camera = [150.5, 100.0, 530.5];
+    let mut input = TerrainSelection::default();
+    for key in [9, 4] {
+        input.sections.push(FfiStaticTerrainSection { mesh_key: key, mesh_generation: 11,
+            origin: [16, 64, -32], depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+            flags: 0, reserved: 0 });
+    }
+    input.casters.push(FfiStaticTerrainShadowCaster { mesh_key: 13, mesh_generation: 17,
+        origin: [-16, 32, 16], depth_policy: WORLD_DEPTH_POLICY_TEST_NO_WRITE });
+    let id = owner.publish(&input, camera).unwrap();
+    let published = terrain_frames::resolve(owner.id, id, camera).unwrap();
+    let mut inline = whole_frame_request(&[], &[]);
+    inline.static_terrain_camera = camera;
+    inline.world_static_terrain_sections = FfiSlice { ptr: input.sections.as_ptr(), count: input.sections.len() as u64 };
+    inline.world_static_terrain_shadow_casters = FfiSlice { ptr: input.casters.as_ptr(), count: input.casters.len() as u64 };
+    let (_, _, old, _) = unsafe { decode_whole_frame_submit(&inline, test_vulkan_capabilities()) }.unwrap();
+    let mut native = whole_frame_request(&[], &[]);
+    native.static_terrain_camera = camera;
+    native.world_terrain_frame_owner = owner.id;
+    native.world_terrain_frame_id = id;
+    let (_, _, frame, _) = unsafe { decode_whole_frame_submit(&native, test_vulkan_capabilities()) }.unwrap();
+    assert_eq!(frame.static_terrain_sections, old.static_terrain_sections);
+    assert_eq!(frame.static_terrain_shadow_casters, old.static_terrain_shadow_casters);
+    assert!(Arc::ptr_eq(&frame.static_terrain_sections.sections, &published.0.sections));
+    assert!(Arc::ptr_eq(&frame.static_terrain_shadow_casters.casters, &published.1.casters));
+    input.sections[0].mesh_key = 77;
+    assert_eq!(frame.static_terrain_sections.sections[0].mesh_key, 9);
+    for change in 0..4 {
+        let mut bad = native;
+        match change {
+            0 => bad.world_static_terrain_sections = FfiSlice { ptr: std::ptr::null(), count: 1 },
+            1 => bad.world_static_terrain_shadow_casters = FfiSlice { ptr: std::ptr::null(), count: 1 },
+            2 => bad.world_terrain_frame_owner = 0,
+            _ => bad.static_terrain_camera[0] += 1.0,
+        }
+        let error = unsafe { decode_whole_frame_submit(&bad, test_vulkan_capabilities()) }.unwrap_err();
+        assert!(format!("{error}").contains("terrain frame"));
+    }
+    owner.invalidate();
+    assert!(unsafe { decode_whole_frame_submit(&native, test_vulkan_capabilities()) }.is_err());
+    drop(owner);
+    assert_eq!(frame.static_terrain_sections.sections[0].mesh_key, 9);
+    assert_eq!(frame.static_terrain_shadow_casters.casters[0].mesh_generation, 17);
+}

@@ -12,6 +12,10 @@ import net.minecraft.tags.TagKey;
 import org.jetbrains.annotations.Nullable;
 
 public interface Holder<T> {
+	/** Advances whenever any reference holder's tags are rebound, so caches of
+	 * tag membership know when to recompute. */
+	java.util.concurrent.atomic.AtomicLong TAG_GENERATION = new java.util.concurrent.atomic.AtomicLong();
+
 	T value();
 
 	boolean isBound();
@@ -230,6 +234,7 @@ public interface Holder<T> {
 
 		void bindTags(Collection<TagKey<T>> collection) {
 			this.tags = Set.copyOf(collection);
+			TAG_GENERATION.incrementAndGet();
 		}
 
 		@Override

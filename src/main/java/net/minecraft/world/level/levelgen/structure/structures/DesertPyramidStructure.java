@@ -71,6 +71,18 @@ public class DesertPyramidStructure extends SinglePieceStructure {
 		}
 	}
 
+	/** {@code small_plan.rs}'s params: {@code [family 1]}. */
+	@Override
+	public int[] nativePlanParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager) {
+		return new int[]{1};
+	}
+
+	/** Rebuilds {@code small_plan.rs}'s pieces ({@link DesertPyramidPiece#addNativePieces}). */
+	@Override
+	public void nativePlanPieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager, int[] words) {
+		DesertPyramidPiece.addNativePieces(builder, manager, words);
+	}
+
 	@Override
 	public StructureType<?> type() {
 		return StructureType.DESERT_PYRAMID;

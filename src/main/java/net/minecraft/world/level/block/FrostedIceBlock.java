@@ -33,7 +33,9 @@ public class FrostedIceBlock extends IceBlock {
 
 	public FrostedIceBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		}
 	}
 
 	@Override

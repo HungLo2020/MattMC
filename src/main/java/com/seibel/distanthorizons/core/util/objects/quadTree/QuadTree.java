@@ -79,6 +79,8 @@ public class QuadTree<T>
 	// getters and setters //
 	//=====================//
 	
+    protected QuadTreeMutationObserver<T> mutationObserver() { return null; }
+
 	/** @return the node at the given section position */
 	@Nullable
 	public final QuadNode<T> getNode(long pos) throws IndexOutOfBoundsException { return this.getOrSetNode(pos, false, null, true); }
@@ -129,7 +131,7 @@ public class QuadTree<T>
 				return null;
 			}
 			
-			topQuadNode = new QuadNode<T>(rootPos, this.treeLeafDetailLevel);
+			topQuadNode = new QuadNode<T>(rootPos, this.treeLeafDetailLevel, this.mutationObserver());
 			boolean successfullyAdded = this.topRingList.set(ringListPosX, ringListPosZ, topQuadNode);
 			if (!successfullyAdded)
 			{
@@ -258,6 +260,7 @@ public class QuadTree<T>
 				
 				removedItemConsumer.accept(quadNode.value);
 			}
+            if (quadNode != null) quadNode.detachObservation();
 		});
 
 
@@ -525,7 +528,18 @@ public class QuadTree<T>
 					&& this.rootNodeIterator.hasNext())
 			{
 				long sectionPos = this.rootNodeIterator.nextLong();
-				QuadNode<T> rootNode = QuadTree.this.getNode(sectionPos);
+				QuadNode<T> rootNode;
+				try
+				{
+					rootNode = QuadTree.this.getNode(sectionPos);
+				}
+				catch (IndexOutOfBoundsException recentered)
+				{
+					// The render thread iterates without LodQuadTree's lock while its
+					// tick can recenter the tree. A root position captured before that
+					// recenter is no longer part of the tree, so it has no nodes to yield.
+					continue;
+				}
 				if (rootNode != null)
 				{
 					nodeIterator = this.onlyReturnLeaves ? rootNode.getLeafNodeIterator() : rootNode.getNodeIterator(this.stopIteratingFunc);

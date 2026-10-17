@@ -20,21 +20,32 @@ import org.jetbrains.annotations.Nullable;
 public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>> {
 	private final LightLayer layer;
 	protected final LightChunkGetter chunkSource;
-	protected final Long2ByteMap sectionStates = new Long2ByteOpenHashMap();
-	private final LongSet columnsWithSources = new LongOpenHashSet();
+	protected final Long2ByteMap sectionStates;
+	private final LongSet columnsWithSources;
 	protected volatile M visibleSectionData;
 	protected final M updatingSectionData;
-	protected final LongSet changedSections = new LongOpenHashSet();
-	protected final LongSet sectionsAffectedByLightUpdates = new LongOpenHashSet();
-	protected final Long2ObjectMap<DataLayer> queuedSections = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
-	private final LongSet columnsToRetainQueuedDataFor = new LongOpenHashSet();
-	private final LongSet toRemove = new LongOpenHashSet();
+	protected final LongSet changedSections;
+	protected final LongSet sectionsAffectedByLightUpdates;
+	protected final Long2ObjectMap<DataLayer> queuedSections;
+	private final LongSet columnsToRetainQueuedDataFor;
+	private final LongSet toRemove;
 	protected volatile boolean hasInconsistencies;
+    @Nullable final NativeLightCoordinator coordinator;
 
 	protected LayerLightSectionStorage(LightLayer lightLayer, LightChunkGetter lightChunkGetter, M dataLayerStorageMap) {
 		this.layer = lightLayer;
 		this.chunkSource = lightChunkGetter;
 		this.updatingSectionData = dataLayerStorageMap;
+        boolean canonical=dataLayerStorageMap.nativeMap!=null
+            && (getClass()==BlockLightSectionStorage.class||getClass()==SkyLightSectionStorage.class);
+        this.coordinator=canonical?new NativeLightCoordinator(this,lightLayer,dataLayerStorageMap.nativeMap):null;
+        this.sectionStates=coordinator==null?new Long2ByteOpenHashMap():coordinator.states();
+        this.columnsWithSources=coordinator==null?new LongOpenHashSet():coordinator.set(2);
+        this.changedSections=coordinator==null?new LongOpenHashSet():coordinator.set(3);
+        this.sectionsAffectedByLightUpdates=coordinator==null?new LongOpenHashSet():coordinator.set(4);
+        this.queuedSections=coordinator==null?Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>()):coordinator.queued();
+        this.columnsToRetainQueuedDataFor=coordinator==null?new LongOpenHashSet():coordinator.set(6);
+        this.toRemove=coordinator==null?new LongOpenHashSet():coordinator.set(7);
 		this.visibleSectionData = dataLayerStorageMap.copy();
 		this.visibleSectionData.disableCache();
 		this.sectionStates.defaultReturnValue((byte)0);
@@ -56,6 +67,7 @@ public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>>
 
 	@Nullable
 	protected DataLayer getDataLayerToWrite(long l) {
+        if(this.coordinator!=null)return this.coordinator.writable(l);
 		DataLayer dataLayer = this.updatingSectionData.getLayer(l);
 		if (dataLayer == null) {
 			return null;
@@ -85,6 +97,7 @@ public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>>
 	}
 
 	protected void setStoredLevel(long l, int i) {
+        if(this.coordinator!=null){this.coordinator.setStored(l,i);return;}
 		long m = SectionPos.blockToSection(l);
 		DataLayer dataLayer;
 		if (this.changedSections.add(m)) {
@@ -98,6 +111,7 @@ public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>>
 	}
 
 	protected void markSectionAndNeighborsAsAffected(long l) {
+        if(this.coordinator!=null){this.coordinator.affectSection(l);return;}
 		int i = SectionPos.x(l);
 		int j = SectionPos.y(l);
 		int k = SectionPos.z(l);
@@ -117,10 +131,11 @@ public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>>
 	}
 
 	protected boolean hasInconsistencies() {
-		return this.hasInconsistencies;
+		return this.coordinator==null?this.hasInconsistencies:this.coordinator.inconsistent();
 	}
 
 	protected void markNewInconsistencies(LightEngine<M, ?> lightEngine) {
+        if(this.coordinator!=null){this.coordinator.reconcile();return;}
 		if (this.hasInconsistencies) {
 			this.hasInconsistencies = false;
 			LongIterator objectIterator = this.toRemove.iterator();
@@ -200,15 +215,17 @@ public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>>
 	}
 
 	protected void queueSectionData(long l, @Nullable DataLayer dataLayer) {
+        if(this.coordinator!=null){this.coordinator.queueSectionData(l,dataLayer);return;}
 		if (dataLayer != null) {
 			this.queuedSections.put(l, dataLayer);
-			this.hasInconsistencies = true;
+            this.hasInconsistencies=true;
 		} else {
 			this.queuedSections.remove(l);
 		}
 	}
 
 	protected void updateSectionStatus(long l, boolean bl) {
+        if(this.coordinator!=null){this.coordinator.updateSectionStatus(l,bl);return;}
 		byte b = this.sectionStates.get(l);
 		byte c = LayerLightSectionStorage.SectionState.hasData(b, !bl);
 		if (b != c) {
@@ -230,6 +247,7 @@ public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>>
 	}
 
 	protected void putSectionState(long l, byte b) {
+        if(this.coordinator!=null){this.coordinator.putSectionState(l,b);return;}
 		if (b != 0) {
 			if (this.sectionStates.put(l, b) == 0) {
 				this.initializeSection(l);
@@ -255,6 +273,7 @@ public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>>
 	}
 
 	protected void swapSectionMap() {
+        if(this.coordinator!=null){this.coordinator.publish();return;}
 		if (!this.changedSections.isEmpty()) {
 			M dataLayerStorageMap = this.updatingSectionData.copy();
 			dataLayerStorageMap.disableCache();
@@ -273,6 +292,18 @@ public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>>
 			this.sectionsAffectedByLightUpdates.clear();
 		}
 	}
+
+    /** Applies the facade handoff selected/prepared by the native coordinator. */
+    @SuppressWarnings("unchecked")
+    void publishNativeMap(NativeLightingMap map) {
+        M replacement=(M)(this.layer==LightLayer.SKY
+            ? new SkyLightSectionStorage.SkyDataLayerStorageMap(map)
+            : new BlockLightSectionStorage.BlockDataLayerStorageMap(map));
+        if(this.coordinator!=null&&this.visibleSectionData.nativeMap!=null)
+            this.coordinator.prepareSavePublication(this.visibleSectionData.nativeMap,map);
+        // All allocation/native preparation precedes this volatile commit.
+        this.visibleSectionData=replacement;
+    }
 
 	public LayerLightSectionStorage.SectionType getDebugSectionType(long l) {
 		return LayerLightSectionStorage.SectionState.type(this.sectionStates.get(l));

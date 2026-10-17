@@ -39,8 +39,11 @@ public class ClonedChunkSection {
     private final @Nullable SodiumAuxiliaryLightManager auxLightManager;
 
     private final @Nullable PalettedContainerRO<BlockState> blockData;
+    private final @Nullable NativeBlockSectionSnapshot nativeBlockData;
 
     private final @Nullable PalettedContainerRO<Holder<Biome>> biomeData;
+    /** Native biome sections: the 4x4x4 cells read at capture, indexed {@code (x * 4 + y) * 4 + z}. */
+    private final Holder<Biome> @Nullable [] biomeCells;
     private final SodiumModelDataContainer modelMap;
 
     private long lastUsedTimestamp = Long.MAX_VALUE;
@@ -49,7 +52,9 @@ public class ClonedChunkSection {
         this.pos = pos;
 
         PalettedContainerRO<BlockState> blockData = null;
+        NativeBlockSectionSnapshot nativeBlockData = null;
         PalettedContainerRO<Holder<Biome>> biomeData = null;
+        Holder<Biome>[] biomeCells = null;
 
         Int2ReferenceMap<BlockEntity> blockEntityMap = null;
         Int2ReferenceMap<Object> blockEntityRenderDataMap = null;
@@ -59,7 +64,8 @@ public class ClonedChunkSection {
         if (section != null) {
             if (!section.hasOnlyAir()) {
                 if (!level.isDebug()) {
-                    blockData = PalettedContainerROExtension.clone(section.getStates());
+                    nativeBlockData = NativeBlockSectionSnapshot.capture(section.getStates());
+                    if (nativeBlockData == null) blockData = PalettedContainerROExtension.clone(section.getStates());
                 } else {
                     blockData = constructDebugWorldContainer(pos);
                 }
@@ -69,11 +75,19 @@ public class ClonedChunkSection {
                 }
             }
 
-            biomeData = PalettedContainerROExtension.clone(section.getBiomes());
+            var biomes = section.getBiomes();
+            if (biomes.getClass() == PalettedContainer.class && ((PalettedContainer<Holder<Biome>>) biomes).isNativeBiomeOwned()) {
+                // Read the 64 cells now, as the copy would hold them, without a native owner copy.
+                biomeCells = captureBiomeCells(biomes);
+            } else {
+                biomeData = PalettedContainerROExtension.clone(biomes);
+            }
         }
 
         this.blockData = blockData;
+        this.nativeBlockData = nativeBlockData;
         this.biomeData = biomeData;
+        this.biomeCells = biomeCells;
         this.modelMap = modelMap;
 
         this.blockEntityMap = blockEntityMap;
@@ -176,6 +190,8 @@ public class ClonedChunkSection {
 
     @Nullable
     private static Int2ReferenceMap<BlockEntity> copyBlockEntities(LevelChunk chunk, SectionPos chunkCoord) {
+        // Most chunks have none; the scan below would find nothing and return null.
+        if (chunk.getBlockEntities().isEmpty()) return null;
         BoundingBox box = new BoundingBox(chunkCoord.minBlockX(), chunkCoord.minBlockY(), chunkCoord.minBlockZ(),
                 chunkCoord.maxBlockX(), chunkCoord.maxBlockY(), chunkCoord.maxBlockZ());
 
@@ -237,12 +253,36 @@ public class ClonedChunkSection {
         return this.pos;
     }
 
+    public @Nullable NativeBlockSectionSnapshot getNativeBlockData() {
+        return this.nativeBlockData;
+    }
+
     public @Nullable PalettedContainerRO<BlockState> getBlockData() {
         return this.blockData;
     }
 
     public @Nullable PalettedContainerRO<Holder<Biome>> getBiomeData() {
         return this.biomeData;
+    }
+
+    /** Whether this capture holds biomes (null sections read as the default biome). */
+    public boolean hasBiomes() {
+        return this.biomeCells != null || this.biomeData != null;
+    }
+
+    /** The captured biome of cell ({@code x}, {@code y}, {@code z}), each 0-3; requires {@link #hasBiomes()}. */
+    public Holder<Biome> getBiome(int x, int y, int z) {
+        var cells = this.biomeCells;
+        return cells != null ? cells[(x * 4 + y) * 4 + z] : this.biomeData.get(x, y, z);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Holder<Biome>[] captureBiomeCells(PalettedContainerRO<Holder<Biome>> biomes) {
+        Holder<Biome>[] cells = new Holder[64];
+        for (int x = 0; x < 4; x++) for (int y = 0; y < 4; y++) for (int z = 0; z < 4; z++) {
+            cells[(x * 4 + y) * 4 + z] = biomes.get(x, y, z);
+        }
+        return cells;
     }
 
     public @Nullable Int2ReferenceMap<BlockEntity> getBlockEntityMap() {

@@ -40,7 +40,9 @@ public class CocoaBlock extends HorizontalDirectionalBlock implements Bonemealab
 
 	public CocoaBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(AGE, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(AGE, 0));
+		}
 	}
 
 	@Override

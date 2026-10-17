@@ -25,7 +25,8 @@ from pathlib import Path
 from shield_animation_scenarios import SHIELD_ANIMATION_SCENARIOS, SHIELD_ANIMATION_SPRITES, shield_animation_materials, SHIELD_ANIMATION_FRAMES, shield_animation_frames
 
 import artifact_retention
-from capture_window import menu_capture_window
+from capture_window import capture_window_size
+from client_memory import start_ticks as process_start_ticks
 
 
 SHADER_EVENT_PATTERN = (
@@ -235,6 +236,19 @@ def static_terrain_requires_translucent_camera_sort(scenario: str) -> bool:
     scenario = (scenario or "").strip().lower()
     return scenario in {"translucent-overlap", "translucent-moving-camera-performance"}
 
+
+
+def timed_dump_allowed(frame_benchmark_configured: bool, frame_benchmark_status: str | None) -> bool:
+    """Whether the timed diagnostic dump may run now.
+
+    The dump's jcmd commands stop the JVM at a safepoint (thread dump, heap and
+    native-memory summaries), which stalls the render thread for 100+ ms. A
+    frame benchmark writes no status while it measures, so defer the dump while
+    its status is non-terminal; it runs once the benchmark completes or fails.
+    """
+    if not frame_benchmark_configured or frame_benchmark_status is None:
+        return True
+    return frame_benchmark_status in {"complete", "failed"}
 
 @dataclass
 class CaptureConfig:
@@ -567,6 +581,19 @@ class CaptureRunner:
             if path is None or not path.exists():
                 continue
             try:
+                if path.is_symlink():
+                    self.append_meta(f"artifact_retention_game_dir_cleanup=retained_symlink:{path}")
+                    continue
+                path = artifact_retention.assert_inside_marked_root(marker_root, path)
+                if (not Path("/proc").is_dir()
+                        or artifact_retention._live_process_references(path, str(path))):
+                    self.append_meta(f"artifact_retention_game_dir_cleanup=retained_live_or_unproven:{path}")
+                    continue
+                crash_files = [*path.glob("hs_err_pid*.log"), *path.glob("core*"),
+                               *path.glob("crash-reports/*")]
+                if any(item.is_file() for item in crash_files):
+                    self.append_meta(f"artifact_retention_game_dir_cleanup=retained_crash_evidence:{path}")
+                    continue
                 artifact_retention.remove_path(marker_root, path)
                 removed.append(path)
                 parent = path.parent
@@ -1237,7 +1264,7 @@ class CaptureRunner:
             # masking pixels or letting it influence world-color parity.
             upsert_option(voxelmap_file, "Hide Minimap", "true")
             self.append_meta("forced_voxelmap_minimap_hidden=true")
-        width, height = menu_capture_window(self.config.title_screen_capture)
+        width, height = capture_window_size(self.config.title_screen_capture)
         self.append_meta(f"forced_window_width={width}")
         self.append_meta(f"forced_window_height={height}")
         for key, value in forced_options.items():
@@ -1271,7 +1298,7 @@ class CaptureRunner:
         self.config.client_args = remove_client_arg_assignment(self.config.client_args, "enableShaders")
         if not self.config.title_screen_capture:
             self.config.client_args = append_client_arg(self.config.client_args, f"--quickPlaySingleplayer={shlex.quote(self.config.world)}")
-        width, height = menu_capture_window(self.config.title_screen_capture)
+        width, height = capture_window_size(self.config.title_screen_capture)
         self.config.client_args = append_client_arg(self.config.client_args, f"--width {width}")
         self.config.client_args = append_client_arg(self.config.client_args, f"--height {height}")
         self.config.client_args = append_client_arg(self.config.client_args, f"enableShaders={shaders_enabled}")
@@ -1653,6 +1680,10 @@ class CaptureRunner:
         return command
 
     def configure_validation_environment(self) -> None:
+        if self.config.validation_mode == "standard":
+            # Validation runs also keep the Rust GAL's per-frame command,
+            # handle and hazard checks, which normal play skips.
+            self.env["MATTMC_GAL_VALIDATION"] = "1"
         if not self.validation_enabled:
             return
         current_layers = self.env.get("VK_INSTANCE_LAYERS", "")
@@ -1970,7 +2001,11 @@ class CaptureRunner:
                     self.terminate_run_processes("title_screen_capture_complete")
                     break
 
-            if not self.dump_taken and elapsed >= self.config.dump_secs:
+            if (
+                not self.dump_taken
+                and elapsed >= self.config.dump_secs
+                and timed_dump_allowed(self.frame_benchmark_status_path is not None, self.frame_benchmark_status())
+            ):
                 self.take_dump(elapsed, client_pid)
 
             if elapsed >= self.config.max_secs:
@@ -2385,8 +2420,10 @@ class CaptureRunner:
                 "===== jcmd GC.class_histogram (bounded diagnostic) =====",
                 # This is intentionally a non-live histogram: it identifies
                 # retained heap owners without forcing a full collection or
-                # changing the measured game's allocation behaviour.
-                command_text(["jcmd", str(client_pid), "GC.class_histogram"], cwd=self.root, timeout_secs=8),
+                # changing the measured game's allocation behaviour. Without
+                # `-all`, jcmd inspects live objects and forces a full GC
+                # (~90 ms observed inside a measured window).
+                command_text(["jcmd", str(client_pid), "GC.class_histogram", "-all"], cwd=self.root, timeout_secs=8),
                 "",
                 "===== jcmd VM.native_memory summary =====",
                 command_text(
@@ -2444,6 +2481,12 @@ class CaptureRunner:
                 safe_kill(self.gradle_process.pid, signal.SIGKILL)
                 self.run_client_active = False
                 return
+            client_start_ticks = None
+            if self.platform_name == "linux" and client_pid:
+                try:
+                    client_start_ticks = process_start_ticks((Path("/proc") / str(client_pid) / "stat").read_text())
+                except (OSError, ValueError, IndexError):
+                    pass
             if client_pid:
                 safe_kill(client_pid, signal.SIGTERM)
             try:
@@ -2451,7 +2494,20 @@ class CaptureRunner:
             except OSError:
                 pass
             safe_kill(self.gradle_process.pid, signal.SIGTERM)
-            time.sleep(5)
+            # A native abort can start after SIGTERM has closed the wrapper's
+            # output pipes. It may leave no hs_err, and the wrapper exit code
+            # still reports 143. Retain the kernel's signal/core evidence before
+            # forced cleanup can truncate the dump; do not extend the grace.
+            if client_start_ticks is None:
+                time.sleep(5)
+            else:
+                deadline = time.monotonic() + 5
+                observed_core = False
+                while time.monotonic() < deadline:
+                    if not observed_core and linux_core_dump_in_progress(client_pid, client_start_ticks):
+                        self.append_meta("cleanup_client_core_dumping=true")
+                        observed_core = True
+                    time.sleep(min(.25, max(0, deadline - time.monotonic())))
             if client_pid and process_exists(client_pid, self.platform_name):
                 self.append_meta("cleanup_client_kill=true")
                 safe_kill(client_pid, signal.SIGKILL)
@@ -4468,6 +4524,18 @@ def process_exists(pid: int, platform_name: str) -> bool:
         os.kill(pid, 0)
         return True
     except OSError:
+        return False
+
+
+def linux_core_dump_in_progress(pid: int, expected_start_ticks: int, *, proc_root: Path = Path("/proc")) -> bool:
+    process = proc_root / str(pid)
+    try:
+        before = process_start_ticks((process / "stat").read_text())
+        status = (process / "status").read_text()
+        return (before == expected_start_ticks
+                and re.search(r"(?m)^CoreDumping:\s+1\s*$", status) is not None
+                and process_start_ticks((process / "stat").read_text()) == before)
+    except (OSError, ValueError, IndexError):
         return False
 
 

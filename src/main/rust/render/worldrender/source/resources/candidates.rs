@@ -35,6 +35,19 @@ impl WorldPrimitiveFrontend {
         allow_pending_colored_light: bool,
         includes_distant_horizons: bool,
     ) -> GalResult<bool> {
+        let rejected = self.shader_runtime.as_ref().and_then(|runtime| {
+            match runtime.source_candidate() {
+                crate::render::shaderpack::runtime::TerrainSourceCandidateState::Rejected { reason, .. } => {
+                    Some(reason.clone())
+                }
+                _ => None,
+            }
+        });
+        if let Some(reason) = rejected {
+            self.clear_candidate_source_asset_runtime(gal)?;
+            self.candidate_source_asset_error = Some(reason);
+            return Ok(false);
+        }
         let assets = match self.shader_pack_sources.active() {
             Some(source) => match self
                 .shader_pack_assets
@@ -224,9 +237,7 @@ impl WorldPrimitiveFrontend {
         ) {
             Ok(()) => Ok(()),
             Err(error) => {
-                if let Some(runtime) = self.shader_runtime.as_mut() {
-                    runtime.discard_source_color_targets_submission(gal);
-                }
+                self.discard_source_color_submission(gal);
                 self.candidate_source_asset_error =
                     Some(format!("source color target preparation failed: {error}"));
                 Ok(())
@@ -466,12 +477,7 @@ impl WorldPrimitiveFrontend {
                 GalError::invalid_argument("source color resources require a shader runtime")
             })?
             .stage_terrain_source_color_resources(gal, program, color_targets)?;
-        let unique_color_resources = color_resources.excluding_roles_already_owned_by(&base)?;
-        let merged = if unique_color_resources.len() == 0 {
-            base
-        } else {
-            TerrainSourceOwnedResourceSet::merge([&base, &unique_color_resources])?
-        };
+        let merged = base.with_stage_color_resources(&color_resources)?;
         program.require_semantic_resources(merged.availability())?;
         Ok(merged)
     }
@@ -512,12 +518,12 @@ impl WorldPrimitiveFrontend {
                 )
             })?
             .stage_textured_material_source_color_resources(gal, program, color_targets)?;
-        let unique_color_resources = color_resources.excluding_roles_already_owned_by(&base)?;
-        let merged = if unique_color_resources.len() == 0 {
-            base
-        } else {
-            TerrainSourceOwnedResourceSet::merge([&base, &unique_color_resources])?
-        };
+        let merged = base.with_stage_color_resources(&color_resources)?;
+        let merged = if program.opaque_resource_bindings.bindings().iter()
+            .any(|binding| binding.role() == TerrainSourceResourceRole::MaterialTexture)
+            && merged.availability().resource_for(TerrainSourceResourceRole::MaterialTexture).is_some() {
+            merged.excluding_roles([TerrainSourceResourceRole::MaterialTexture])?
+        } else { merged };
         // Let the candidate stage producer roles this writer declares even
         // when the dimension's terrain program does not (Nether/End writers
         // can declare a shadow map the terrain program never samples).
@@ -527,10 +533,22 @@ impl WorldPrimitiveFrontend {
                     .opaque_resource_bindings
                     .bindings()
                     .iter()
-                    .map(|binding| binding.role()),
+                    .map(|binding| binding.role())
+                    .filter(|role| *role != TerrainSourceResourceRole::MaterialTexture),
             );
         }
-        program.require_semantic_resources(merged.availability())?;
+        if program.opaque_resource_bindings.bindings().iter()
+            .any(|binding| binding.role() == TerrainSourceResourceRole::MaterialTexture) {
+            for binding in program.opaque_resource_bindings.bindings() {
+                // The glyph's exact local texture is supplied per producer batch.
+                if binding.role() != TerrainSourceResourceRole::MaterialTexture
+                    && merged.availability().resource_for(binding.role()).is_none() {
+                    return Err(GalError::invalid_argument(format!("material source resource '{}' is unavailable before local texture binding", binding.resource_name())));
+                }
+            }
+        } else {
+            program.require_semantic_resources(merged.availability())?;
+        }
         Ok(merged)
     }
 
@@ -568,12 +586,7 @@ impl WorldPrimitiveFrontend {
                 GalError::invalid_argument("entity source resources require a shader runtime")
             })?
             .stage_terrain_source_color_resources_for_entity(gal, program, color_targets)?;
-        let unique_color_resources = color_resources.excluding_roles_already_owned_by(&base)?;
-        let merged = if unique_color_resources.len() == 0 {
-            base
-        } else {
-            TerrainSourceOwnedResourceSet::merge([&base, &unique_color_resources])?
-        };
+        let merged = base.with_stage_color_resources(&color_resources)?;
         // Local `MaterialTexture` is explicitly supplied for each entity draw.
         let without_local_texture = if merged
             .availability()
@@ -634,12 +647,7 @@ impl WorldPrimitiveFrontend {
                 GalError::invalid_argument("hand source resources require a shader runtime")
             })?
             .stage_terrain_source_color_resources_for_hand(gal, program, color_targets)?;
-        let unique_color_resources = color_resources.excluding_roles_already_owned_by(&base)?;
-        let merged = if unique_color_resources.len() == 0 {
-            base
-        } else {
-            TerrainSourceOwnedResourceSet::merge([&base, &unique_color_resources])?
-        };
+        let merged = base.with_stage_color_resources(&color_resources)?;
         // The selected hand program samples the copied local item texture per
         // draw. Deliberately remove any broad material role before binding it
         // so a terrain atlas can never alias an item material.
@@ -1097,6 +1105,14 @@ impl WorldPrimitiveFrontend {
     }
 
     pub(crate) fn clear_candidate_source_material_texture_resources(&mut self, gal: &mut VulkanicGal) {
+        // Atlas removal also replaces semantic sampler identities without
+        // changing the shader-pack/world cache keys. Release every cached
+        // consumer before the runtime destroys those sampler wrappers.
+        self.destroy_lowered_source_terrain_pack_resources(gal);
+        self.destroy_lowered_textured_material_source_pack_resources(gal);
+        self.destroy_lowered_entity_source_pack_resources(gal);
+        self.lod_exact_atlas_source_pass_resources.destroy(gal);
+        self.lod_source_pass_resources.destroy(gal);
         if let Some(runtime) = self.shader_runtime.as_mut() {
             let _ = runtime.clear_candidate_source_material_texture_resources(gal);
         }
@@ -1129,6 +1145,8 @@ impl WorldPrimitiveFrontend {
                     ),
                     runtime.candidate_source_requires_resource(
                         TerrainSourceResourceRole::ShadowDepthRaw,
+                    ) || runtime.candidate_source_requires_resource(
+                        TerrainSourceResourceRole::ShadowDepthRawSecondary,
                     ),
                     runtime.expected_shader_pack_generation_for_resources(),
                 )
@@ -1297,12 +1315,12 @@ impl WorldPrimitiveFrontend {
             crate::core::environment::var("MATTMC_RUST_SOURCE_DEPTH_TRACE").as_deref(),
             Ok("1") | Ok("true") | Ok("TRUE")
         ) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC source-depth-trace] semantic main=0x{:016x} before={:?} previous={:?}",
                 input.main_depth_view.raw(),
                 input.before_translucency_view.map(Handle::raw),
                 input.previous_view.map(Handle::raw),
-            );
+            ));
         }
         self.shader_runtime
             .as_mut()

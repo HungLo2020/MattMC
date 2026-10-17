@@ -1,3 +1,5 @@
+pub(super) use crate::core::console::{stderr, stdout};
+
 #[cfg(feature = "tracy")]
 use std::sync::OnceLock;
 
@@ -23,7 +25,9 @@ impl Zone {
         {
             let client = CLIENT.get_or_init(|| {
                 let client = tracy_client::Client::start();
-                eprintln!("MattMC Rust VulkanicGAL Tracy client start requested");
+                stderr(format_args!(
+                    "MattMC Rust VulkanicGAL Tracy client start requested"
+                ));
                 client.set_thread_name("MattMC Rust VulkanicGAL");
                 client.message("MattMC Rust VulkanicGAL Tracy client started", 0);
                 client

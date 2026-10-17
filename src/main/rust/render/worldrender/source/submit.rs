@@ -11,6 +11,7 @@ impl WorldPrimitiveFrontend {
     pub(crate) fn append_private_terrain_occupancy_for_frame(
         &mut self,
         occupancy_frame: &WorldPrimitiveFrame,
+        scene: &SceneTerrainFrame,
         operations: &mut Vec<CommandOp>,
     ) -> GalResult<bool> {
         // Occupancy submissions are confirmed by the call that submits them;
@@ -61,7 +62,7 @@ impl WorldPrimitiveFrontend {
         let cull = mapping
             .filter(|_| puddle_descriptor.is_none())
             .map(|mapping| [mapping.valid_world_min, mapping.valid_world_max_exclusive]);
-        let source_meshes = self.terrain_voxel_source_meshes_within(occupancy_frame, cull)?;
+        let source_meshes = self.terrain_voxel_source_meshes_with_scene(occupancy_frame, cull, scene)?;
         let runtime = self
             .shader_runtime
             .as_mut()
@@ -99,6 +100,88 @@ impl WorldPrimitiveFrontend {
         }
     }
 
+    /// Initializes source prerequisites without writing the acquired image.
+    /// The ordinary graph owns depth history, lightmaps and voxel uploads;
+    /// prepare those through an offscreen GAL target, then rebuild admission
+    /// for the same semantic frame and the actual final target. Only the
+    /// subsequent selected-source submission may present this world frame.
+    pub(crate) fn prepare_runtime_source_before_presentation(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        frame: &mut WorldPrimitiveFrame,
+    ) -> GalResult<()> {
+        if self.runtime_source_execution_is_armed()
+            || !self.runtime_source_preparation_requested()
+            || !frame.background.enabled
+            || frame.voxel_volume.world_generation == 0
+            || frame_target.kind() != Some(crate::render::vulkanic::handles::HandleKind::FrameTarget)
+        {
+            return Ok(());
+        }
+        // Coverage would reject this frame after the whole offscreen
+        // preparation: skip that doubled work while shader-off meshes are
+        // still being rebuilt with source semantics.
+        if let Some((mesh_key, stratum, identity)) = self.visible_mesh_lacking_source_semantics(frame) {
+            self.source_execution_armed = false;
+            self.last_admission_decision = Some(format!(
+                "selected-source frame coverage is incomplete: visible mesh {mesh_key} (stratum {stratum}, identity '{identity}') has no retained source semantics yet"
+            ));
+            return Ok(());
+        }
+        let owner = passes::oriented_target::OrientedWorldTarget::create(
+            gal,
+            "minecraft.source.entry-preparation",
+            passes::oriented_target::WorldTargetDesc {
+                extent: gal.pass_target_extent(frame_target)?,
+                color_format: gal.pass_target_color_format(frame_target)?,
+                raster_y_direction: RasterYDirection::Up,
+            },
+        )?;
+        let result = (|| {
+            self.submit_whole_frame_with_initial_ops(
+                gal, generation, owner.target, frame.clone(), Vec::new(),
+                GuiSubmitStats::default(), None,
+                vec![CommandOp::Barrier(texture_barrier(
+                    owner.color_texture,
+                    TextureUsageState::Undefined,
+                    TextureUsageState::ColorAttachment,
+                ))],
+                true,
+            )?;
+            // Confirmation makes the newly written history available. The
+            // pre-submit snapshot still described the uninitialized history;
+            // rebuild it before testing this frame's source admission.
+            if self.shader_runtime.is_some() && self.shader_pack_sources.active().is_some() {
+                self.ensure_candidate_source_assets_for_frame(
+                    gal, frame.voxel_volume.world_generation, frame.frame_id,
+                    false, source_frame_includes_distant_horizons(frame),
+                )?;
+                // Rejected contracts/assets deliberately leave no snapshot and
+                // retain their admission error. They cannot participate in
+                // final-target correlation or confirmed-depth merging. Keep the
+                // source unarmed instead of turning that rejection into a
+                // backend failure during world entry.
+                if self.candidate_source_resource_snapshot.is_some() {
+                    self.prepare_runtime_source_snapshot(gal, generation, frame_target, frame)?;
+                    self.arm_runtime_source_execution_if_ready(frame);
+                } else {
+                    self.source_execution_armed = false;
+                }
+            }
+            Ok(())
+        })();
+        self.clear_frame_passes_for_targets(gal, &[owner.target]);
+        let mut cleanup = Ok(());
+        for handle in owner.handles_in_destroy_order() {
+            if let Err(error) = gal.destroy(handle) {
+                cleanup = Err(error);
+            }
+        }
+        result.and(cleanup)
+    }
+
     /// Stages the exact current-frame source snapshot before the complete
     /// source executor records its one real submission. This intentionally
     /// uses the ordinary Rust frontend only as a private semantic/resource
@@ -125,11 +208,17 @@ impl WorldPrimitiveFrontend {
                 std::mem::take(&mut frame.first_person_mesh_instances);
             let lod_instances = std::mem::take(&mut frame.lod_instances);
             let dh_generic_boxes = std::mem::take(&mut frame.dh_generic_boxes);
+            // Compact terrain belongs to the selected planner below, not to
+            // this provisional mesh-less graph.
+            let terrain_sections = std::mem::take(&mut frame.static_terrain_sections);
+            let terrain_casters = std::mem::take(&mut frame.static_terrain_shadow_casters);
             let snapshot = frame.clone();
             frame.mesh_instances = mesh_instances;
             frame.first_person_mesh_instances = first_person_mesh_instances;
             frame.lod_instances = lod_instances;
             frame.dh_generic_boxes = dh_generic_boxes;
+            frame.static_terrain_sections = terrain_sections;
+            frame.static_terrain_shadow_casters = terrain_casters;
             snapshot
         };
         let frame: &WorldPrimitiveFrame = frame;
@@ -216,18 +305,11 @@ impl WorldPrimitiveFrontend {
                 },
                 source_frame_includes_distant_horizons(frame),
             )?;
-            let missing_roles = {
-                let runtime = self.shader_runtime.as_ref().expect(
-                    "source runtime remains installed while validating merged DH resources",
-                );
-                runtime.candidate_source_missing_resource_roles_for_frame(
-                    self.candidate_source_resource_snapshot
-                        .as_ref()
-                        .map(|snapshot| &snapshot.resources),
-                    source_frame_includes_distant_horizons(frame),
-                )
-            };
-            self.set_candidate_source_missing_resource_roles(missing_roles);
+            // Color preparation just checked the merged resources together
+            // with the complete graph's declared outputs. Those outputs are
+            // initialized by its bootstrap/writers, even when no terrain
+            // draws exist yet. Rechecking without declared outputs would
+            // incorrectly require a previous terrain frame to supply them.
 
             // Rebuilding the exact-frame source resource snapshot above
             // deliberately clears its final-target correlation. Reattach the
@@ -286,13 +368,16 @@ impl WorldPrimitiveFrontend {
         frame_target: Handle,
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
+        gui_stats: GuiSubmitStats,
     ) -> GalResult<(WorldPrimitiveSubmitStats, GuiSubmitStats)> {
+        // `gui_stats` came from recording `gui_ops`; its declared private
+        // intermediates are what the source GUI validation admits.
         self.submit_armed_runtime_source_frame_with_gui(
             gal,
             generation,
             frame_target,
             frame,
-            move |_, _, _, _| Ok((gui_ops.clone(), GuiSubmitStats::default())),
+            move |_, _, _, _| Ok((gui_ops.clone(), gui_stats.clone())),
         )
     }
 
@@ -672,7 +757,7 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         generation: u64,
         frame_target: Handle,
-        frame: WorldPrimitiveFrame,
+        mut frame: WorldPrimitiveFrame,
         mut append_gui: F,
     ) -> GalResult<(WorldPrimitiveSubmitStats, GuiSubmitStats)>
     where
@@ -701,6 +786,9 @@ impl WorldPrimitiveFrontend {
             started.elapsed(),
         );
         let validate_started = std::time::Instant::now();
+        // Resident static terrain is drawn by the scene path straight from its
+        // compact entries; the rest becomes ordinary instances here.
+        let scene = self.take_scene_terrain(gal, &mut frame)?;
         validate_frame(&frame)?;
         let entity_outline_plan = features::outline::prepare_entity_outline_post_effect(&frame)?;
         // The armed entry validates this exact frame's coverage just before
@@ -780,27 +868,48 @@ impl WorldPrimitiveFrontend {
                 && MeshBatchSelection::All.includes(instance)
                 && is_source_terrain_mesh_stratum(instance.stratum)
         });
-        let static_batches = self.cached_mesh_batch_plan(
+        // Key the camera plan by exactly the instances it can draw, so churn
+        // in shadow-only candidates (excluded by this selection) does not
+        // invalidate it. The core skips every other instance anyway.
+        let static_selection = if has_camera_sorted_meshes {
+            MeshBatchSelection::Static
+        } else {
+            MeshBatchSelection::All
+        };
+        // Described, resident static chunk sections are drawn by the scene
+        // path; only the rest go through batch plans.
+        let static_indices = frame
+            .mesh_instances
+            .iter()
+            .enumerate()
+            .filter(|(_, instance)| {
+                static_selection.includes(instance)
+                    && is_source_terrain_mesh_stratum(instance.stratum)
+                    && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let static_identities = static_indices
+            .iter()
+            .map(|&index| mesh_identities[index].clone())
+            .collect::<Vec<_>>();
+        let static_batches = self.cached_mesh_batch_plan_selected(
             &frame,
             color_format,
             RasterYDirection::Up,
             true,
-            if has_camera_sorted_meshes {
-                MeshBatchSelection::Static
-            } else {
-                MeshBatchSelection::All
-            },
-            &mesh_identities,
+            static_selection,
+            &static_identities,
             true,
+            Some(&static_indices),
         );
-        let shadow_batches = self.cached_mesh_batch_plan(
-            &frame,
-            color_format,
-            RasterYDirection::Up,
-            true,
-            MeshBatchSelection::ShadowOnly,
-            &mesh_identities,
-            true,
+        let shadow_indices = self.source_shadow_supplement_instance_indices(
+            &frame, programs.opaque.shader_pack_generation,
+        )?;
+        let shadow_identities = shadow_indices.iter().map(|&index| mesh_identities[index].clone()).collect::<Vec<_>>();
+        let shadow_batches = self.cached_mesh_batch_plan_selected(
+            &frame, color_format, RasterYDirection::Up, true,
+            MeshBatchSelection::ShadowSupplement, &shadow_identities, true, Some(&shadow_indices),
         );
         self.mesh_batch_identity_scratch = mesh_identities;
         let (static_batches, shadow_batches) = (static_batches?, shadow_batches?);
@@ -840,6 +949,7 @@ impl WorldPrimitiveFrontend {
             g_buffer_generation,
             &frame,
             &batches,
+            &scene,
             &shadow_batches,
             expected_extent,
             source_depth_texture,
@@ -847,7 +957,7 @@ impl WorldPrimitiveFrontend {
             source_shadow_targets,
             source_main_depth,
             frame_target,
-            ShaderPackColorBootstrapClearValues {
+            ShaderPackColorClearValues {
                 fog_color: background_clear_color(&frame.background),
             },
         )?;
@@ -856,7 +966,8 @@ impl WorldPrimitiveFrontend {
         let source_draw_coverage = SourceTerrainDrawCoverage::from_batches_and_draws(
             &batches,
             &plan.terrain.terrain.draws,
-        );
+        )
+        .without_scene(plan.terrain.scene_coverage);
         require_source_terrain_writer_coverage(&batches, source_draw_coverage)?;
         let source_lod_draw_count = plan.distant_horizons.as_ref().map_or(0_u64, |dh| {
             (dh.draws.len() + dh.exact_atlas_draws.len() + dh.translucent_draws.len()) as u64
@@ -956,12 +1067,12 @@ impl WorldPrimitiveFrontend {
             .shader_runtime
             .as_ref()
             .is_some_and(ShaderPackRuntimeExecutor::suppresses_vanilla_cloud_faces);
-        let source_textured_material_coverage = source_material_writer_coverage(
+        let source_textured_material_coverage = source_material_writer_coverage_for_draws(
             &textured_batches,
             plan.terrain
                 .textured_material
-                .as_ref()
-                .map(|material| material.draws.as_slice()),
+                .iter()
+                .flat_map(|material| material.draws.iter()),
         )?;
         let source_weather_coverage = source_material_writer_coverage(
             &weather_batches,
@@ -1102,9 +1213,22 @@ impl WorldPrimitiveFrontend {
             self.mesh_asset_generation,
             gal.capabilities().shader_conventions,
         )?;
-        if gameplay_attachment_capture.is_some() {
+        let source_dh_depth_coverage = plan.distant_horizons.as_ref().map(|distant_horizons| {
+            (
+                source_main_depth.targets.before_translucency_texture,
+                distant_horizons.depth_targets.distant_depth_before_translucency_texture,
+            )
+        });
+        if let Some(capture) = gameplay_attachment_capture.as_mut() {
+            self.retain_captured_fullscreen_uniform_receipts(
+                &frame,
+                capture,
+                plan.fullscreen_consumers.iter().map(|consumer| {
+                    (consumer.program.as_ref(), consumer.frame.scalar_uniforms.as_slice())
+                }),
+            );
             for observation in &self.latest_atlas_animation_observations {
-                eprintln!("{observation}");
+                crate::core::console::stderr(format_args!("{observation}"));
             }
         }
         let terrain_primary = plan
@@ -1337,7 +1461,7 @@ impl WorldPrimitiveFrontend {
             }
         }
         let occupancy_started = std::time::Instant::now();
-        match self.append_private_terrain_occupancy_for_frame(&frame, &mut operations) {
+        match self.append_private_terrain_occupancy_for_frame(&frame, &scene, &mut operations) {
             Ok(true) => whole_frame_phase_trace(
                 "private-occupancy",
                 frame.frame_id,
@@ -1535,6 +1659,9 @@ impl WorldPrimitiveFrontend {
                         "final_output",
                     )?;
                     capture.append_ops(gal, operations, self.g_buffer_resources.as_ref(), None)?;
+                    if let Some((main_depth, dh_depth)) = source_dh_depth_coverage {
+                        capture.append_source_dh_depth_coverage(gal, operations, main_depth, dh_depth)?;
+                    }
                 }
                 Ok(())
             },
@@ -1546,6 +1673,9 @@ impl WorldPrimitiveFrontend {
             Ok(submission) => submission,
             Err(error) => {
                 self.discard_unrecorded_source_frame(gal, frame.frame_id);
+                if let Some(capture) = gameplay_attachment_capture.take() {
+                    capture.discard(gal);
+                }
                 return Err(error);
             }
         };
@@ -1564,6 +1694,9 @@ impl WorldPrimitiveFrontend {
                 &mut operations,
             ) {
                 source_submission.discard(self, gal);
+                if let Some(capture) = gameplay_attachment_capture.take() {
+                    capture.discard(gal);
+                }
                 return Err(error);
             }
         }
@@ -1690,6 +1823,9 @@ impl WorldPrimitiveFrontend {
             .any(|operation| matches!(operation, CommandOp::Present { .. }))
         {
             source_submission.discard(self, gal);
+            if let Some(capture) = gameplay_attachment_capture.take() {
+                capture.discard(gal);
+            }
             return Err(GalError::invalid_argument(
                 "complete source execution rejects embedded presentation; the frame coordinator owns the sole present",
             ));
@@ -1705,6 +1841,9 @@ impl WorldPrimitiveFrontend {
             .count() as u64;
         if source_draw_ops.saturating_add(source_draw_indexed_ops) == 0 {
             source_submission.discard(self, gal);
+            if let Some(capture) = gameplay_attachment_capture.take() {
+                capture.discard(gal);
+            }
             return Err(GalError::invalid_argument(
                 "complete source execution recorded no terrain or fullscreen draws",
             ));
@@ -1774,6 +1913,9 @@ impl WorldPrimitiveFrontend {
             Err(error) => {
                 self.world_text.cancel_submission();
                 source_submission.discard(self, gal);
+                if let Some(capture) = gameplay_attachment_capture.take() {
+                    capture.discard(gal);
+                }
                 if let Some(runtime) = self.shader_runtime.as_mut() {
                     runtime.discard_private_terrain_occupancy_submission();
                 }
@@ -1792,6 +1934,9 @@ impl WorldPrimitiveFrontend {
             Err(error) => {
                 self.world_text.cancel_submission();
                 source_submission.discard(self, gal);
+                if let Some(capture) = gameplay_attachment_capture.take() {
+                    capture.discard(gal);
+                }
                 if let Some(runtime) = self.shader_runtime.as_mut() {
                     runtime.discard_private_terrain_occupancy_submission();
                 }

@@ -79,6 +79,8 @@ pub(crate) struct BridgeRegistry {
     // otherwise copies whole contexts through several stack frames, exhausting
     // ordinary JVM native stacks when inserting into an existing node.
     pub(crate) contexts: BTreeMap<u64, Box<BridgeContext>>,
+    /// Pipelined frame workers by context id; see `pipeline`.
+    pub(crate) pipelines: BTreeMap<u64, FramePipeline>,
     pub(crate) last_error: String,
     pub(crate) windowed_presenter_active: bool,
 }
@@ -88,6 +90,8 @@ impl Drop for BridgeRegistry {
         // The registry is thread-local, so a thread can terminate with live
         // contexts if its owner did not reach the explicit destroy seam. Do
         // not strand the process-wide admission counters in that case.
+        // Finish and stop every frame worker before its context is dropped.
+        self.pipelines.clear();
         let live = self.contexts.len();
         let presenter_active = self.windowed_presenter_active;
         // Drop the owning GALs before releasing their admission slots. This
@@ -115,6 +119,7 @@ thread_local! {
     static BRIDGE_REGISTRY: RefCell<BridgeRegistry> = RefCell::new(BridgeRegistry {
         next_context_id: 1,
         contexts: BTreeMap::new(),
+        pipelines: BTreeMap::new(),
         last_error: String::new(),
         windowed_presenter_active: false,
     });
@@ -124,9 +129,14 @@ pub(crate) fn with_registry_mut<T>(f: impl FnOnce(&mut BridgeRegistry) -> T) -> 
     let budget = memory::RequestBudget::begin();
     BRIDGE_REGISTRY.with(|registry| {
         let mut registry = registry.borrow_mut();
+        registry.join_pipelined_frames();
         let before: Vec<_> = registry.contexts.iter().map(|(id, ctx)| (*id, ctx.ffi_calls, ctx.ffi_input_bytes)).collect();
         let result = f(&mut registry);
         for (id, calls, bytes) in before {
+            // A pipelined frame now owns its context; decode already charged it.
+            if registry.pipelines.get(&id).is_some_and(FramePipeline::is_pending) {
+                continue;
+            }
             if let Some(context) = registry.contexts.get_mut(&id) {
                 if context.ffi_calls != calls {
                     context.ffi_input_bytes = bytes.saturating_add(budget.bytes() as u64);
@@ -137,8 +147,54 @@ pub(crate) fn with_registry_mut<T>(f: impl FnOnce(&mut BridgeRegistry) -> T) -> 
     })
 }
 
+/// Gives a queued entry point its context's pipeline without joining queued
+/// work. `f` may only copy its input and queue jobs; it must not use the
+/// context, which a job may be using.
+pub(crate) fn with_queue<T>(
+    context_id: u64,
+    f: impl FnOnce(&FramePipeline) -> GalResult<T>,
+) -> GalResult<T> {
+    let _budget = memory::RequestBudget::begin();
+    BRIDGE_REGISTRY.with(|registry| {
+        let mut registry = registry.borrow_mut();
+        if !registry.pipelines.contains_key(&context_id) {
+            // Without a pipeline nothing is queued, so the context is free.
+            let context = registry.contexts.get_mut(&context_id).ok_or_else(|| {
+                GalError::ffi(StatusCode::StaleHandle, format!("unknown context id {context_id}"))
+            })?;
+            let pipeline = FramePipeline::new(context)?;
+            registry.pipelines.insert(context_id, pipeline);
+        }
+        let result = f(registry.pipelines.get(&context_id).expect("pipeline inserted above"));
+        if let Err(error) = &result {
+            // A rejected queue entry leaves the worker's queue as it was; join
+            // it so the message lands where `last_error` reports it.
+            registry.join_pipelined_frames();
+            registry.last_error = error.to_string();
+            if let Some(context) = registry.contexts.get_mut(&context_id) {
+                context.last_error = error.to_string();
+            }
+        }
+        result
+    })
+}
+
 pub(crate) fn with_registry<T>(f: impl FnOnce(&BridgeRegistry) -> T) -> T {
-    BRIDGE_REGISTRY.with(|registry| f(&registry.borrow()))
+    BRIDGE_REGISTRY.with(|registry| {
+        let registry = registry.borrow();
+        registry.join_pipelined_frames();
+        f(&registry)
+    })
+}
+
+impl BridgeRegistry {
+    /// Every entry point calls this before touching any context: a pipelined
+    /// frame owns its context until joined.
+    pub(crate) fn join_pipelined_frames(&self) {
+        for pipeline in self.pipelines.values() {
+            pipeline.join();
+        }
+    }
 }
 
 fn reserve_windowed_presenter(registry: &mut BridgeRegistry) -> GalResult<()> {
@@ -518,6 +574,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
             write_status_out(out, status_error(Some(context), &error));
             return error.code as i32;
         }
+        registry.pipelines.remove(&context_id);
         let mut context = registry
             .contexts
             .remove(&context_id)
@@ -541,20 +598,33 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_context_destroy(
 #[cfg(test)]
 mod tests {
     use crate::render::bridge::context::*;
+    // Both fixtures exercise the same process-wide admission flag.
+    static PRESENTER_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn windowed_presenter_reservation_is_exclusive_and_releasable() {
+        let _guard = PRESENTER_TEST_LOCK.lock().expect("presenter test lock");
         let mut registry = BridgeRegistry::default();
         assert!(reserve_windowed_presenter(&mut registry).is_ok());
         let second =
             reserve_windowed_presenter(&mut registry).expect_err("second presenter admitted");
         assert_eq!(second.code, StatusCode::InvalidArgument);
+        let mut other = BridgeRegistry::default();
+        let second = reserve_windowed_presenter(&mut other)
+            .expect_err("second registry presenter admitted");
+        assert_eq!(second.code, StatusCode::InvalidArgument);
+        assert!(!other.windowed_presenter_active);
+        drop(other);
+        // Dropping a rejected registry must not release the live reservation.
+        let mut other = BridgeRegistry::default();
+        assert!(reserve_windowed_presenter(&mut other).is_err());
         release_windowed_presenter(&mut registry);
-        assert!(reserve_windowed_presenter(&mut registry).is_ok());
+        assert!(reserve_windowed_presenter(&mut other).is_ok());
     }
 
     #[test]
     fn registry_drop_releases_presenter_admission() {
+        let _guard = PRESENTER_TEST_LOCK.lock().expect("presenter test lock");
         {
             let mut registry = BridgeRegistry::default();
             reserve_windowed_presenter(&mut registry).expect("first presenter reservation");

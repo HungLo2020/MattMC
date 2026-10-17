@@ -40,6 +40,8 @@ For an **untested, source-based Water setup**, dig a 2 × 2 pool one block deep 
 
 Different contact directions produce different blocks. Use the canonical [water/lava stone conversions](Stone.md#water-and-lava) and [Basalt generation rules](BlackstoneAndBasalt.md#making-basalt-with-lava) before building a generator. Water beside or above lava can convert the lava position into Obsidian or Cobblestone depending on its source state; lava flowing downward into Water has a separate Stone conversion. Soul Soil and Blue Ice provide the separate Basalt route. These interactions can consume a source; a generator needs a deliberate layout. [Liquid contact checks][liquid] · [Downward lava callback][lava]
 
+For a repeatable source-derived layout, see the [four-cell Cobblestone generator](Stone.md#repeatable-cobblestone-generator), including its Water drop pit, separate Lava source and wrong-product troubleshooting.
+
 Lava Buckets also have a [Furnace fuel use](../items/LavaBucket.md); burning fuel in a furnace and placed-world fluid flow are separate systems.
 
 ## Light, fire and breathing

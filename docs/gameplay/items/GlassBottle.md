@@ -8,12 +8,18 @@ Place three Glass blocks in a V-shaped arrangement: two separated across the upp
 
 Use a bottle while targeting a water source. The item checks interaction permission and water-tag fluid, then creates a Water Bottle. That is the ordinary starting container for [brewing](../brewing/Brewing.md).
 
+In ordinary Survival, using a Glass Bottle normally on a [Water Cauldron](../blocks/Cauldrons.md#bucket-and-bottle-transactions) at any water level produces one Water Bottle and lowers the cauldron by one level. The cauldron guide covers stack exchanges and Creative behavior. [Cauldron filling][cauldron-fill]
+
 ## Other collection uses
 
 - Use a Glass Bottle on a Beehive or Bee Nest at honey level 5 to collect a Honey Bottle. Hive harvesting has bee-release and smoke conditions; see [Honeycomb](Honeycomb.md#harvesting) for the shared hive-safety context.
 - Near a living area-effect cloud owned by an Ender Dragon, the bottle can create Dragon's Breath and reduce the cloud's radius by 0.5. This is a specific owner/type check, not a way to bottle every lingering-effect cloud.
 
 The item checks for qualifying nearby dragon clouds before its water-targeting branch. These behaviors are source-reviewed; this page does not promise safe access to a dragon encounter.
+
+## Re-bottling honey
+
+Combine one [Honey Block](HoneyBlock.md#usage) with four Glass Bottles, each in a separate slot, at a Crafting Table to make four Honey Bottles. The recipe is shapeless. [Re-bottling recipe][honey-rebottling] · [Ingredient matching][shapeless-matching]
 
 ## Related pages
 
@@ -28,3 +34,9 @@ Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No 
 - [Bottle recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/crafting/glass_bottle.json)
 - [Water and dragon-cloud collection](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/BottleItem.java)
 - [Honey collection](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/level/block/BeehiveBlock.java#L147-L189)
+
+The additional cauldron and re-bottling routes were source-reviewed at `9bafc14d2e2943dcfe8a37e9e81dc001386b88bb` on 2026-10-04; no in-game cauldron or crafting test was run.
+
+[cauldron-fill]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/core/cauldron/CauldronInteraction.java#L74-L102
+[honey-rebottling]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/resources/data/minecraft/recipe/crafting/honey_bottle.json
+[shapeless-matching]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/world/item/crafting/ShapelessRecipe.java#L58-L70

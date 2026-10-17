@@ -8,16 +8,16 @@ import static net.vulkanic.bridge.VulkanicGalBridge.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class WorldItemFoilEncodingTest {
-    private static WorldMeshInstanceRecord instance(int stratum) {
+    private static WorldMeshInstance instance(int stratum) {
         return new WorldMeshInstanceRecord(stratum, 17, 1, 0, 2, 1, 0, -1,
             new float[]{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1}, 128,128,0,0,0,0,-1);
     }
 
-    private static WorldMeshInstanceRecord sourceArmor(StandardItemFoilRecord foil) {
+    private static WorldMeshInstance sourceArmor(StandardItemFoilRecord foil) {
         return instance(WORLD_MESH_ENTITY_STRATUM).withItemFoil(foil);
     }
 
-    private static WorldMeshInstanceRecord layered(int stratum, int flags) {
+    private static WorldMeshInstance layered(int stratum, int flags) {
         var source = instance(stratum);
         return new WorldMeshInstanceRecord(stratum, 17, 1, 0, 2, 1, 0, -1,
             source.transform(),128,128,0,0,0,flags,-1);
@@ -54,7 +54,7 @@ class WorldItemFoilEncodingTest {
 
     @Test void exportedNativeLayoutCarriesExactAndCanonicalAbsentFields() throws Exception {
         try (var bridge = VulkanicGalBridge.create("rust-vulkan"); var arena = Arena.ofConfined()) {
-			assertEquals(66, ABI_VERSION);
+			assertEquals(81, ABI_VERSION);
             var layout = Struct.WORLD_MESH_INSTANCE_RECORD;
             var item = arena.allocate(layout.byteSize(), 8);
             var encode = VulkanicGalBridge.class.getDeclaredMethod("encodeWorldItemFoil", MemorySegment.class, StandardItemFoilRecord.class);

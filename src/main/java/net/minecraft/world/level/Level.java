@@ -86,6 +86,13 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class Level implements LevelAccessor, AutoCloseable {
+    private net.minecraft.world.entity.NativeEntityGeometry nativeEntityGeometry;
+
+    /** Shared primary component owner; Java keeps object identities and callbacks. */
+    public final synchronized net.minecraft.world.entity.NativeEntityGeometry nativeEntityGeometry() {
+        if(this.nativeEntityGeometry==null)this.nativeEntityGeometry=new net.minecraft.world.entity.NativeEntityGeometry();
+        return this.nativeEntityGeometry;
+    }
 	public static final Codec<ResourceKey<Level>> RESOURCE_KEY_CODEC = ResourceKey.codec(Registries.DIMENSION);
 	public static final ResourceKey<Level> OVERWORLD = ResourceKey.create(Registries.DIMENSION, ResourceLocation.withDefaultNamespace("overworld"));
 	public static final ResourceKey<Level> NETHER = ResourceKey.create(Registries.DIMENSION, ResourceLocation.withDefaultNamespace("the_nether"));
@@ -109,8 +116,8 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
 	private final Thread thread;
 	private final boolean isDebug;
 	private int skyDarken;
-	protected int randValue = RandomSource.create().nextInt();
-	protected final int addend = 1013904223;
+	protected final net.minecraft.world.level.chunk.NativeRandomTicks randomTicks =
+		new net.minecraft.world.level.chunk.NativeRandomTicks(RandomSource.create().nextInt());
 	protected float oRainLevel;
 	protected float rainLevel;
 	protected float oThunderLevel;
@@ -683,12 +690,8 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
 	@Override
 	public List<Entity> getEntities(@Nullable Entity entity, AABB aABB, Predicate<? super Entity> predicate) {
 		Profiler.get().incrementCounter("getEntities");
-		List<Entity> list = Lists.<Entity>newArrayList();
-		this.getEntities().get(aABB, entity2 -> {
-			if (entity2 != entity && predicate.test(entity2)) {
-				list.add(entity2);
-			}
-		});
+		java.util.ArrayList<Entity> list = Lists.<Entity>newArrayList();
+        this.getEntities().collectEntities(aABB, entity, predicate, list);
 
 		for (EnderDragonPart enderDragonPart : this.dragonParts()) {
 			if (enderDragonPart != entity && enderDragonPart.parentMob != entity && predicate.test(enderDragonPart) && aABB.intersects(enderDragonPart.getBoundingBox())
@@ -700,6 +703,25 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
 
 		return list;
 	}
+
+    /** Preserve the original world query callbacks while projecting only shake sources. */
+    public List<Entity> getScreenShakeSources(@Nullable Entity excluded,AABB query) {
+        if(getClass()!=net.minecraft.client.multiplayer.ClientLevel.class && getClass()!=net.minecraft.server.level.ServerLevel.class) {
+            var result=new java.util.ArrayList<Entity>();
+            for(Entity entity:getEntities(excluded,query))
+                if(entity instanceof net.alexscaves.server.entity.util.ShakesScreen)result.add(entity);
+            return result;
+        }
+        Profiler.get().incrementCounter("getEntities");
+        var result=new java.util.ArrayList<Entity>();
+        this.getEntities().collectScreenShakeSources(query,excluded,result);
+        // The original dragon-part getters still run, even for rejected capabilities.
+        for(EnderDragonPart part:this.dragonParts()) {
+            if(part!=excluded && part.parentMob!=excluded && net.minecraft.world.entity.EntitySelector.NO_SPECTATORS.test(part)
+                && query.intersects(part.getBoundingBox()) && part instanceof net.alexscaves.server.entity.util.ShakesScreen)result.add(part);
+        }
+        return result;
+    }
 
 	@Override
 	public <T extends Entity> List<T> getEntities(EntityTypeTest<Entity, T> entityTypeTest, AABB aABB, Predicate<? super T> predicate) {
@@ -977,8 +999,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
 	public abstract RecipeAccess recipeAccess();
 
 	public BlockPos getBlockRandomPos(int i, int j, int k, int l) {
-		this.randValue = this.randValue * 3 + 1013904223;
-		int m = this.randValue >> 2;
+		int m = this.randomTicks.nextBits();
 		return new BlockPos(i + (m & 15), j + (m >> 16 & l), k + (m >> 8 & 15));
 	}
 

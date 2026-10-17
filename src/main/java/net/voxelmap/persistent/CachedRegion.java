@@ -280,12 +280,19 @@ public class CachedRegion {
     public boolean isSurroundedByLoaded(LevelChunk chunk) {
         int chunkX = chunk.getPos().x;
         int chunkZ = chunk.getPos().z;
-        boolean neighborsLoaded = !chunk.isEmpty() && VoxelConstants.getPlayer().level().hasChunk(chunkX, chunkZ);
+        // This runs on the map calculation pool, which can still be working
+        // after the world unloads (save and quit): no player means no level.
+        var player = VoxelConstants.getMinecraft().player;
+        if (player == null) {
+            return false;
+        }
+        var level = player.level();
+        boolean neighborsLoaded = !chunk.isEmpty() && level.hasChunk(chunkX, chunkZ);
 
         for (int t = chunkX - 1; t <= chunkX + 1 && neighborsLoaded; ++t) {
             for (int s = chunkZ - 1; s <= chunkZ + 1 && neighborsLoaded; ++s) {
-                LevelChunk neighborChunk = VoxelConstants.getPlayer().level().getChunk(t, s);
-                neighborsLoaded = neighborChunk != null && !neighborChunk.isEmpty() && VoxelConstants.getPlayer().level().hasChunk(t, s);
+                LevelChunk neighborChunk = level.getChunk(t, s);
+                neighborsLoaded = neighborChunk != null && !neighborChunk.isEmpty() && level.hasChunk(t, s);
             }
         }
 

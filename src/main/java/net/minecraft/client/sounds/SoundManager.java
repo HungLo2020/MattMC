@@ -1,26 +1,25 @@
 package net.minecraft.client.sounds;
 
-import com.google.common.collect.Maps;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import net.blaze3d.audio.ListenerTransform;
 import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import java.util.Map;
-import java.util.Map.Entry;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Options;
 import net.minecraft.client.resources.sounds.Sound;
-import net.minecraft.client.resources.sounds.SoundEventRegistration;
-import net.minecraft.client.resources.sounds.SoundEventRegistrationSerializer;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.TickableSoundInstance;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -30,14 +29,12 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.GsonHelper;
-import net.minecraft.util.RandomSource;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.util.profiling.Zone;
 import net.minecraft.util.valueproviders.ConstantFloat;
-import net.minecraft.util.valueproviders.MultipliedFloats;
-import net.minecraft.util.valueproviders.SampledFloat;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -52,9 +49,12 @@ public class SoundManager extends SimplePreparableReloadListener<SoundManager.Pr
 	);
 	static final Logger LOGGER = LogUtils.getLogger();
 	private static final String SOUNDS_PATH = "sounds.json";
-	private static final Gson GSON = new GsonBuilder().registerTypeAdapter(SoundEventRegistration.class, new SoundEventRegistrationSerializer()).create();
-	private static final TypeToken<Map<String, SoundEventRegistration>> SOUND_EVENT_REGISTRATION_TYPE = new TypeToken<Map<String, SoundEventRegistration>>() {};
-	private final Map<ResourceLocation, WeighedSoundEvents> registry = Maps.<ResourceLocation, WeighedSoundEvents>newHashMap();
+	private static final AtomicLong REGISTRY_GENERATION = new AtomicLong();
+	/** A built registry awaiting apply; a newer prepare discards an unapplied one. */
+	private static final AtomicLong PENDING_REGISTRY = new AtomicLong();
+	/** Event views of the installed Rust registry (empty Optional: no such event). */
+	private final Map<ResourceLocation, Optional<WeighedSoundEvents>> registry = new ConcurrentHashMap<>();
+	private Set<ResourceLocation> availableSounds = Set.of();
 	private final SoundEngine soundEngine;
 	private final Map<ResourceLocation, Resource> soundCache = new HashMap();
 
@@ -85,74 +85,32 @@ public class SoundManager extends SimplePreparableReloadListener<SoundManager.Pr
 		}
 
 		for (String string : resourceManager.getNamespaces()) {
-			try {
-				Zone zone2 = profilerFiller.zone(string);
+			try (Zone zone2 = profilerFiller.zone(string)) {
+				for (Resource resource : resourceManager.getResourceStack(ResourceLocation.fromNamespaceAndPath(string, "sounds.json"))) {
+					profilerFiller.push(resource.sourcePackId());
 
-				try {
-					for (Resource resource : resourceManager.getResourceStack(ResourceLocation.fromNamespaceAndPath(string, "sounds.json"))) {
-						profilerFiller.push(resource.sourcePackId());
-
-						try {
-							Reader reader = resource.openAsReader();
-
-							try {
-								profilerFiller.push("parse");
-								Map<String, SoundEventRegistration> map = (Map<String, SoundEventRegistration>)GsonHelper.fromJson(GSON, reader, SOUND_EVENT_REGISTRATION_TYPE);
-								profilerFiller.popPush("register");
-
-								for (Entry<String, SoundEventRegistration> entry : map.entrySet()) {
-									preparations.handleRegistration(ResourceLocation.fromNamespaceAndPath(string, (String)entry.getKey()), (SoundEventRegistration)entry.getValue());
-								}
-
-								profilerFiller.pop();
-							} catch (Throwable var18) {
-								if (reader != null) {
-									try {
-										reader.close();
-									} catch (Throwable var16) {
-										var18.addSuppressed(var16);
-									}
-								}
-
-								throw var18;
-							}
-
-							if (reader != null) {
-								reader.close();
-							}
-						} catch (RuntimeException var19) {
-							LOGGER.warn("Invalid {} in resourcepack: '{}'", "sounds.json", resource.sourcePackId(), var19);
-						}
-
-						profilerFiller.pop();
-					}
-				} catch (Throwable var20) {
-					if (zone2 != null) {
-						try {
-							zone2.close();
-						} catch (Throwable var15) {
-							var20.addSuppressed(var15);
-						}
+					try (Reader reader = resource.openAsReader()) {
+						preparations.resources.add(new NativeSoundPolicy.Resource(string, resource.sourcePackId(), reader.readAllAsString()));
+					} catch (IOException | RuntimeException var19) {
+						LOGGER.warn("Invalid {} in resourcepack: '{}'", "sounds.json", resource.sourcePackId(), var19);
 					}
 
-					throw var20;
+					profilerFiller.pop();
 				}
-
-				if (zone2 != null) {
-					zone2.close();
-				}
-			} catch (IOException var21) {
 			}
 		}
 
+		preparations.build();
 		return preparations;
 	}
 
 	protected void apply(SoundManager.Preparations preparations, ResourceManager resourceManager, ProfilerFiller profilerFiller) {
-		preparations.apply(this.registry, this.soundCache, this.soundEngine);
+		preparations.apply(this.soundCache);
+		this.registry.clear();
+		this.availableSounds = NativeSoundPolicy.eventNames().stream().map(ResourceLocation::parse).collect(Collectors.toUnmodifiableSet());
 		if (SharedConstants.IS_RUNNING_IN_IDE) {
-			for (ResourceLocation resourceLocation : this.registry.keySet()) {
-				WeighedSoundEvents weighedSoundEvents = (WeighedSoundEvents)this.registry.get(resourceLocation);
+			for (ResourceLocation resourceLocation : this.availableSounds) {
+				WeighedSoundEvents weighedSoundEvents = this.getSoundEvent(resourceLocation);
 				if (!ComponentUtils.isTranslationResolvable(weighedSoundEvents.getSubtitle()) && BuiltInRegistries.SOUND_EVENT.containsKey(resourceLocation)) {
 					LOGGER.error("Missing subtitle {} for sound event: {}", weighedSoundEvents.getSubtitle(), resourceLocation);
 				}
@@ -160,7 +118,7 @@ public class SoundManager extends SimplePreparableReloadListener<SoundManager.Pr
 		}
 
 		if (LOGGER.isDebugEnabled()) {
-			for (ResourceLocation resourceLocationx : this.registry.keySet()) {
+			for (ResourceLocation resourceLocationx : this.availableSounds) {
 				if (!BuiltInRegistries.SOUND_EVENT.containsKey(resourceLocationx)) {
 					LOGGER.debug("Not having sound event for: {}", resourceLocationx);
 				}
@@ -178,23 +136,16 @@ public class SoundManager extends SimplePreparableReloadListener<SoundManager.Pr
 		return this.soundEngine.getListenerTransform();
 	}
 
-	static boolean validateSoundResource(Sound sound, ResourceLocation resourceLocation, ResourceProvider resourceProvider) {
-		ResourceLocation resourceLocation2 = sound.getPath();
-		if (resourceProvider.getResource(resourceLocation2).isEmpty()) {
-			LOGGER.warn("File {} does not exist, cannot add it to event {}", resourceLocation2, resourceLocation);
-			return false;
-		} else {
-			return true;
-		}
-	}
-
 	@Nullable
 	public WeighedSoundEvents getSoundEvent(ResourceLocation resourceLocation) {
-		return (WeighedSoundEvents)this.registry.get(resourceLocation);
+		return this.registry.computeIfAbsent(resourceLocation, location -> {
+			NativeSoundPolicy.EventInfo info = NativeSoundPolicy.lookupEvent(location.toString());
+			return info == null ? Optional.empty() : Optional.of(WeighedSoundEvents.registered(location, info.subtitle()));
+		}).orElse(null);
 	}
 
 	public Collection<ResourceLocation> getAvailableSounds() {
-		return this.registry.keySet();
+		return this.availableSounds;
 	}
 
 	public void queueTickingSound(TickableSoundInstance tickableSoundInstance) {
@@ -253,12 +204,31 @@ public class SoundManager extends SimplePreparableReloadListener<SoundManager.Pr
 		return this.soundEngine.isActive(soundInstance);
 	}
 
-	public void addListener(SoundEventListener soundEventListener) {
-		this.soundEngine.addEventListener(soundEventListener);
+	/**
+	 * Plays a seeded world sound event (`ClientLevel.playSound`); Rust
+	 * resolves it like a `SimpleSoundInstance` with `RandomSource.create(seed)`.
+	 * A positive `delay` waits that many ticks.
+	 */
+	public void playEvent(SoundEvent soundEvent, SoundSource soundSource, float volume, float pitch, long seed, double x, double y, double z, int delay) {
+		this.soundEngine.playEvent(soundEvent.location(), soundSource, volume, pitch, seed, x, y, z, delay);
 	}
 
-	public void removeListener(SoundEventListener soundEventListener) {
-		this.soundEngine.removeEventListener(soundEventListener);
+	/** The options screen's volume slider preview (`SoundPreviewHandler`). */
+	public void preview(SoundSource soundSource, float volume) {
+		NativeSoundClient.preview(soundSource.ordinal(), volume);
+	}
+
+	/** Starts or stops recording subtitles for the overlay. */
+	public void setSubtitlesListening(boolean listening) {
+		NativeSoundClient.subtitlesListen(listening, SharedConstants.DEBUG_SUBTITLES);
+	}
+
+	/**
+	 * The subtitles audible from `listener` this frame, their expired plays
+	 * purged after `displayMillis`, in draw order.
+	 */
+	public List<SoundSubtitle> subtitleFrame(Vec3 listener, double displayMillis) {
+		return NativeSoundClient.subtitleFrame(listener.x, listener.y, listener.z, displayMillis);
 	}
 
 	public void stop(@Nullable ResourceLocation resourceLocation, @Nullable SoundSource soundSource) {
@@ -273,93 +243,39 @@ public class SoundManager extends SimplePreparableReloadListener<SoundManager.Pr
 		this.soundEngine.reload();
 	}
 
+	/**
+	 * The reload's `sounds.json` texts and sound file listing; Rust parses them
+	 * into a registry off the main thread, installed on apply.
+	 */
 	@Environment(EnvType.CLIENT)
 	protected static class Preparations {
-		final Map<ResourceLocation, WeighedSoundEvents> registry = Maps.<ResourceLocation, WeighedSoundEvents>newHashMap();
+		final List<NativeSoundPolicy.Resource> resources = new ArrayList<>();
 		private Map<ResourceLocation, Resource> soundCache = Map.of();
+		private long handle;
 
 		void listResources(ResourceManager resourceManager) {
 			this.soundCache = Sound.SOUND_LISTER.listMatchingResources(resourceManager);
 		}
 
-		void handleRegistration(ResourceLocation resourceLocation, SoundEventRegistration soundEventRegistration) {
-			WeighedSoundEvents weighedSoundEvents = (WeighedSoundEvents)this.registry.get(resourceLocation);
-			boolean bl = weighedSoundEvents == null;
-			if (bl || soundEventRegistration.isReplace()) {
-				if (!bl) {
-					SoundManager.LOGGER.debug("Replaced sound event location {}", resourceLocation);
-				}
-
-				weighedSoundEvents = new WeighedSoundEvents(resourceLocation, soundEventRegistration.getSubtitle());
-				this.registry.put(resourceLocation, weighedSoundEvents);
-			}
-
-			ResourceProvider resourceProvider = ResourceProvider.fromMap(this.soundCache);
-
-			for (final Sound sound : soundEventRegistration.getSounds()) {
-				final ResourceLocation resourceLocation2 = sound.getLocation();
-				Weighted<Sound> weighted;
-				switch (sound.getType()) {
-					case FILE:
-						if (!SoundManager.validateSoundResource(sound, resourceLocation, resourceProvider)) {
-							continue;
-						}
-
-						weighted = sound;
-						break;
-					case SOUND_EVENT:
-						weighted = new Weighted<Sound>() {
-							@Override
-							public int getWeight() {
-								WeighedSoundEvents weighedSoundEventsx = (WeighedSoundEvents)Preparations.this.registry.get(resourceLocation2);
-								return weighedSoundEventsx == null ? 0 : weighedSoundEventsx.getWeight();
-							}
-
-							public Sound getSound(RandomSource randomSource) {
-								WeighedSoundEvents weighedSoundEventsx = (WeighedSoundEvents)Preparations.this.registry.get(resourceLocation2);
-								if (weighedSoundEventsx == null) {
-									return SoundManager.EMPTY_SOUND;
-								} else {
-									Sound soundx = weighedSoundEventsx.getSound(randomSource);
-									return new Sound(
-										soundx.getLocation(),
-										new MultipliedFloats(new SampledFloat[]{soundx.getVolume(), sound.getVolume()}),
-										new MultipliedFloats(new SampledFloat[]{soundx.getPitch(), sound.getPitch()}),
-										sound.getWeight(),
-										Sound.Type.FILE,
-										soundx.shouldStream() || sound.shouldStream(),
-										soundx.shouldPreload(),
-										soundx.getAttenuationDistance()
-									);
-								}
-							}
-
-							@Override
-							public void preloadIfRequired(SoundEngine soundEngine) {
-								WeighedSoundEvents weighedSoundEventsx = (WeighedSoundEvents)Preparations.this.registry.get(resourceLocation2);
-								if (weighedSoundEventsx != null) {
-									weighedSoundEventsx.preloadIfRequired(soundEngine);
-								}
-							}
-						};
-						break;
-					default:
-						throw new IllegalStateException("Unknown SoundEventRegistration type: " + sound.getType());
-				}
-
-				weighedSoundEvents.addSound(weighted);
+		void build() {
+			String files = this.soundCache.keySet().stream().map(ResourceLocation::toString).collect(Collectors.joining("\n"));
+			this.handle = NativeSoundPolicy.buildRegistry(REGISTRY_GENERATION.incrementAndGet(), this.resources, files);
+			long abandoned = PENDING_REGISTRY.getAndSet(this.handle);
+			if (abandoned != 0L) {
+				NativeSoundPolicy.discardRegistry(abandoned);
 			}
 		}
 
-		public void apply(Map<ResourceLocation, WeighedSoundEvents> map, Map<ResourceLocation, Resource> map2, SoundEngine soundEngine) {
-			map.clear();
+		public void apply(Map<ResourceLocation, Resource> map2) {
+			for (String warning : NativeSoundPolicy.registryWarnings(this.handle)) {
+				SoundManager.LOGGER.warn(warning);
+			}
+			if (PENDING_REGISTRY.compareAndSet(this.handle, 0L)) {
+				NativeSoundPolicy.installRegistry(this.handle);
+			}
+			this.handle = 0L;
 			map2.clear();
 			map2.putAll(this.soundCache);
-
-			for (Entry<ResourceLocation, WeighedSoundEvents> entry : this.registry.entrySet()) {
-				map.put((ResourceLocation)entry.getKey(), (WeighedSoundEvents)entry.getValue());
-				((WeighedSoundEvents)entry.getValue()).preloadIfRequired(soundEngine);
-			}
 		}
 	}
 }

@@ -29,6 +29,28 @@ class GraphicsAuditGuiFoilTimingTest {
         assertFalse(GraphicsAuditGuiFoilTiming.phaseMatches(120000,10000));
         assertFalse(GraphicsAuditGuiFoilTiming.phaseMatches(-1,10000));
     }
+
+    @Test void movingGuiRequiresEightCurrentFrameClocksAtTheNaturalPhase() {
+        String key="mattmc.dev.graphicsAuditGuiItemFoilPhase", old=System.getProperty(key);
+        try {
+            System.setProperty(key,"10000");
+            withTrace(() -> {
+                GraphicsAuditGuiFoilTiming.beginFrame();
+                // Actual failed Current capture: ticks126736, outside the requested window.
+                for (int i=0;i<8;i++) GraphicsAuditGuiFoilTiming.observeSemanticClock(145+i*20,221,31684,.5,.5F);
+                assertFalse(GraphicsAuditGuiFoilTiming.readyForCapture());
+                GraphicsAuditGuiFoilTiming.beginFrame();
+                for (int i=0;i<7;i++) GraphicsAuditGuiFoilTiming.observeSemanticClock(145+i*20,221,85000,.5,.5F);
+                assertFalse(GraphicsAuditGuiFoilTiming.readyForCapture(),"an incomplete frame cannot qualify");
+                GraphicsAuditGuiFoilTiming.observeSemanticClock(285,221,85000,.5,.5F);
+                assertTrue(GraphicsAuditGuiFoilTiming.readyForCapture(),"340000 ticks naturally matches the next cycle");
+                GraphicsAuditGuiFoilTiming.beginFrame();
+                assertFalse(GraphicsAuditGuiFoilTiming.readyForCapture(),"a previous accepted frame must not qualify a new one");
+            });
+        } finally {
+            if (old==null) System.clearProperty(key);else System.setProperty(key,old);
+        }
+    }
     private static void withTrace(Runnable test) {
         String old = System.getProperty("mattmc.dev.guiItemRasterTrace");
         System.setProperty("mattmc.dev.guiItemRasterTrace", "true");

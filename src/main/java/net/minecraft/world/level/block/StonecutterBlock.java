@@ -37,7 +37,9 @@ public class StonecutterBlock extends Block {
 
 	public StonecutterBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+		}
 	}
 
 	@Override

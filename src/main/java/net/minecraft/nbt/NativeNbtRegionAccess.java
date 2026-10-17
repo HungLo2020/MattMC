@@ -13,4 +13,12 @@ public final class NativeNbtRegionAccess {
 	public static byte[] writeTape(CompoundTag tag) throws IOException {
 		return NativeNbt.writeTape(tag);
 	}
+
+	public static byte[] writeTape(CompoundTag tag, Tag placeholder, byte[] splice) throws IOException {
+		return NativeNbt.writeTape(tag, placeholder, splice);
+	}
+
+	public static byte[] elementTape(Tag tag) throws IOException {
+		return NativeNbt.elementTape(tag);
+	}
 }

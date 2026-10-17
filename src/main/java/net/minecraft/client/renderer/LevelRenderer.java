@@ -132,6 +132,7 @@ import org.slf4j.Logger;
 @Environment(EnvType.CLIENT)
 public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable {
 	private final java.util.List<net.minecraft.client.renderer.entity.state.EntityRenderState> rustShadowOnlyEntityStates = new java.util.ArrayList<>();
+	private final java.util.List<Entity> rustShadowCandidateEntities = new java.util.ArrayList<>();
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final ResourceLocation TRANSPARENCY_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("transparency");
 	private static final ResourceLocation ENTITY_OUTLINE_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("entity_outline");
@@ -167,6 +168,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private final SectionOcclusionGraph sectionOcclusionGraph = new SectionOcclusionGraph();
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections = new ObjectArrayList<>(10000);
 	private final LongOpenHashSet rustExtractedBlockEntityPositions = new LongOpenHashSet(512);
+	/** This frame's block entities came from the section graph (no fallback scans). */
+	private boolean frozenBlockEntityExtraction;
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> nearbyVisibleSections = new ObjectArrayList<>(50);
 	@Nullable
 	private ViewArea viewArea;
@@ -471,7 +474,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			boolean extractedForProbe = false;
 			if (shouldRenderEntity) {
 				BlockPos blockPos = entity.blockPosition();
-				compiledSection = this.level.isOutsideBuildHeight(blockPos.getY()) || this.isSectionCompiled(blockPos);
+				// Readiness does not gate this semantic stream. Query it only for
+				// the falling-block observer; custom callbacks retain their order.
+				if (probeFallingBlock || this.getClass() != LevelRenderer.class || this.level.getClass() != ClientLevel.class) {
+					compiledSection = this.level.isOutsideBuildHeight(blockPos.getY()) || this.isSectionCompiled(blockPos);
+				}
 				// Java's entity extraction historically waited for the nearby terrain
 				// section to become compiled because the same pass immediately emitted
 				// Java terrain and entity draws. Rust whole-frame ownership separates
@@ -504,36 +511,73 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	/**
-	 * Iris's shadow pass renders the local player even while the first-person
-	 * camera pass does not (`ShadowRenderer` extracts it separately). On the
-	 * Rust shader-pack route, copy that same render state into a separate list;
-	 * Rust admits it only to the shadow pass per the pack's caster directives.
-	 * The camera argument is kept for the call site's extraction phase.
+	 * Copies bounded off-camera candidates. Rust applies the selected pack's
+	 * culling; asking it first (from copied culling facts) skips extracting
+	 * entities the shadow pass rejects.
 	 */
-	private void extractRustShadowOnlyPlayer(Camera camera) {
+	private void extractRustShadowCandidates(Camera camera) {
 		this.rustShadowOnlyEntityStates.clear();
-		if (!net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive()) {
-			return;
+		this.rustShadowCandidateEntities.clear();
+		if (!net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive()) return;
+		var cameraEntities = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
+		for (EntityRenderState state : this.levelRenderState.entityRenderStates) cameraEntities.add(state.entityId);
+		var tickRates = this.level.tickRateManager();
+		var dispatcherCamera = this.entityRenderDispatcher.camera;
+		var query = dispatcherCamera == null ? null : net.vulkanic.gui.RustGalFrameCoordinator.entityShadowQuery();
+		if (query != null) query.clear();
+		for (Entity entity : this.level.entitiesForRendering()) {
+			if (cameraEntities.contains(entity.getId())) continue;
+			if (entity.tickCount == 0) {
+				entity.xOld=entity.getX(); entity.yOld=entity.getY(); entity.zOld=entity.getZ();
+			}
+			// Only ELIGIBLE states are kept below; skip extracting the rest.
+			var renderer = this.entityRenderDispatcher.getRenderer(entity);
+			if (dispatcherCamera != null && !renderer.rustShadowCullingEligible(entity, dispatcherCamera.getPosition()))
+				continue;
+			this.rustShadowCandidateEntities.add(entity);
+			if (query != null) renderer.captureEntityShadowCandidate(entity, dispatcherCamera.getPosition(), query);
 		}
+		Vec3 submitCamera = this.levelRenderState.cameraRenderState.pos;
+		boolean decided = query != null && submitCamera != null
+			&& net.vulkanic.world.RustGalWorldPrimitiveRenderer.selectEntityShadowCandidates(
+				query, submitCamera.x, submitCamera.y, submitCamera.z);
+		for (int index = 0; index < this.rustShadowCandidateEntities.size(); index++) {
+			if (decided && !query.admitted(index)) continue;
+			Entity entity = this.rustShadowCandidateEntities.get(index);
+			float delta = this.minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(!tickRates.isEntityFrozen(entity));
+			EntityRenderState state = this.entityRenderDispatcher.extractEntity(entity,delta);
+			var inputs = state.rustEntityCulling;
+			if (inputs != null && (inputs.flags() & net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord.ELIGIBLE) != 0)
+				addRustShadowOnlyEntity(state);
+		}
+		this.rustShadowCandidateEntities.clear();
+		// Frozen's player-only branch extracts these states with the ordinary
+		// partial tick and skips the entity frustum/compiled-section predicates.
+		// Carry a separate CPU role; Java never reads shadowEntities/shadowPlayer.
 		LocalPlayer player = this.minecraft.player;
-		if (player == null) {
-			return;
-		}
-		// Iris adds the local player to the shadow pass regardless of camera
-		// mode (`shouldRenderPlayer`). Its camera-pass instance is not a
-		// player caster in Rust, so always submit this separate caster; with
-		// `shadowEntities` also enabled the duplicate depth write is harmless.
-		float g = this.minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
-		this.rustShadowOnlyEntityStates.add(stripRustShadowOnlySideStreams(this.entityRenderDispatcher.extractEntity(player, g)));
-		if (player.getVehicle() != null) {
-			this.rustShadowOnlyEntityStates.add(
-				stripRustShadowOnlySideStreams(this.entityRenderDispatcher.extractEntity(player.getVehicle(), g)));
+		if (player != null) {
+			float delta = this.minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+			addRustPlayerOnlyVariant(player,delta);
+			if (player.getVehicle() != null) addRustPlayerOnlyVariant(player.getVehicle(),delta);
 		}
 	}
 
+	private void addRustPlayerOnlyVariant(Entity entity,float delta) {
+		EntityRenderState state = this.entityRenderDispatcher.extractEntity(entity,delta);
+		if (state.rustEntityCulling == null) throw new IllegalStateException("player shadow candidate lacks copied gameplay bounds");
+		state.rustEntityCulling = state.rustEntityCulling.asPlayerOnlyVariant();
+		addRustShadowOnlyEntity(state);
+	}
+
+	private void addRustShadowOnlyEntity(EntityRenderState state) {
+		if (this.rustShadowOnlyEntityStates.size() >= 4096)
+			throw new IllegalStateException("shadow-only entity candidates exceeded bounded capacity 4096");
+		this.rustShadowOnlyEntityStates.add(stripRustShadowOnlySideStreams(state));
+	}
+
 	private static EntityRenderState stripRustShadowOnlySideStreams(EntityRenderState state) {
-		// Only mesh geometry casts shadows; these streams would otherwise leak
-		// into the camera frame because they are not mesh instances.
+		// These camera overlays have no shadow role in the current transport.
+		// Other unported shadow geometry is recorded explicitly during capture.
 		state.outlineColor = 0;
 		state.displayFireAnimation = false;
 		state.nameTag = null;
@@ -647,9 +691,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.extractVisibleEntities(camera, frustum, deltaTracker, this.levelRenderState);
 			this.extractVisibleBlockEntities(camera, deltaTracker.getGameTimeDeltaPartialTick(false), this.levelRenderState);
 		}
+		// This frame's camera search applied to the camera-pass entities only.
+		net.vulkanic.world.RustGalWholeFrameTerrainSource.closeEntityCulling();
 		// Independent of the camera pass (and of capture entity suppression),
 		// exactly like Iris's ShadowRenderer player extraction.
-		this.extractRustShadowOnlyPlayer(camera);
+		this.extractRustShadowCandidates(camera);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.indexed-mesh.real-state-extraction");
 		PoseStack poseStack = new PoseStack();
 		boolean selectedSourceCoverage = net.vulkanic.world.RustGalWorldPrimitiveRenderer.requiresSelectedSourceFeatureCoverage();
@@ -1983,9 +2029,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		if ((this.level == null) || camera == null) {
 			return;
 		}
-		if (net.vulkanic.world.RustGalWorldPrimitiveRenderer.hasDistantHorizonsPrivateClouds()) {
-			return;
-		}
+		// Frozen draws vanilla and DH clouds independently.
 		CloudStatus cloudStatus = this.minecraft.options.getCloudsType();
 		Optional<Integer> cloudHeight = this.level.dimensionType().cloudHeight();
 		if (cloudStatus == CloudStatus.OFF || cloudHeight.isEmpty()) {
@@ -2010,6 +2054,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		LongOpenHashSet extractedBlockEntityPositions = this.rustExtractedBlockEntityPositions;
 		extractedBlockEntityPositions.clear();
 		PoseStack poseStack = new PoseStack();
+		// Without a shader pack, extract exactly as Frozen's Sodium does from this
+		// frame's section-graph search (moving pistons included: they are section
+		// block entities). Shader frames keep the range scan below, whose
+		// off-camera block entities also feed the shadow pass.
+		this.frozenBlockEntityExtraction = !net.vulkanic.gui.RustGalFrameCoordinator.isRustShaderExecutionActive()
+			&& net.vulkanic.world.RustGalWholeFrameTerrainSource.forEachVisibleBlockEntity(
+				blockEntity -> this.extractWholeFrameBlockEntity(blockEntity, poseStack, camera, f, levelRenderState));
+		if (this.frozenBlockEntityExtraction) {
+			return;
+		}
 		for (SectionRenderDispatcher.RenderSection section : this.visibleSections) {
 			if (!(section.getSectionMesh() instanceof CompiledSectionMesh compiled)) continue;
 			for (BlockEntity blockEntity : compiled.getRenderableBlockEntities()) {
@@ -2028,16 +2082,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		int centerChunkX = SectionPos.blockToSectionCoord(Mth.floor(camera.getPosition().x));
 		int centerChunkZ = SectionPos.blockToSectionCoord(Mth.floor(camera.getPosition().z));
 		int radius = this.minecraft.options.getEffectiveRenderDistance() + 1;
-		for (int chunkZ = centerChunkZ - radius; chunkZ <= centerChunkZ + radius; chunkZ++) {
-			for (int chunkX = centerChunkX - radius; chunkX <= centerChunkX + radius; chunkX++) {
-				LevelChunk chunk = this.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-				if (chunk == null) continue;
-				for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
-					if (!extractedBlockEntityPositions.add(blockEntity.getBlockPos().asLong())) continue;
-					this.extractWholeFrameBlockEntity(blockEntity, poseStack, camera, f, levelRenderState);
-				}
+		// Each block entity belongs to one chunk, so the scan can only repeat
+		// positions the section pass already extracted.
+		boolean deduplicate = !extractedBlockEntityPositions.isEmpty();
+		this.level.getChunkSource().forEachLoadedChunkInRange(centerChunkX,centerChunkZ,radius,chunk -> {
+			for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+				if (deduplicate && extractedBlockEntityPositions.contains(blockEntity.getBlockPos().asLong())) continue;
+				this.extractWholeFrameBlockEntity(blockEntity, poseStack, camera, f, levelRenderState);
 			}
-		}
+		});
 		return;
 
 	}
@@ -2087,7 +2140,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 				visiblePistonStates++;
 			}
 		}
-		if (visiblePistonStates > 0) {
+		if (visiblePistonStates > 0 || this.frozenBlockEntityExtraction) {
 			net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordMovingBlockShellScan(
 				"rust-vulkan-whole-frame",
 				visiblePistonStates,
@@ -2105,43 +2158,26 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		int centerChunkX = SectionPos.blockToSectionCoord(Mth.floor(cameraPos.x()));
 		int centerChunkZ = SectionPos.blockToSectionCoord(Mth.floor(cameraPos.z()));
 		int radius = this.minecraft.options.getEffectiveRenderDistance() + 1;
-		int chunksScanned = 0;
-		int blockEntitiesInspected = 0;
-		int pistonEntitiesFound = 0;
-		int pistonStatesExtracted = 0;
-		for (int chunkZ = centerChunkZ - radius; chunkZ <= centerChunkZ + radius; chunkZ++) {
-			for (int chunkX = centerChunkX - radius; chunkX <= centerChunkX + radius; chunkX++) {
-				LevelChunk chunk = this.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-				if (chunk == null) {
-					continue;
-				}
-				chunksScanned++;
-				for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
-					blockEntitiesInspected++;
-					if (!(blockEntity instanceof PistonMovingBlockEntity pistonMovingBlockEntity)) {
-						continue;
-					}
-					pistonEntitiesFound++;
-					PistonHeadRenderState renderState = this.blockEntityRenderDispatcher.tryExtractRenderState(
-						pistonMovingBlockEntity,
-						partialTick,
-						null
-					);
-					if (renderState != null) {
-						this.levelRenderState.blockEntityRenderStates.add(renderState);
-						pistonStatesExtracted++;
-					}
+		int[] counts = new int[4]; // Diagnostic counts remain local to this extraction.
+		this.level.getChunkSource().forEachLoadedChunkInRange(centerChunkX,centerChunkZ,radius,chunk -> {
+			counts[0]++;
+			for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+				counts[1]++;
+				if (!(blockEntity instanceof PistonMovingBlockEntity pistonMovingBlockEntity)) continue;
+				counts[2]++;
+				PistonHeadRenderState renderState = this.blockEntityRenderDispatcher.tryExtractRenderState(
+					pistonMovingBlockEntity, partialTick, null);
+				if (renderState != null) {
+					this.levelRenderState.blockEntityRenderStates.add(renderState);
+					counts[3]++;
 				}
 			}
-		}
+		});
 		net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordMovingBlockShellScan(
 			"rust-vulkan-whole-frame",
 			visiblePistonStates,
 			true,
-			chunksScanned,
-			blockEntitiesInspected,
-			pistonEntitiesFound,
-			pistonStatesExtracted,
+			counts[0], counts[1], counts[2], counts[3],
 			System.nanoTime() - startedNanos
 		);
 	}

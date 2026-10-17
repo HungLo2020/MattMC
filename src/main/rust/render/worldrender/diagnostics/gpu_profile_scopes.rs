@@ -11,6 +11,8 @@ pub(crate) const SHADOW_DEPTH: u8 = 0;
 pub(crate) const TERRAIN_OPAQUE: u8 = 1;
 pub(crate) const TERRAIN_CUTOUT: u8 = 2;
 pub(crate) const DEFERRED_LIGHTING: u8 = 3;
+// The selected-source route uses this existing bucket for its entire
+// composite family; built-in routes still report their individual pass zero.
 pub(crate) const COMPOSITE_0: u8 = 4;
 pub(crate) const COMPOSITE_1: u8 = 5;
 pub(crate) const FINAL_OUTPUT: u8 = 6;
@@ -26,6 +28,15 @@ pub(crate) const WORLD_GPU_PROFILE_CLASSIFIER: GpuProfileClassifier = GpuProfile
 };
 
 fn classify(object: GpuProfiledObject, label: &str) -> GpuProfileTag {
+    let label = label.trim();
+    if label.starts_with("fullscreen-source.") {
+        let timing = source_fullscreen_timing_scope(label);
+        return GpuProfileTag {
+            timing_scope: timing,
+            statistics_scope: timing,
+            timing_ends_at_untimed_pipeline: false,
+        };
+    }
     match object {
         GpuProfiledObject::RenderPass => {
             let timing = pass_timing_scope(label);
@@ -92,6 +103,34 @@ fn pipeline_timing_scope(label: &str) -> Option<u8> {
     } else if label.contains("composite_1") || label.contains("composite-1.pipeline") {
         Some(COMPOSITE_1)
     } else if label.contains("final_output") || label.contains("final-output.pipeline") {
+        Some(FINAL_OUTPUT)
+    } else {
+        None
+    }
+}
+
+/// Parse the runtime's lowered program identity, excluding pack names and
+/// dimensions from stage classification. These are family aggregates: source
+/// chains may contain arbitrarily numbered deferred/composite stages.
+fn source_fullscreen_timing_scope(label: &str) -> Option<u8> {
+    let identity = label.strip_prefix("fullscreen-source.vulkanic:shader-pack/")?;
+    let (_, stage) = identity.rsplit_once('/')?;
+    let stage = stage.strip_suffix(".pass").or_else(|| stage.strip_suffix(".pipeline"))?;
+    let (stage, generation) = stage.rsplit_once("-source-gen")?;
+    if generation.is_empty() || !generation.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let stage = stage.strip_suffix("-horizon").unwrap_or(stage);
+    let stage = stage.rsplit('-').next()?;
+    let numbered_family = |family: &str| {
+        stage.strip_prefix(family)
+            .is_some_and(|suffix| suffix.bytes().all(|byte| byte.is_ascii_digit()))
+    };
+    if numbered_family("deferred") {
+        Some(DEFERRED_LIGHTING)
+    } else if numbered_family("composite") {
+        Some(COMPOSITE_0)
+    } else if stage == "final" {
         Some(FINAL_OUTPUT)
     } else {
         None
@@ -198,6 +237,49 @@ mod tests {
             assert_eq!(Some(statistics), tag.statistics_scope);
             assert!(!tag.timing_ends_at_untimed_pipeline);
             assert_ne!("unknown", scope_name(statistics));
+        }
+    }
+
+    #[test]
+    fn selected_source_fullscreen_families_have_gpu_timings_without_pack_name_collisions() {
+        // These identities use the actual lowered-program/pass constructor
+        // format, not the built-in graph's underscore-separated labels.
+        for (stage, scope) in [
+            ("world0-deferred1", DEFERRED_LIGHTING),
+            ("world0-composite", COMPOSITE_0),
+            ("world0-composite3", COMPOSITE_0),
+            ("world0-composite7", COMPOSITE_0),
+            ("world-1-final", FINAL_OUTPUT),
+        ] {
+            for suffix in ["pass", "pipeline"] {
+                let label = format!(
+                    "fullscreen-source.vulkanic:shader-pack/complementaryhungloified.zip/{stage}-source-gen2.{suffix}"
+                );
+                let kind = if suffix == "pass" {
+                    GpuProfiledObject::RenderPass
+                } else {
+                    GpuProfiledObject::GraphicsPipeline
+                };
+                let tag = classify(kind, &label);
+                assert_eq!(Some(scope), tag.timing_scope, "{label}");
+                assert_eq!(Some(scope), tag.statistics_scope, "{label}");
+                assert!(!tag.timing_ends_at_untimed_pipeline);
+            }
+        }
+        for stage in ["world0-gbuffers_skybasic", "world0-composite_custom", "world0-finally"] {
+            for (suffix, kind) in [
+                ("pass", GpuProfiledObject::RenderPass),
+                ("pipeline", GpuProfiledObject::GraphicsPipeline),
+            ] {
+                let label = format!(
+                    "fullscreen-source.vulkanic:shader-pack/shadow_depth-composite_0-world-lod-water-surface.zip/{stage}-source-gen2.{suffix}"
+                );
+                assert_eq!(
+                    GpuProfileTag::default(),
+                    classify(kind, &label),
+                    "pack names must not classify an unrelated stage: {label}"
+                );
+            }
         }
     }
 

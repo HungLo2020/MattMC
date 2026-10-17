@@ -1,12 +1,28 @@
 # Rust block-section palette packing
 
+Current canonical storage uses the [Rust live section owner](RUST-LIVE-SECTIONS.md).
+The helper path and historical acceptance below are narrower verification;
+historical pinned-body drivers reject the new container ownership changes.
+Use the live-section guide's current Gradle checks; the older driver commands
+below describe the historical helper acceptance, not current-owner verification.
+
+Canonical `pack()` callers first export a temporary Java compatibility palette
+and word array from the live owner, then enter the helper below. Ordinary live
+storage and mutation are already Rust-owned; this save path is not a direct
+owner-to-serialized-output transfer.
+
 Standard 4096-entry block containers use Rust for `PalettedContainer.pack()`:
 decoding source words, compacting used IDs in first-use order, and encoding
 padded save words with identity-alias remapping when needed. Java owns the
 container lock, resolves used object identities, and builds the returned
 list/stream. This is save packing; [block palette growth](RUST-PALETTE-RESIZE.md)
-is a separate migration. Ordinary storage reads/writes, network serialization,
-unpacking and 64-entry biome packing remain their existing implementations.
+is a separate consumer. Network serialization and generic enumeration still
+use temporary compatibility data; 64-entry biome packing retains its existing
+implementation. [Global unpacking](RUST-PALETTE-UNPACKING.md) prepares compatible
+data before current canonical containers adopt a live owner.
+Chunk saves no longer call this path: the
+[section serializer](RUST-CHUNK-SECTIONS.md) packs inside its own Rust call. This
+path still serves other `pack()` and codec callers.
 
 The kernels and FFI live in
 [`world/level/chunk/palette/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/palette).
@@ -22,13 +38,16 @@ The Java bridge is
   single identity, and every output word. Unused padding must be zero even if
   input padding is nonzero. Packing must not mutate the source.
 - Keep the original `acquire()`/`finally release()` contract. Use thread-owned
-  native scratch and ordinary FFM downcalls; Rust borrows disjoint buffers,
-  allocates nothing and retains no pointers. Never use critical heap access
+  native scratch and ordinary FFM downcalls. The packing helper kernels borrow
+  disjoint buffers, allocate nothing and retain no pointers; that claim excludes
+  live-owner storage and its temporary compatibility export. Never use critical heap access
   for this full-section work.
 - Resolve local identities from used palette entries afresh each call; never
-  cache their object references or inspect unused entries. Global labels refer only to the
-  immutable canonical block-state registry after bootstrap; registry growth
-  selects the original path. Do not mutate that registry after bootstrap.
+  cache their object references or inspect unused entries. Global labels are
+  state IDs, used only once the [block registry](../../game-model/RUST-BLOCK-REGISTRY.md)
+  is installed, which guarantees every state is a distinct object at its own
+  ID; registry growth selects the original path. Do not mutate that registry
+  after bootstrap.
 - Custom containers, strategies, palettes/storage, noncanonical global maps,
   malformed IDs, used null entries and unsupported sizes/widths retain the
   original compatibility path before publishing a result. Avoid additional
@@ -70,7 +89,17 @@ pair and at its upper 95% bootstrap ratio bound. Evidence is written beneath
 source/library hashes and focused parity results. These measurements describe
 save packing on the measured machine, not complete chunk generation or disk I/O.
 
+The container source audit additionally permits only the separately pinned
+[ordered-value dispatch](RUST-PALETTE-DISTINCT.md); the original reference bodies
+remain unchanged.
+
 ## Verified status
+
+The results below are historical: they measured the original slice, when Java
+built the global label table. Global palettes now pass no table (each state
+ID is its own label). The [block registry verification record](../../game-model/BLOCK-REGISTRY-VERIFICATION.md)
+contains the author's later parity and spot-check measurements against the
+slice's previous code; it does not rerun the full original acceptance gate.
 
 Release acceptance passed on 2026-10-01: Ryzen 5 5600G, Linux x86_64,
 OpenJDK 25.0.4.1. Eleven Java tests and three Rust tests passed with zero

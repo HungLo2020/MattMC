@@ -4,13 +4,15 @@ package com.seibel.distanthorizons.core.dataObjects.render.columnViews;
 import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 
 import java.util.Arrays;
+import net.vulkanic.world.NativeDhRenderSource;
 import java.util.ConcurrentModificationException;
 
 public final class ColumnArrayView implements IColumnDataView
 {
-	public final LongArrayList data;
+	public final LongList data;
 	
 	/** 
 	 * How many data points are currently being represented by this view. <br>
@@ -36,7 +38,7 @@ public final class ColumnArrayView implements IColumnDataView
 	//=============//
 	
 	/** @throws IllegalArgumentException if the offset is greater than the data's size */
-	public ColumnArrayView(LongArrayList data, int size, int offset, int verticalSize) throws IllegalArgumentException
+	public ColumnArrayView(LongList data, int size, int offset, int verticalSize) throws IllegalArgumentException
 	{
 		this.data = data;
 		this.size = size;
@@ -84,92 +86,14 @@ public final class ColumnArrayView implements IColumnDataView
 	public ColumnArrayView subView(int dataIndexStart, int dataCount)
 	{ return new ColumnArrayView(data, dataCount * verticalSize, offset + dataIndexStart * verticalSize, verticalSize); }
 	
-	public void fill(long value) { Arrays.fill(data.elements(), offset, offset + size, value); }
-	
-	public void copyFrom(IColumnDataView source) { copyFrom(source, 0); }
-	public void copyFrom(IColumnDataView source, int outputDataIndexOffset)
-	{
-		if (source.verticalSize() > verticalSize)
-		{
-			throw new IllegalArgumentException("source verticalSize must be <= self's verticalSize to copy");
-		}
-		else if (source.dataCount() + outputDataIndexOffset > dataCount())
-		{
-			throw new IllegalArgumentException("dataIndexStart + source.dataCount() must be <= self.dataCount() to copy");
-		}
-		else if (source.verticalSize() != verticalSize)
-		{
-			for (int i = 0; i < source.dataCount(); i++)
-			{
-				int outputOffset = offset + outputDataIndexOffset * verticalSize + i * verticalSize;
-				source.subView(i, 1).copyTo(data.elements(), outputOffset, source.verticalSize());
-				Arrays.fill(data.elements(), outputOffset + source.verticalSize(),
-						outputOffset + verticalSize, 0);
-			}
-		}
-		else
-		{
-			source.copyTo(data.elements(), offset + outputDataIndexOffset * verticalSize, source.size());
-		}
+	public void fill(long value) {
+		if (data instanceof NativeDhRenderSource) NativeDhRenderSource.span(data, offset, size, 0, value);
+		else if (data instanceof LongArrayList array) Arrays.fill(array.elements(), offset, offset + size, value);
+		else for (int i = 0; i < size; i++) data.set(offset + i, value);
 	}
 	
 	@Override
-	public void copyTo(long[] target, int offset, int size) { System.arraycopy(data.elements(), this.offset, target, offset, size); }
-	
-	public boolean mergeWith(ColumnArrayView source, boolean override)
-	{
-		if (size != source.size)
-		{
-			throw new IllegalArgumentException("Cannot merge views of different sizes");
-		}
-		if (verticalSize != source.verticalSize)
-		{
-			throw new IllegalArgumentException("Cannot merge views of different vertical sizes");
-		}
-		boolean anyChange = false;
-		for (int o = 0; o < (source.size() * verticalSize); o += verticalSize)
-		{
-			if (override)
-			{
-				if (RenderDataPointUtil.compareDatapointPriority(source.get(o), get(o)) >= 0)
-				{
-					anyChange = true;
-					System.arraycopy(source.data, source.offset + o, data, offset + o, verticalSize);
-				}
-			}
-			else
-			{
-				if (RenderDataPointUtil.compareDatapointPriority(source.get(o), get(o)) > 0)
-				{
-					anyChange = true;
-					System.arraycopy(source.data, source.offset + o, data, offset + o, verticalSize);
-				}
-			}
-		}
-		return anyChange;
-	}
-	
-	public void changeVerticalSizeFrom(IColumnDataView source)
-	{
-		if (this.dataCount() != source.dataCount())
-		{
-			throw new IllegalArgumentException("Cannot copy and resize to views with different dataCounts");
-		}
-		
-		if (this.verticalSize >= source.verticalSize())
-		{
-			this.copyFrom(source);
-		}
-		else
-		{
-			for (int i = 0; i < this.dataCount(); i++)
-			{
-				RenderDataPointUtil.mergeMultiData(source.subView(i, 1), this.subView(i, 1));
-			}
-		}
-	}
-	
-	
+	public void copyTo(long[] target, int offset, int size) { data.getElements(this.offset, target, offset, size); }
 	
 	//================//
 	// base overrides //
@@ -198,8 +122,9 @@ public final class ColumnArrayView implements IColumnDataView
 	}
 	
 	
-	public int getDataHash() { return arrayHash(this.data, this.offset, this.size); }
-	private static int arrayHash(LongArrayList a, int offset, int length)
+	public int getDataHash() { return data instanceof NativeDhRenderSource
+		? NativeDhRenderSource.span(data, offset, size, 1, 0L) : arrayHash(data, offset, size); }
+	private static int arrayHash(LongList a, int offset, int length)
 	{
 		if (a == null)
 		{

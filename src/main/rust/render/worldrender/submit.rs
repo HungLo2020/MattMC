@@ -56,9 +56,38 @@ impl WorldPrimitiveFrontend {
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
+        self.submit_whole_frame_with_gui_stats(
+            gal,
+            generation,
+            frame_target,
+            frame,
+            gui_ops,
+            GuiSubmitStats::default(),
+        )
+    }
+
+    /// Submits prebuilt GUI operations together with the stats that recorded
+    /// them. The route is chosen inside this call: source preparation may arm
+    /// the selected-source route for this very frame, and that submission
+    /// validates the GUI stream against the private targets the stats declare.
+    pub(super) fn submit_whole_frame_with_gui_stats(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        frame: WorldPrimitiveFrame,
+        gui_ops: Vec<CommandOp>,
+        gui_stats: GuiSubmitStats,
+    ) -> GalResult<WorldPrimitiveSubmitStats> {
         gal.begin_command_recording()?;
-        let result =
-            self.submit_whole_frame_recorded(gal, generation, frame_target, frame, gui_ops);
+        let result = self.submit_whole_frame_recorded(
+            gal,
+            generation,
+            frame_target,
+            frame,
+            gui_ops,
+            gui_stats,
+        );
         let finish = gal.finish_command_recording();
         result.and_then(|stats| finish.map(|()| stats))
     }
@@ -70,6 +99,7 @@ impl WorldPrimitiveFrontend {
         frame_target: Handle,
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
+        gui_stats: GuiSubmitStats,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
         let direction = match crate::core::environment::var("MATTMC_RUST_OWNED_WORLD_TARGET").as_deref() {
             Ok("1") => Some(RasterYDirection::Up),
@@ -82,6 +112,7 @@ impl WorldPrimitiveFrontend {
             frame_target,
             frame,
             gui_ops,
+            gui_stats,
             direction,
         )
     }
@@ -115,7 +146,40 @@ impl WorldPrimitiveFrontend {
         frame_target: Handle,
         frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
+        gui_stats: GuiSubmitStats,
         owned_world_direction: Option<RasterYDirection>,
+    ) -> GalResult<WorldPrimitiveSubmitStats> {
+        #[cfg(not(test))]
+        let mut frame = frame;
+        #[cfg(not(test))]
+        {
+            self.disarm_source_route_on_extent_change(&frame);
+            self.prepare_runtime_source_before_presentation(gal, generation, frame_target, &mut frame)?;
+        }
+        self.submit_whole_frame_with_initial_ops(
+            gal,
+            generation,
+            frame_target,
+            frame,
+            gui_ops,
+            gui_stats,
+            owned_world_direction,
+            Vec::new(),
+            false,
+        )
+    }
+
+    pub(super) fn submit_whole_frame_with_initial_ops(
+        &mut self,
+        gal: &mut VulkanicGal,
+        generation: u64,
+        frame_target: Handle,
+        frame: WorldPrimitiveFrame,
+        gui_ops: Vec<CommandOp>,
+        gui_stats: GuiSubmitStats,
+        owned_world_direction: Option<RasterYDirection>,
+        mut pre_graph_ops: Vec<CommandOp>,
+        preparing_source_entry: bool,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
         if owned_world_direction.is_some()
             && (!gal.capabilities().supports(BackendFeature::TextureRowReversal)
@@ -130,7 +194,7 @@ impl WorldPrimitiveFrontend {
         self.pending_translucent_capture_written = false;
         self.pending_lod_direct_composition_written = false;
         self.pending_lod_ssao_written = false;
-        self.pending_lod_vanilla_snapshot_written = false;
+        self.pending_lod_vanilla_sample_state_established = false;
         self.pending_entity_outline_targets_written = false;
         self.pending_terrain_external_item_entity_written = false;
         #[cfg(test)]
@@ -143,7 +207,7 @@ impl WorldPrimitiveFrontend {
                     generation,
                     frame_target,
                     frame,
-                    move |_, _, _, _| Ok((gui_ops.clone(), GuiSubmitStats::default())),
+                    move |_, _, _, _| Ok((gui_ops.clone(), gui_stats.clone())),
                 )
                 .map(|(stats, _)| stats);
         }
@@ -151,7 +215,9 @@ impl WorldPrimitiveFrontend {
         #[cfg(not(test))]
         let frame = self.admit_armed_source_frame(frame);
         #[cfg(not(test))]
-        self.report_shader_route_outcome(&frame);
+        if frame_target.kind() == Some(crate::render::vulkanic::handles::HandleKind::FrameTarget) {
+            self.report_shader_route_outcome(&frame);
+        }
         #[cfg(not(test))]
         if self.runtime_source_execution_is_armed() {
             self.write_runtime_source_admission_status(
@@ -166,11 +232,19 @@ impl WorldPrimitiveFrontend {
             self.pending_terrain_fabulous_handoff = false;
             Self::reject_source_gui_presenters(&gui_ops)?;
             return self
-                .submit_armed_runtime_source_frame(gal, generation, frame_target, frame, gui_ops)
+                .submit_armed_runtime_source_frame(
+                    gal,
+                    generation,
+                    frame_target,
+                    frame,
+                    gui_ops,
+                    gui_stats,
+                )
                 .map(|(stats, _)| stats);
         }
         if self.frame_has_fabulous_transparency_work(&frame)
             && !self.pending_terrain_fabulous_handoff
+            && !preparing_source_entry
         {
             self.validate_fabulous_material_sources(&frame)?;
             // Admit only complete semantic frames; never drop an unsupported
@@ -243,7 +317,6 @@ impl WorldPrimitiveFrontend {
         // Keep a bounded semantic snapshot only when the private runtime is
         // installed. Normal submissions retain their existing allocation and
         // routing cadence.
-        let mut pre_graph_ops = Vec::new();
         // Persistent attachment state is committed only after the enclosing
         // submission succeeds.  Command construction can still be discarded
         // by a later validation/resource step, so recording it eagerly would
@@ -252,6 +325,7 @@ impl WorldPrimitiveFrontend {
         let phase_started = std::time::Instant::now();
         if self.append_private_terrain_occupancy_for_frame(
             source_frame_for_admission,
+            &SceneTerrainFrame::default(),
             &mut pre_graph_ops,
         )? {
             whole_frame_phase_trace("private-occupancy", world_frame_id, Some(phase_started));
@@ -337,7 +411,7 @@ impl WorldPrimitiveFrontend {
         )?;
         if gameplay_attachment_capture.is_some() {
             for observation in &self.latest_atlas_animation_observations {
-                eprintln!("{observation}");
+                crate::core::console::stderr(format_args!("{observation}"));
             }
         }
         let deferred_handoff_text_quads = if self.pending_terrain_fabulous_handoff {
@@ -454,13 +528,14 @@ impl WorldPrimitiveFrontend {
             Some(graph_target_started),
         );
         let graph_started = std::time::Instant::now();
-        let (graph_ops, mut stats) = match self.append_frame_ops_inner(
+        let (graph_ops, mut stats) = match self.append_frame_ops_inner_with_source_preparation(
             gal,
             generation,
             graph_target,
             graph_frame,
             true,
             graph_direction,
+            preparing_source_entry,
         ) {
             Ok(result) => result,
             Err(error) => {
@@ -689,7 +764,7 @@ impl WorldPrimitiveFrontend {
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     return Err(error);
@@ -743,7 +818,7 @@ impl WorldPrimitiveFrontend {
                     Err(error) => {
                         self.pending_terrain_fabulous_handoff = false;
                         if terrain_presentation_pass != Handle::NULL {
-                            let _ = gal.destroy(terrain_presentation_pass);
+                            let _ = gal.retire(terrain_presentation_pass);
                         }
                         gal.rollback_frame_target_depth_write(frame_target);
                         return Err(error);
@@ -772,7 +847,7 @@ impl WorldPrimitiveFrontend {
                     None => {
                         self.pending_terrain_fabulous_handoff = false;
                         if terrain_presentation_pass != Handle::NULL {
-                            let _ = gal.destroy(terrain_presentation_pass);
+                            let _ = gal.retire(terrain_presentation_pass);
                         }
                         gal.rollback_frame_target_depth_write(frame_target);
                         return Err(GalError::backend(
@@ -785,7 +860,7 @@ impl WorldPrimitiveFrontend {
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     return Err(error);
@@ -796,7 +871,7 @@ impl WorldPrimitiveFrontend {
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     return Err(error);
@@ -807,7 +882,7 @@ impl WorldPrimitiveFrontend {
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     return Err(error);
@@ -833,7 +908,7 @@ impl WorldPrimitiveFrontend {
                 Err(error) => {
                     self.pending_terrain_fabulous_handoff = false;
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     return Err(error);
@@ -915,7 +990,7 @@ impl WorldPrimitiveFrontend {
             if let Err(error) = capture_result {
                 self.world_text.cancel_submission();
                 if terrain_presentation_pass != Handle::NULL {
-                    let _ = gal.destroy(terrain_presentation_pass);
+                    let _ = gal.retire(terrain_presentation_pass);
                 }
                 gal.rollback_frame_target_depth_write(frame_target);
                 self.discard_pending_lowered_source_terrain_submission(gal);
@@ -937,7 +1012,7 @@ impl WorldPrimitiveFrontend {
             if let Err(error) = capture.append_normal_world_output(gal, &mut ops, frame_target) {
                 self.world_text.cancel_submission();
                 if terrain_presentation_pass != Handle::NULL {
-                    let _ = gal.destroy(terrain_presentation_pass);
+                    let _ = gal.retire(terrain_presentation_pass);
                 }
                 gal.rollback_frame_target_depth_write(frame_target);
                 self.discard_pending_lowered_source_terrain_submission(gal);
@@ -980,7 +1055,7 @@ impl WorldPrimitiveFrontend {
                 ) {
                     self.world_text.cancel_submission();
                     if terrain_presentation_pass != Handle::NULL {
-                        let _ = gal.destroy(terrain_presentation_pass);
+                        let _ = gal.retire(terrain_presentation_pass);
                     }
                     gal.rollback_frame_target_depth_write(frame_target);
                     self.discard_pending_lowered_source_terrain_submission(gal);
@@ -1002,7 +1077,7 @@ impl WorldPrimitiveFrontend {
             {
                 self.world_text.cancel_submission();
                 if terrain_presentation_pass != Handle::NULL {
-                    let _ = gal.destroy(terrain_presentation_pass);
+                    let _ = gal.retire(terrain_presentation_pass);
                 }
                 gal.rollback_frame_target_depth_write(frame_target);
                 self.discard_pending_lowered_source_terrain_submission(gal);
@@ -1055,7 +1130,7 @@ impl WorldPrimitiveFrontend {
             Err(error) => {
                 self.world_text.cancel_submission();
                 if terrain_presentation_pass != Handle::NULL {
-                    let _ = gal.destroy(terrain_presentation_pass);
+                    let _ = gal.retire(terrain_presentation_pass);
                 }
                 gal.rollback_frame_target_depth_write(frame_target);
                 self.pending_entity_outline_targets_written = false;
@@ -1093,7 +1168,7 @@ impl WorldPrimitiveFrontend {
             Err(error) => {
                 self.world_text.cancel_submission();
                 if terrain_presentation_pass != Handle::NULL {
-                    let _ = gal.destroy(terrain_presentation_pass);
+                    let _ = gal.retire(terrain_presentation_pass);
                 }
                 gal.rollback_frame_target_depth_write(frame_target);
                 self.pending_entity_outline_targets_written = false;
@@ -1115,10 +1190,12 @@ impl WorldPrimitiveFrontend {
         }
         self.pending_terrain_fabulous_handoff = false;
         self.fabulous_attachment_set_initialized = true;
-        gal.commit_frame_target_depth_write(frame_target)?;
+        if frame_target.kind() == Some(crate::render::vulkanic::handles::HandleKind::FrameTarget) {
+            gal.commit_frame_target_depth_write(frame_target)?;
+        }
         if owned_world_target && gameplay_attachment_capture.is_some() {
-            eprintln!("[VulkanicGAL] owned-world-output frame={} submission={} raster={:?} rowReverse={} colorCopy=true depthCopy=true presenter=existing-frame-owner",
-                world_frame_id, token.submission.0, graph_direction, graph_direction == RasterYDirection::Down);
+            crate::core::console::stderr(format_args!("[VulkanicGAL] owned-world-output frame={} submission={} raster={:?} rowReverse={} colorCopy=true depthCopy=true presenter=existing-frame-owner",
+                world_frame_id, token.submission.0, graph_direction, graph_direction == RasterYDirection::Down));
         }
         self.world_text.confirm_submission();
         // The submission has now validated and marked every handle used by
@@ -1146,9 +1223,9 @@ impl WorldPrimitiveFrontend {
             self.lod_ssao_initialized = true;
             self.pending_lod_ssao_written = false;
         }
-        if self.pending_lod_vanilla_snapshot_written {
-            self.lod_vanilla_snapshot_initialized = true;
-            self.pending_lod_vanilla_snapshot_written = false;
+        if self.pending_lod_vanilla_sample_state_established {
+            self.lod_vanilla_sample_state_initialized = true;
+            self.pending_lod_vanilla_sample_state_established = false;
         }
         if self.pending_entity_outline_targets_written {
             self.entity_outline_targets_initialized = true;
@@ -1319,10 +1396,10 @@ impl WorldPrimitiveFrontend {
             let reads = gal.completed_host_reads().to_vec();
             capture.write_artifacts(gal, reads, token.submission.0, &stats)?;
         }
-        // The source route can become eligible only after this normal Rust
-        // submission has confirmed its voxel/lightmap work. A later frame
-        // performs its own exact-frame preparation before it is allowed to
-        // execute the selected source graph.
+        // The source route requires confirmation of this normal graph's
+        // voxel/lightmap work. At world entry this graph targets private
+        // attachments, then the same semantic frame rebuilds admission and
+        // executes the selected source graph into the acquired image.
         if let Some(source_frame_for_admission) = source_activation_frame.as_ref() {
             self.arm_runtime_source_execution_if_ready(source_frame_for_admission);
             // Pre-submit status establishes that source resources were staged;
@@ -1497,6 +1574,8 @@ impl WorldPrimitiveFrontend {
         gui_blur_radius: i32,
         gui_tiled_quads: Vec<GuiTiledQuadRequest>,
     ) -> GalResult<(WorldPrimitiveSubmitStats, GuiSubmitStats)> {
+        let creates_before = gal.metrics().resource_creates;
+        let destroys_before = gal.metrics().resource_destroys;
         gal.begin_command_recording()?;
         let result = self.submit_whole_frame_with_tiled_gui_frontend_recorded(
             gal,
@@ -1520,6 +1599,13 @@ impl WorldPrimitiveFrontend {
             finish.map(|()| {
                 stats.profile.gal.gal_command_recording_finish_nanos = finish_nanos;
                 stats.profile.gal.gal_command_recording_deferred_destroys = deferred_destroy_count;
+                // SubmitProfile alone excludes frontend preparation and the
+                // retirement boundary. This embedded profile covers the whole
+                // accepted world/GUI attempt, including both lifecycle phases.
+                stats.profile.gal.resource_creates_delta =
+                    gal.metrics().resource_creates.saturating_sub(creates_before);
+                stats.profile.gal.resource_destroys_delta =
+                    gal.metrics().resource_destroys.saturating_sub(destroys_before);
                 (stats, gui_stats)
             })
         })
@@ -1530,7 +1616,7 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         generation: u64,
         frame_target: Handle,
-        frame: WorldPrimitiveFrame,
+        mut frame: WorldPrimitiveFrame,
         gui_frontend: &mut GuiFrontend,
         gui_sprites: Vec<GuiSpriteRequest>,
         mut gui_affine_quads: Vec<GuiAffineQuadRequest>,
@@ -1543,7 +1629,14 @@ impl WorldPrimitiveFrontend {
         self.discard_stale_pending_vanilla_lightmap(gal);
         self.disarm_source_route_on_extent_change(&frame);
         #[cfg(not(test))]
-        let frame = self.admit_armed_source_frame(frame);
+        self.prepare_runtime_source_before_presentation(gal, generation, frame_target, &mut frame)?;
+        #[cfg(not(test))]
+        let mut frame = self.admit_armed_source_frame(frame);
+        // A frame that left the shader route (disarmed or never armed) is
+        // drawn from instances; expand any terrain kept compact for the scene.
+        if !self.runtime_source_execution_is_armed() {
+            self.expand_static_terrain(&mut frame)?;
+        }
         #[cfg(not(test))]
         self.report_shader_route_outcome(&frame);
         crate::render::guirender::frontend::preflight_tiled_affine_count(
@@ -1788,20 +1881,31 @@ impl WorldPrimitiveFrontend {
                     gui_blur_radius,
                     false,
                 )?;
+            let mut gui_stats = gui_stats;
             if let Some(shader_sources) = custom_post_effect.as_ref() {
-                let mut custom_ops = gui_frontend.append_custom_post_effect_with_external_targets(
-                    gal,
-                    frame_target,
-                    frame_target,
-                    std::str::from_utf8(&post_effect_id).expect("validated post-effect identity"),
-                    shader_sources,
-                    custom_external_targets.as_ref(),
-                )?;
+                let (mut custom_ops, custom_owned_targets) = gui_frontend
+                    .append_custom_post_effect_with_owned_targets(
+                        gal,
+                        frame_target,
+                        frame_target,
+                        std::str::from_utf8(&post_effect_id)
+                            .expect("validated post-effect identity"),
+                        shader_sources,
+                        custom_external_targets.as_ref(),
+                    )?;
                 custom_ops.extend(gui_ops);
                 gui_ops = custom_ops;
+                gui_stats = declare_gui_owned_targets(gui_stats, &custom_owned_targets);
             }
             return self
-                .submit_whole_frame(gal, generation, frame_target, frame, gui_ops)
+                .submit_whole_frame_with_gui_stats(
+                    gal,
+                    generation,
+                    frame_target,
+                    frame,
+                    gui_ops,
+                    gui_stats.clone(),
+                )
                 .map(|stats| (stats, gui_stats));
         }
         #[cfg(test)]
@@ -1813,9 +1917,12 @@ impl WorldPrimitiveFrontend {
                 frame,
                 |gal, target, color_attachment, diagnostic_capture| {
                     let mut post_ops = Vec::new();
+                    // Private custom post-effect targets must be declared to
+                    // the complete source frame's GUI target validation.
+                    let mut post_owned_targets = Vec::new();
                     if let Some(shader_sources) = custom_post_effect.as_ref() {
-                        post_ops.extend(
-                            gui_frontend.append_custom_post_effect_with_external_targets(
+                        let (custom_ops, custom_owned_targets) =
+                            gui_frontend.append_custom_post_effect_with_owned_targets(
                                 gal,
                                 target,
                                 color_attachment,
@@ -1823,8 +1930,9 @@ impl WorldPrimitiveFrontend {
                                     .expect("validated post-effect identity"),
                                 shader_sources,
                                 custom_external_targets.as_ref(),
-                            )?,
-                        );
+                            )?;
+                        post_ops.extend(custom_ops);
+                        post_owned_targets = custom_owned_targets;
                     }
                     if gui_blur_before_stratum >= 0 {
                         let (gui_ops, stats) = gui_frontend
@@ -1842,7 +1950,10 @@ impl WorldPrimitiveFrontend {
                                 true,
                             )?;
                         post_ops.extend(gui_ops);
-                        return Ok((post_ops, stats));
+                        return Ok((
+                            post_ops,
+                            declare_gui_owned_targets(stats, &post_owned_targets),
+                        ));
                     }
                     if diagnostic_capture {
                         let (gui_ops, stats) = gui_frontend
@@ -1857,7 +1968,10 @@ impl WorldPrimitiveFrontend {
                                 gui_tiled_quads.clone(),
                             )?;
                         post_ops.extend(gui_ops);
-                        Ok((post_ops, stats))
+                        Ok((
+                            post_ops,
+                            declare_gui_owned_targets(stats, &post_owned_targets),
+                        ))
                     } else {
                         let (gui_ops, stats) = gui_frontend
                             .append_frame_ops_with_tiled_quads_to_target(
@@ -1875,7 +1989,10 @@ impl WorldPrimitiveFrontend {
                                 gui_tiled_quads.clone(),
                             )?;
                         post_ops.extend(gui_ops);
-                        Ok((post_ops, stats))
+                        Ok((
+                            post_ops,
+                            declare_gui_owned_targets(stats, &post_owned_targets),
+                        ))
                     }
                 },
             );
@@ -1919,9 +2036,12 @@ impl WorldPrimitiveFrontend {
                 frame,
                 move |gal, target, color_attachment, diagnostic_capture| {
                     let mut post_ops = Vec::new();
+                    // Private custom post-effect targets must be declared to
+                    // the complete source frame's GUI target validation.
+                    let mut post_owned_targets = Vec::new();
                     if let Some(shader_sources) = custom_post_effect.as_ref() {
-                        post_ops.extend(
-                            gui_frontend.append_custom_post_effect_with_external_targets(
+                        let (custom_ops, custom_owned_targets) =
+                            gui_frontend.append_custom_post_effect_with_owned_targets(
                                 gal,
                                 target,
                                 color_attachment,
@@ -1929,8 +2049,9 @@ impl WorldPrimitiveFrontend {
                                     .expect("validated post-effect identity"),
                                 shader_sources,
                                 custom_external_targets.as_ref(),
-                            )?,
-                        );
+                            )?;
+                        post_ops.extend(custom_ops);
+                        post_owned_targets = custom_owned_targets;
                     }
                     if gui_blur_before_stratum >= 0 {
                         let (gui_ops, stats) = gui_frontend
@@ -1948,11 +2069,20 @@ impl WorldPrimitiveFrontend {
                                 false,
                             )?;
                         post_ops.extend(gui_ops);
-                        return Ok((post_ops, stats));
+                        return Ok((
+                            post_ops,
+                            declare_gui_owned_targets(stats, &post_owned_targets),
+                        ));
                     }
                     if !diagnostic_capture {
                         post_ops.extend(prepared_gui_ops.clone());
-                        return Ok((post_ops, prepared_gui_stats.clone()));
+                        return Ok((
+                            post_ops,
+                            declare_gui_owned_targets(
+                                prepared_gui_stats.clone(),
+                                &post_owned_targets,
+                            ),
+                        ));
                     }
                     let (gui_ops, stats) = gui_frontend
                         .append_frame_ops_with_tiled_quads_to_target(
@@ -1970,7 +2100,10 @@ impl WorldPrimitiveFrontend {
                             gui_tiled_quads.clone(),
                         )?;
                     post_ops.extend(gui_ops);
-                    Ok((post_ops, stats))
+                    Ok((
+                        post_ops,
+                        declare_gui_owned_targets(stats, &post_owned_targets),
+                    ))
                 },
             );
         }
@@ -2007,20 +2140,33 @@ impl WorldPrimitiveFrontend {
                 gui_tiled_quads,
             )?
         };
+        let mut gui_stats = gui_stats;
         if let Some(shader_sources) = custom_post_effect.as_ref() {
-            let mut custom_ops = gui_frontend.append_custom_post_effect_with_external_targets(
-                gal,
-                frame_target,
-                frame_target,
-                std::str::from_utf8(&post_effect_id).expect("validated post-effect identity"),
-                shader_sources,
-                custom_external_targets.as_ref(),
-            )?;
+            let (mut custom_ops, custom_owned_targets) = gui_frontend
+                .append_custom_post_effect_with_owned_targets(
+                    gal,
+                    frame_target,
+                    frame_target,
+                    std::str::from_utf8(&post_effect_id).expect("validated post-effect identity"),
+                    shader_sources,
+                    custom_external_targets.as_ref(),
+                )?;
             custom_ops.extend(gui_ops);
             gui_ops = custom_ops;
+            gui_stats = declare_gui_owned_targets(gui_stats, &custom_owned_targets);
         }
-        self.submit_whole_frame(gal, generation, frame_target, frame, gui_ops)
-            .map(|stats| (stats, gui_stats))
+        // Source preparation inside this submission may arm the selected
+        // route for this frame; keep the recorded GUI declarations with the
+        // operations so that route validates them like its own GUI.
+        self.submit_whole_frame_with_gui_stats(
+            gal,
+            generation,
+            frame_target,
+            frame,
+            gui_ops,
+            gui_stats.clone(),
+        )
+        .map(|stats| (stats, gui_stats))
     }
 
     pub fn submit_partial_frame(
@@ -2126,4 +2272,16 @@ impl WorldPrimitiveFrontend {
         }
         result
     }
+}
+
+/// Adds private GUI-owned targets written by GUI-side post work (custom
+/// post-effect intermediates) to the stats that the complete source frame
+/// validates its GUI command stream against.
+fn declare_gui_owned_targets(mut stats: GuiSubmitStats, owned_targets: &[Handle]) -> GuiSubmitStats {
+    for target in owned_targets {
+        if !stats.owned_intermediate_targets.contains(target) {
+            stats.owned_intermediate_targets.push(*target);
+        }
+    }
+    stats
 }

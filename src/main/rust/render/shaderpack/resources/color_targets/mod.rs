@@ -6,16 +6,19 @@
 //! attachment indices nor backend handles.
 
 mod declarations;
+mod scoped;
 mod targets;
 mod attachments;
 mod resource_sets;
 mod frame_plan;
+mod clears;
 
 pub use self::declarations::*;
 pub(crate) use self::targets::*;
 pub(crate) use self::attachments::*;
 pub(crate) use self::resource_sets::*;
 pub(crate) use self::frame_plan::*;
+pub(crate) use self::clears::*;
 
 use std::collections::BTreeMap;
 

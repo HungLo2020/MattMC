@@ -1,8 +1,9 @@
 //! Pack-declared semantic bindings for lowered terrain source resources.
 //!
-//! A shader source name is not a backend binding. This module converts an
-//! explicitly transported pack declaration into stable semantic roles; it
-//! intentionally contains neither native handles nor attachment indices.
+//! A shader source name is not a backend binding. Explicit transported
+//! manifests or the standard Iris source protocol resolve names into stable
+//! semantic roles. Pass-specific custom textures require selected-stage
+//! preprocessing; alias discovery creates no native resources.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -13,6 +14,8 @@ use crate::render::shaderpack::source::ShaderPackSource;
 use crate::render::shaderpack::contracts::terrain::{TerrainPassContract, TerrainPassInput, TerrainPassRequiredResource};
 
 pub const TERRAIN_RESOURCE_BINDINGS_PATH: &str = "mattmc/terrain-resource-bindings.properties";
+
+mod legacy;
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum TerrainSourceResourceRole {
@@ -33,6 +36,8 @@ pub enum TerrainSourceResourceRole {
     /// Raw shadow-depth data used by source paths that explicitly reconstruct
     /// or combine shadow depth rather than issuing a compare sample.
     ShadowDepthRaw,
+    /// Raw depth from the opaque-only shadow snapshot.
+    ShadowDepthRawSecondary,
     ShadowColor,
     /// A distinct shadow color target sampled by source stages that retain
     /// multiple shadow attachments. It cannot alias the primary merely
@@ -98,6 +103,7 @@ impl TerrainSourceResourceRole {
             }
             "shadow_depth_secondary" => Ok(Self::ShadowDepthSecondary),
             "shadow_depth_raw" => Ok(Self::ShadowDepthRaw),
+            "shadow_depth_raw_secondary" => Ok(Self::ShadowDepthRawSecondary),
             "shadow_color" => Ok(Self::ShadowColor),
             "shadow_color_secondary" => Ok(Self::ShadowColorSecondary),
             "noise" => Ok(Self::Noise),
@@ -131,6 +137,7 @@ impl TerrainSourceResourceRole {
             | Self::Lightmap
             | Self::Noise
             | Self::ShadowDepthRaw
+            | Self::ShadowDepthRawSecondary
             | Self::ShadowColor
             | Self::ShadowColorSecondary
             | Self::GBufferAlbedo
@@ -158,9 +165,8 @@ impl TerrainSourceResourceRole {
     /// semantic source lowering instead of tying it to an Iris texture unit.
     pub fn resolve_sampled_declaration(&self, type_name: &str) -> GalResult<Self> {
         match (self, type_name) {
-            (Self::ShadowDepthPrimary | Self::ShadowDepthSecondary, "sampler2D") => {
-                Ok(Self::ShadowDepthRaw)
-            }
+            (Self::ShadowDepthPrimary, "sampler2D") => Ok(Self::ShadowDepthRaw),
+            (Self::ShadowDepthSecondary, "sampler2D") => Ok(Self::ShadowDepthRawSecondary),
             _ if self.expected_sampler_type() == type_name => Ok(self.clone()),
             _ => Err(GalError::invalid_argument(format!(
                 "semantic terrain source resource '{}' requires '{}' but source declares '{type_name}'",
@@ -185,6 +191,7 @@ impl TerrainSourceResourceRole {
             | Self::ShadowDepthPrimary
             | Self::ShadowDepthSecondary
             | Self::ShadowDepthRaw
+            | Self::ShadowDepthRawSecondary
             | Self::ShadowColor
             | Self::ShadowColorSecondary
             | Self::Noise
@@ -214,6 +221,7 @@ impl TerrainSourceResourceRole {
             Self::ShadowDepthPrimary => "shadow_depth_primary",
             Self::ShadowDepthSecondary => "shadow_depth_secondary",
             Self::ShadowDepthRaw => "shadow_depth_raw",
+            Self::ShadowDepthRawSecondary => "shadow_depth_raw_secondary",
             Self::ShadowColor => "shadow_color",
             Self::ShadowColorSecondary => "shadow_color_secondary",
             Self::Noise => "noise",
@@ -296,6 +304,7 @@ impl TerrainSourceResourceRole {
             | Self::MaterialSpecularMap
             | Self::Lightmap
             | Self::ShadowDepthRaw
+            | Self::ShadowDepthRawSecondary
             | Self::ShadowColor
             | Self::ShadowColorSecondary
             | Self::Noise
@@ -446,14 +455,35 @@ pub struct TerrainSourceOwnedStorageResource {
 /// source parsing and from backend lowering: a later runtime can create a GAL
 /// resource set from this table only after it has owned every referenced
 /// texture, view, sampler, and lifetime.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TerrainSourceOwnedResourceSet {
+///
+/// Immutable after construction and shared: per-draw material preparation
+/// clones and compares the same frame set many times, so clones share one
+/// allocation and equality first checks identity.
+#[derive(Clone, Debug)]
+pub struct TerrainSourceOwnedResourceSet(std::sync::Arc<OwnedResourceSetFields>);
+
+#[derive(Debug, Eq, PartialEq)]
+struct OwnedResourceSetFields {
     availability: TerrainSourceResourceAvailabilitySet,
     samplers: BTreeMap<TerrainSourceResourceRole, Handle>,
     storage_views: BTreeMap<TerrainSourceResourceRole, Handle>,
 }
 
+impl PartialEq for TerrainSourceOwnedResourceSet {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.0, &other.0) || *self.0 == *other.0
+    }
+}
+
+impl Eq for TerrainSourceOwnedResourceSet {}
+
 impl TerrainSourceOwnedResourceSet {
+    /// Whether both name the same snapshot object. Memos keyed by a held
+    /// snapshot use this; equal content in another object simply misses.
+    pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.0, &other.0)
+    }
+
     pub fn new(
         availability: TerrainSourceResourceAvailabilitySet,
         resources: impl IntoIterator<Item = TerrainSourceOwnedResource>,
@@ -529,27 +559,27 @@ impl TerrainSourceOwnedResourceSet {
                 )));
             }
         }
-        Ok(Self {
+        Ok(Self(std::sync::Arc::new(OwnedResourceSetFields {
             availability,
             samplers,
             storage_views,
-        })
+        })))
     }
 
     pub fn availability(&self) -> &TerrainSourceResourceAvailabilitySet {
-        &self.availability
+        &self.0.availability
     }
 
     pub fn combined_sampler_for(&self, role: TerrainSourceResourceRole) -> Option<Handle> {
-        self.samplers.get(&role).copied()
+        self.0.samplers.get(&role).copied()
     }
 
     pub fn storage_texture_for(&self, role: TerrainSourceResourceRole) -> Option<Handle> {
-        self.storage_views.get(&role).copied()
+        self.0.storage_views.get(&role).copied()
     }
 
     pub fn len(&self) -> usize {
-        self.samplers.len() + self.storage_views.len()
+        self.0.samplers.len() + self.0.storage_views.len()
     }
 
     /// Stable semantic cache identity for one owned source-resource table.
@@ -558,7 +588,7 @@ impl TerrainSourceOwnedResourceSet {
     /// A frontend may use this to retain a compatible source resource set
     /// across frames while making pack/world replacement invalidate it.
     pub fn generation_signature(&self) -> Vec<(TerrainSourceResourceRole, u64)> {
-        self.availability
+        self.0.availability
             .resources()
             .map(|resource| (resource.role, resource.resource_generation))
             .collect()
@@ -587,20 +617,20 @@ impl TerrainSourceOwnedResourceSet {
                 role.semantic_name()
             )));
         }
-        let Some(existing) = self.availability.resource_for(role.clone()) else {
+        let Some(existing) = self.0.availability.resource_for(role.clone()) else {
             return Err(GalError::invalid_argument(format!(
                 "terrain source override references unavailable role '{}'",
                 role.semantic_name()
             )));
         };
-        if self.storage_views.contains_key(&role) || !self.samplers.contains_key(&role) {
+        if self.0.storage_views.contains_key(&role) || !self.0.samplers.contains_key(&role) {
             return Err(GalError::invalid_argument(format!(
                 "terrain source override requires sampled role '{}'",
                 role.semantic_name()
             )));
         }
         let availability = self
-            .availability
+            .0.availability
             .resources()
             .map(|available| TerrainSourceResourceAvailability {
                 role: available.role.clone(),
@@ -614,7 +644,7 @@ impl TerrainSourceOwnedResourceSet {
             .collect::<Vec<_>>();
         debug_assert!(existing.resource_generation > 0);
         let resources = self
-            .samplers
+            .0.samplers
             .iter()
             .map(|(available_role, sampler)| TerrainSourceOwnedResource {
                 role: available_role.clone(),
@@ -626,7 +656,7 @@ impl TerrainSourceOwnedResourceSet {
             })
             .collect::<Vec<_>>();
         let storage_resources = self
-            .storage_views
+            .0.storage_views
             .iter()
             .map(
                 |(available_role, texture_view)| TerrainSourceOwnedStorageResource {
@@ -637,8 +667,8 @@ impl TerrainSourceOwnedResourceSet {
             .collect::<Vec<_>>();
         Self::with_storage_resources(
             TerrainSourceResourceAvailabilitySet::new(
-                self.availability.shader_pack_generation(),
-                self.availability.world_generation(),
+                self.0.availability.shader_pack_generation(),
+                self.0.availability.world_generation(),
                 availability,
             )?,
             resources,
@@ -656,12 +686,12 @@ impl TerrainSourceOwnedResourceSet {
     ) -> GalResult<Self> {
         let exclusions = exclusions.into_iter().collect::<BTreeSet<_>>();
         let availability = self
-            .availability
+            .0.availability
             .resources()
             .filter(|resource| !exclusions.contains(&resource.role))
             .collect::<Vec<_>>();
         let resources = self
-            .samplers
+            .0.samplers
             .iter()
             .filter(|(role, _)| !exclusions.contains(*role))
             .map(|(role, &combined_sampler)| TerrainSourceOwnedResource {
@@ -670,7 +700,7 @@ impl TerrainSourceOwnedResourceSet {
             })
             .collect::<Vec<_>>();
         let storage_resources = self
-            .storage_views
+            .0.storage_views
             .iter()
             .filter(|(role, _)| !exclusions.contains(*role))
             .map(|(role, &texture_view)| TerrainSourceOwnedStorageResource {
@@ -680,13 +710,41 @@ impl TerrainSourceOwnedResourceSet {
             .collect::<Vec<_>>();
         Self::with_storage_resources(
             TerrainSourceResourceAvailabilitySet::new(
-                self.availability.shader_pack_generation(),
-                self.availability.world_generation(),
+                self.0.availability.shader_pack_generation(),
+                self.0.availability.world_generation(),
                 availability,
             )?,
             resources,
             storage_resources,
         )
+    }
+
+    /// Selects a writer's locally owned color samplers over color bindings
+    /// carried by an admission snapshot. Program-local descriptor ordinals
+    /// can produce different combined handles for the same target image.
+    /// Every other resource role stays unchanged and strict merging remains
+    /// the rule for independently owned non-color subsets.
+    pub(crate) fn with_stage_color_resources(
+        &self,
+        colors: &TerrainSourceOwnedResourceSet,
+    ) -> GalResult<Self> {
+        if self.0.availability.shader_pack_generation() != colors.0.availability.shader_pack_generation()
+            || self.0.availability.world_generation() != colors.0.availability.world_generation()
+        {
+            return Err(GalError::invalid_argument(
+                "stage color bindings must match the snapshot's world and shader-pack generations",
+            ));
+        }
+        let roles = colors.0.availability.resources().map(|resource| resource.role).collect::<Vec<_>>();
+        if roles.iter().any(|role| !matches!(role, TerrainSourceResourceRole::ShaderPackColor(_)))
+            || !colors.0.storage_views.is_empty()
+        {
+            return Err(GalError::invalid_argument(
+                "stage color replacement accepts only owned color sampler roles",
+            ));
+        }
+        let base = self.excluding_roles(roles)?;
+        Self::merge([&base, colors])
     }
 
     /// Removes roles already supplied by an earlier stage of the same source
@@ -698,17 +756,17 @@ impl TerrainSourceOwnedResourceSet {
         &self,
         existing: &TerrainSourceOwnedResourceSet,
     ) -> GalResult<Self> {
-        if self.availability.shader_pack_generation()
-            != existing.availability.shader_pack_generation()
-            || self.availability.world_generation() != existing.availability.world_generation()
+        if self.0.availability.shader_pack_generation()
+            != existing.0.availability.shader_pack_generation()
+            || self.0.availability.world_generation() != existing.0.availability.world_generation()
         {
             return Err(GalError::invalid_argument(
                 "cannot compare terrain source resources from different shader-pack or world generations",
             ));
         }
         let mut exclusions = BTreeSet::new();
-        for resource in self.availability.resources() {
-            let Some(previous) = existing.availability.resource_for(resource.role.clone()) else {
+        for resource in self.0.availability.resources() {
+            let Some(previous) = existing.0.availability.resource_for(resource.role.clone()) else {
                 continue;
             };
             if previous != resource
@@ -741,8 +799,8 @@ impl TerrainSourceOwnedResourceSet {
         let mut resources = Vec::new();
         let mut storage_resources = Vec::new();
         for set in sets {
-            let source_generation = set.availability.shader_pack_generation();
-            let world_generation = set.availability.world_generation();
+            let source_generation = set.0.availability.shader_pack_generation();
+            let world_generation = set.0.availability.world_generation();
             if let Some(expected) = expected_generation {
                 if source_generation != expected {
                     return Err(GalError::invalid_argument(format!(
@@ -761,14 +819,14 @@ impl TerrainSourceOwnedResourceSet {
             } else {
                 expected_world_generation = Some(world_generation);
             }
-            availability.extend(set.availability.resources());
-            resources.extend(set.samplers.iter().map(|(role, combined_sampler)| {
+            availability.extend(set.0.availability.resources());
+            resources.extend(set.0.samplers.iter().map(|(role, combined_sampler)| {
                 TerrainSourceOwnedResource {
                     role: role.clone(),
                     combined_sampler: *combined_sampler,
                 }
             }));
-            storage_resources.extend(set.storage_views.iter().map(|(role, texture_view)| {
+            storage_resources.extend(set.0.storage_views.iter().map(|(role, texture_view)| {
                 TerrainSourceOwnedStorageResource {
                     role: role.clone(),
                     texture_view: *texture_view,
@@ -798,12 +856,15 @@ impl TerrainSourceOwnedResourceSet {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TerrainSourceResourceBindings {
     bindings: BTreeMap<String, TerrainSourceResourceRole>,
+    // Protocol outputs remain color identities even when a phase overrides
+    // the corresponding sampler spelling with a custom PNG.
+    color_outputs: BTreeMap<u32, TerrainSourceResourceRole>,
 }
 
 impl TerrainSourceResourceBindings {
     pub fn from_source(source: &ShaderPackSource) -> GalResult<Self> {
         let Some(contents) = source.get(TERRAIN_RESOURCE_BINDINGS_PATH) else {
-            return Ok(Self::default());
+            return Self::from_legacy_source(source);
         };
         let mut bindings = BTreeMap::new();
         for (index, raw_line) in contents.lines().enumerate() {
@@ -837,7 +898,7 @@ impl TerrainSourceResourceBindings {
                 )));
             }
         }
-        Ok(Self { bindings })
+        Ok(Self { bindings, color_outputs: BTreeMap::new() })
     }
 
     pub fn role_for(&self, name: &str) -> Option<TerrainSourceResourceRole> {
@@ -852,6 +913,9 @@ impl TerrainSourceResourceBindings {
         &self,
         slot: u32,
     ) -> GalResult<TerrainSourceResourceRole> {
+        if let Some(role) = self.color_outputs.get(&slot) {
+            return Ok(role.clone());
+        }
         let name = format!("colortex{slot}");
         match self.role_for(&name) {
             Some(role @ TerrainSourceResourceRole::ShaderPackColor(_)) => Ok(role),

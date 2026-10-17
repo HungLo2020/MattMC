@@ -24,6 +24,8 @@ import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataOutputStre
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
+import it.unimi.dsi.fastutil.bytes.ByteList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -95,16 +97,16 @@ public class FullDataSourceV2DTO
 		FullDataSourceV2DTO dto = FullDataSourceV2DTO.CreateEmptyDataSourceForDecoding();
 		
 		// populate arrays
-		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedDataByteArray, null, compressionModeEnum);
+		writeDataSourceDataArrayToBlobV2(dataSource, dto.compressedDataByteArray, null, compressionModeEnum);
 		writeGenerationStepsToBlob(dataSource.columnGenerationSteps, dto.compressedColumnGenStepByteArray, compressionModeEnum);
 		writeWorldCompressionModeToBlob(dataSource, dto.compressedWorldCompressionModeByteArray, compressionModeEnum);
 		writeSemanticHorizontalContributorsToBlob(dataSource, dto.compressedSemanticHorizontalContributorByteArray, compressionModeEnum);
 		writeDataMappingToBlob(dataSource.mapping, dto.compressedMappingByteArray, compressionModeEnum);
 		// adjacent full data
-		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedNorthAdjDataByteArray, EDhDirection.NORTH, compressionModeEnum);
-		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedSouthAdjDataByteArray, EDhDirection.SOUTH, compressionModeEnum);
-		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedEastAdjDataByteArray, EDhDirection.EAST, compressionModeEnum);
-		writeDataSourceDataArrayToBlobV2(dataSource.dataPoints, dto.compressedWestAdjDataByteArray, EDhDirection.WEST, compressionModeEnum);
+		writeDataSourceDataArrayToBlobV2(dataSource, dto.compressedNorthAdjDataByteArray, EDhDirection.NORTH, compressionModeEnum);
+		writeDataSourceDataArrayToBlobV2(dataSource, dto.compressedSouthAdjDataByteArray, EDhDirection.SOUTH, compressionModeEnum);
+		writeDataSourceDataArrayToBlobV2(dataSource, dto.compressedEastAdjDataByteArray, EDhDirection.EAST, compressionModeEnum);
+		writeDataSourceDataArrayToBlobV2(dataSource, dto.compressedWestAdjDataByteArray, EDhDirection.WEST, compressionModeEnum);
 		
 		// populate individual variables
 		{
@@ -219,21 +221,29 @@ public class FullDataSourceV2DTO
 		// data //
 		
 		// clear any old data so we can start fresh
-		for (int i = 0; i < FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH; i++)
-		{
-			@NotNull LongArrayList array = dataSource.dataPoints[i];
-			array.clear();
-			array.add(FullDataPointUtil.EMPTY_DATA_POINT);
+		if (!net.minecraft.world.level.chunk.NativeDhCodec.initialize(dataSource)) {
+			for (int i = 0; i < FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH; i++) {
+				@NotNull LongList array = dataSource.getColumn(i);
+				array.clear(); array.add(FullDataPointUtil.EMPTY_DATA_POINT);
+			}
 		}
 		
 		if (direction == null)
 		{
 			readBlobToGenerationSteps(this.compressedColumnGenStepByteArray, dataSource.columnGenerationSteps, compressionModeEnum);
-			readBlobToWorldCompressionMode(this.compressedWorldCompressionModeByteArray, dataSource.columnWorldCompressionMode, compressionModeEnum);
-			if (this.dataFormatVersion >= DATA_FORMAT.V3_LATEST) {
-				readBlobToSemanticHorizontalUniformity(
-					this.compressedWorldCompressionModeByteArray, dataSource, compressionModeEnum
-				);
+			if (this.dataFormatVersion >= DATA_FORMAT.V3_LATEST && codecByteArrayMode(compressionModeEnum))
+			{
+				// One decompression for both planes of this blob.
+				readBlobToWorldCompressionModeAndUniformity(this.compressedWorldCompressionModeByteArray, dataSource, compressionModeEnum);
+			}
+			else
+			{
+				readBlobToWorldCompressionMode(this.compressedWorldCompressionModeByteArray, dataSource.columnWorldCompressionMode, compressionModeEnum);
+				if (this.dataFormatVersion >= DATA_FORMAT.V3_LATEST) {
+					readBlobToSemanticHorizontalUniformity(
+						this.compressedWorldCompressionModeByteArray, dataSource, compressionModeEnum
+					);
+				}
 			}
 			if (this.dataFormatVersion >= DATA_FORMAT.V4_LATEST) {
 				readSemanticHorizontalContributorsFromBlob(
@@ -243,17 +253,17 @@ public class FullDataSourceV2DTO
 			
 			if (this.dataFormatVersion == 1)
 			{
-				readBlobToDataSourceDataArrayV1(this.compressedDataByteArray, dataSource.dataPoints, compressionModeEnum);
+				readBlobToDataSourceDataArrayV1(this.compressedDataByteArray, dataSource, compressionModeEnum);
 			}
 			else
 			{
 				// doesn't include adjacent (ie edge) data
-				readBlobToDataSourceDataArrayV2(this.compressedDataByteArray, dataSource.dataPoints, null, compressionModeEnum);
+				readBlobToDataSourceDataArrayV2(this.compressedDataByteArray, dataSource, null, compressionModeEnum);
 				
-				readBlobToDataSourceDataArrayV2(this.compressedNorthAdjDataByteArray, dataSource.dataPoints, EDhDirection.NORTH, compressionModeEnum);
-				readBlobToDataSourceDataArrayV2(this.compressedSouthAdjDataByteArray, dataSource.dataPoints, EDhDirection.SOUTH, compressionModeEnum);
-				readBlobToDataSourceDataArrayV2(this.compressedEastAdjDataByteArray, dataSource.dataPoints, EDhDirection.EAST, compressionModeEnum);
-				readBlobToDataSourceDataArrayV2(this.compressedWestAdjDataByteArray, dataSource.dataPoints, EDhDirection.WEST, compressionModeEnum);
+				readBlobToDataSourceDataArrayV2(this.compressedNorthAdjDataByteArray, dataSource, EDhDirection.NORTH, compressionModeEnum);
+				readBlobToDataSourceDataArrayV2(this.compressedSouthAdjDataByteArray, dataSource, EDhDirection.SOUTH, compressionModeEnum);
+				readBlobToDataSourceDataArrayV2(this.compressedEastAdjDataByteArray, dataSource, EDhDirection.EAST, compressionModeEnum);
+				readBlobToDataSourceDataArrayV2(this.compressedWestAdjDataByteArray, dataSource, EDhDirection.WEST, compressionModeEnum);
 			}
 		}
 		else
@@ -263,7 +273,7 @@ public class FullDataSourceV2DTO
 			// this is done so data sources down-stream
 			// can all be handled identically regardless of
 			// whether they're a full or partial data source
-			readBlobToDataSourceDataArrayV2(this.compressedDataByteArray, dataSource.dataPoints, direction, compressionModeEnum);	
+			readBlobToDataSourceDataArrayV2(this.compressedDataByteArray, dataSource, direction, compressionModeEnum);
 		}
 		
 		
@@ -315,11 +325,13 @@ public class FullDataSourceV2DTO
 	//=================//
 	
 	private static void readBlobToDataSourceDataArrayV1(
-			ByteArrayList inputCompressedDataByteArray, LongArrayList[] outputDataLongArray, 
+			ByteArrayList inputCompressedDataByteArray, FullDataSourceV2 outputDataLongArray,
 			EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
 	{
 		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
 		{
+			if (net.minecraft.world.level.chunk.NativeDhCodec.decode(outputDataLongArray, compressedIn,
+				0, 64, 0, 64, true, VALIDATE_INPUT_DATAPOINTS)) return;
 			// read the data
 			int dataArrayLength = FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH;
 			for (int xz = 0; xz < dataArrayLength; xz++)
@@ -331,7 +343,7 @@ public class FullDataSourceV2DTO
 					throw new DataCorruptedException("Read DataSource Blob data at index [" + xz + "], column length [" + dataColumnLength + "] should be greater than zero.");
 				}
 				
-				LongArrayList dataColumn = outputDataLongArray[xz];
+				LongList dataColumn = outputDataLongArray.getColumn(xz);
 				ListUtil.clearAndSetSize(dataColumn, dataColumnLength);
 				
 				// read column data (will be skipped if no data was present)
@@ -349,7 +361,7 @@ public class FullDataSourceV2DTO
 	}
 	
 	private static void writeDataSourceDataArrayToBlobV2(
-			LongArrayList[] inputDataArray, ByteArrayList outputByteArray,
+			FullDataSourceV2 inputDataArray, ByteArrayList outputByteArray,
 			@Nullable EDhDirection direction, EDhApiDataCompressionMode compressionModeEnum) throws IOException
 	{
 		int minX, maxX, minZ, maxZ;
@@ -372,6 +384,8 @@ public class FullDataSourceV2DTO
 		
 		try (DhDataOutputStream compressedOut = DhDataOutputStream.create(compressionModeEnum, outputByteArray))
 		{
+			if (net.minecraft.world.level.chunk.NativeDhCodec.encode(inputDataArray, compressedOut,
+				minX, maxX, minZ, maxZ)) return;
 			// this method would be simpler if we allocated a bunch of temporary arrays,
 			// but we're trying to avoid garbage.
 			
@@ -382,7 +396,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x,z);
 					
-					LongArrayList col = inputDataArray[index];
+					LongList col = inputDataArray.getColumn(index);
 					int size = (col != null) ? col.size() : 0;
 					VarintUtil.writeVarint(compressedOut, size);
 				}
@@ -397,7 +411,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongArrayList col = inputDataArray[index];
+					LongList col = inputDataArray.getColumn(index);
 					int size = col != null ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -428,7 +442,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongArrayList col = inputDataArray[index];
+					LongList col = inputDataArray.getColumn(index);
 					int size = (col != null) ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -446,7 +460,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongArrayList col = inputDataArray[index];
+					LongList col = inputDataArray.getColumn(index);
 					int size = (col != null) ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -472,7 +486,7 @@ public class FullDataSourceV2DTO
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
-					LongArrayList col = inputDataArray[index];
+					LongList col = inputDataArray.getColumn(index);
 					int size = (col != null) ? col.size() : 0;
 					for (int y = 0; y < size; y++)
 					{
@@ -491,7 +505,7 @@ public class FullDataSourceV2DTO
 	}
 	private static void readBlobToDataSourceDataArrayV2(
 			ByteArrayList inputCompressedDataByteArray,
-			LongArrayList[] outputDataLongArray,
+			FullDataSourceV2 outputDataLongArray,
 			@Nullable EDhDirection direction, EDhApiDataCompressionMode compressionModeEnum)
 			throws IOException, DataCorruptedException
 	{
@@ -516,6 +530,8 @@ public class FullDataSourceV2DTO
 		
 		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
 		{
+			if (net.minecraft.world.level.chunk.NativeDhCodec.decode(outputDataLongArray, compressedIn,
+				minX, maxX, minZ, maxZ, false, FullDataPointUtil.RUN_VALIDATION)) return;
 			// 1. column counts, preallocate
 			for (int x = minX; x < maxX; x++)
 			{
@@ -524,7 +540,7 @@ public class FullDataSourceV2DTO
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
 					
 					int count = VarintUtil.readVarint(compressedIn);
-					ListUtil.clearAndSetSize(outputDataLongArray[index], count);
+					ListUtil.clearAndSetSize(outputDataLongArray.getColumn(index), count);
 				}
 			}
 			
@@ -534,7 +550,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongArrayList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray.getColumn(index);
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -550,7 +566,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongArrayList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray.getColumn(index);
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -568,7 +584,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongArrayList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray.getColumn(index);
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -591,7 +607,7 @@ public class FullDataSourceV2DTO
 				for (int z = minZ; z < maxZ; z++)
 				{
 					int index = FullDataSourceV2.relativePosToIndex(x, z);
-					LongArrayList col = outputDataLongArray[index];
+					LongList col = outputDataLongArray.getColumn(index);
 					
 					for (int i = 0; i < col.size(); i++)
 					{
@@ -621,7 +637,7 @@ public class FullDataSourceV2DTO
 					for (int z = minZ; z < maxZ; z++)
 					{
 						int index = FullDataSourceV2.relativePosToIndex(x, z);
-						LongArrayList col = outputDataLongArray[index];
+						LongList col = outputDataLongArray.getColumn(index);
 						
 						for (int i = 0; i < col.size(); i++)
 						{
@@ -638,21 +654,23 @@ public class FullDataSourceV2DTO
 	}
 	
 	
-	private static void writeGenerationStepsToBlob(ByteArrayList inputColumnGenStepByteArray, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException
+	private static void writeGenerationStepsToBlob(it.unimi.dsi.fastutil.bytes.ByteList inputColumnGenStepByteArray, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException
 	{
 		try (DhDataOutputStream compressedOut = DhDataOutputStream.create(compressionModeEnum, outputByteArray))
 		{
+			if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.encode(inputColumnGenStepByteArray, compressedOut)) return;
 			for (int i = 0; i < inputColumnGenStepByteArray.size(); i++)
 			{
 				compressedOut.writeByte(inputColumnGenStepByteArray.getByte(i));
 			}
 		}
 	}
-	private static void readBlobToGenerationSteps(ByteArrayList inputCompressedDataByteArray, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
+	private static void readBlobToGenerationSteps(ByteArrayList inputCompressedDataByteArray, it.unimi.dsi.fastutil.bytes.ByteList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
 	{
 		try(DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
 		{
-			compressedIn.readFully(outputByteArray.elements(), 0, FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH);
+			if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.decode(outputByteArray, compressedIn)) return;
+			readMetadataBytes(outputByteArray, compressedIn);
 		}
 		catch (EOFException e)
 		{
@@ -665,6 +683,7 @@ public class FullDataSourceV2DTO
 	{
 		try (DhDataOutputStream compressedOut = DhDataOutputStream.create(compressionModeEnum, outputByteArray))
 		{
+			if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.encodeCompression(dataSource, compressedOut)) return;
 			for (int i = 0; i < dataSource.columnWorldCompressionMode.size(); i++)
 			{
 				compressedOut.write(dataSource.columnWorldCompressionMode.getByte(i));
@@ -676,11 +695,12 @@ public class FullDataSourceV2DTO
 			}
 		}
 	}
-	private static void readBlobToWorldCompressionMode(ByteArrayList inputCompressedDataByteArray, ByteArrayList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
+	private static void readBlobToWorldCompressionMode(ByteArrayList inputCompressedDataByteArray, it.unimi.dsi.fastutil.bytes.ByteList outputByteArray, EDhApiDataCompressionMode compressionModeEnum) throws IOException, DataCorruptedException
 	{
 		try(DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum))
 		{
-			compressedIn.readFully(outputByteArray.elements(), 0, FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH);
+			if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.decode(outputByteArray, compressedIn)) return;
+			readMetadataBytes(outputByteArray, compressedIn);
 		}
 		catch (EOFException e)
 		{
@@ -688,18 +708,63 @@ public class FullDataSourceV2DTO
 		}
 	}
 
+	/** Compatibility control: Frozen reads into retained backing capacity, even
+	 * after shrinking the logical list. Native metadata starts with that same
+	 * 4096-byte capacity; ordinary imports run directly in Rust above. */
+	private static void readMetadataBytes(ByteList output, DhDataInputStream input) throws IOException {
+		if (output instanceof ByteArrayList array) {
+			input.readFully(array.elements(), 0, FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH);
+			return;
+		}
+		byte[] values = output.toByteArray();
+		if (output instanceof net.minecraft.world.level.chunk.NativeDhMetadataList && values.length < 4096)
+			values = java.util.Arrays.copyOf(values, 4096);
+		try { input.readFully(values, 0, 4096); }
+		finally { output.setElements(0, values, 0, output.size()); }
+	}
+
 	private static void readBlobToSemanticHorizontalUniformity(
 		ByteArrayList inputCompressedDataByteArray, FullDataSourceV2 dataSource,
 		EDhApiDataCompressionMode compressionModeEnum
 	) throws IOException, DataCorruptedException {
 		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum)) {
-			byte[] ignoredCompressionModes = new byte[FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH];
-			compressedIn.readFully(ignoredCompressionModes, 0, ignoredCompressionModes.length);
-			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) {
-				for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
-					dataSource.setSemanticHorizontalUniformity(x, z, compressedIn.readUnsignedByte() != 0);
-				}
+			readSemanticHorizontalUniformity(compressedIn, dataSource);
+		}
+	}
+	/** Reads the uniformity plane from a stream positioned at the start of the compression blob. */
+	private static void readSemanticHorizontalUniformity(DhDataInputStream compressedIn, FullDataSourceV2 dataSource) throws IOException {
+		if (net.minecraft.world.level.chunk.NativeDhMetadataCodec.decodeUniformity(dataSource, compressedIn)) return;
+		byte[] ignoredCompressionModes = new byte[FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH];
+		compressedIn.readFully(ignoredCompressionModes, 0, ignoredCompressionModes.length);
+		for (int x = 0; x < FullDataSourceV2.WIDTH; x++) {
+			for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
+				dataSource.setSemanticHorizontalUniformity(x, z, compressedIn.readUnsignedByte() != 0);
 			}
+		}
+	}
+	/** Modes whose streams hold the whole decompressed blob in an array. */
+	private static boolean codecByteArrayMode(EDhApiDataCompressionMode mode)
+	{ return mode == EDhApiDataCompressionMode.UNCOMPRESSED || mode == EDhApiDataCompressionMode.Z_STD_BLOCK; }
+	/**
+	 * {@link #readBlobToWorldCompressionMode} then {@link #readBlobToSemanticHorizontalUniformity}
+	 * over one decompression: the uniformity reader rereads the same bytes from
+	 * the start. Each plane keeps its own failure: a short compression plane is
+	 * {@link DataCorruptedException}, a short uniformity plane a raw {@link EOFException}.
+	 */
+	private static void readBlobToWorldCompressionModeAndUniformity(
+		ByteArrayList inputCompressedDataByteArray, FullDataSourceV2 dataSource,
+		EDhApiDataCompressionMode compressionModeEnum
+	) throws IOException, DataCorruptedException {
+		try (DhDataInputStream compressedIn = DhDataInputStream.create(inputCompressedDataByteArray, compressionModeEnum)) {
+			int start = compressedIn.codecPosition();
+			try {
+				if (!net.minecraft.world.level.chunk.NativeDhMetadataCodec.decode(dataSource.columnWorldCompressionMode, compressedIn))
+					readMetadataBytes(dataSource.columnWorldCompressionMode, compressedIn);
+			} catch (EOFException e) {
+				throw new DataCorruptedException(e);
+			}
+			compressedIn.codecSeek(start);
+			readSemanticHorizontalUniformity(compressedIn, dataSource);
 		}
 	}
 
@@ -708,10 +773,10 @@ public class FullDataSourceV2DTO
 	) throws IOException {
 		try (DhDataOutputStream out = DhDataOutputStream.create(compressionMode, output)) {
 			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
-				LongArrayList[] contributors = dataSource.getSemanticHorizontalContributors(x, z);
+				LongList[] contributors = dataSource.getRetainedSemanticHorizontalContributors(x, z);
 				out.writeBoolean(contributors != null);
 				if (contributors == null) continue;
-				for (LongArrayList column : contributors) {
+				for (LongList column : contributors) {
 					int size = column == null ? -1 : Math.min(column.size(), FullDataSourceV2.MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS);
 					out.writeShort(size);
 					if (column != null) for (int i = 0; i < size; i++) out.writeLong(column.getLong(i));
@@ -724,15 +789,24 @@ public class FullDataSourceV2DTO
 		ByteArrayList input, FullDataSourceV2 dataSource, EDhApiDataCompressionMode compressionMode
 	) throws IOException, DataCorruptedException {
 		try (DhDataInputStream in = DhDataInputStream.create(input, compressionMode)) {
+			if (in.codecByteArrayInput() && net.minecraft.world.level.chunk.NativeDhCodec.nativeEnabled()) {
+				// One Rust pass straight into the source; cells before a failure are applied, as below.
+				int position = in.codecPosition();
+				int[] stop = dataSource.nativeSource().decodeFootprints(in.codecArray(), position, in.codecLimit() - position);
+				if (stop[0] == 1) throw new EOFException();
+				if (stop[0] == 2)
+					throw new DataCorruptedException("Semantic contributor column exceeds bound: " + stop[1]);
+				return;
+			}
 			for (int x = 0; x < FullDataSourceV2.WIDTH; x++) for (int z = 0; z < FullDataSourceV2.WIDTH; z++) {
 				if (!in.readBoolean()) continue;
-				LongArrayList[] contributors = new LongArrayList[4];
+				LongList[] contributors = new LongList[4];
 				for (int i = 0; i < 4; i++) {
 					int size = in.readShort();
 					if (size < 0) continue;
 					if (size > FullDataSourceV2.MAX_SEMANTIC_HORIZONTAL_CONTRIBUTOR_POINTS)
 						throw new DataCorruptedException("Semantic contributor column exceeds bound: " + size);
-					LongArrayList column = new LongArrayList(size);
+					LongList column = new LongArrayList(size);
 					for (int point = 0; point < size; point++) column.add(in.readLong());
 					contributors[i] = column;
 				}

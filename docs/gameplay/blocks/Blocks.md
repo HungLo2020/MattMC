@@ -1,10 +1,10 @@
 # Blocks
 
-Find every built-in block by name below, including MattMC additions and separately registered variants. For a material or purpose, browse the [block categories](catalog/index.md).
+Find the **1,235 source-inventoried built-in IDs** by name below, including MattMC additions, separately registered variants and helper-created Copper forms. Browse [block categories](catalog/index.md) for material or purpose.
 
-**Article coverage is incomplete.** A **related guide** may explain shared family behavior without covering every detail of this variant. **Article needed** means no placed-block guide is linked yet. The directory is a list of registered blocks, not a claim that all articles or Survival acquisition routes are finished.
+**Every listed ID currently links to a related guide.** A family link does not certify every variant detail: acquisition, placement, state changes and drops may need further review. Article depth remains uneven, so navigation coverage is not full behavior coverage. See the [correction of the earlier direct-field-only count](catalog/index.md#registration-method-correction).
 
-Names use English localization where available. A † marks one of 25 readable registry-name labels without a separate English entry; the exact ID distinguishes these forms.
+Names use English localization where available. A † marks one of 25 readable registry-name labels without a separate English entry; the exact ID distinguishes those forms.
 
 ## List of Blocks
 
@@ -15,26 +15,26 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Acacia Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:acacia_door`
 - **Acacia Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:acacia_fence`
 - **Acacia Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:acacia_fence_gate`
-- **Acacia Hanging Sign** — article needed; `minecraft:acacia_hanging_sign`
+- **Acacia Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:acacia_hanging_sign`
 - **Acacia Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#acacia-leaves) (related guide); `minecraft:acacia_leaves`
 - **Acacia Log** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:acacia_log`
 - **Acacia Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:acacia_planks`
 - **Acacia Pressure Plate** — [Pressure plates](PressurePlates.md#acacia-pressure-plate) (related guide); `minecraft:acacia_pressure_plate`
 - **Acacia Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#acacia-sapling) (related guide); `minecraft:acacia_sapling`
-- **Acacia Shelf** — article needed; `minecraft:acacia_shelf`
-- **Acacia Sign** — article needed; `minecraft:acacia_sign`
+- **Acacia Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:acacia_shelf`
+- **Acacia Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:acacia_sign`
 - **Acacia Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:acacia_slab`
 - **Acacia Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:acacia_stairs`
 - **Acacia Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:acacia_trapdoor`
-- **Acacia Wall Hanging Sign** — article needed; `minecraft:acacia_wall_hanging_sign`
-- **Acacia Wall Sign** — article needed; `minecraft:acacia_wall_sign`
+- **Acacia Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:acacia_wall_hanging_sign`
+- **Acacia Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:acacia_wall_sign`
 - **Acacia Wood** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:acacia_wood`
 - **Activator Rail** — [Rails](Rails.md) (related guide); `minecraft:activator_rail`
-- **Air** — article needed; `minecraft:air`
-- **Allium** — article needed; `minecraft:allium`
+- **Air** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#air) (related guide); `minecraft:air`
+- **Allium** — [Small and tall flowers](Flowers.md#allium) (related guide); `minecraft:allium`
 - **Amber** — [Amber](Amber.md) (related guide); `minecraft:amber`
 - **Ambersol** — [Ambersol](Ambersol.md) (related guide); `minecraft:ambersol`
-- **Ambersol Light †** — [Ambersol](Ambersol.md) (related guide); `minecraft:ambersol_light`
+- **Ambersol Light †** — [Ambersol Light](Ambersol.md#ambersol-light) (related guide); `minecraft:ambersol_light`
 - **Amethyst Cluster** — [Amethyst, buds and clusters](Amethyst.md#cluster) (related guide); `minecraft:amethyst_cluster`
 - **Ancient Debris** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:ancient_debris`
 - **Ancient Leaves** — [Ancient trees, Flytraps and Tree Stars](AncientPlants.md#ancient-leaves-decoration-decay-and-drops) (related guide); `minecraft:ancient_leaves`
@@ -50,7 +50,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Attached Pumpkin Stem** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:attached_pumpkin_stem`
 - **Azalea** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#azalea) (related guide); `minecraft:azalea`
 - **Azalea Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#azalea-leaves) (related guide); `minecraft:azalea_leaves`
-- **Azure Bluet** — article needed; `minecraft:azure_bluet`
+- **Azure Bluet** — [Small and tall flowers](Flowers.md#azure-bluet) (related guide); `minecraft:azure_bluet`
 
 ### B
 
@@ -59,52 +59,52 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Bamboo Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:bamboo_door`
 - **Bamboo Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:bamboo_fence`
 - **Bamboo Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:bamboo_fence_gate`
-- **Bamboo Hanging Sign** — article needed; `minecraft:bamboo_hanging_sign`
+- **Bamboo Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:bamboo_hanging_sign`
 - **Bamboo Mosaic** — [Wood construction](WoodConstruction.md#bamboo-mosaic) (related guide); `minecraft:bamboo_mosaic`
 - **Bamboo Mosaic Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:bamboo_mosaic_slab`
 - **Bamboo Mosaic Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:bamboo_mosaic_stairs`
 - **Bamboo Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:bamboo_planks`
 - **Bamboo Pressure Plate** — [Pressure plates](PressurePlates.md#bamboo-pressure-plate) (related guide); `minecraft:bamboo_pressure_plate`
-- **Bamboo Shelf** — article needed; `minecraft:bamboo_shelf`
+- **Bamboo Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:bamboo_shelf`
 - **Bamboo Shoot** — [Bamboo](Bamboo.md) (related guide); `minecraft:bamboo_sapling`
-- **Bamboo Sign** — article needed; `minecraft:bamboo_sign`
+- **Bamboo Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:bamboo_sign`
 - **Bamboo Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:bamboo_slab`
 - **Bamboo Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:bamboo_stairs`
 - **Bamboo Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:bamboo_trapdoor`
-- **Bamboo Wall Hanging Sign** — article needed; `minecraft:bamboo_wall_hanging_sign`
-- **Bamboo Wall Sign** — article needed; `minecraft:bamboo_wall_sign`
-- **Barrel** — article needed; `minecraft:barrel`
-- **Barrier** — article needed; `minecraft:barrier`
+- **Bamboo Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:bamboo_wall_hanging_sign`
+- **Bamboo Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:bamboo_wall_sign`
+- **Barrel** — [Barrel](Barrel.md#persistence-and-breaking-a-filled-barrel) (related guide); `minecraft:barrel`
+- **Barrier** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#barrier) (related guide); `minecraft:barrier`
 - **Basalt** — [Blackstone and Basalt](BlackstoneAndBasalt.md#basalt-variants-and-orientation) (related guide); `minecraft:basalt`
 - **Beacon** — [Beacon](Beacon.md#build-the-base) (related guide); `minecraft:beacon`
-- **Bedrock** — article needed; `minecraft:bedrock`
+- **Bedrock** — [Bedrock](Bedrock.md) (related guide); `minecraft:bedrock`
 - **Bee Nest** — [Bee housing](BeeHousing.md) (related guide); `minecraft:bee_nest`
 - **Beehive** — [Bee housing](BeeHousing.md) (related guide); `minecraft:beehive`
 - **Beetroots** — [Root crops](RootCrops.md) (related guide); `minecraft:beetroots`
-- **Bell** — article needed; `minecraft:bell`
-- **Big Dripleaf** — article needed; `minecraft:big_dripleaf`
-- **Big Dripleaf Stem** — article needed; `minecraft:big_dripleaf_stem`
+- **Bell** — [Bell](Bell.md#mounting-and-support) (related guide); `minecraft:bell`
+- **Big Dripleaf** — [Dripleaves](Dripleaves.md#big-dripleaf) (related guide); `minecraft:big_dripleaf`
+- **Big Dripleaf Stem** — [Dripleaves](Dripleaves.md#big-dripleaf-stem) (related guide); `minecraft:big_dripleaf_stem`
 - **Birch Button** — [Buttons](Buttons.md#birch-button) (related guide); `minecraft:birch_button`
 - **Birch Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:birch_door`
 - **Birch Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:birch_fence`
 - **Birch Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:birch_fence_gate`
-- **Birch Hanging Sign** — article needed; `minecraft:birch_hanging_sign`
+- **Birch Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:birch_hanging_sign`
 - **Birch Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#birch-leaves) (related guide); `minecraft:birch_leaves`
 - **Birch Log** — [Tree logs and roots](TreeLogsAndRoots.md#birch-timber) (related guide); `minecraft:birch_log`
 - **Birch Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:birch_planks`
 - **Birch Pressure Plate** — [Pressure plates](PressurePlates.md#birch-pressure-plate) (related guide); `minecraft:birch_pressure_plate`
 - **Birch Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#birch-sapling) (related guide); `minecraft:birch_sapling`
-- **Birch Shelf** — article needed; `minecraft:birch_shelf`
-- **Birch Sign** — article needed; `minecraft:birch_sign`
+- **Birch Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:birch_shelf`
+- **Birch Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:birch_sign`
 - **Birch Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:birch_slab`
 - **Birch Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:birch_stairs`
 - **Birch Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:birch_trapdoor`
-- **Birch Wall Hanging Sign** — article needed; `minecraft:birch_wall_hanging_sign`
-- **Birch Wall Sign** — article needed; `minecraft:birch_wall_sign`
+- **Birch Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:birch_wall_hanging_sign`
+- **Birch Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:birch_wall_sign`
 - **Birch Wood** — [Tree logs and roots](TreeLogsAndRoots.md#birch-timber) (related guide); `minecraft:birch_wood`
-- **Black Banner** — article needed; `minecraft:black_banner`
+- **Black Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:black_banner`
 - **Black Bed** — [Beds](Bed.md) (related guide); `minecraft:black_bed`
-- **Black Candle** — article needed; `minecraft:black_candle`
+- **Black Candle** — [Candles](Candles.md#black-candle) (related guide); `minecraft:black_candle`
 - **Black Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:black_carpet`
 - **Black Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:black_concrete`
 - **Black Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:black_concrete_powder`
@@ -113,47 +113,47 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Black Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:black_stained_glass`
 - **Black Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:black_stained_glass_pane`
 - **Black Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:black_terracotta`
-- **Black Wall Banner †** — article needed; `minecraft:black_wall_banner`
+- **Black Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:black_wall_banner`
 - **Black Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:black_wool`
 - **Blackstone** — [Blackstone and Basalt](BlackstoneAndBasalt.md#blackstone-variants) (related guide); `minecraft:blackstone`
 - **Blackstone Slab** — [Blackstone and Basalt](BlackstoneAndBasalt.md#blackstone-variants) (related guide); `minecraft:blackstone_slab`
 - **Blackstone Stairs** — [Blackstone and Basalt](BlackstoneAndBasalt.md#blackstone-variants) (related guide); `minecraft:blackstone_stairs`
 - **Blackstone Wall** — [Blackstone and Basalt](BlackstoneAndBasalt.md#blackstone-variants) (related guide); `minecraft:blackstone_wall`
-- **Blast Furnace** — article needed; `minecraft:blast_furnace`
+- **Blast Furnace** — [Furnace, Blast Furnace and Smoker](Furnace.md#blast-furnace) (related guide); `minecraft:blast_furnace`
 - **Block of Amethyst** — [Amethyst, buds and clusters](Amethyst.md#amethyst-block) (related guide); `minecraft:amethyst_block`
-- **Block of Bamboo** — article needed; `minecraft:bamboo_block`
-- **Block of Coal** — article needed; `minecraft:coal_block`
+- **Block of Bamboo** — [Bamboo blocks](BambooBlocks.md#block-of-bamboo) (related guide); `minecraft:bamboo_block`
+- **Block of Coal** — [Resource Storage Blocks](ResourceStorageBlocks.md#coal-block) (related guide); `minecraft:coal_block`
 - **Block of Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:copper_block`
-- **Block of Diamond** — article needed; `minecraft:diamond_block`
-- **Block of Emerald** — article needed; `minecraft:emerald_block`
-- **Block of Gold** — article needed; `minecraft:gold_block`
-- **Block of Iron** — article needed; `minecraft:iron_block`
-- **Block of Lapis Lazuli** — article needed; `minecraft:lapis_block`
-- **Block of Netherite** — article needed; `minecraft:netherite_block`
+- **Block of Diamond** — [Resource Storage Blocks](ResourceStorageBlocks.md#diamond-block) (related guide); `minecraft:diamond_block`
+- **Block of Emerald** — [Resource Storage Blocks](ResourceStorageBlocks.md#emerald-block) (related guide); `minecraft:emerald_block`
+- **Block of Gold** — [Resource Storage Blocks](ResourceStorageBlocks.md#gold-block) (related guide); `minecraft:gold_block`
+- **Block of Iron** — [Resource Storage Blocks](ResourceStorageBlocks.md#iron-block) (related guide); `minecraft:iron_block`
+- **Block of Lapis Lazuli** — [Resource Storage Blocks](ResourceStorageBlocks.md#lapis-block) (related guide); `minecraft:lapis_block`
+- **Block of Netherite** — [Resource Storage Blocks](ResourceStorageBlocks.md#netherite-block) (related guide); `minecraft:netherite_block`
 - **Block of Quartz** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:quartz_block`
 - **Block of Raw Copper** — [Raw Copper storage](RawCopperStorage.md#collecting-and-processing) (related guide); `minecraft:raw_copper_block`
-- **Block of Raw Gold** — article needed; `minecraft:raw_gold_block`
-- **Block of Raw Iron** — article needed; `minecraft:raw_iron_block`
-- **Block of Redstone** — article needed; `minecraft:redstone_block`
-- **Block of Resin** — article needed; `minecraft:resin_block`
-- **Block of Stripped Bamboo** — article needed; `minecraft:stripped_bamboo_block`
-- **Blue Banner** — article needed; `minecraft:blue_banner`
+- **Block of Raw Gold** — [Resource Storage Blocks](ResourceStorageBlocks.md#raw-gold-block) (related guide); `minecraft:raw_gold_block`
+- **Block of Raw Iron** — [Resource Storage Blocks](ResourceStorageBlocks.md#raw-iron-block) (related guide); `minecraft:raw_iron_block`
+- **Block of Redstone** — [Resource Storage Blocks](ResourceStorageBlocks.md#redstone-block) (related guide); `minecraft:redstone_block`
+- **Block of Resin** — [Resin](Resin.md#block-of-resin) (related guide); `minecraft:resin_block`
+- **Block of Stripped Bamboo** — [Bamboo blocks](BambooBlocks.md#block-of-stripped-bamboo) (related guide); `minecraft:stripped_bamboo_block`
+- **Blue Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:blue_banner`
 - **Blue Bed** — [Beds](Bed.md) (related guide); `minecraft:blue_bed`
-- **Blue Candle** — article needed; `minecraft:blue_candle`
+- **Blue Candle** — [Candles](Candles.md#blue-candle) (related guide); `minecraft:blue_candle`
 - **Blue Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:blue_carpet`
 - **Blue Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:blue_concrete`
 - **Blue Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:blue_concrete_powder`
 - **Blue Glazed Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:blue_glazed_terracotta`
 - **Blue Ice** — [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md#registered-ice-blocks) (related guide); `minecraft:blue_ice`
-- **Blue Orchid** — article needed; `minecraft:blue_orchid`
+- **Blue Orchid** — [Small and tall flowers](Flowers.md#blue-orchid) (related guide); `minecraft:blue_orchid`
 - **Blue Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:blue_shulker_box`
 - **Blue Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:blue_stained_glass`
 - **Blue Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:blue_stained_glass_pane`
 - **Blue Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:blue_terracotta`
-- **Blue Wall Banner †** — article needed; `minecraft:blue_wall_banner`
+- **Blue Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:blue_wall_banner`
 - **Blue Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:blue_wool`
-- **Bone Block** — article needed; `minecraft:bone_block`
-- **Bookshelf** — article needed; `minecraft:bookshelf`
+- **Bone Block** — [Bone Block](BoneBlock.md#bone-block) (related guide); `minecraft:bone_block`
+- **Bookshelf** — [Bookshelves](Bookshelves.md#bookshelf) (related guide); `minecraft:bookshelf`
 - **Brain Coral** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:brain_coral`
 - **Brain Coral Block** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:brain_coral_block`
 - **Brain Coral Fan** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:brain_coral_fan`
@@ -163,20 +163,20 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Brick Stairs** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:brick_stairs`
 - **Brick Wall** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:brick_wall`
 - **Bricks** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:bricks`
-- **Brown Banner** — article needed; `minecraft:brown_banner`
+- **Brown Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:brown_banner`
 - **Brown Bed** — [Beds](Bed.md) (related guide); `minecraft:brown_bed`
-- **Brown Candle** — article needed; `minecraft:brown_candle`
+- **Brown Candle** — [Candles](Candles.md#brown-candle) (related guide); `minecraft:brown_candle`
 - **Brown Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:brown_carpet`
 - **Brown Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:brown_concrete`
 - **Brown Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:brown_concrete_powder`
 - **Brown Glazed Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:brown_glazed_terracotta`
-- **Brown Mushroom** — article needed; `minecraft:brown_mushroom`
-- **Brown Mushroom Block** — article needed; `minecraft:brown_mushroom_block`
+- **Brown Mushroom** — [Mushrooms](Mushrooms.md#brown-mushroom) (related guide); `minecraft:brown_mushroom`
+- **Brown Mushroom Block** — [Mushrooms](Mushrooms.md#brown-mushroom-block) (related guide); `minecraft:brown_mushroom_block`
 - **Brown Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:brown_shulker_box`
 - **Brown Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:brown_stained_glass`
 - **Brown Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:brown_stained_glass_pane`
 - **Brown Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:brown_terracotta`
-- **Brown Wall Banner †** — article needed; `minecraft:brown_wall_banner`
+- **Brown Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:brown_wall_banner`
 - **Brown Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:brown_wool`
 - **Bubble Column** — [Bubble Columns](BubbleColumns.md) (related guide); `minecraft:bubble_column`
 - **Bubble Coral** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:bubble_coral`
@@ -184,81 +184,81 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Bubble Coral Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:bubble_coral_fan`
 - **Bubble Coral Wall Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:bubble_coral_wall_fan`
 - **Budding Amethyst** — [Amethyst, buds and clusters](Amethyst.md#budding-amethyst) (related guide); `minecraft:budding_amethyst`
-- **Bush** — article needed; `minecraft:bush`
+- **Bush** — [Shrubs and Dry Grass](ShrubsAndDryGrass.md#bush) (related guide); `minecraft:bush`
 
 ### C
 
 - **Cactus** — [Cactus](Cactus.md) (related guide); `minecraft:cactus`
 - **Cactus Flower** — [Cactus](Cactus.md) (related guide); `minecraft:cactus_flower`
-- **Caiman Egg** — article needed; `minecraft:caiman_egg`
-- **Cake** — article needed; `minecraft:cake`
-- **Cake with Black Candle** — article needed; `minecraft:black_candle_cake`
-- **Cake with Blue Candle** — article needed; `minecraft:blue_candle_cake`
-- **Cake with Brown Candle** — article needed; `minecraft:brown_candle_cake`
-- **Cake with Candle** — article needed; `minecraft:candle_cake`
-- **Cake with Cyan Candle** — article needed; `minecraft:cyan_candle_cake`
-- **Cake with Gray Candle** — article needed; `minecraft:gray_candle_cake`
-- **Cake with Green Candle** — article needed; `minecraft:green_candle_cake`
-- **Cake with Light Blue Candle** — article needed; `minecraft:light_blue_candle_cake`
-- **Cake with Light Gray Candle** — article needed; `minecraft:light_gray_candle_cake`
-- **Cake with Lime Candle** — article needed; `minecraft:lime_candle_cake`
-- **Cake with Magenta Candle** — article needed; `minecraft:magenta_candle_cake`
-- **Cake with Orange Candle** — article needed; `minecraft:orange_candle_cake`
-- **Cake with Pink Candle** — article needed; `minecraft:pink_candle_cake`
-- **Cake with Purple Candle** — article needed; `minecraft:purple_candle_cake`
-- **Cake with Red Candle** — article needed; `minecraft:red_candle_cake`
-- **Cake with White Candle** — article needed; `minecraft:white_candle_cake`
-- **Cake with Yellow Candle** — article needed; `minecraft:yellow_candle_cake`
+- **Caiman Egg** — [Placed animal eggs](AnimalEggs.md#caiman-eggs) (related guide); `minecraft:caiman_egg`
+- **Cake** — [Cake](Cake.md#placement-and-collection) (related guide); `minecraft:cake`
+- **Cake with Black Candle** — [Cake](Cake.md#black-candle-cake) (related guide); `minecraft:black_candle_cake`
+- **Cake with Blue Candle** — [Cake](Cake.md#blue-candle-cake) (related guide); `minecraft:blue_candle_cake`
+- **Cake with Brown Candle** — [Cake](Cake.md#brown-candle-cake) (related guide); `minecraft:brown_candle_cake`
+- **Cake with Candle** — [Cake](Cake.md#candle-cake) (related guide); `minecraft:candle_cake`
+- **Cake with Cyan Candle** — [Cake](Cake.md#cyan-candle-cake) (related guide); `minecraft:cyan_candle_cake`
+- **Cake with Gray Candle** — [Cake](Cake.md#gray-candle-cake) (related guide); `minecraft:gray_candle_cake`
+- **Cake with Green Candle** — [Cake](Cake.md#green-candle-cake) (related guide); `minecraft:green_candle_cake`
+- **Cake with Light Blue Candle** — [Cake](Cake.md#light-blue-candle-cake) (related guide); `minecraft:light_blue_candle_cake`
+- **Cake with Light Gray Candle** — [Cake](Cake.md#light-gray-candle-cake) (related guide); `minecraft:light_gray_candle_cake`
+- **Cake with Lime Candle** — [Cake](Cake.md#lime-candle-cake) (related guide); `minecraft:lime_candle_cake`
+- **Cake with Magenta Candle** — [Cake](Cake.md#magenta-candle-cake) (related guide); `minecraft:magenta_candle_cake`
+- **Cake with Orange Candle** — [Cake](Cake.md#orange-candle-cake) (related guide); `minecraft:orange_candle_cake`
+- **Cake with Pink Candle** — [Cake](Cake.md#pink-candle-cake) (related guide); `minecraft:pink_candle_cake`
+- **Cake with Purple Candle** — [Cake](Cake.md#purple-candle-cake) (related guide); `minecraft:purple_candle_cake`
+- **Cake with Red Candle** — [Cake](Cake.md#red-candle-cake) (related guide); `minecraft:red_candle_cake`
+- **Cake with White Candle** — [Cake](Cake.md#white-candle-cake) (related guide); `minecraft:white_candle_cake`
+- **Cake with Yellow Candle** — [Cake](Cake.md#yellow-candle-cake) (related guide); `minecraft:yellow_candle_cake`
 - **Calcite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#calcite) (related guide); `minecraft:calcite`
-- **Calibrated Sculk Sensor** — article needed; `minecraft:calibrated_sculk_sensor`
-- **Campfire** — article needed; `minecraft:campfire`
-- **Candle** — article needed; `minecraft:candle`
-- **Carmine Froglight** — article needed; `minecraft:carmine_froglight`
+- **Calibrated Sculk Sensor** — [Sculk Sensors and calibration](SculkSensors.md#calibrated-sculk-sensor) (related guide); `minecraft:calibrated_sculk_sensor`
+- **Campfire** — [Campfires](Campfires.md#variants-and-crafting) (related guide); `minecraft:campfire`
+- **Candle** — [Candles](Candles.md#candle) (related guide); `minecraft:candle`
+- **Carmine Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#carmine-froglight) (related guide); `minecraft:carmine_froglight`
 - **Carrots** — [Root crops](RootCrops.md) (related guide); `minecraft:carrots`
-- **Cartography Table** — [Cartography Table](CartographyTable.md) (related guide); `minecraft:cartography_table`
+- **Cartography Table** — [Cartography Table](CartographyTable.md#cartography-table) (related guide); `minecraft:cartography_table`
 - **Carved Pumpkin** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:carved_pumpkin`
-- **Cauldron** — article needed; `minecraft:cauldron`
-- **Cave Air** — article needed; `minecraft:cave_air`
-- **Cave Vines** — article needed; `minecraft:cave_vines`
-- **Cave Vines Plant** — article needed; `minecraft:cave_vines_plant`
-- **Chain Command Block** — article needed; `minecraft:chain_command_block`
+- **Cauldron** — [Cauldrons](Cauldrons.md#empty-cauldron) (related guide); `minecraft:cauldron`
+- **Cave Air** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#cave-air) (related guide); `minecraft:cave_air`
+- **Cave Vines** — [Vines and Glow Berries](Vines.md#cave-vines) (related guide); `minecraft:cave_vines`
+- **Cave Vines Plant** — [Vines and Glow Berries](Vines.md#cave-vines-plant) (related guide); `minecraft:cave_vines_plant`
+- **Chain Command Block** — [Command Blocks](CommandBlocks.md#chain-command-block) (related guide); `minecraft:chain_command_block`
 - **Cherry Button** — [Buttons](Buttons.md#cherry-button) (related guide); `minecraft:cherry_button`
 - **Cherry Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:cherry_door`
 - **Cherry Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:cherry_fence`
 - **Cherry Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:cherry_fence_gate`
-- **Cherry Hanging Sign** — article needed; `minecraft:cherry_hanging_sign`
+- **Cherry Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:cherry_hanging_sign`
 - **Cherry Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#cherry-leaves) (related guide); `minecraft:cherry_leaves`
 - **Cherry Log** — [Tree logs and roots](TreeLogsAndRoots.md#cherry-timber) (related guide); `minecraft:cherry_log`
 - **Cherry Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:cherry_planks`
 - **Cherry Pressure Plate** — [Pressure plates](PressurePlates.md#cherry-pressure-plate) (related guide); `minecraft:cherry_pressure_plate`
 - **Cherry Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#cherry-sapling) (related guide); `minecraft:cherry_sapling`
-- **Cherry Shelf** — article needed; `minecraft:cherry_shelf`
-- **Cherry Sign** — article needed; `minecraft:cherry_sign`
+- **Cherry Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:cherry_shelf`
+- **Cherry Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:cherry_sign`
 - **Cherry Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:cherry_slab`
 - **Cherry Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:cherry_stairs`
 - **Cherry Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:cherry_trapdoor`
-- **Cherry Wall Hanging Sign** — article needed; `minecraft:cherry_wall_hanging_sign`
-- **Cherry Wall Sign** — article needed; `minecraft:cherry_wall_sign`
+- **Cherry Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:cherry_wall_hanging_sign`
+- **Cherry Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:cherry_wall_sign`
 - **Cherry Wood** — [Tree logs and roots](TreeLogsAndRoots.md#cherry-timber) (related guide); `minecraft:cherry_wood`
 - **Chest** — [Chest](Chest.md) (related guide); `minecraft:chest`
 - **Chipped Anvil** — [Anvil](Anvil.md) (related guide); `minecraft:chipped_anvil`
-- **Chiseled Bookshelf** — article needed; `minecraft:chiseled_bookshelf`
+- **Chiseled Bookshelf** — [Bookshelves](Bookshelves.md#chiseled-bookshelf) (related guide); `minecraft:chiseled_bookshelf`
 - **Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:chiseled_copper`
 - **Chiseled Deepslate** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:chiseled_deepslate`
-- **Chiseled Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_chiseled`
+- **Chiseled Limestone** — [Limestone family](Limestone.md#limestone-chiseled) (related guide); `minecraft:limestone_chiseled`
 - **Chiseled Nether Bricks** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:chiseled_nether_bricks`
 - **Chiseled Polished Blackstone** — [Blackstone and Basalt](BlackstoneAndBasalt.md#blackstone-variants) (related guide); `minecraft:chiseled_polished_blackstone`
 - **Chiseled Quartz Block** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:chiseled_quartz_block`
 - **Chiseled Red Sandstone** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:chiseled_red_sandstone`
-- **Chiseled Resin Bricks** — article needed; `minecraft:chiseled_resin_bricks`
+- **Chiseled Resin Bricks** — [Resin](Resin.md#chiseled-resin-bricks) (related guide); `minecraft:chiseled_resin_bricks`
 - **Chiseled Sandstone** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:chiseled_sandstone`
 - **Chiseled Stone Bricks** — [Stone](Stone.md#stone-bricks) (related guide); `minecraft:chiseled_stone_bricks`
 - **Chiseled Tuff** — [Tuff](Tuff.md#variants) (related guide); `minecraft:chiseled_tuff`
 - **Chiseled Tuff Bricks** — [Tuff](Tuff.md#variants) (related guide); `minecraft:chiseled_tuff_bricks`
-- **Chorus Flower** — article needed; `minecraft:chorus_flower`
-- **Chorus Plant** — article needed; `minecraft:chorus_plant`
+- **Chorus Flower** — [Chorus Plants and Flowers](Chorus.md#chorus-flower) (related guide); `minecraft:chorus_flower`
+- **Chorus Plant** — [Chorus Plants and Flowers](Chorus.md#chorus-plant) (related guide); `minecraft:chorus_plant`
 - **Clay** — [Clay and Bricks](ClayAndBricks.md) (related guide); `minecraft:clay`
-- **Closed Eyeblossom** — article needed; `minecraft:closed_eyeblossom`
+- **Closed Eyeblossom** — [Eyeblossoms](Eyeblossoms.md#closed-eyeblossom) (related guide); `minecraft:closed_eyeblossom`
 - **Coal Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:coal_ore`
 - **Coarse Dirt** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#coarse-dirt-recipe) (related guide); `minecraft:coarse_dirt`
 - **Cobbled Deepslate** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cobbled_deepslate`
@@ -269,22 +269,25 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cobblestone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_slab`
 - **Cobblestone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_stairs`
 - **Cobblestone Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:cobblestone_wall`
-- **Cobweb** — article needed; `minecraft:cobweb`
-- **Cocoa** — article needed; `minecraft:cocoa`
-- **Command Block** — article needed; `minecraft:command_block`
-- **Composter** — article needed; `minecraft:composter`
+- **Cobweb** — [Cobweb](Cobweb.md) (related guide); `minecraft:cobweb`
+- **Cocoa** — [Cocoa](Cocoa.md) (related guide); `minecraft:cocoa`
+- **Command Block** — [Command Blocks](CommandBlocks.md#impulse-command-block) (related guide); `minecraft:command_block`
+- **Composter** — [Composter](Composter.md#composter) (related guide); `minecraft:composter`
 - **Conduit** — [Conduit](Conduit.md#build-a-valid-frame) (related guide); `minecraft:conduit`
 - **Cooked Dinosaur Chop** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:cooked_dinosaur_chop`
+- **Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#copper-bars) (related guide); `minecraft:copper_bars`
 - **Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:copper_bulb`
+- **Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#copper-chain) (related guide); `minecraft:copper_chain`
 - **Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:copper_chest`
 - **Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:copper_door`
 - **Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:copper_golem_statue`
 - **Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:copper_grate`
+- **Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#copper-lantern) (related guide); `minecraft:copper_lantern`
 - **Copper Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:copper_ore`
 - **Copper Torch** — [Copper lighting](CopperLighting.md#copper-torches) (related guide); `minecraft:copper_torch`
 - **Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:copper_trapdoor`
 - **Copper Wall Torch** — [Copper lighting](CopperLighting.md#copper-torches) (related guide); `minecraft:copper_wall_torch`
-- **Cornflower** — article needed; `minecraft:cornflower`
+- **Cornflower** — [Small and tall flowers](Flowers.md#cornflower) (related guide); `minecraft:cornflower`
 - **Cracked Deepslate Bricks** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cracked_deepslate_bricks`
 - **Cracked Deepslate Tiles** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:cracked_deepslate_tiles`
 - **Cracked Nether Bricks** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:cracked_nether_bricks`
@@ -292,29 +295,29 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cracked Stone Bricks** — [Stone](Stone.md#stone-bricks) (related guide); `minecraft:cracked_stone_bricks`
 - **Crafter** — [Crafter](Crafter.md) (related guide); `minecraft:crafter`
 - **Crafting Table** — [Crafting Table](CraftingTable.md) (related guide); `minecraft:crafting_table`
-- **Creaking Heart** — article needed; `minecraft:creaking_heart`
-- **Creeper Head** — article needed; `minecraft:creeper_head`
-- **Creeper Wall Head** — article needed; `minecraft:creeper_wall_head`
+- **Creaking Heart** — [Creaking Heart](CreakingHeart.md#creaking-heart) (related guide); `minecraft:creaking_heart`
+- **Creeper Head** — [Heads and Skulls](HeadsAndSkulls.md#creeper-heads) (related guide); `minecraft:creeper_head`
+- **Creeper Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#creeper-heads) (related guide); `minecraft:creeper_wall_head`
 - **Crimson Button** — [Buttons](Buttons.md#crimson-button) (related guide); `minecraft:crimson_button`
 - **Crimson Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:crimson_door`
 - **Crimson Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:crimson_fence`
 - **Crimson Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:crimson_fence_gate`
 - **Crimson Fungus** — [Crimson and Warped Fungi](NetherFungi.md#crimson-fungus) (related guide); `minecraft:crimson_fungus`
-- **Crimson Hanging Sign** — article needed; `minecraft:crimson_hanging_sign`
+- **Crimson Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:crimson_hanging_sign`
 - **Crimson Hyphae** — [Tree logs and roots](TreeLogsAndRoots.md#crimson-timber) (related guide); `minecraft:crimson_hyphae`
-- **Crimson Nylium** — article needed; `minecraft:crimson_nylium`
+- **Crimson Nylium** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#crimson-nylium) (related guide); `minecraft:crimson_nylium`
 - **Crimson Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:crimson_planks`
 - **Crimson Pressure Plate** — [Pressure plates](PressurePlates.md#crimson-pressure-plate) (related guide); `minecraft:crimson_pressure_plate`
-- **Crimson Roots** — article needed; `minecraft:crimson_roots`
-- **Crimson Shelf** — article needed; `minecraft:crimson_shelf`
-- **Crimson Sign** — article needed; `minecraft:crimson_sign`
+- **Crimson Roots** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#crimson-roots) (related guide); `minecraft:crimson_roots`
+- **Crimson Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:crimson_shelf`
+- **Crimson Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:crimson_sign`
 - **Crimson Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:crimson_slab`
 - **Crimson Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:crimson_stairs`
 - **Crimson Stem** — [Tree logs and roots](TreeLogsAndRoots.md#crimson-timber) (related guide); `minecraft:crimson_stem`
 - **Crimson Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:crimson_trapdoor`
-- **Crimson Wall Hanging Sign** — article needed; `minecraft:crimson_wall_hanging_sign`
-- **Crimson Wall Sign** — article needed; `minecraft:crimson_wall_sign`
-- **Crying Obsidian** — article needed; `minecraft:crying_obsidian`
+- **Crimson Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:crimson_wall_hanging_sign`
+- **Crimson Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:crimson_wall_sign`
+- **Crying Obsidian** — [Obsidian and Crying Obsidian](Obsidian.md#crying-obsidian) (related guide); `minecraft:crying_obsidian`
 - **Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:cut_copper`
 - **Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:cut_copper_slab`
 - **Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:cut_copper_stairs`
@@ -322,9 +325,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cut Red Sandstone Slab** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:cut_red_sandstone_slab`
 - **Cut Sandstone** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:cut_sandstone`
 - **Cut Sandstone Slab** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:cut_sandstone_slab`
-- **Cyan Banner** — article needed; `minecraft:cyan_banner`
+- **Cyan Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:cyan_banner`
 - **Cyan Bed** — [Beds](Bed.md) (related guide); `minecraft:cyan_bed`
-- **Cyan Candle** — article needed; `minecraft:cyan_candle`
+- **Cyan Candle** — [Candles](Candles.md#cyan-candle) (related guide); `minecraft:cyan_candle`
 - **Cyan Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:cyan_carpet`
 - **Cyan Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:cyan_concrete`
 - **Cyan Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:cyan_concrete_powder`
@@ -333,36 +336,36 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Cyan Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:cyan_stained_glass`
 - **Cyan Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:cyan_stained_glass_pane`
 - **Cyan Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:cyan_terracotta`
-- **Cyan Wall Banner †** — article needed; `minecraft:cyan_wall_banner`
+- **Cyan Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:cyan_wall_banner`
 - **Cyan Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:cyan_wool`
 - **Cycad** — [Primordial decorative plants](PrimordialPlants.md) (related guide); `minecraft:cycad`
 
 ### D
 
 - **Damaged Anvil** — [Anvil](Anvil.md) (related guide); `minecraft:damaged_anvil`
-- **Dandelion** — article needed; `minecraft:dandelion`
+- **Dandelion** — [Small and tall flowers](Flowers.md#dandelion) (related guide); `minecraft:dandelion`
 - **Dark Oak Button** — [Buttons](Buttons.md#dark-oak-button) (related guide); `minecraft:dark_oak_button`
 - **Dark Oak Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:dark_oak_door`
 - **Dark Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:dark_oak_fence`
 - **Dark Oak Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:dark_oak_fence_gate`
-- **Dark Oak Hanging Sign** — article needed; `minecraft:dark_oak_hanging_sign`
+- **Dark Oak Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:dark_oak_hanging_sign`
 - **Dark Oak Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#dark-oak-leaves) (related guide); `minecraft:dark_oak_leaves`
 - **Dark Oak Log** — [Tree logs and roots](TreeLogsAndRoots.md#dark_oak-timber) (related guide); `minecraft:dark_oak_log`
 - **Dark Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:dark_oak_planks`
 - **Dark Oak Pressure Plate** — [Pressure plates](PressurePlates.md#dark-oak-pressure-plate) (related guide); `minecraft:dark_oak_pressure_plate`
 - **Dark Oak Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#dark-oak-sapling) (related guide); `minecraft:dark_oak_sapling`
-- **Dark Oak Shelf** — article needed; `minecraft:dark_oak_shelf`
-- **Dark Oak Sign** — article needed; `minecraft:dark_oak_sign`
+- **Dark Oak Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:dark_oak_shelf`
+- **Dark Oak Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:dark_oak_sign`
 - **Dark Oak Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:dark_oak_slab`
 - **Dark Oak Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:dark_oak_stairs`
 - **Dark Oak Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:dark_oak_trapdoor`
-- **Dark Oak Wall Hanging Sign** — article needed; `minecraft:dark_oak_wall_hanging_sign`
-- **Dark Oak Wall Sign** — article needed; `minecraft:dark_oak_wall_sign`
+- **Dark Oak Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:dark_oak_wall_hanging_sign`
+- **Dark Oak Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:dark_oak_wall_sign`
 - **Dark Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#dark_oak-timber) (related guide); `minecraft:dark_oak_wood`
-- **Dark Prismarine** — article needed; `minecraft:dark_prismarine`
-- **Dark Prismarine Slab** — article needed; `minecraft:dark_prismarine_slab`
-- **Dark Prismarine Stairs** — article needed; `minecraft:dark_prismarine_stairs`
-- **Daylight Detector** — article needed; `minecraft:daylight_detector`
+- **Dark Prismarine** — [Prismarine construction](Prismarine.md#dark-prismarine-forms) (related guide); `minecraft:dark_prismarine`
+- **Dark Prismarine Slab** — [Prismarine construction](Prismarine.md#dark-prismarine-forms) (related guide); `minecraft:dark_prismarine_slab`
+- **Dark Prismarine Stairs** — [Prismarine construction](Prismarine.md#dark-prismarine-forms) (related guide); `minecraft:dark_prismarine_stairs`
+- **Daylight Detector** — [Daylight Detector](DaylightDetector.md#daylight-detector) (related guide); `minecraft:daylight_detector`
 - **Dead Brain Coral** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral`
 - **Dead Brain Coral Block** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral_block`
 - **Dead Brain Coral Fan** — [Coral](Coral.md#brain-coral) (related guide); `minecraft:dead_brain_coral_fan`
@@ -371,7 +374,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dead Bubble Coral Block** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:dead_bubble_coral_block`
 - **Dead Bubble Coral Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:dead_bubble_coral_fan`
 - **Dead Bubble Coral Wall Fan** — [Coral](Coral.md#bubble-coral) (related guide); `minecraft:dead_bubble_coral_wall_fan`
-- **Dead Bush** — [Dead Bush](DeadBush.md) (related guide); `minecraft:dead_bush`
+- **Dead Bush** — [Dead Bush](DeadBush.md#finding-and-collecting) (related guide); `minecraft:dead_bush`
 - **Dead Fire Coral** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:dead_fire_coral`
 - **Dead Fire Coral Block** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:dead_fire_coral_block`
 - **Dead Fire Coral Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:dead_fire_coral_fan`
@@ -384,7 +387,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dead Tube Coral Block** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:dead_tube_coral_block`
 - **Dead Tube Coral Fan** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:dead_tube_coral_fan`
 - **Dead Tube Coral Wall Fan** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:dead_tube_coral_wall_fan`
-- **Decorated Pot** — article needed; `minecraft:decorated_pot`
+- **Decorated Pot** — [Decorated Pot](DecoratedPot.md#decorated-pot) (related guide); `minecraft:decorated_pot`
 - **Deepslate** — [Deepslate](Deepslate.md#orienting-ordinary-deepslate) (related guide); `minecraft:deepslate`
 - **Deepslate Brick Slab** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_brick_slab`
 - **Deepslate Brick Stairs** — [Deepslate](Deepslate.md#building-variants) (related guide); `minecraft:deepslate_brick_stairs`
@@ -413,35 +416,38 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Dirt Path** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#dirt-path-placement-and-cover) (related guide); `minecraft:dirt_path`
 - **Dispenser** — [Dispenser and Dropper](DispenserAndDropper.md) (related guide); `minecraft:dispenser`
 - **Dragon Egg** — [Dragon Egg](DragonEgg.md) (related guide); `minecraft:dragon_egg`
-- **Dragon Head** — article needed; `minecraft:dragon_head`
-- **Dragon Wall Head** — article needed; `minecraft:dragon_wall_head`
-- **Dried Ghast** — article needed; `minecraft:dried_ghast`
+- **Dragon Head** — [Heads and Skulls](HeadsAndSkulls.md#dragon-heads) (related guide); `minecraft:dragon_head`
+- **Dragon Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#dragon-heads) (related guide); `minecraft:dragon_wall_head`
+- **Dried Ghast** — [Dried Ghast](DriedGhast.md) (related guide); `minecraft:dried_ghast`
 - **Dried Kelp Block** — [Kelp](Kelp.md) (related guide); `minecraft:dried_kelp_block`
-- **Dripstone Block** — article needed; `minecraft:dripstone_block`
+- **Dripstone Block** — [Dripstone](Dripstone.md#dripstone-block) (related guide); `minecraft:dripstone_block`
 - **Dropper** — [Dispenser and Dropper](DispenserAndDropper.md) (related guide); `minecraft:dropper`
 
 ### E
 
-- **Elevator** — article needed; `minecraft:elevator`
+- **Elevator** — [Elevator](Elevator.md#elevator) (related guide); `minecraft:elevator`
 - **Emerald Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:emerald_ore`
 - **Enchanting Table** — [Enchanting Table](EnchantingTable.md) (related guide); `minecraft:enchanting_table`
-- **End Gateway** — article needed; `minecraft:end_gateway`
-- **End Portal** — article needed; `minecraft:end_portal`
-- **End Portal Frame** — article needed; `minecraft:end_portal_frame`
-- **End Rod** — article needed; `minecraft:end_rod`
+- **End Gateway** — [End portals, frames, and gateways](EndPortals.md#end-gateway) (related guide); `minecraft:end_gateway`
+- **End Portal** — [End portals, frames, and gateways](EndPortals.md#end-portal) (related guide); `minecraft:end_portal`
+- **End Portal Frame** — [End portals, frames, and gateways](EndPortals.md#end-portal-frame) (related guide); `minecraft:end_portal_frame`
+- **End Rod** — [End Rod](EndRod.md#facing-support-and-collision) (related guide); `minecraft:end_rod`
 - **End Stone** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone`
 - **End Stone Brick Slab** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_slab`
 - **End Stone Brick Stairs** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_stairs`
 - **End Stone Brick Wall** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_brick_wall`
 - **End Stone Bricks** — [End Stone and Purpur](EndStoneAndPurpur.md#end-stone-variants-and-recipes) (related guide); `minecraft:end_stone_bricks`
-- **Ender Chest** — article needed; `minecraft:ender_chest`
+- **Ender Chest** — [Ender Chest](EnderChest.md#player-ownership-and-persistence) (related guide); `minecraft:ender_chest`
 - **Exposed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_chiseled_copper`
 - **Exposed Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_copper`
+- **Exposed Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#exposed-copper-bars) (related guide); `minecraft:exposed_copper_bars`
 - **Exposed Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:exposed_copper_bulb`
+- **Exposed Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#exposed-copper-chain) (related guide); `minecraft:exposed_copper_chain`
 - **Exposed Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:exposed_copper_chest`
 - **Exposed Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:exposed_copper_door`
 - **Exposed Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:exposed_copper_golem_statue`
 - **Exposed Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:exposed_copper_grate`
+- **Exposed Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#exposed-copper-lantern) (related guide); `minecraft:exposed_copper_lantern`
 - **Exposed Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:exposed_copper_trapdoor`
 - **Exposed Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:exposed_cut_copper`
 - **Exposed Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:exposed_cut_copper_slab`
@@ -451,17 +457,17 @@ Names use English localization where available. A † marks one of 25 readable r
 ### F
 
 - **Farmland** — [Farmland](Farmland.md) (related guide); `minecraft:farmland`
-- **Fern** — article needed; `minecraft:fern`
+- **Fern** — [Grass and Ferns](GrassAndFerns.md#fern) (related guide); `minecraft:fern`
 - **Fern Thatch** — [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md#fern-thatch-crafting-and-collecting) (related guide); `minecraft:fern_thatch`
 - **Fiddlehead** — [Primordial decorative plants](PrimordialPlants.md) (related guide); `minecraft:fiddlehead`
-- **Fire** — article needed; `minecraft:fire`
+- **Fire** — [Fire and Soul Fire](Fire.md#fire) (related guide); `minecraft:fire`
 - **Fire Coral** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral`
 - **Fire Coral Block** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_block`
 - **Fire Coral Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_fan`
 - **Fire Coral Wall Fan** — [Coral](Coral.md#fire-coral) (related guide); `minecraft:fire_coral_wall_fan`
-- **Firefly Bush** — article needed; `minecraft:firefly_bush`
+- **Firefly Bush** — [Shrubs and Dry Grass](ShrubsAndDryGrass.md#firefly-bush) (related guide); `minecraft:firefly_bush`
 - **Fissure Primal Magma †** — [Primal Magma and Fissure Primal Magma](PrimalMagma.md) (related guide); `minecraft:fissure_primal_magma`
-- **Fletching Table** — article needed; `minecraft:fletching_table`
+- **Fletching Table** — [Fletching Table](FletchingTable.md#fletching-table) (related guide); `minecraft:fletching_table`
 - **Flood Basalt** — [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md#flood-basalt-access-and-the-mining-limitation) (related guide); `minecraft:flood_basalt`
 - **Flower Pot** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:flower_pot`
 - **Flowering Azalea** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#flowering-azalea) (related guide); `minecraft:flowering_azalea`
@@ -469,15 +475,15 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Flytrap** — [Ancient trees, Flytraps and Tree Stars](AncientPlants.md#flytrap) (related guide); `minecraft:flytrap`
 - **Frogspawn** — [Frogspawn](Frogspawn.md) (related guide); `minecraft:frogspawn`
 - **Frosted Ice** — [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md#frosted-ice-and-frost-walker) (related guide); `minecraft:frosted_ice`
-- **Furnace** — [Furnace](Furnace.md) (related guide); `minecraft:furnace`
+- **Furnace** — [Furnace, Blast Furnace and Smoker](Furnace.md) (related guide); `minecraft:furnace`
 
 ### G
 
 - **Gilded Blackstone** — [Blackstone and Basalt](BlackstoneAndBasalt.md#gilded-blackstone) (related guide); `minecraft:gilded_blackstone`
 - **Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:glass`
 - **Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:glass_pane`
-- **Glow Lichen** — article needed; `minecraft:glow_lichen`
-- **Glowstone** — article needed; `minecraft:glowstone`
+- **Glow Lichen** — [Glow Lichen](GlowLichen.md#placement-and-support) (related guide); `minecraft:glow_lichen`
+- **Glowstone** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#glowstone) (related guide); `minecraft:glowstone`
 - **Gold Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:gold_ore`
 - **Granite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#finding-granite-diorite-and-andesite) (related guide); `minecraft:granite`
 - **Granite Slab** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:granite_slab`
@@ -485,9 +491,9 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Granite Wall** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:granite_wall`
 - **Grass Block** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#grass-block-and-mycelium) (related guide); `minecraft:grass_block`
 - **Gravel** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#gravel-and-flint) (related guide); `minecraft:gravel`
-- **Gray Banner** — article needed; `minecraft:gray_banner`
+- **Gray Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:gray_banner`
 - **Gray Bed** — [Beds](Bed.md) (related guide); `minecraft:gray_bed`
-- **Gray Candle** — article needed; `minecraft:gray_candle`
+- **Gray Candle** — [Candles](Candles.md#gray-candle) (related guide); `minecraft:gray_candle`
 - **Gray Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:gray_carpet`
 - **Gray Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:gray_concrete`
 - **Gray Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:gray_concrete_powder`
@@ -496,11 +502,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Gray Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:gray_stained_glass`
 - **Gray Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:gray_stained_glass_pane`
 - **Gray Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:gray_terracotta`
-- **Gray Wall Banner †** — article needed; `minecraft:gray_wall_banner`
+- **Gray Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:gray_wall_banner`
 - **Gray Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:gray_wool`
-- **Green Banner** — article needed; `minecraft:green_banner`
+- **Green Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:green_banner`
 - **Green Bed** — [Beds](Bed.md) (related guide); `minecraft:green_bed`
-- **Green Candle** — article needed; `minecraft:green_candle`
+- **Green Candle** — [Candles](Candles.md#green-candle) (related guide); `minecraft:green_candle`
 - **Green Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:green_carpet`
 - **Green Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:green_concrete`
 - **Green Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:green_concrete_powder`
@@ -509,19 +515,19 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Green Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:green_stained_glass`
 - **Green Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:green_stained_glass_pane`
 - **Green Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:green_terracotta`
-- **Green Wall Banner †** — article needed; `minecraft:green_wall_banner`
+- **Green Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:green_wall_banner`
 - **Green Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:green_wool`
 - **Grindstone** — [Grindstone](Grindstone.md) (related guide); `minecraft:grindstone`
 - **Grottoceratops Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:grottoceratops_egg`
 
 ### H
 
-- **Hanging Roots** — article needed; `minecraft:hanging_roots`
-- **Hay Bale** — article needed; `minecraft:hay_block`
-- **Heavy Core** — article needed; `minecraft:heavy_core`
+- **Hanging Roots** — [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md#hanging-roots) (related guide); `minecraft:hanging_roots`
+- **Hay Bale** — [Hay Bale](HayBale.md) (related guide); `minecraft:hay_block`
+- **Heavy Core** — [Heavy Core](HeavyCore.md) (related guide); `minecraft:heavy_core`
 - **Heavy Weighted Pressure Plate** — [Pressure plates](PressurePlates.md#heavy-weighted-pressure-plate) (related guide); `minecraft:heavy_weighted_pressure_plate`
-- **Honey Block** — article needed; `minecraft:honey_block`
-- **Honeycomb Block** — article needed; `minecraft:honeycomb_block`
+- **Honey Block** — [Slime and Honey Blocks](SlimeAndHoneyBlocks.md#honey-block) (related guide); `minecraft:honey_block`
+- **Honeycomb Block** — [Honeycomb Block](HoneycombBlock.md) (related guide); `minecraft:honeycomb_block`
 - **Hopper** — [Hopper](Hopper.md) (related guide); `minecraft:hopper`
 - **Horn Coral** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:horn_coral`
 - **Horn Coral Block** — [Coral](Coral.md#horn-coral) (related guide); `minecraft:horn_coral_block`
@@ -538,34 +544,34 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Infested Mossy Stone Bricks** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_mossy_stone_bricks`
 - **Infested Stone** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_stone`
 - **Infested Stone Bricks** — [Stone](Stone.md#infested-stone-variants) (related guide); `minecraft:infested_stone_bricks`
-- **Iron Bars** — article needed; `minecraft:iron_bars`
-- **Iron Chain** — article needed; `minecraft:iron_chain`
-- **Iron Door** — article needed; `minecraft:iron_door`
+- **Iron Bars** — [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md#iron-bars) (related guide); `minecraft:iron_bars`
+- **Iron Chain** — [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md#iron-chain) (related guide); `minecraft:iron_chain`
+- **Iron Door** — [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md#iron-door) (related guide); `minecraft:iron_door`
 - **Iron Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:iron_ore`
-- **Iron Trapdoor** — article needed; `minecraft:iron_trapdoor`
+- **Iron Trapdoor** — [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md#iron-trapdoor) (related guide); `minecraft:iron_trapdoor`
 
 ### J
 
-- **Jack o'Lantern** — article needed; `minecraft:jack_o_lantern`
-- **Jigsaw Block** — article needed; `minecraft:jigsaw`
-- **Jukebox** — article needed; `minecraft:jukebox`
+- **Jack o'Lantern** — [Jack o'Lantern](JackOLantern.md#placement-water-and-light) (related guide); `minecraft:jack_o_lantern`
+- **Jigsaw Block** — [Structure and Jigsaw Blocks](StructureAndJigsawBlocks.md#jigsaw-block) (related guide); `minecraft:jigsaw`
+- **Jukebox** — [Jukebox](Jukebox.md#inserting-and-ejecting-discs) (related guide); `minecraft:jukebox`
 - **Jungle Button** — [Buttons](Buttons.md#jungle-button) (related guide); `minecraft:jungle_button`
 - **Jungle Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:jungle_door`
 - **Jungle Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:jungle_fence`
 - **Jungle Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:jungle_fence_gate`
-- **Jungle Hanging Sign** — article needed; `minecraft:jungle_hanging_sign`
+- **Jungle Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:jungle_hanging_sign`
 - **Jungle Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#jungle-leaves) (related guide); `minecraft:jungle_leaves`
 - **Jungle Log** — [Tree logs and roots](TreeLogsAndRoots.md#jungle-timber) (related guide); `minecraft:jungle_log`
 - **Jungle Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:jungle_planks`
 - **Jungle Pressure Plate** — [Pressure plates](PressurePlates.md#jungle-pressure-plate) (related guide); `minecraft:jungle_pressure_plate`
 - **Jungle Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#jungle-sapling) (related guide); `minecraft:jungle_sapling`
-- **Jungle Shelf** — article needed; `minecraft:jungle_shelf`
-- **Jungle Sign** — article needed; `minecraft:jungle_sign`
+- **Jungle Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:jungle_shelf`
+- **Jungle Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:jungle_sign`
 - **Jungle Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:jungle_slab`
 - **Jungle Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:jungle_stairs`
 - **Jungle Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:jungle_trapdoor`
-- **Jungle Wall Hanging Sign** — article needed; `minecraft:jungle_wall_hanging_sign`
-- **Jungle Wall Sign** — article needed; `minecraft:jungle_wall_sign`
+- **Jungle Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:jungle_wall_hanging_sign`
+- **Jungle Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:jungle_wall_sign`
 - **Jungle Wood** — [Tree logs and roots](TreeLogsAndRoots.md#jungle-timber) (related guide); `minecraft:jungle_wood`
 
 ### K
@@ -575,22 +581,22 @@ Names use English localization where available. A † marks one of 25 readable r
 
 ### L
 
-- **Ladder** — article needed; `minecraft:ladder`
-- **Lantern** — article needed; `minecraft:lantern`
+- **Ladder** — [Ladder](Ladder.md) (related guide); `minecraft:ladder`
+- **Lantern** — [Lanterns and Soul Lanterns](Lanterns.md#crafting-and-obtaining) (related guide); `minecraft:lantern`
 - **Lapis Lazuli Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:lapis_ore`
 - **Large Amethyst Bud** — [Amethyst, buds and clusters](Amethyst.md#large-bud) (related guide); `minecraft:large_amethyst_bud`
-- **Large Fern** — article needed; `minecraft:large_fern`
+- **Large Fern** — [Grass and Ferns](GrassAndFerns.md#large-fern) (related guide); `minecraft:large_fern`
 - **Lava** — [Water and Lava](WaterAndLava.md) (related guide); `minecraft:lava`
-- **Lava Cauldron** — article needed; `minecraft:lava_cauldron`
-- **Leaf Litter** — article needed; `minecraft:leaf_litter`
-- **Leafcutter Ant Chamber** — article needed; `minecraft:leafcutter_ant_chamber`
-- **Leafcutter Anthill** — article needed; `minecraft:leafcutter_anthill`
-- **Lectern** — article needed; `minecraft:lectern`
+- **Lava Cauldron** — [Cauldrons](Cauldrons.md#lava-cauldron) (related guide); `minecraft:lava_cauldron`
+- **Leaf Litter** — [Flowerbeds and Leaf Litter](FlowerbedsAndLeafLitter.md#leaf-litter) (related guide); `minecraft:leaf_litter`
+- **Leafcutter Ant Chamber** — [Leafcutter ant nests](LeafcutterNests.md#leafcutter-ant-chamber) (related guide); `minecraft:leafcutter_ant_chamber`
+- **Leafcutter Anthill** — [Leafcutter ant nests](LeafcutterNests.md#leafcutter-anthill) (related guide); `minecraft:leafcutter_anthill`
+- **Lectern** — [Lectern](Lectern.md#lectern) (related guide); `minecraft:lectern`
 - **Lever** — [Lever](Lever.md) (related guide); `minecraft:lever`
-- **Light** — article needed; `minecraft:light`
-- **Light Blue Banner** — article needed; `minecraft:light_blue_banner`
+- **Light** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#light) (related guide); `minecraft:light`
+- **Light Blue Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:light_blue_banner`
 - **Light Blue Bed** — [Beds](Bed.md) (related guide); `minecraft:light_blue_bed`
-- **Light Blue Candle** — article needed; `minecraft:light_blue_candle`
+- **Light Blue Candle** — [Candles](Candles.md#light-blue-candle) (related guide); `minecraft:light_blue_candle`
 - **Light Blue Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:light_blue_carpet`
 - **Light Blue Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:light_blue_concrete`
 - **Light Blue Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:light_blue_concrete_powder`
@@ -599,11 +605,11 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Light Blue Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:light_blue_stained_glass`
 - **Light Blue Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:light_blue_stained_glass_pane`
 - **Light Blue Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:light_blue_terracotta`
-- **Light Blue Wall Banner †** — article needed; `minecraft:light_blue_wall_banner`
+- **Light Blue Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:light_blue_wall_banner`
 - **Light Blue Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:light_blue_wool`
-- **Light Gray Banner** — article needed; `minecraft:light_gray_banner`
+- **Light Gray Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:light_gray_banner`
 - **Light Gray Bed** — [Beds](Bed.md) (related guide); `minecraft:light_gray_bed`
-- **Light Gray Candle** — article needed; `minecraft:light_gray_candle`
+- **Light Gray Candle** — [Candles](Candles.md#light-gray-candle) (related guide); `minecraft:light_gray_candle`
 - **Light Gray Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:light_gray_carpet`
 - **Light Gray Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:light_gray_concrete`
 - **Light Gray Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:light_gray_concrete_powder`
@@ -612,16 +618,16 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Light Gray Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:light_gray_stained_glass`
 - **Light Gray Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:light_gray_stained_glass_pane`
 - **Light Gray Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:light_gray_terracotta`
-- **Light Gray Wall Banner †** — article needed; `minecraft:light_gray_wall_banner`
+- **Light Gray Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:light_gray_wall_banner`
 - **Light Gray Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:light_gray_wool`
 - **Light Weighted Pressure Plate** — [Pressure plates](PressurePlates.md#light-weighted-pressure-plate) (related guide); `minecraft:light_weighted_pressure_plate`
 - **Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:lightning_rod`
-- **Lilac** — article needed; `minecraft:lilac`
-- **Lily of the Valley** — article needed; `minecraft:lily_of_the_valley`
-- **Lily Pad** — article needed; `minecraft:lily_pad`
-- **Lime Banner** — article needed; `minecraft:lime_banner`
+- **Lilac** — [Small and tall flowers](Flowers.md#lilac) (related guide); `minecraft:lilac`
+- **Lily of the Valley** — [Small and tall flowers](Flowers.md#lily-of-the-valley) (related guide); `minecraft:lily_of_the_valley`
+- **Lily Pad** — [Lily Pad](LilyPad.md#placement-and-support) (related guide); `minecraft:lily_pad`
+- **Lime Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:lime_banner`
 - **Lime Bed** — [Beds](Bed.md) (related guide); `minecraft:lime_bed`
-- **Lime Candle** — article needed; `minecraft:lime_candle`
+- **Lime Candle** — [Candles](Candles.md#lime-candle) (related guide); `minecraft:lime_candle`
 - **Lime Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:lime_carpet`
 - **Lime Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:lime_concrete`
 - **Lime Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:lime_concrete_powder`
@@ -630,21 +636,21 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Lime Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:lime_stained_glass`
 - **Lime Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:lime_stained_glass_pane`
 - **Lime Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:lime_terracotta`
-- **Lime Wall Banner †** — article needed; `minecraft:lime_wall_banner`
+- **Lime Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:lime_wall_banner`
 - **Lime Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:lime_wool`
-- **Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone`
-- **Limestone Pillar** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_pillar`
-- **Limestone Slab** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_slab`
-- **Limestone Stairs** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_stairs`
-- **Limestone Wall** — [Limestone family](Limestone.md) (related guide); `minecraft:limestone_wall`
-- **Lodestone** — article needed; `minecraft:lodestone`
-- **Loom** — article needed; `minecraft:loom`
+- **Limestone** — [Limestone family](Limestone.md#limestone) (related guide); `minecraft:limestone`
+- **Limestone Pillar** — [Limestone family](Limestone.md#limestone-pillar) (related guide); `minecraft:limestone_pillar`
+- **Limestone Slab** — [Limestone family](Limestone.md#limestone-slab) (related guide); `minecraft:limestone_slab`
+- **Limestone Stairs** — [Limestone family](Limestone.md#limestone-stairs) (related guide); `minecraft:limestone_stairs`
+- **Limestone Wall** — [Limestone family](Limestone.md#limestone-wall) (related guide); `minecraft:limestone_wall`
+- **Lodestone** — [Lodestone](Lodestone.md) (related guide); `minecraft:lodestone`
+- **Loom** — [Loom](Loom.md#crafting-and-placing) (related guide); `minecraft:loom`
 
 ### M
 
-- **Magenta Banner** — article needed; `minecraft:magenta_banner`
+- **Magenta Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:magenta_banner`
 - **Magenta Bed** — [Beds](Bed.md) (related guide); `minecraft:magenta_bed`
-- **Magenta Candle** — article needed; `minecraft:magenta_candle`
+- **Magenta Candle** — [Candles](Candles.md#magenta-candle) (related guide); `minecraft:magenta_candle`
 - **Magenta Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:magenta_carpet`
 - **Magenta Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:magenta_concrete`
 - **Magenta Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:magenta_concrete_powder`
@@ -653,34 +659,34 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Magenta Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:magenta_stained_glass`
 - **Magenta Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:magenta_stained_glass_pane`
 - **Magenta Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:magenta_terracotta`
-- **Magenta Wall Banner †** — article needed; `minecraft:magenta_wall_banner`
+- **Magenta Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:magenta_wall_banner`
 - **Magenta Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:magenta_wool`
 - **Magma Block** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#magma-block) (related guide); `minecraft:magma_block`
 - **Mangrove Button** — [Buttons](Buttons.md#mangrove-button) (related guide); `minecraft:mangrove_button`
 - **Mangrove Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:mangrove_door`
 - **Mangrove Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:mangrove_fence`
 - **Mangrove Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:mangrove_fence_gate`
-- **Mangrove Hanging Sign** — article needed; `minecraft:mangrove_hanging_sign`
+- **Mangrove Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:mangrove_hanging_sign`
 - **Mangrove Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#mangrove-leaves) (related guide); `minecraft:mangrove_leaves`
 - **Mangrove Log** — [Tree logs and roots](TreeLogsAndRoots.md#mangrove-timber) (related guide); `minecraft:mangrove_log`
 - **Mangrove Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:mangrove_planks`
 - **Mangrove Pressure Plate** — [Pressure plates](PressurePlates.md#mangrove-pressure-plate) (related guide); `minecraft:mangrove_pressure_plate`
 - **Mangrove Propagule** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#planted-mangrove-propagules) (related guide); `minecraft:mangrove_propagule`
 - **Mangrove Roots** — [Tree logs and roots](TreeLogsAndRoots.md#mangrove-roots) (related guide); `minecraft:mangrove_roots`
-- **Mangrove Shelf** — article needed; `minecraft:mangrove_shelf`
-- **Mangrove Sign** — article needed; `minecraft:mangrove_sign`
+- **Mangrove Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:mangrove_shelf`
+- **Mangrove Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:mangrove_sign`
 - **Mangrove Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:mangrove_slab`
 - **Mangrove Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:mangrove_stairs`
 - **Mangrove Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:mangrove_trapdoor`
-- **Mangrove Wall Hanging Sign** — article needed; `minecraft:mangrove_wall_hanging_sign`
-- **Mangrove Wall Sign** — article needed; `minecraft:mangrove_wall_sign`
+- **Mangrove Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:mangrove_wall_hanging_sign`
+- **Mangrove Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:mangrove_wall_sign`
 - **Mangrove Wood** — [Tree logs and roots](TreeLogsAndRoots.md#mangrove-timber) (related guide); `minecraft:mangrove_wood`
 - **Medium Amethyst Bud** — [Amethyst, buds and clusters](Amethyst.md#medium-bud) (related guide); `minecraft:medium_amethyst_bud`
 - **Melon** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:melon`
 - **Melon Stem** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:melon_stem`
 - **Monster Spawner** — [Monster Spawner](MonsterSpawner.md) (related guide); `minecraft:spawner`
-- **Moss Block** — article needed; `minecraft:moss_block`
-- **Moss Carpet** — article needed; `minecraft:moss_carpet`
+- **Moss Block** — [Moss and Pale Moss](MossAndPaleMoss.md#moss-blocks-and-spreading) (related guide); `minecraft:moss_block`
+- **Moss Carpet** — [Moss and Pale Moss](MossAndPaleMoss.md#moss-carpet) (related guide); `minecraft:moss_carpet`
 - **Mossy Cobblestone** — [Stone](Stone.md#mossy-variants) (related guide); `minecraft:mossy_cobblestone`
 - **Mossy Cobblestone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_cobblestone_slab`
 - **Mossy Cobblestone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_cobblestone_stairs`
@@ -689,14 +695,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Mossy Stone Brick Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_stone_brick_stairs`
 - **Mossy Stone Brick Wall** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:mossy_stone_brick_wall`
 - **Mossy Stone Bricks** — [Stone](Stone.md#mossy-variants) (related guide); `minecraft:mossy_stone_bricks`
-- **Moving Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:moving_piston`
-- **Mud** — article needed; `minecraft:mud`
-- **Mud Brick Slab** — article needed; `minecraft:mud_brick_slab`
-- **Mud Brick Stairs** — article needed; `minecraft:mud_brick_stairs`
-- **Mud Brick Wall** — article needed; `minecraft:mud_brick_wall`
-- **Mud Bricks** — article needed; `minecraft:mud_bricks`
+- **Moving Piston** — [Piston and Sticky Piston](Pistons.md#piston-head-and-moving-piston) (related guide); `minecraft:moving_piston`
+- **Mud** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud) (related guide); `minecraft:mud`
+- **Mud Brick Slab** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud-brick-slab) (related guide); `minecraft:mud_brick_slab`
+- **Mud Brick Stairs** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud-brick-stairs) (related guide); `minecraft:mud_brick_stairs`
+- **Mud Brick Wall** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud-brick-wall) (related guide); `minecraft:mud_brick_wall`
+- **Mud Bricks** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#mud-bricks) (related guide); `minecraft:mud_bricks`
 - **Muddy Mangrove Roots** — [Tree logs and roots](TreeLogsAndRoots.md#muddy-mangrove-roots) (related guide); `minecraft:muddy_mangrove_roots`
-- **Mushroom Stem** — article needed; `minecraft:mushroom_stem`
+- **Mushroom Stem** — [Mushrooms](Mushrooms.md#mushroom-stem) (related guide); `minecraft:mushroom_stem`
 - **Mycelium** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#grass-block-and-mycelium) (related guide); `minecraft:mycelium`
 
 ### N
@@ -707,13 +713,13 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Nether Brick Wall** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:nether_brick_wall`
 - **Nether Bricks** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:nether_bricks`
 - **Nether Gold Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:nether_gold_ore`
-- **Nether Portal** — article needed; `minecraft:nether_portal`
+- **Nether Portal** — [Nether and Primordial Caves portals](NetherPortals.md#nether-portal) (related guide); `minecraft:nether_portal`
 - **Nether Quartz Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:nether_quartz_ore`
-- **Nether Sprouts** — article needed; `minecraft:nether_sprouts`
+- **Nether Sprouts** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#nether-sprouts) (related guide); `minecraft:nether_sprouts`
 - **Nether Wart** — [Nether Wart crop](NetherWart.md) (related guide); `minecraft:nether_wart`
-- **Nether Wart Block** — article needed; `minecraft:nether_wart_block`
-- **Netherrack** — article needed; `minecraft:netherrack`
-- **Note Block** — article needed; `minecraft:note_block`
+- **Nether Wart Block** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#nether-wart-block) (related guide); `minecraft:nether_wart_block`
+- **Netherrack** — [Netherrack](Netherrack.md#netherrack) (related guide); `minecraft:netherrack`
+- **Note Block** — [Note Block](NoteBlock.md) (related guide); `minecraft:note_block`
 
 ### O
 
@@ -721,27 +727,27 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Oak Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:oak_door`
 - **Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:oak_fence`
 - **Oak Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:oak_fence_gate`
-- **Oak Hanging Sign** — article needed; `minecraft:oak_hanging_sign`
+- **Oak Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:oak_hanging_sign`
 - **Oak Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#oak-leaves) (related guide); `minecraft:oak_leaves`
 - **Oak Log** — [Tree logs and roots](TreeLogsAndRoots.md#oak-timber) (related guide); `minecraft:oak_log`
 - **Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:oak_planks`
 - **Oak Pressure Plate** — [Pressure plates](PressurePlates.md#oak-pressure-plate) (related guide); `minecraft:oak_pressure_plate`
 - **Oak Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#oak-sapling) (related guide); `minecraft:oak_sapling`
-- **Oak Shelf** — article needed; `minecraft:oak_shelf`
-- **Oak Sign** — article needed; `minecraft:oak_sign`
+- **Oak Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:oak_shelf`
+- **Oak Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:oak_sign`
 - **Oak Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:oak_slab`
 - **Oak Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:oak_stairs`
 - **Oak Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:oak_trapdoor`
-- **Oak Wall Hanging Sign** — article needed; `minecraft:oak_wall_hanging_sign`
-- **Oak Wall Sign** — article needed; `minecraft:oak_wall_sign`
+- **Oak Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:oak_wall_hanging_sign`
+- **Oak Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:oak_wall_sign`
 - **Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#oak-timber) (related guide); `minecraft:oak_wood`
 - **Observer** — [Observer](Observer.md) (related guide); `minecraft:observer`
-- **Obsidian** — article needed; `minecraft:obsidian`
-- **Ochre Froglight** — article needed; `minecraft:ochre_froglight`
-- **Open Eyeblossom** — article needed; `minecraft:open_eyeblossom`
-- **Orange Banner** — article needed; `minecraft:orange_banner`
+- **Obsidian** — [Obsidian and Crying Obsidian](Obsidian.md#obsidian) (related guide); `minecraft:obsidian`
+- **Ochre Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#ochre-verdant-and-pearlescent) (related guide); `minecraft:ochre_froglight`
+- **Open Eyeblossom** — [Eyeblossoms](Eyeblossoms.md#open-eyeblossom) (related guide); `minecraft:open_eyeblossom`
+- **Orange Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:orange_banner`
 - **Orange Bed** — [Beds](Bed.md) (related guide); `minecraft:orange_bed`
-- **Orange Candle** — article needed; `minecraft:orange_candle`
+- **Orange Candle** — [Candles](Candles.md#orange-candle) (related guide); `minecraft:orange_candle`
 - **Orange Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:orange_carpet`
 - **Orange Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:orange_concrete`
 - **Orange Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:orange_concrete_powder`
@@ -750,17 +756,20 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Orange Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:orange_stained_glass`
 - **Orange Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:orange_stained_glass_pane`
 - **Orange Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:orange_terracotta`
-- **Orange Tulip** — article needed; `minecraft:orange_tulip`
-- **Orange Wall Banner †** — article needed; `minecraft:orange_wall_banner`
+- **Orange Tulip** — [Small and tall flowers](Flowers.md#orange-tulip) (related guide); `minecraft:orange_tulip`
+- **Orange Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:orange_wall_banner`
 - **Orange Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:orange_wool`
-- **Oxeye Daisy** — article needed; `minecraft:oxeye_daisy`
+- **Oxeye Daisy** — [Small and tall flowers](Flowers.md#oxeye-daisy) (related guide); `minecraft:oxeye_daisy`
 - **Oxidized Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_chiseled_copper`
 - **Oxidized Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_copper`
+- **Oxidized Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#oxidized-copper-bars) (related guide); `minecraft:oxidized_copper_bars`
 - **Oxidized Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:oxidized_copper_bulb`
+- **Oxidized Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#oxidized-copper-chain) (related guide); `minecraft:oxidized_copper_chain`
 - **Oxidized Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:oxidized_copper_chest`
 - **Oxidized Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:oxidized_copper_door`
 - **Oxidized Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:oxidized_copper_golem_statue`
 - **Oxidized Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:oxidized_copper_grate`
+- **Oxidized Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#oxidized-copper-lantern) (related guide); `minecraft:oxidized_copper_lantern`
 - **Oxidized Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:oxidized_copper_trapdoor`
 - **Oxidized Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:oxidized_cut_copper`
 - **Oxidized Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:oxidized_cut_copper_slab`
@@ -770,75 +779,75 @@ Names use English localization where available. A † marks one of 25 readable r
 ### P
 
 - **Packed Ice** — [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md#registered-ice-blocks) (related guide); `minecraft:packed_ice`
-- **Packed Mud** — article needed; `minecraft:packed_mud`
-- **Pale Hanging Moss** — article needed; `minecraft:pale_hanging_moss`
-- **Pale Moss Block** — article needed; `minecraft:pale_moss_block`
-- **Pale Moss Carpet** — article needed; `minecraft:pale_moss_carpet`
+- **Packed Mud** — [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md#packed-mud) (related guide); `minecraft:packed_mud`
+- **Pale Hanging Moss** — [Moss and Pale Moss](MossAndPaleMoss.md#pale-hanging-moss) (related guide); `minecraft:pale_hanging_moss`
+- **Pale Moss Block** — [Moss and Pale Moss](MossAndPaleMoss.md#moss-blocks-and-spreading) (related guide); `minecraft:pale_moss_block`
+- **Pale Moss Carpet** — [Moss and Pale Moss](MossAndPaleMoss.md#pale-moss-carpet) (related guide); `minecraft:pale_moss_carpet`
 - **Pale Oak Button** — [Buttons](Buttons.md#pale-oak-button) (related guide); `minecraft:pale_oak_button`
 - **Pale Oak Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:pale_oak_door`
 - **Pale Oak Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:pale_oak_fence`
 - **Pale Oak Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:pale_oak_fence_gate`
-- **Pale Oak Hanging Sign** — article needed; `minecraft:pale_oak_hanging_sign`
+- **Pale Oak Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:pale_oak_hanging_sign`
 - **Pale Oak Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#pale-oak-leaves) (related guide); `minecraft:pale_oak_leaves`
 - **Pale Oak Log** — [Tree logs and roots](TreeLogsAndRoots.md#pale_oak-timber) (related guide); `minecraft:pale_oak_log`
 - **Pale Oak Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:pale_oak_planks`
 - **Pale Oak Pressure Plate** — [Pressure plates](PressurePlates.md#pale-oak-pressure-plate) (related guide); `minecraft:pale_oak_pressure_plate`
 - **Pale Oak Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#pale-oak-sapling) (related guide); `minecraft:pale_oak_sapling`
-- **Pale Oak Shelf** — article needed; `minecraft:pale_oak_shelf`
-- **Pale Oak Sign** — article needed; `minecraft:pale_oak_sign`
+- **Pale Oak Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:pale_oak_shelf`
+- **Pale Oak Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:pale_oak_sign`
 - **Pale Oak Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:pale_oak_slab`
 - **Pale Oak Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:pale_oak_stairs`
 - **Pale Oak Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:pale_oak_trapdoor`
-- **Pale Oak Wall Hanging Sign** — article needed; `minecraft:pale_oak_wall_hanging_sign`
-- **Pale Oak Wall Sign** — article needed; `minecraft:pale_oak_wall_sign`
+- **Pale Oak Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:pale_oak_wall_hanging_sign`
+- **Pale Oak Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:pale_oak_wall_sign`
 - **Pale Oak Wood** — [Tree logs and roots](TreeLogsAndRoots.md#pale_oak-timber) (related guide); `minecraft:pale_oak_wood`
-- **Pearlescent Froglight** — article needed; `minecraft:pearlescent_froglight`
-- **Peony** — article needed; `minecraft:peony`
-- **Petrified Oak Slab** — article needed; `minecraft:petrified_oak_slab`
+- **Pearlescent Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#ochre-verdant-and-pearlescent) (related guide); `minecraft:pearlescent_froglight`
+- **Peony** — [Small and tall flowers](Flowers.md#peony) (related guide); `minecraft:peony`
+- **Petrified Oak Slab** — [Petrified Oak Slab](PetrifiedOakSlab.md#petrified-oak-slab) (related guide); `minecraft:petrified_oak_slab`
 - **Pewen Branch** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_branch`
 - **Pewen Button** — [Buttons](Buttons.md#pewen-button) (related guide); `minecraft:pewen_button`
 - **Pewen Door** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_door`
-- **Pewen Fence** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_fence`
+- **Pewen Fence** — [Pewen family](Pewen.md#fence-connections) (related guide); `minecraft:pewen_fence`
 - **Pewen Fence Gate** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_fence_gate`
-- **Pewen Hanging Sign** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_hanging_sign`
+- **Pewen Hanging Sign** — [Signs and Hanging Signs](Signs.md#pewen-signs-incomplete-integration) (related guide); `minecraft:pewen_hanging_sign`
 - **Pewen Log** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_log`
 - **Pewen Pines** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_pines`
 - **Pewen Planks** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_planks`
 - **Pewen Pressure Plate** — [Pressure plates](PressurePlates.md#pewen-pressure-plate) (related guide); `minecraft:pewen_pressure_plate`
 - **Pewen Sapling** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_sapling`
-- **Pewen Sign** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_sign`
+- **Pewen Sign** — [Signs and Hanging Signs](Signs.md#pewen-signs-incomplete-integration) (related guide); `minecraft:pewen_sign`
 - **Pewen Slab** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_slab`
 - **Pewen Stairs** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_stairs`
 - **Pewen Trapdoor** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_trapdoor`
-- **Pewen Wall Hanging Sign †** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_wall_hanging_sign`
-- **Pewen Wall Sign †** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_wall_sign`
+- **Pewen Wall Hanging Sign †** — [Signs and Hanging Signs](Signs.md#pewen-signs-incomplete-integration) (related guide); `minecraft:pewen_wall_hanging_sign`
+- **Pewen Wall Sign †** — [Signs and Hanging Signs](Signs.md#pewen-signs-incomplete-integration) (related guide); `minecraft:pewen_wall_sign`
 - **Pewen Wood** — [Pewen family](Pewen.md) (related guide); `minecraft:pewen_wood`
-- **Piglin Head** — article needed; `minecraft:piglin_head`
-- **Piglin Wall Head** — article needed; `minecraft:piglin_wall_head`
-- **Pink Banner** — article needed; `minecraft:pink_banner`
+- **Piglin Head** — [Heads and Skulls](HeadsAndSkulls.md#piglin-heads) (related guide); `minecraft:piglin_head`
+- **Piglin Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#piglin-heads) (related guide); `minecraft:piglin_wall_head`
+- **Pink Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:pink_banner`
 - **Pink Bed** — [Beds](Bed.md) (related guide); `minecraft:pink_bed`
-- **Pink Candle** — article needed; `minecraft:pink_candle`
+- **Pink Candle** — [Candles](Candles.md#pink-candle) (related guide); `minecraft:pink_candle`
 - **Pink Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:pink_carpet`
 - **Pink Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:pink_concrete`
 - **Pink Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:pink_concrete_powder`
 - **Pink Glazed Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:pink_glazed_terracotta`
-- **Pink Petals** — article needed; `minecraft:pink_petals`
+- **Pink Petals** — [Flowerbeds and Leaf Litter](FlowerbedsAndLeafLitter.md#pink-petals) (related guide); `minecraft:pink_petals`
 - **Pink Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:pink_shulker_box`
 - **Pink Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:pink_stained_glass`
 - **Pink Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:pink_stained_glass_pane`
 - **Pink Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:pink_terracotta`
-- **Pink Tulip** — article needed; `minecraft:pink_tulip`
-- **Pink Wall Banner †** — article needed; `minecraft:pink_wall_banner`
+- **Pink Tulip** — [Small and tall flowers](Flowers.md#pink-tulip) (related guide); `minecraft:pink_tulip`
+- **Pink Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:pink_wall_banner`
 - **Pink Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:pink_wool`
 - **Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:piston`
-- **Piston Head** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:piston_head`
-- **Pitcher Crop** — article needed; `minecraft:pitcher_crop`
-- **Pitcher Plant** — article needed; `minecraft:pitcher_plant`
-- **Platypus Egg** — article needed; `minecraft:platypus_egg`
-- **Player Head** — article needed; `minecraft:player_head`
-- **Player Wall Head** — article needed; `minecraft:player_wall_head`
+- **Piston Head** — [Piston and Sticky Piston](Pistons.md#piston-head-and-moving-piston) (related guide); `minecraft:piston_head`
+- **Pitcher Crop** — [Pitcher Plant and Pitcher Crop](PitcherPlant.md) (related guide); `minecraft:pitcher_crop`
+- **Pitcher Plant** — [Pitcher Plant and Pitcher Crop](PitcherPlant.md) (related guide); `minecraft:pitcher_plant`
+- **Platypus Egg** — [Placed animal eggs](AnimalEggs.md#platypus-eggs) (related guide); `minecraft:platypus_egg`
+- **Player Head** — [Heads and Skulls](HeadsAndSkulls.md#player-heads) (related guide); `minecraft:player_head`
+- **Player Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#player-heads) (related guide); `minecraft:player_wall_head`
 - **Podzol** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#podzol-and-mushroom-support) (related guide); `minecraft:podzol`
-- **Pointed Dripstone** — article needed; `minecraft:pointed_dripstone`
+- **Pointed Dripstone** — [Dripstone](Dripstone.md#pointed-dripstone) (related guide); `minecraft:pointed_dripstone`
 - **Polished Andesite** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_andesite`
 - **Polished Andesite Slab** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_andesite_slab`
 - **Polished Andesite Stairs** — [Granite, Diorite, Andesite and Calcite](DecorativeStone.md#polished-and-shaped-variants) (related guide); `minecraft:polished_andesite_stairs`
@@ -867,7 +876,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Polished Tuff Slab** — [Tuff](Tuff.md#variants) (related guide); `minecraft:polished_tuff_slab`
 - **Polished Tuff Stairs** — [Tuff](Tuff.md#variants) (related guide); `minecraft:polished_tuff_stairs`
 - **Polished Tuff Wall** — [Tuff](Tuff.md#variants) (related guide); `minecraft:polished_tuff_wall`
-- **Poppy** — article needed; `minecraft:poppy`
+- **Poppy** — [Small and tall flowers](Flowers.md#poppy) (related guide); `minecraft:poppy`
 - **Potatoes** — [Root crops](RootCrops.md) (related guide); `minecraft:potatoes`
 - **Potted Acacia Sapling** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:potted_acacia_sapling`
 - **Potted Allium** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:potted_allium`
@@ -910,22 +919,22 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Potted White Tulip** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:potted_white_tulip`
 - **Potted Wither Rose** — [Flower Pot](FlowerPot.md) (related guide); `minecraft:potted_wither_rose`
 - **Powder Snow** — [Snow and Powder Snow](Snow.md#powder-snow-buckets-and-collision) (related guide); `minecraft:powder_snow`
-- **Powder Snow Cauldron** — article needed; `minecraft:powder_snow_cauldron`
+- **Powder Snow Cauldron** — [Cauldrons](Cauldrons.md#powder-snow-cauldron) (related guide); `minecraft:powder_snow_cauldron`
 - **Powered Rail** — [Rails](Rails.md) (related guide); `minecraft:powered_rail`
 - **Primal Magma** — [Primal Magma and Fissure Primal Magma](PrimalMagma.md) (related guide); `minecraft:primal_magma`
-- **Primordial Caves Portal †** — article needed; `minecraft:primordial_caves_portal`
-- **Prismarine** — article needed; `minecraft:prismarine`
-- **Prismarine Brick Slab** — article needed; `minecraft:prismarine_brick_slab`
-- **Prismarine Brick Stairs** — article needed; `minecraft:prismarine_brick_stairs`
-- **Prismarine Bricks** — article needed; `minecraft:prismarine_bricks`
-- **Prismarine Slab** — article needed; `minecraft:prismarine_slab`
-- **Prismarine Stairs** — article needed; `minecraft:prismarine_stairs`
-- **Prismarine Wall** — article needed; `minecraft:prismarine_wall`
+- **Primordial Caves Portal †** — [Nether and Primordial Caves portals](NetherPortals.md#primordial-caves-portal) (related guide); `minecraft:primordial_caves_portal`
+- **Prismarine** — [Prismarine construction](Prismarine.md#prismarine-forms) (related guide); `minecraft:prismarine`
+- **Prismarine Brick Slab** — [Prismarine construction](Prismarine.md#prismarine-brick-forms) (related guide); `minecraft:prismarine_brick_slab`
+- **Prismarine Brick Stairs** — [Prismarine construction](Prismarine.md#prismarine-brick-forms) (related guide); `minecraft:prismarine_brick_stairs`
+- **Prismarine Bricks** — [Prismarine construction](Prismarine.md#prismarine-brick-forms) (related guide); `minecraft:prismarine_bricks`
+- **Prismarine Slab** — [Prismarine construction](Prismarine.md#prismarine-forms) (related guide); `minecraft:prismarine_slab`
+- **Prismarine Stairs** — [Prismarine construction](Prismarine.md#prismarine-forms) (related guide); `minecraft:prismarine_stairs`
+- **Prismarine Wall** — [Prismarine construction](Prismarine.md#prismarine-forms) (related guide); `minecraft:prismarine_wall`
 - **Pumpkin** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:pumpkin`
 - **Pumpkin Stem** — [Pumpkin and Melon farming](PumpkinAndMelon.md) (related guide); `minecraft:pumpkin_stem`
-- **Purple Banner** — article needed; `minecraft:purple_banner`
+- **Purple Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:purple_banner`
 - **Purple Bed** — [Beds](Bed.md) (related guide); `minecraft:purple_bed`
-- **Purple Candle** — article needed; `minecraft:purple_candle`
+- **Purple Candle** — [Candles](Candles.md#purple-candle) (related guide); `minecraft:purple_candle`
 - **Purple Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:purple_carpet`
 - **Purple Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:purple_concrete`
 - **Purple Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:purple_concrete_powder`
@@ -934,7 +943,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Purple Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:purple_stained_glass`
 - **Purple Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:purple_stained_glass_pane`
 - **Purple Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:purple_terracotta`
-- **Purple Wall Banner †** — article needed; `minecraft:purple_wall_banner`
+- **Purple Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:purple_wall_banner`
 - **Purple Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:purple_wool`
 - **Purpur Block** — [End Stone and Purpur](EndStoneAndPurpur.md#purpur-variants-and-recipes) (related guide); `minecraft:purpur_block`
 - **Purpur Pillar** — [End Stone and Purpur](EndStoneAndPurpur.md#placement-pillars-and-dragon-interactions) (related guide); `minecraft:purpur_pillar`
@@ -951,15 +960,15 @@ Names use English localization where available. A † marks one of 25 readable r
 ### R
 
 - **Rail** — [Rails](Rails.md) (related guide); `minecraft:rail`
-- **Red Banner** — article needed; `minecraft:red_banner`
+- **Red Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:red_banner`
 - **Red Bed** — [Beds](Bed.md) (related guide); `minecraft:red_bed`
-- **Red Candle** — article needed; `minecraft:red_candle`
+- **Red Candle** — [Candles](Candles.md#red-candle) (related guide); `minecraft:red_candle`
 - **Red Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:red_carpet`
 - **Red Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:red_concrete`
 - **Red Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:red_concrete_powder`
 - **Red Glazed Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:red_glazed_terracotta`
-- **Red Mushroom** — article needed; `minecraft:red_mushroom`
-- **Red Mushroom Block** — article needed; `minecraft:red_mushroom_block`
+- **Red Mushroom** — [Mushrooms](Mushrooms.md#red-mushroom) (related guide); `minecraft:red_mushroom`
+- **Red Mushroom Block** — [Mushrooms](Mushrooms.md#red-mushroom-block) (related guide); `minecraft:red_mushroom_block`
 - **Red Nether Brick Slab** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:red_nether_brick_slab`
 - **Red Nether Brick Stairs** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:red_nether_brick_stairs`
 - **Red Nether Brick Wall** — [Nether Bricks](NetherBricks.md#variants) (related guide); `minecraft:red_nether_brick_wall`
@@ -973,28 +982,28 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Red Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:red_stained_glass`
 - **Red Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:red_stained_glass_pane`
 - **Red Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:red_terracotta`
-- **Red Tulip** — article needed; `minecraft:red_tulip`
-- **Red Wall Banner †** — article needed; `minecraft:red_wall_banner`
+- **Red Tulip** — [Small and tall flowers](Flowers.md#red-tulip) (related guide); `minecraft:red_tulip`
+- **Red Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:red_wall_banner`
 - **Red Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:red_wool`
 - **Redstone Comparator** — [Redstone Comparator](RedstoneComparator.md) (related guide); `minecraft:comparator`
 - **Redstone Lamp** — [Redstone Lamp](RedstoneLamp.md) (related guide); `minecraft:redstone_lamp`
 - **Redstone Ore** — [Ores and Ancient Debris](OreResources.md#registered-forms-and-loot) (related guide); `minecraft:redstone_ore`
-- **Redstone Randomizer** — article needed; `minecraft:redstone_randomizer`
+- **Redstone Randomizer** — [Redstone Randomizer](RedstoneRandomizer.md#redstone-randomizer) (related guide); `minecraft:redstone_randomizer`
 - **Redstone Repeater** — [Redstone Repeater](RedstoneRepeater.md) (related guide); `minecraft:repeater`
 - **Redstone Torch** — [Redstone Torch](RedstoneTorch.md) (related guide); `minecraft:redstone_torch`
 - **Redstone Wall Torch** — [Redstone Torch](RedstoneTorch.md) (related guide); `minecraft:redstone_wall_torch`
 - **Redstone Wire** — [Redstone Dust and wire](RedstoneDust.md) (related guide); `minecraft:redstone_wire`
 - **Reinforced Deepslate** — [Deepslate](Deepslate.md#reinforced-deepslate) (related guide); `minecraft:reinforced_deepslate`
 - **Relicheirus Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:relicheirus_egg`
-- **Repeating Command Block** — article needed; `minecraft:repeating_command_block`
-- **Resin Brick Slab** — article needed; `minecraft:resin_brick_slab`
-- **Resin Brick Stairs** — article needed; `minecraft:resin_brick_stairs`
-- **Resin Brick Wall** — article needed; `minecraft:resin_brick_wall`
-- **Resin Bricks** — article needed; `minecraft:resin_bricks`
-- **Resin Clump** — article needed; `minecraft:resin_clump`
-- **Respawn Anchor** — article needed; `minecraft:respawn_anchor`
+- **Repeating Command Block** — [Command Blocks](CommandBlocks.md#repeating-command-block) (related guide); `minecraft:repeating_command_block`
+- **Resin Brick Slab** — [Resin](Resin.md#resin-brick-slab) (related guide); `minecraft:resin_brick_slab`
+- **Resin Brick Stairs** — [Resin](Resin.md#resin-brick-stairs) (related guide); `minecraft:resin_brick_stairs`
+- **Resin Brick Wall** — [Resin](Resin.md#resin-brick-wall) (related guide); `minecraft:resin_brick_wall`
+- **Resin Bricks** — [Resin](Resin.md#resin-bricks) (related guide); `minecraft:resin_bricks`
+- **Resin Clump** — [Resin](Resin.md#resin-clump) (related guide); `minecraft:resin_clump`
+- **Respawn Anchor** — [Respawn Anchor](RespawnAnchor.md#respawn-anchor) (related guide); `minecraft:respawn_anchor`
 - **Rooted Dirt** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#rooted-dirt-and-hanging-roots) (related guide); `minecraft:rooted_dirt`
-- **Rose Bush** — article needed; `minecraft:rose_bush`
+- **Rose Bush** — [Small and tall flowers](Flowers.md#rose-bush) (related guide); `minecraft:rose_bush`
 
 ### S
 
@@ -1004,31 +1013,31 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Sandstone Stairs** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:sandstone_stairs`
 - **Sandstone Wall** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:sandstone_wall`
 - **Scaffolding** — [Scaffolding](Scaffolding.md) (related guide); `minecraft:scaffolding`
-- **Sculk** — article needed; `minecraft:sculk`
-- **Sculk Catalyst** — article needed; `minecraft:sculk_catalyst`
-- **Sculk Sensor** — article needed; `minecraft:sculk_sensor`
-- **Sculk Shrieker** — article needed; `minecraft:sculk_shrieker`
-- **Sculk Vein** — article needed; `minecraft:sculk_vein`
-- **Sea Lantern** — article needed; `minecraft:sea_lantern`
+- **Sculk** — [Sculk, veins and catalysts](Sculk.md#sculk) (related guide); `minecraft:sculk`
+- **Sculk Catalyst** — [Sculk, veins and catalysts](Sculk.md#sculk-catalyst) (related guide); `minecraft:sculk_catalyst`
+- **Sculk Sensor** — [Sculk Sensors and calibration](SculkSensors.md#sculk-sensor) (related guide); `minecraft:sculk_sensor`
+- **Sculk Shrieker** — [Sculk Shrieker](SculkShrieker.md#sculk-shrieker) (related guide); `minecraft:sculk_shrieker`
+- **Sculk Vein** — [Sculk, veins and catalysts](Sculk.md#sculk-vein) (related guide); `minecraft:sculk_vein`
+- **Sea Lantern** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#sea-lantern) (related guide); `minecraft:sea_lantern`
 - **Sea Pickle** — [Sea Pickle](SeaPickle.md) (related guide); `minecraft:sea_pickle`
 - **Seagrass** — [Seagrass](Seagrass.md) (related guide); `minecraft:seagrass`
-- **Short Dry Grass** — article needed; `minecraft:short_dry_grass`
-- **Short Grass** — article needed; `minecraft:short_grass`
-- **Shroomlight** — article needed; `minecraft:shroomlight`
+- **Short Dry Grass** — [Shrubs and Dry Grass](ShrubsAndDryGrass.md#short-dry-grass) (related guide); `minecraft:short_dry_grass`
+- **Short Grass** — [Grass and Ferns](GrassAndFerns.md#short-grass) (related guide); `minecraft:short_grass`
+- **Shroomlight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#shroomlight) (related guide); `minecraft:shroomlight`
 - **Shulker Box** — [Shulker Box](ShulkerBox.md) (related guide); `minecraft:shulker_box`
-- **Skeleton Skull** — article needed; `minecraft:skeleton_skull`
-- **Skeleton Wall Skull** — article needed; `minecraft:skeleton_wall_skull`
-- **Skunk Spray** — article needed; `minecraft:skunk_spray`
-- **Slime Block** — article needed; `minecraft:slime_block`
+- **Skeleton Skull** — [Heads and Skulls](HeadsAndSkulls.md#skeleton-skulls) (related guide); `minecraft:skeleton_skull`
+- **Skeleton Wall Skull** — [Heads and Skulls](HeadsAndSkulls.md#skeleton-skulls) (related guide); `minecraft:skeleton_wall_skull`
+- **Skunk Spray** — [Skunk Spray](SkunkSpray.md#skunk-spray) (related guide); `minecraft:skunk_spray`
+- **Slime Block** — [Slime and Honey Blocks](SlimeAndHoneyBlocks.md#slime-block) (related guide); `minecraft:slime_block`
 - **Small Amethyst Bud** — [Amethyst, buds and clusters](Amethyst.md#small-bud) (related guide); `minecraft:small_amethyst_bud`
-- **Small Dripleaf** — article needed; `minecraft:small_dripleaf`
+- **Small Dripleaf** — [Dripleaves](Dripleaves.md#small-dripleaf) (related guide); `minecraft:small_dripleaf`
 - **Smithing Table** — [Smithing Table](SmithingTable.md) (related guide); `minecraft:smithing_table`
-- **Smoker** — article needed; `minecraft:smoker`
+- **Smoker** — [Furnace, Blast Furnace and Smoker](Furnace.md#smoker) (related guide); `minecraft:smoker`
 - **Smooth Basalt** — [Blackstone and Basalt](BlackstoneAndBasalt.md#basalt-variants-and-orientation) (related guide); `minecraft:smooth_basalt`
-- **Smooth Limestone** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone`
-- **Smooth Limestone Slab** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone_slab`
-- **Smooth Limestone Stairs** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone_stairs`
-- **Smooth Limestone Wall** — [Limestone family](Limestone.md) (related guide); `minecraft:smooth_limestone_wall`
+- **Smooth Limestone** — [Limestone family](Limestone.md#smooth-limestone) (related guide); `minecraft:smooth_limestone`
+- **Smooth Limestone Slab** — [Limestone family](Limestone.md#smooth-limestone-slab) (related guide); `minecraft:smooth_limestone_slab`
+- **Smooth Limestone Stairs** — [Limestone family](Limestone.md#smooth-limestone-stairs) (related guide); `minecraft:smooth_limestone_stairs`
+- **Smooth Limestone Wall** — [Limestone family](Limestone.md#smooth-limestone-wall) (related guide); `minecraft:smooth_limestone_wall`
 - **Smooth Quartz Block** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:smooth_quartz`
 - **Smooth Quartz Slab** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:smooth_quartz_slab`
 - **Smooth Quartz Stairs** — [Quartz construction](Quartz.md#registered-variants) (related guide); `minecraft:smooth_quartz_stairs`
@@ -1040,35 +1049,35 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Smooth Sandstone Stairs** — [Sandstone and Red Sandstone](Sandstone.md#registered-forms-and-loot) (related guide); `minecraft:smooth_sandstone_stairs`
 - **Smooth Stone** — [Stone](Stone.md#smooth-stone) (related guide); `minecraft:smooth_stone`
 - **Smooth Stone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:smooth_stone_slab`
-- **Sniffer Egg** — article needed; `minecraft:sniffer_egg`
+- **Sniffer Egg** — [Placed animal eggs](AnimalEggs.md#sniffer-eggs) (related guide); `minecraft:sniffer_egg`
 - **Snow** — [Snow and Powder Snow](Snow.md#placing-layers-and-keeping-their-support) (related guide); `minecraft:snow`
 - **Snow Block** — [Snow and Powder Snow](Snow.md#collecting-and-crafting-snow) (related guide); `minecraft:snow_block`
-- **Soul Campfire** — article needed; `minecraft:soul_campfire`
-- **Soul Fire** — article needed; `minecraft:soul_fire`
-- **Soul Lantern** — article needed; `minecraft:soul_lantern`
+- **Soul Campfire** — [Campfires](Campfires.md#variants-and-crafting) (related guide); `minecraft:soul_campfire`
+- **Soul Fire** — [Fire and Soul Fire](Fire.md#soul-fire) (related guide); `minecraft:soul_fire`
+- **Soul Lantern** — [Lanterns and Soul Lanterns](Lanterns.md#crafting-and-obtaining) (related guide); `minecraft:soul_lantern`
 - **Soul Sand** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-sand) (related guide); `minecraft:soul_sand`
 - **Soul Soil** — [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md#soul-soil) (related guide); `minecraft:soul_soil`
-- **Soul Torch** — article needed; `minecraft:soul_torch`
-- **Soul Wall Torch** — article needed; `minecraft:soul_wall_torch`
-- **Sponge** — article needed; `minecraft:sponge`
-- **Spore Blossom** — article needed; `minecraft:spore_blossom`
+- **Soul Torch** — [Torch](Torch.md#soul-torch) (related guide); `minecraft:soul_torch`
+- **Soul Wall Torch** — [Torch](Torch.md#soul-torch) (related guide); `minecraft:soul_wall_torch`
+- **Sponge** — [Sponge and Wet Sponge](Sponge.md#dry-sponge) (related guide); `minecraft:sponge`
+- **Spore Blossom** — [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md#spore-blossom) (related guide); `minecraft:spore_blossom`
 - **Spruce Button** — [Buttons](Buttons.md#spruce-button) (related guide); `minecraft:spruce_button`
 - **Spruce Door** — [Wood construction](WoodConstruction.md#doors) (related guide); `minecraft:spruce_door`
 - **Spruce Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:spruce_fence`
 - **Spruce Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:spruce_fence_gate`
-- **Spruce Hanging Sign** — article needed; `minecraft:spruce_hanging_sign`
+- **Spruce Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:spruce_hanging_sign`
 - **Spruce Leaves** — [Tree leaves and Mangrove Propagules](TreeLeaves.md#spruce-leaves) (related guide); `minecraft:spruce_leaves`
 - **Spruce Log** — [Tree logs and roots](TreeLogsAndRoots.md#spruce-timber) (related guide); `minecraft:spruce_log`
 - **Spruce Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:spruce_planks`
 - **Spruce Pressure Plate** — [Pressure plates](PressurePlates.md#spruce-pressure-plate) (related guide); `minecraft:spruce_pressure_plate`
 - **Spruce Sapling** — [Saplings and Azalea growth](SaplingsAndAzaleas.md#spruce-sapling) (related guide); `minecraft:spruce_sapling`
-- **Spruce Shelf** — article needed; `minecraft:spruce_shelf`
-- **Spruce Sign** — article needed; `minecraft:spruce_sign`
+- **Spruce Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:spruce_shelf`
+- **Spruce Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:spruce_sign`
 - **Spruce Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:spruce_slab`
 - **Spruce Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:spruce_stairs`
 - **Spruce Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:spruce_trapdoor`
-- **Spruce Wall Hanging Sign** — article needed; `minecraft:spruce_wall_hanging_sign`
-- **Spruce Wall Sign** — article needed; `minecraft:spruce_wall_sign`
+- **Spruce Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:spruce_wall_hanging_sign`
+- **Spruce Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:spruce_wall_sign`
 - **Spruce Wood** — [Tree logs and roots](TreeLogsAndRoots.md#spruce-timber) (related guide); `minecraft:spruce_wood`
 - **Sticky Piston** — [Piston and Sticky Piston](Pistons.md) (related guide); `minecraft:sticky_piston`
 - **Stone** — [Stone](Stone.md#stone-and-cobblestone) (related guide); `minecraft:stone`
@@ -1080,7 +1089,7 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Stone Pressure Plate** — [Pressure plates](PressurePlates.md#stone-pressure-plate) (related guide); `minecraft:stone_pressure_plate`
 - **Stone Slab** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_slab`
 - **Stone Stairs** — [Stone](Stone.md#stairs-slabs-and-walls) (related guide); `minecraft:stone_stairs`
-- **Stonecutter** — [Stonecutter](Stonecutter.md) (related guide); `minecraft:stonecutter`
+- **Stonecutter** — [Stonecutter](Stonecutter.md#stonecutter) (related guide); `minecraft:stonecutter`
 - **Stripped Acacia Log** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:stripped_acacia_log`
 - **Stripped Acacia Wood** — [Tree logs and roots](TreeLogsAndRoots.md#acacia-timber) (related guide); `minecraft:stripped_acacia_wood`
 - **Stripped Birch Log** — [Tree logs and roots](TreeLogsAndRoots.md#birch-timber) (related guide); `minecraft:stripped_birch_log`
@@ -1105,38 +1114,38 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Stripped Spruce Wood** — [Tree logs and roots](TreeLogsAndRoots.md#spruce-timber) (related guide); `minecraft:stripped_spruce_wood`
 - **Stripped Warped Hyphae** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:stripped_warped_hyphae`
 - **Stripped Warped Stem** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:stripped_warped_stem`
-- **Structure Block** — article needed; `minecraft:structure_block`
-- **Structure Void** — article needed; `minecraft:structure_void`
+- **Structure Block** — [Structure and Jigsaw Blocks](StructureAndJigsawBlocks.md#structure-block) (related guide); `minecraft:structure_block`
+- **Structure Void** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#structure-void) (related guide); `minecraft:structure_void`
 - **Subterranodon Egg** — [Subterranodon Egg](SubterranodonEgg.md) (related guide); `minecraft:subterranodon_egg`
 - **Sugar Cane** — [Sugar Cane](SugarCane.md) (related guide); `minecraft:sugar_cane`
-- **Sunflower** — article needed; `minecraft:sunflower`
+- **Sunflower** — [Small and tall flowers](Flowers.md#sunflower) (related guide); `minecraft:sunflower`
 - **Suspicious Gravel** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#suspicious-sand-and-suspicious-gravel) (related guide); `minecraft:suspicious_gravel`
 - **Suspicious Sand** — [Soil, Sand, and Gravel](SoilSandAndGravel.md#suspicious-sand-and-suspicious-gravel) (related guide); `minecraft:suspicious_sand`
-- **Sweet Berry Bush** — article needed; `minecraft:sweet_berry_bush`
+- **Sweet Berry Bush** — [Sweet Berry Bush](SweetBerryBush.md) (related guide); `minecraft:sweet_berry_bush`
 
 ### T
 
-- **TaCZ Ammo Assembly Table** — article needed; `minecraft:ammo_workbench`
-- **TaCZ Attachment Table** — article needed; `minecraft:attachment_workbench`
-- **TaCZ Gun Smith Table** — article needed; `minecraft:gun_smith_table`
-- **Tall Dry Grass** — article needed; `minecraft:tall_dry_grass`
-- **Tall Grass** — article needed; `minecraft:tall_grass`
+- **TaCZ Ammo Assembly Table** — [TaCZ Workbenches](TaCZWorkbenches.md#ammo-assembly-table) (related guide); `minecraft:ammo_workbench`
+- **TaCZ Attachment Table** — [TaCZ Workbenches](TaCZWorkbenches.md#attachment-table) (related guide); `minecraft:attachment_workbench`
+- **TaCZ Gun Smith Table** — [TaCZ Workbenches](TaCZWorkbenches.md#gun-smith-table) (related guide); `minecraft:gun_smith_table`
+- **Tall Dry Grass** — [Shrubs and Dry Grass](ShrubsAndDryGrass.md#tall-dry-grass) (related guide); `minecraft:tall_dry_grass`
+- **Tall Grass** — [Grass and Ferns](GrassAndFerns.md#tall-grass) (related guide); `minecraft:tall_grass`
 - **Tall Seagrass** — [Seagrass](Seagrass.md) (related guide); `minecraft:tall_seagrass`
-- **Target** — article needed; `minecraft:target`
+- **Target** — [Target](Target.md#target) (related guide); `minecraft:target`
 - **Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:terracotta`
-- **Terrapin Egg** — article needed; `minecraft:terrapin_egg`
-- **Test Block** — article needed; `minecraft:test_block`
-- **Test Instance Block** — article needed; `minecraft:test_instance_block`
-- **Thin Bone** — [Dinosaur Chop](DinosaurChop.md) (related guide); `minecraft:thin_bone`
+- **Terrapin Egg** — [Placed animal eggs](AnimalEggs.md#terrapin-eggs) (related guide); `minecraft:terrapin_egg`
+- **Test Block** — [Test Blocks and Test Instance Blocks](TestBlocks.md#test-block) (related guide); `minecraft:test_block`
+- **Test Instance Block** — [Test Blocks and Test Instance Blocks](TestBlocks.md#test-instance-block) (related guide); `minecraft:test_instance_block`
+- **Thin Bone** — [Dinosaur Chop](DinosaurChop.md#the-leftover-thin-bone) (related guide); `minecraft:thin_bone`
 - **Tinted Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:tinted_glass`
-- **TNT** — article needed; `minecraft:tnt`
+- **TNT** — [TNT](TNT.md#tnt) (related guide); `minecraft:tnt`
 - **Torch** — [Torch](Torch.md) (related guide); `minecraft:torch`
-- **Torchflower** — article needed; `minecraft:torchflower`
-- **Torchflower Crop** — article needed; `minecraft:torchflower_crop`
-- **Trapped Chest** — article needed; `minecraft:trapped_chest`
+- **Torchflower** — [Torchflower and Torchflower Crop](Torchflower.md) (related guide); `minecraft:torchflower`
+- **Torchflower Crop** — [Torchflower and Torchflower Crop](Torchflower.md) (related guide); `minecraft:torchflower_crop`
+- **Trapped Chest** — [Trapped Chest](TrappedChest.md#opening-signal-and-counted-users) (related guide); `minecraft:trapped_chest`
 - **Tree Star** — [Ancient trees, Flytraps and Tree Stars](AncientPlants.md#tree-star) (related guide); `minecraft:tree_star`
 - **Tremorsaurus Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:tremorsaurus_egg`
-- **Trial Spawner** — article needed; `minecraft:trial_spawner`
+- **Trial Spawner** — [Trial Spawner](TrialSpawner.md#trial-spawner) (related guide); `minecraft:trial_spawner`
 - **Tripwire** — [Tripwire and Tripwire Hooks](Tripwire.md) (related guide); `minecraft:tripwire`
 - **Tripwire Hook** — [Tripwire and Tripwire Hooks](Tripwire.md) (related guide); `minecraft:tripwire_hook`
 - **Tube Coral** — [Coral](Coral.md#tube-coral) (related guide); `minecraft:tube_coral`
@@ -1151,17 +1160,17 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Tuff Slab** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_slab`
 - **Tuff Stairs** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_stairs`
 - **Tuff Wall** — [Tuff](Tuff.md#variants) (related guide); `minecraft:tuff_wall`
-- **Turtle Egg** — article needed; `minecraft:turtle_egg`
-- **Twisting Vines** — article needed; `minecraft:twisting_vines`
-- **Twisting Vines Plant** — article needed; `minecraft:twisting_vines_plant`
+- **Turtle Egg** — [Placed animal eggs](AnimalEggs.md#turtle-eggs) (related guide); `minecraft:turtle_egg`
+- **Twisting Vines** — [Vines and Glow Berries](Vines.md#twisting-vines) (related guide); `minecraft:twisting_vines`
+- **Twisting Vines Plant** — [Vines and Glow Berries](Vines.md#twisting-vines-plant) (related guide); `minecraft:twisting_vines_plant`
 
 ### V
 
 - **Vallumraptor Egg** — [Placed dinosaur eggs](DinosaurEggs.md) (related guide); `minecraft:vallumraptor_egg`
-- **Vault** — article needed; `minecraft:vault`
-- **Verdant Froglight** — article needed; `minecraft:verdant_froglight`
-- **Vines** — article needed; `minecraft:vine`
-- **Void Air** — article needed; `minecraft:void_air`
+- **Vault** — [Vault](Vault.md#normal-and-ominous-vaults) (related guide); `minecraft:vault`
+- **Verdant Froglight** — [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md#ochre-verdant-and-pearlescent) (related guide); `minecraft:verdant_froglight`
+- **Vines** — [Vines and Glow Berries](Vines.md#vine) (related guide); `minecraft:vine`
+- **Void Air** — [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md#void-air) (related guide); `minecraft:void_air`
 
 ### W
 
@@ -1171,41 +1180,47 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Warped Fence** — [Wood construction](WoodConstruction.md#fences) (related guide); `minecraft:warped_fence`
 - **Warped Fence Gate** — [Wood construction](WoodConstruction.md#fence-gates) (related guide); `minecraft:warped_fence_gate`
 - **Warped Fungus** — [Crimson and Warped Fungi](NetherFungi.md#warped-fungus) (related guide); `minecraft:warped_fungus`
-- **Warped Hanging Sign** — article needed; `minecraft:warped_hanging_sign`
+- **Warped Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:warped_hanging_sign`
 - **Warped Hyphae** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:warped_hyphae`
-- **Warped Nylium** — article needed; `minecraft:warped_nylium`
+- **Warped Nylium** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#warped-nylium) (related guide); `minecraft:warped_nylium`
 - **Warped Planks** — [Wood construction](WoodConstruction.md#planks-and-materials) (related guide); `minecraft:warped_planks`
 - **Warped Pressure Plate** — [Pressure plates](PressurePlates.md#warped-pressure-plate) (related guide); `minecraft:warped_pressure_plate`
-- **Warped Roots** — article needed; `minecraft:warped_roots`
-- **Warped Shelf** — article needed; `minecraft:warped_shelf`
-- **Warped Sign** — article needed; `minecraft:warped_sign`
+- **Warped Roots** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#warped-roots) (related guide); `minecraft:warped_roots`
+- **Warped Shelf** — [Wooden Shelves](Shelves.md#variants-and-crafting) (related guide); `minecraft:warped_shelf`
+- **Warped Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:warped_sign`
 - **Warped Slab** — [Wood construction](WoodConstruction.md#slabs) (related guide); `minecraft:warped_slab`
 - **Warped Stairs** — [Wood construction](WoodConstruction.md#stairs) (related guide); `minecraft:warped_stairs`
 - **Warped Stem** — [Tree logs and roots](TreeLogsAndRoots.md#warped-timber) (related guide); `minecraft:warped_stem`
 - **Warped Trapdoor** — [Wood construction](WoodConstruction.md#trapdoors) (related guide); `minecraft:warped_trapdoor`
-- **Warped Wall Hanging Sign** — article needed; `minecraft:warped_wall_hanging_sign`
-- **Warped Wall Sign** — article needed; `minecraft:warped_wall_sign`
-- **Warped Wart Block** — article needed; `minecraft:warped_wart_block`
+- **Warped Wall Hanging Sign** — [Signs and Hanging Signs](Signs.md#hanging-sign-variants) (related guide); `minecraft:warped_wall_hanging_sign`
+- **Warped Wall Sign** — [Signs and Hanging Signs](Signs.md#ordinary-sign-variants) (related guide); `minecraft:warped_wall_sign`
+- **Warped Wart Block** — [Nylium and Nether vegetation](NetherGroundAndVegetation.md#warped-wart-block) (related guide); `minecraft:warped_wart_block`
 - **Water** — [Water and Lava](WaterAndLava.md) (related guide); `minecraft:water`
-- **Water Cauldron** — article needed; `minecraft:water_cauldron`
+- **Water Cauldron** — [Cauldrons](Cauldrons.md#water-cauldron) (related guide); `minecraft:water_cauldron`
 - **Waxed Block of Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_copper_block`
 - **Waxed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_chiseled_copper`
+- **Waxed Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-copper-bars) (related guide); `minecraft:waxed_copper_bars`
 - **Waxed Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:waxed_copper_bulb`
+- **Waxed Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-copper-chain) (related guide); `minecraft:waxed_copper_chain`
 - **Waxed Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:waxed_copper_chest`
 - **Waxed Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_copper_door`
 - **Waxed Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:waxed_copper_golem_statue`
 - **Waxed Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_copper_grate`
+- **Waxed Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-copper-lantern) (related guide); `minecraft:waxed_copper_lantern`
 - **Waxed Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_copper_trapdoor`
 - **Waxed Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_cut_copper`
 - **Waxed Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_cut_copper_slab`
 - **Waxed Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_cut_copper_stairs`
 - **Waxed Exposed Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_exposed_chiseled_copper`
 - **Waxed Exposed Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_exposed_copper`
+- **Waxed Exposed Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-exposed-copper-bars) (related guide); `minecraft:waxed_exposed_copper_bars`
 - **Waxed Exposed Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:waxed_exposed_copper_bulb`
+- **Waxed Exposed Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-exposed-copper-chain) (related guide); `minecraft:waxed_exposed_copper_chain`
 - **Waxed Exposed Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:waxed_exposed_copper_chest`
 - **Waxed Exposed Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_exposed_copper_door`
 - **Waxed Exposed Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:waxed_exposed_copper_golem_statue`
 - **Waxed Exposed Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_exposed_copper_grate`
+- **Waxed Exposed Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-exposed-copper-lantern) (related guide); `minecraft:waxed_exposed_copper_lantern`
 - **Waxed Exposed Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_exposed_copper_trapdoor`
 - **Waxed Exposed Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_exposed_cut_copper`
 - **Waxed Exposed Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_exposed_cut_copper_slab`
@@ -1214,11 +1229,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Waxed Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:waxed_lightning_rod`
 - **Waxed Oxidized Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_oxidized_chiseled_copper`
 - **Waxed Oxidized Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_oxidized_copper`
+- **Waxed Oxidized Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-oxidized-copper-bars) (related guide); `minecraft:waxed_oxidized_copper_bars`
 - **Waxed Oxidized Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:waxed_oxidized_copper_bulb`
+- **Waxed Oxidized Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-oxidized-copper-chain) (related guide); `minecraft:waxed_oxidized_copper_chain`
 - **Waxed Oxidized Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:waxed_oxidized_copper_chest`
 - **Waxed Oxidized Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_oxidized_copper_door`
 - **Waxed Oxidized Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:waxed_oxidized_copper_golem_statue`
 - **Waxed Oxidized Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_oxidized_copper_grate`
+- **Waxed Oxidized Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-oxidized-copper-lantern) (related guide); `minecraft:waxed_oxidized_copper_lantern`
 - **Waxed Oxidized Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_oxidized_copper_trapdoor`
 - **Waxed Oxidized Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_oxidized_cut_copper`
 - **Waxed Oxidized Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_oxidized_cut_copper_slab`
@@ -1226,11 +1244,14 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Waxed Oxidized Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:waxed_oxidized_lightning_rod`
 - **Waxed Weathered Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_weathered_chiseled_copper`
 - **Waxed Weathered Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_weathered_copper`
+- **Waxed Weathered Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-weathered-copper-bars) (related guide); `minecraft:waxed_weathered_copper_bars`
 - **Waxed Weathered Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:waxed_weathered_copper_bulb`
+- **Waxed Weathered Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-weathered-copper-chain) (related guide); `minecraft:waxed_weathered_copper_chain`
 - **Waxed Weathered Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:waxed_weathered_copper_chest`
 - **Waxed Weathered Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_weathered_copper_door`
 - **Waxed Weathered Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:waxed_weathered_copper_golem_statue`
 - **Waxed Weathered Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:waxed_weathered_copper_grate`
+- **Waxed Weathered Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#waxed-weathered-copper-lantern) (related guide); `minecraft:waxed_weathered_copper_lantern`
 - **Waxed Weathered Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:waxed_weathered_copper_trapdoor`
 - **Waxed Weathered Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:waxed_weathered_cut_copper`
 - **Waxed Weathered Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:waxed_weathered_cut_copper_slab`
@@ -1238,23 +1259,26 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Waxed Weathered Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:waxed_weathered_lightning_rod`
 - **Weathered Chiseled Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:weathered_chiseled_copper`
 - **Weathered Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:weathered_copper`
+- **Weathered Copper Bars** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#weathered-copper-bars) (related guide); `minecraft:weathered_copper_bars`
 - **Weathered Copper Bulb** — [Copper lighting](CopperLighting.md#copper-bulbs) (related guide); `minecraft:weathered_copper_bulb`
+- **Weathered Copper Chain** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#weathered-copper-chain) (related guide); `minecraft:weathered_copper_chain`
 - **Weathered Copper Chest** — [Copper Chests](CopperChests.md#storage-and-joining) (related guide); `minecraft:weathered_copper_chest`
 - **Weathered Copper Door** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:weathered_copper_door`
 - **Weathered Copper Golem Statue** — [Copper Golem Statues](CopperGolemStatues.md#poses-and-revival) (related guide); `minecraft:weathered_copper_golem_statue`
 - **Weathered Copper Grate** — [Copper construction](CopperConstruction.md#grates) (related guide); `minecraft:weathered_copper_grate`
+- **Weathered Copper Lantern** — [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md#weathered-copper-lantern) (related guide); `minecraft:weathered_copper_lantern`
 - **Weathered Copper Trapdoor** — [Copper construction](CopperConstruction.md#doors-and-trapdoors) (related guide); `minecraft:weathered_copper_trapdoor`
 - **Weathered Cut Copper** — [Copper construction](CopperConstruction.md#full-blocks) (related guide); `minecraft:weathered_cut_copper`
 - **Weathered Cut Copper Slab** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:weathered_cut_copper_slab`
 - **Weathered Cut Copper Stairs** — [Copper construction](CopperConstruction.md#slabs-and-stairs) (related guide); `minecraft:weathered_cut_copper_stairs`
 - **Weathered Lightning Rod** — [Lightning Rods](LightningRods.md#attracting-natural-lightning) (related guide); `minecraft:weathered_lightning_rod`
-- **Weeping Vines** — article needed; `minecraft:weeping_vines`
-- **Weeping Vines Plant** — article needed; `minecraft:weeping_vines_plant`
-- **Wet Sponge** — article needed; `minecraft:wet_sponge`
+- **Weeping Vines** — [Vines and Glow Berries](Vines.md#weeping-vines) (related guide); `minecraft:weeping_vines`
+- **Weeping Vines Plant** — [Vines and Glow Berries](Vines.md#weeping-vines-plant) (related guide); `minecraft:weeping_vines_plant`
+- **Wet Sponge** — [Sponge and Wet Sponge](Sponge.md#wet-sponge) (related guide); `minecraft:wet_sponge`
 - **Wheat Crops** — [Wheat crop](Wheat.md) (related guide); `minecraft:wheat`
-- **White Banner** — article needed; `minecraft:white_banner`
+- **White Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:white_banner`
 - **White Bed** — [Beds](Bed.md) (related guide); `minecraft:white_bed`
-- **White Candle** — article needed; `minecraft:white_candle`
+- **White Candle** — [Candles](Candles.md#white-candle) (related guide); `minecraft:white_candle`
 - **White Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:white_carpet`
 - **White Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:white_concrete`
 - **White Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:white_concrete_powder`
@@ -1263,19 +1287,19 @@ Names use English localization where available. A † marks one of 25 readable r
 - **White Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:white_stained_glass`
 - **White Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:white_stained_glass_pane`
 - **White Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:white_terracotta`
-- **White Tulip** — article needed; `minecraft:white_tulip`
-- **White Wall Banner †** — article needed; `minecraft:white_wall_banner`
+- **White Tulip** — [Small and tall flowers](Flowers.md#white-tulip) (related guide); `minecraft:white_tulip`
+- **White Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:white_wall_banner`
 - **White Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:white_wool`
-- **Wildflowers** — article needed; `minecraft:wildflowers`
-- **Wither Rose** — article needed; `minecraft:wither_rose`
-- **Wither Skeleton Skull** — article needed; `minecraft:wither_skeleton_skull`
-- **Wither Skeleton Wall Skull** — article needed; `minecraft:wither_skeleton_wall_skull`
+- **Wildflowers** — [Flowerbeds and Leaf Litter](FlowerbedsAndLeafLitter.md#wildflowers) (related guide); `minecraft:wildflowers`
+- **Wither Rose** — [Small and tall flowers](Flowers.md#wither-rose) (related guide); `minecraft:wither_rose`
+- **Wither Skeleton Skull** — [Heads and Skulls](HeadsAndSkulls.md#wither-skeleton-skulls) (related guide); `minecraft:wither_skeleton_skull`
+- **Wither Skeleton Wall Skull** — [Heads and Skulls](HeadsAndSkulls.md#wither-skeleton-skulls) (related guide); `minecraft:wither_skeleton_wall_skull`
 
 ### Y
 
-- **Yellow Banner** — article needed; `minecraft:yellow_banner`
+- **Yellow Banner** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:yellow_banner`
 - **Yellow Bed** — [Beds](Bed.md) (related guide); `minecraft:yellow_bed`
-- **Yellow Candle** — article needed; `minecraft:yellow_candle`
+- **Yellow Candle** — [Candles](Candles.md#yellow-candle) (related guide); `minecraft:yellow_candle`
 - **Yellow Carpet** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:yellow_carpet`
 - **Yellow Concrete** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:yellow_concrete`
 - **Yellow Concrete Powder** — [Concrete and Concrete Powder](Concrete.md) (related guide); `minecraft:yellow_concrete_powder`
@@ -1284,13 +1308,13 @@ Names use English localization where available. A † marks one of 25 readable r
 - **Yellow Stained Glass** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:yellow_stained_glass`
 - **Yellow Stained Glass Pane** — [Glass and Glass Panes](GlassAndPanes.md) (related guide); `minecraft:yellow_stained_glass_pane`
 - **Yellow Terracotta** — [Terracotta and Glazed Terracotta](Terracotta.md) (related guide); `minecraft:yellow_terracotta`
-- **Yellow Wall Banner †** — article needed; `minecraft:yellow_wall_banner`
+- **Yellow Wall Banner †** — [Banners](Banners.md#colors-and-crafted-banners) (related guide); `minecraft:yellow_wall_banner`
 - **Yellow Wool** — [Wool and Carpet](WoolAndCarpet.md) (related guide); `minecraft:yellow_wool`
 
 ### Z
 
-- **Zombie Head** — article needed; `minecraft:zombie_head`
-- **Zombie Wall Head** — article needed; `minecraft:zombie_wall_head`
+- **Zombie Head** — [Heads and Skulls](HeadsAndSkulls.md#zombie-heads) (related guide); `minecraft:zombie_head`
+- **Zombie Wall Head** — [Heads and Skulls](HeadsAndSkulls.md#zombie-heads) (related guide); `minecraft:zombie_wall_head`
 
 ## Block categories
 
@@ -1298,38 +1322,56 @@ Names use English localization where available. A † marks one of 25 readable r
 - [Stone and masonry](catalog/stone.md): Stone, deepslate, tuff, sandstone, brick, Nether and End building families, including shaped variants.
 - [Ores, minerals and resource blocks](catalog/ores.md): Overworld and Nether ores, raw-resource blocks, refined storage blocks, amethyst and obsidian.
 - [Wood and tree families](catalog/wood.md): Logs, wood, stripped forms, planks, stems, roots, saplings, foliage and wooden building forms.
-- [Copper and oxidation variants](catalog/copper.md): Copper ores and resource blocks, building forms, doors, trapdoors, grates, bulbs, chests, statues, torches and lightning rods.
+- [Copper and oxidation variants](catalog/copper.md): Copper ores and resource blocks, building forms, doors, trapdoors, grates, bulbs, chests, statues, torches, lightning rods, bars, chains and lanterns.
 - [Colored building and decoration](catalog/colored.md): Wool, carpets, glass, concrete, terracotta, beds, banners and Shulker Boxes, with every registered color.
 - [Plants, crops and coral](catalog/plants.md): Flowers, grasses, crops, vines, mushrooms, underwater vegetation, coral and decorative plants.
 - [Flower pots and potted plants](catalog/pots.md): The empty Flower Pot and every separately registered planted form.
 - [Workstations, storage and utility](catalog/workstations.md): Crafting and processing stations, containers, village work blocks, beacons, conduits and other utility blocks.
 - [Redstone and transport](catalog/redstone.md): Inputs, signal components, powered machinery, rails and related moving parts. Wooden and copper components are listed in their material catalogs.
-- [Light sources and fire](catalog/lighting.md): Torches, lanterns, candles, glowing blocks, campfires and fire. Copper Bulbs are in the copper catalog.
+- [Light sources and fire](catalog/lighting.md): Torches, lanterns, candles, glowing blocks, campfires and fire. Copper forms are in the copper catalog.
 - [Spawning, portals and technical blocks](catalog/special.md): Spawners, eggs, portals, skulls, sculk, technical blocks and special world objects.
 
 ## Placed-block guides
 
 Alphabetical list of existing guides; family pages can cover several registered forms.
 
+- [Air, Barriers, Light, and Structure Void](TechnicalBlocks.md)
 - [Amber](Amber.md)
 - [Ambersol](Ambersol.md)
 - [Amethyst, buds and clusters](Amethyst.md)
 - [Ancient trees, Flytraps and Tree Stars](AncientPlants.md)
 - [Anvil](Anvil.md)
 - [Bamboo](Bamboo.md)
+- [Bamboo blocks](BambooBlocks.md)
+- [Banners](Banners.md)
+- [Barrel](Barrel.md)
 - [Beacon](Beacon.md)
+- [Bedrock](Bedrock.md)
 - [Beds](Bed.md)
 - [Bee housing](BeeHousing.md)
+- [Bell](Bell.md)
 - [Blackstone and Basalt](BlackstoneAndBasalt.md)
+- [Bone Block](BoneBlock.md)
+- [Bookshelves](Bookshelves.md)
 - [Brewing Stand](BrewingStand.md)
 - [Bubble Columns](BubbleColumns.md)
 - [Buttons](Buttons.md)
 - [Cactus](Cactus.md)
+- [Cake](Cake.md)
+- [Campfires](Campfires.md)
+- [Candles](Candles.md)
 - [Cartography Table](CartographyTable.md)
+- [Cauldrons](Cauldrons.md)
 - [Chest](Chest.md)
+- [Chorus Plants and Flowers](Chorus.md)
 - [Clay and Bricks](ClayAndBricks.md)
+- [Cobweb](Cobweb.md)
+- [Cocoa](Cocoa.md)
+- [Command Blocks](CommandBlocks.md)
+- [Composter](Composter.md)
 - [Concrete and Concrete Powder](Concrete.md)
 - [Conduit](Conduit.md)
+- [Copper Bars, Chains, and Lanterns](CopperBarsChainsAndLanterns.md)
 - [Copper Chests](CopperChests.md)
 - [Copper construction](CopperConstruction.md)
 - [Copper Golem Statues](CopperGolemStatues.md)
@@ -1337,40 +1379,84 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Coral](Coral.md)
 - [Crafter](Crafter.md)
 - [Crafting Table](CraftingTable.md)
+- [Creaking Heart](CreakingHeart.md)
 - [Crimson and Warped Fungi](NetherFungi.md)
+- [Daylight Detector](DaylightDetector.md)
 - [Dead Bush](DeadBush.md)
+- [Decorated Pot](DecoratedPot.md)
 - [Deepslate](Deepslate.md)
 - [Dinosaur Chop](DinosaurChop.md)
 - [Dispenser and Dropper](DispenserAndDropper.md)
 - [Dragon Egg](DragonEgg.md)
+- [Dried Ghast](DriedGhast.md)
+- [Dripleaves](Dripleaves.md)
+- [Dripstone](Dripstone.md)
+- [Elevator](Elevator.md)
 - [Enchanting Table](EnchantingTable.md)
+- [End portals, frames, and gateways](EndPortals.md)
+- [End Rod](EndRod.md)
 - [End Stone and Purpur](EndStoneAndPurpur.md)
+- [Ender Chest](EnderChest.md)
+- [Eyeblossoms](Eyeblossoms.md)
 - [Farmland](Farmland.md)
+- [Fire and Soul Fire](Fire.md)
+- [Fletching Table](FletchingTable.md)
 - [Flood Basalt and Fern Thatch](FloodBasaltAndFernThatch.md)
 - [Flower Pot](FlowerPot.md)
+- [Flowerbeds and Leaf Litter](FlowerbedsAndLeafLitter.md)
 - [Frogspawn](Frogspawn.md)
-- [Furnace](Furnace.md)
+- [Furnace, Blast Furnace and Smoker](Furnace.md)
 - [Glass and Glass Panes](GlassAndPanes.md)
+- [Glow Lichen](GlowLichen.md)
+- [Glowstone, Sea Lanterns, Shroomlights, and Froglights](LuminousBlocks.md)
 - [Granite, Diorite, Andesite and Calcite](DecorativeStone.md)
+- [Grass and Ferns](GrassAndFerns.md)
 - [Grindstone](Grindstone.md)
+- [Hanging Roots and Spore Blossom](HangingRootsAndSporeBlossom.md)
+- [Hay Bale](HayBale.md)
+- [Heads and Skulls](HeadsAndSkulls.md)
+- [Heavy Core](HeavyCore.md)
+- [Honeycomb Block](HoneycombBlock.md)
 - [Hopper](Hopper.md)
 - [Ice, Packed Ice, Blue Ice and Frosted Ice](Ice.md)
+- [Iron Bars, Chain, Door and Trapdoor](IronFixtures.md)
+- [Jack o'Lantern](JackOLantern.md)
+- [Jukebox](Jukebox.md)
 - [Kelp](Kelp.md)
+- [Ladder](Ladder.md)
+- [Lanterns and Soul Lanterns](Lanterns.md)
+- [Leafcutter ant nests](LeafcutterNests.md)
+- [Lectern](Lectern.md)
 - [Lever](Lever.md)
 - [Lightning Rods](LightningRods.md)
+- [Lily Pad](LilyPad.md)
 - [Limestone family](Limestone.md)
+- [Lodestone](Lodestone.md)
+- [Loom](Loom.md)
 - [Monster Spawner](MonsterSpawner.md)
+- [Moss and Pale Moss](MossAndPaleMoss.md)
+- [Mud, Packed Mud and Mud Bricks](MudAndMudBricks.md)
+- [Mushrooms](Mushrooms.md)
+- [Nether and Primordial Caves portals](NetherPortals.md)
 - [Nether Bricks](NetherBricks.md)
 - [Nether Wart crop](NetherWart.md)
+- [Netherrack](Netherrack.md)
+- [Note Block](NoteBlock.md)
+- [Nylium and Nether vegetation](NetherGroundAndVegetation.md)
 - [Oak](Oak.md)
 - [Observer](Observer.md)
+- [Obsidian and Crying Obsidian](Obsidian.md)
 - [Ores and Ancient Debris](OreResources.md)
+- [Petrified Oak Slab](PetrifiedOakSlab.md)
 - [Pewen family](Pewen.md)
 - [Piston and Sticky Piston](Pistons.md)
+- [Pitcher Plant and Pitcher Crop](PitcherPlant.md)
+- [Placed animal eggs](AnimalEggs.md)
 - [Placed dinosaur eggs](DinosaurEggs.md)
 - [Pressure plates](PressurePlates.md)
 - [Primal Magma and Fissure Primal Magma](PrimalMagma.md)
 - [Primordial decorative plants](PrimordialPlants.md)
+- [Prismarine construction](Prismarine.md)
 - [Pumpkin and Melon farming](PumpkinAndMelon.md)
 - [Quartz construction](Quartz.md)
 - [Rails](Rails.md)
@@ -1378,36 +1464,63 @@ Alphabetical list of existing guides; family pages can cover several registered 
 - [Redstone Comparator](RedstoneComparator.md)
 - [Redstone Dust and wire](RedstoneDust.md)
 - [Redstone Lamp](RedstoneLamp.md)
+- [Redstone Randomizer](RedstoneRandomizer.md)
 - [Redstone Repeater](RedstoneRepeater.md)
 - [Redstone Torch](RedstoneTorch.md)
+- [Resin](Resin.md)
+- [Resource Storage Blocks](ResourceStorageBlocks.md)
+- [Respawn Anchor](RespawnAnchor.md)
 - [Root crops](RootCrops.md)
 - [Sandstone and Red Sandstone](Sandstone.md)
 - [Saplings and Azalea growth](SaplingsAndAzaleas.md)
 - [Scaffolding](Scaffolding.md)
+- [Sculk Sensors and calibration](SculkSensors.md)
+- [Sculk Shrieker](SculkShrieker.md)
+- [Sculk, veins and catalysts](Sculk.md)
 - [Sea Pickle](SeaPickle.md)
 - [Seagrass](Seagrass.md)
+- [Shrubs and Dry Grass](ShrubsAndDryGrass.md)
 - [Shulker Box](ShulkerBox.md)
+- [Signs and Hanging Signs](Signs.md)
+- [Skunk Spray](SkunkSpray.md)
+- [Slime and Honey Blocks](SlimeAndHoneyBlocks.md)
+- [Small and tall flowers](Flowers.md)
 - [Smithing Table](SmithingTable.md)
 - [Snow and Powder Snow](Snow.md)
 - [Soil, Sand, and Gravel](SoilSandAndGravel.md)
 - [Soul Sand, Soul Soil and Magma Blocks](SoulSandSoilAndMagma.md)
+- [Sponge and Wet Sponge](Sponge.md)
 - [Stone](Stone.md)
 - [Stonecutter](Stonecutter.md)
+- [Structure and Jigsaw Blocks](StructureAndJigsawBlocks.md)
 - [Subterranodon Egg](SubterranodonEgg.md)
 - [Sugar Cane](SugarCane.md)
+- [Sweet Berry Bush](SweetBerryBush.md)
+- [TaCZ Workbenches](TaCZWorkbenches.md)
+- [Target](Target.md)
 - [Terracotta and Glazed Terracotta](Terracotta.md)
+- [Test Blocks and Test Instance Blocks](TestBlocks.md)
+- [TNT](TNT.md)
 - [Torch](Torch.md)
+- [Torchflower and Torchflower Crop](Torchflower.md)
+- [Trapped Chest](TrappedChest.md)
 - [Tree leaves and Mangrove Propagules](TreeLeaves.md)
 - [Tree logs and roots](TreeLogsAndRoots.md)
+- [Trial Spawner](TrialSpawner.md)
 - [Tripwire and Tripwire Hooks](Tripwire.md)
 - [Tuff](Tuff.md)
+- [Vault](Vault.md)
+- [Vines and Glow Berries](Vines.md)
 - [Water and Lava](WaterAndLava.md)
 - [Wheat crop](Wheat.md)
 - [Wood construction](WoodConstruction.md)
+- [Wooden Shelves](Shelves.md)
 - [Wool and Carpet](WoolAndCarpet.md)
 
 ## Inventory and related pages
 
-The alphabetical directory contains **1,211 built-in registered IDs** from [the active registry at `c87803e7`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java), checked on 2026-10-02. Wall forms, potted plants, separate crop/plant forms, and technical blocks are included. Facing, age, waterlogging, and other states are not counted as separate IDs. See [inventory scope](catalog/index.md#scope-of-the-inventory).
+The inventory traces **1,211 direct static Block fields plus 24 helper-created IDs**, including six pumpkin/melon ResourceKey names. Three WeatheringCopperBlocks fields each pass Blocks::register to eight explicit helper calls. Block states such as facing, age, waterlogging and power are not additional registry IDs.
+
+The [registration-method correction](catalog/index.md#registration-method-correction) supersedes the older claim that 1,211 direct declarations were the complete inventory. The inspected source at [`f9e4a4c9`](https://github.com/HungLo2020/MattMC/blob/f9e4a4c96fcf7fb744bce869c085cdfab189810e/src/main/java/net/minecraft/world/level/block/Blocks.java) gives 1,235 unique IDs; no running-game registry dump or complete variant-behavior certification is claimed.
 
 [Items](../items/Items.md) documents inventory forms; those pages do not replace placed-block behavior. [Content guide](../ContentGuide.md) · [Gameplay](../Gameplay.md)

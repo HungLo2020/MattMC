@@ -19,6 +19,7 @@ import com.seibel.distanthorizons.core.sql.repo.FullDataSourceV2Repo;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
+import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -145,22 +146,39 @@ public class FullDataSourceProviderV2 implements IDebugRenderable, AutoCloseable
 			return CompletableFuture.completedFuture(null);
 		}
 		
-		AbstractExecutorService executor = ThreadPoolUtil.getFileHandlerExecutor();
+		PriorityTaskPicker.Executor executor = ThreadPoolUtil.getFileHandlerExecutor();
 		if (executor == null || executor.isTerminated())
 		{
 			return CompletableFuture.completedFuture(null);
 		}
 		
 		
+		CompletableFuture<FullDataSourceV2> future = new CompletableFuture<>();
 		try
 		{
-			return CompletableFuture.supplyAsync(() -> this.get(pos), executor);
+			executor.execute(() ->
+			{
+				if (future.isDone()) return;
+				try
+				{
+					FullDataSourceV2 source = this.get(pos);
+					if (!future.complete(source) && source != null)
+					{
+						// The caller cancelled while the read was running; nobody owns this result.
+						source.close();
+					}
+				}
+				catch (Throwable failure)
+				{
+					future.completeExceptionally(failure);
+				}
+			}, () -> future.cancel(false));
 		}
 		catch (RejectedExecutionException ignore)
 		{
-			// the thread pool was probably shut down because it's size is being changed, just wait a sec and it should be back
-			return CompletableFuture.completedFuture(null);
+			future.cancel(false);
 		}
+		return future;
 	}
 	/**
 	 * Should only be used in internal file handler methods where we are already running on a file handler thread.

@@ -74,12 +74,13 @@ impl WorldPrimitiveFrontend {
         gal: &mut VulkanicGal,
         generation: u64,
         frame_target: Handle,
-        frame: WorldPrimitiveFrame,
+        mut frame: WorldPrimitiveFrame,
         gui_ops: Vec<CommandOp>,
         fabulous_attachments_initialized: bool,
         raster_y_direction: RasterYDirection,
     ) -> GalResult<WorldPrimitiveSubmitStats> {
         self.world_text.begin_submission();
+        self.expand_static_terrain(&mut frame)?;
         validate_frame(&frame)?;
         if self.generation == 0 {
             self.generation = generation;
@@ -267,6 +268,12 @@ impl WorldPrimitiveFrontend {
                 self.ensure_mesh_resources(gal, batch.key)?;
             }
         }
+        // Fabulous binds every mesh through its own resource set.
+        if let Some(stream_buffer) = mesh_stream_buffer {
+            for batch in world_mesh_batches.iter().chain(hand_mesh_batches.iter().flatten()) {
+                self.ensure_mesh_resource_set(gal, batch.key, stream_buffer)?;
+            }
+        }
         // Fabulous is a separate explicit composition target, not a separate
         // terrain shader contract. Its builtin mesh pipelines use the same
         // Rust-owned copied vanilla lightmap as the normal terrain route.
@@ -277,7 +284,7 @@ impl WorldPrimitiveFrontend {
         let fabulous_lightmap_required = fabulous_meshes_present
             || batches
                 .iter()
-                .any(|batch| material_uses_particle_shader(batch.key.source_program));
+                .any(|batch| material_uses_lightmap(batch.key));
         let builtin_terrain_lightmap_layout = if fabulous_lightmap_required {
             if frame.shader_environment.world_generation == 0
                 || frame.shader_environment.vanilla_lightmap.is_none()
@@ -586,7 +593,7 @@ impl WorldPrimitiveFrontend {
                 });
                 if resources.lightmap_resource_layout.is_some() {
                     let lightmap = builtin_terrain_lightmap_resource_set.ok_or_else(|| {
-                        GalError::backend("Fabulous weather material pipeline has no staged Rust lightmap binding")
+                        GalError::backend("Fabulous lightmapped material pipeline has no staged Rust lightmap binding")
                     })?;
                     operations.push(CommandOp::BindResourceSet {
                         pipeline_layout: resources.pipeline_layout,
@@ -627,7 +634,9 @@ impl WorldPrimitiveFrontend {
                 operations.push(CommandOp::BindResourceSet {
                     pipeline_layout: resources.pipeline_layout,
                     set_index: 0,
-                    set: resources.resource_set,
+                    set: resources.resource_set.ok_or_else(|| {
+                        GalError::backend("Fabulous mesh resource set missing")
+                    })?,
                     dynamic_offsets: mesh_stream_dynamic_offsets(
                         batch,
                         resources.vertex_offset,
@@ -710,7 +719,9 @@ impl WorldPrimitiveFrontend {
                                 operations.push(CommandOp::BindResourceSet {
                                     pipeline_layout: resources.pipeline_layout,
                                     set_index: 0,
-                                    set: resources.resource_set,
+                                    set: resources.resource_set.ok_or_else(|| {
+                        GalError::backend("Fabulous mesh resource set missing")
+                    })?,
                                     dynamic_offsets: mesh_stream_dynamic_offsets(
                                         batch,
                                         resources.vertex_offset,
@@ -791,7 +802,9 @@ impl WorldPrimitiveFrontend {
                             operations.push(CommandOp::BindResourceSet {
                                 pipeline_layout: resources.pipeline_layout,
                                 set_index: 0,
-                                set: resources.resource_set,
+                                set: resources.resource_set.ok_or_else(|| {
+                        GalError::backend("Fabulous mesh resource set missing")
+                    })?,
                                 dynamic_offsets: mesh_stream_dynamic_offsets(
                                     batch,
                                     resources.vertex_offset,
@@ -1483,7 +1496,7 @@ impl WorldPrimitiveFrontend {
         let mut operations = Vec::with_capacity(batches.len() * 12);
         let external_particle_lightmap = if batches
             .iter()
-            .any(|batch| material_uses_particle_shader(batch.key.source_program))
+            .any(|batch| material_uses_lightmap(batch.key))
         {
             let lightmap = frame.shader_environment.vanilla_lightmap.ok_or_else(|| {
                 GalError::unsupported_feature(
@@ -1626,7 +1639,7 @@ impl WorldPrimitiveFrontend {
                 });
                 if resources.lightmap_resource_layout.is_some() {
                     let lightmap = external_particle_lightmap.ok_or_else(|| {
-                        GalError::backend("external weather material pipeline has no staged Rust lightmap binding")
+                        GalError::backend("external lightmapped material pipeline has no staged Rust lightmap binding")
                     })?;
                     operations.push(CommandOp::BindResourceSet {
                         pipeline_layout: resources.pipeline_layout,

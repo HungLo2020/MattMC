@@ -43,6 +43,16 @@ These caveats describe the checked source and data. Runtime recipe-loading error
 
 Pewen logs and wood are axis-oriented with hardness 2. Planks have hardness 2 and blast resistance 3. Most building forms use cherry-wood sounds; doors and trapdoors use the cherry block-set behavior. The button is configured for **30 ticks** per activation. Signs and fence gates use the oak wood-type implementation, so visual or sound assumptions from upstream are not guaranteed.
 
+### Fence connections
+
+**Do not assume Pewen Fence joins other fences like an ordinary wooden fence.** With the bundled tags, the checked connection rules give no joining rail between two Pewen Fences, or between Pewen and an ordinary wooden fence. Pewen is absent from both the fences and wooden-fences block tags. [Fence tags][pewen-fences-tag] · [Wooden-fence tags][pewen-wooden-fences-tag] · [Placement and neighbor-update checks][pewen-fence-connections]
+
+Pewen Fence can still connect to a suitable full sturdy side face, unless that neighbor is a connection exception, and to a correctly oriented Fence Gate. A Nether Brick Fence is an unusual case: the connection check accepts it from the Pewen side, but rejects Pewen from the Nether Brick side. That is a **source-derived one-sided connection**, not a tested rendered layout or animal-containment result. Check a small section before relying on Pewen for a pen. [Connection rules][pewen-fence-connections] · [Full-face support][pewen-fence-support] · [Fence support shape][pewen-fence-shape] · [Connection exceptions][pewen-fence-exceptions] · [Gate orientation][pewen-fence-gate]
+
+These connection rules were source-reviewed at `d815d4429aac38e31ae553cbf42752e5248e24d7` on 2026-10-02. Data packs can change the tags; no in-game placement or containment test was run.
+
+Pewen Signs and Hanging Signs have separate [placement integration limits](Signs.md#pewen-signs-incomplete-integration), tracked in [#795](https://github.com/HungLo2020/MattMC/issues/795). Crafting their items does not establish successful placement.
+
 ## Branches, Pines, and resources
 
 [Pewen Branches](../items/PewenBranch.md) form supported horizontal chains in eight orientations and can be waterlogged. Removing their connecting support causes break checks that can propagate to nearby branches. The outward neighbor controls the leafy-tip state. [Pewen Pines](../items/PewenPines.md) is a separate non-colliding plant placed above the trunk, needing a sturdy upper face below it.
@@ -88,3 +98,11 @@ Reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. Source/dat
 - [Pewen boat recipe](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/resources/data/minecraft/recipe/pewen_boat.json)
 
 Additional branch/foliage review at `b81c01943c9f3254e713c365a1dd633392929cb2`: [branch behavior](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexscaves/server/block/PewenBranchBlock.java), [Pines support](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/alexscaves/server/block/PewenPinesBlock.java), and [branch loot](https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/loot_table/blocks/pewen_branch.json).
+
+[pewen-fences-tag]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/resources/data/minecraft/tags/block/fences.json
+[pewen-wooden-fences-tag]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/resources/data/minecraft/tags/block/wooden_fences.json
+[pewen-fence-connections]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/FenceBlock.java#L60-L117
+[pewen-fence-support]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/SupportType.java#L12-L16
+[pewen-fence-shape]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/CrossCollisionBlock.java#L37-L74
+[pewen-fence-exceptions]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/Block.java#L243-L250
+[pewen-fence-gate]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/FenceGateBlock.java#L207-L209

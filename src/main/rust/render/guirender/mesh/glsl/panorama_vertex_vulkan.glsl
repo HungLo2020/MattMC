@@ -1,6 +1,6 @@
 #version 450
 layout(set = 0, binding = 0, std430) readonly buffer GuiMeshVertices { vec4 vertex_words[]; };
-layout(set = 0, binding = 1, std140) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; };
+layout(set = 0, binding = 1, std140) uniform GuiMeshFrame { vec4 raster_extent; vec4 light0; vec4 light1; vec4 uv_transform_u; vec4 uv_transform_v; };
 layout(location = 0) out vec3 v_ray;
 void main() {
     int base = gl_VertexIndex * 3;

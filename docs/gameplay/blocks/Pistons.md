@@ -18,6 +18,14 @@ To craft one Sticky Piston, put one [Slimeball](../items/Slimeball.md) directly 
 
 A pickaxe is the tagged mining tool for both Pistons, but neither sets a correct-tool requirement for its own ordinary Survival drop. Each returns its matching item. Retract the mechanism and let it settle before collecting the base; the extended head and moving-block stage have separate removal behavior.
 
+## Piston Head and Moving Piston
+
+`minecraft:piston_head` is the attached end of an extended Piston, not a separate inventory item. **Breaking the head also removes its matching extended base.** In ordinary Survival, the base follows its normal drop path; the head itself has no loot. Creative breaking removes that matching base without drops. A head supported by a stationary base must match its direction and ordinary/sticky type; a same-facing Moving Piston can also support the head during movement. Picking the head selects the corresponding Piston or Sticky Piston item. [Head registration][parts-head-registration] · [Matching, removal, support, and pick-block][parts-head] · [Active player-break path][parts-break] · [Removal callback dispatch][parts-removal] · [Base drop dispatch][parts-drops]
+
+`minecraft:moving_piston` is the temporary stage carrying a block during movement. It has no separate inventory item, cannot be mined normally in Survival, and returns no pick-block item. Its special player-destruction callback can remove an extended piston base behind it without dropping that base; this is not a safe way to collect a mechanism. Its loot callback uses the carried block's loot only while the required moving-block data is present, and otherwise returns nothing. **Let movement finish, retract the Piston, then collect its base.** [Moving registration][parts-moving-registration] · [Moving-stage destruction, loot, and pick-block][parts-moving] · [Active player-break path][parts-break]
+
+These part-specific rules were source-reviewed at `d815d4429aac38e31ae553cbf42752e5248e24d7` on 2026-10-02. No in-game head removal, motion-stage destruction, or collection test was run.
+
 ## Facing and power
 
 The head can point in any of the six directions. Placement points it **opposite your nearest look direction**, usually toward you for a horizontal placement. Check the head before placing the load.
@@ -35,12 +43,13 @@ Pistons queue **block events** and recheck power when those events run. They do 
 - Obsidian, Crying Obsidian, Respawn Anchors, Reinforced Deepslate, and blocks with unbreakable hardness are rejected
 - Extended Pistons cannot be moved. Retracted Pistons can be moved when the other rules allow it
 - Ordinary block-entity containers such as Chests, Hoppers, Dispensers, and Droppers are not movable storage here
-- Some blocks are destroyed instead of moved. Torch and Sugar Cane registrations use this behavior; the destruction path runs their normal resource-drop rules
+- Shulker Boxes take the destruction route instead: see [packed-box recovery](ShulkerBox.md#dispenser-placement-and-piston-recovery) for the normal-loot and block-drop conditions
+- Some blocks are destroyed instead of moved. Torch and Sugar Cane registrations use this behavior; the destruction path runs their normal resource-drop rules. See [Sugar Cane harvesting](SugarCane.md#piston-harvesting-without-replanting) for cutting height, regrowth clearance and loose-item collection, or [Pumpkin and Melon harvesting](PumpkinAndMelon.md#piston-fruit-harvesting) for fruit targeting and no-tool loot
 - [Glazed Terracotta](Terracotta.md#pistons-and-sticky-blocks) is push-only: an ordinary push can move it, but a Sticky Piston cannot directly pull it back
 
 World borders and vertical build limits also restrict movement. Do not use the list as a complete catalog of every integrated block's behavior.
 
-**Slime and Honey Blocks** can attach eligible neighboring blocks to the moving group. Slime and Honey do not stick to each other. A neighboring support or wall may add an unwanted load, and all attached moved blocks count toward the same 12-block limit.
+**[Slime and Honey Blocks](SlimeAndHoneyBlocks.md#pistons-and-neighboring-blocks)** can attach eligible neighboring blocks to the moving group. Slime and Honey do not stick to each other. A neighboring support or wall may add an unwanted load, and all attached moved blocks count toward the same 12-block limit.
 
 ## Small example: a retractable block
 
@@ -84,3 +93,11 @@ Source-reviewed at `3e85592c4c78ebb420302360667a6c230dc0318d` on 2026-10-02. Reg
 - [Moving-stage ticker and removal behavior](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/piston/MovingPistonBlock.java)
 - [Motion, settling, waterlogging, and saved state](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/piston/PistonMovingBlockEntity.java)
 - [Active block-entity tick dispatch](https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/chunk/LevelChunk.java)
+
+[parts-head-registration]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/Blocks.java#L808-L810
+[parts-head]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/piston/PistonHeadBlock.java#L64-L125
+[parts-break]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L273-L292
+[parts-removal]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/chunk/LevelChunk.java#L325-L327
+[parts-drops]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/Level.java#L256-L284
+[parts-moving-registration]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/Blocks.java#L890-L904
+[parts-moving]: https://github.com/HungLo2020/MattMC/blob/d815d4429aac38e31ae553cbf42752e5248e24d7/src/main/java/net/minecraft/world/level/block/piston/MovingPistonBlock.java#L68-L118

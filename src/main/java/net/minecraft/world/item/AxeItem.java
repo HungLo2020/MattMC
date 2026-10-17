@@ -54,8 +54,8 @@ public class AxeItem extends Item {
 		.put(Blocks.BAMBOO_BLOCK, Blocks.STRIPPED_BAMBOO_BLOCK)
 		.build();
 
-	public AxeItem(ToolMaterial toolMaterial, float f, float g, Item.Properties properties) {
-		super(properties.axe(toolMaterial, f, g));
+	public AxeItem(Item.Properties properties) {
+		super(properties);
 	}
 
 	@Override

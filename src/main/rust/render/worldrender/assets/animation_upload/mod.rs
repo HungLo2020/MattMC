@@ -135,7 +135,7 @@ impl UploadQueue {
             Err(error) => {
                 // No accepted submission owns this fresh lease. GAL handles any
                 // backend failure retirement; the clock candidate is unchanged.
-                let _ = gal.destroy(upload);
+                let _ = gal.retire(upload);
                 return Err(error);
             }
         };

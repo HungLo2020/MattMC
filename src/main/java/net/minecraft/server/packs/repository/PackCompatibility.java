@@ -24,14 +24,9 @@ public enum PackCompatibility {
 		return this == COMPATIBLE;
 	}
 
+	/** Decided by Rust (`assets/packs/metadata.rs`). */
 	public static PackCompatibility forVersion(InclusiveRange<PackFormat> inclusiveRange, PackFormat packFormat) {
-		if (((PackFormat)inclusiveRange.minInclusive()).major() == Integer.MAX_VALUE) {
-			return UNKNOWN;
-		} else if (((PackFormat)inclusiveRange.maxInclusive()).compareTo(packFormat) < 0) {
-			return TOO_OLD;
-		} else {
-			return packFormat.compareTo((PackFormat)inclusiveRange.minInclusive()) < 0 ? TOO_NEW : COMPATIBLE;
-		}
+		return net.minecraft.server.packs.metadata.pack.NativePackFormats.compatibility(inclusiveRange, packFormat);
 	}
 
 	public Component getDescription() {

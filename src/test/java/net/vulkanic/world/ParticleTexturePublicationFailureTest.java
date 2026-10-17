@@ -29,7 +29,7 @@ class ParticleTexturePublicationFailureTest {
         var savedMaps = new IdentityHashMap<Map, Map>();
         var savedSets = new IdentityHashMap<Set, Set>();
         for (String name : List.of("WORLD_MESH_TEXTURES", "DIRTY_WORLD_MESH_TEXTURES",
-            "UPLOADED_WORLD_MESH_TEXTURES", "DIRTY_WORLD_MESH_ASSETS", "DIRTY_WORLD_MESH_SORTED_INDICES",
+            "UPLOADED_WORLD_MESH_TEXTURES", "DIRTY_WORLD_MESH_ASSETS",
             "PENDING_WORLD_MESH_RETIREMENTS")) {
             Object value = field(name);
             if (value instanceof Map map) { savedMaps.put(map, new LinkedHashMap(map)); map.clear(); }

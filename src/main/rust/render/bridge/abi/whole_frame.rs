@@ -79,6 +79,28 @@ pub struct FfiWholeFrameSubmitRequest {
     /// into its cached material-instance topology; Java never constructs a
     /// per-face vertex record for this stream.
     pub world_distant_horizons_generic_boxes: FfiSlice<FfiWorldDistantHorizonsGenericBoxRecord>,
+    /// ABI v69: off-camera static-terrain shadow casters and the frame's
+    /// full-precision terrain camera (required only when casters are present).
+    pub world_static_terrain_shadow_casters: FfiSlice<FfiStaticTerrainShadowCaster>,
+    pub static_terrain_camera: [f64; 3],
+    /// ABI v70: camera-visible static-terrain section layers, in draw order
+    /// (translucent back to front), placed with `static_terrain_camera`.
+    pub world_static_terrain_sections: FfiSlice<FfiStaticTerrainSection>,
+    /// ABI v71: raw part poses of the frame's model-rig instances; Rust
+    /// composes each rig's hierarchy and expands its part instances.
+    pub world_model_rig_poses: FfiSlice<FfiModelRigPose>,
+    /// ABI v72: the frame's active DH generic groups (boxes retained in Rust,
+    /// see `bridge/world/dh_generic_groups.rs`), placed with `dh_generic_camera`.
+    pub world_dh_generic_group_instances: FfiSlice<FfiDhGenericGroupInstance>,
+    pub dh_generic_camera: [f64; 3],
+    /// ABI v74: opaque immutable CPU visibility snapshot; mutually exclusive
+    /// with inline LOD records. Decode owns it before queued execution.
+    pub world_lod_frame_id: u64,
+    pub world_lod_frame_lifecycle: i64,
+    pub world_lod_frame_count: u64,
+    /// ABI v79: bounded immutable CPU terrain selection; excludes inline records.
+    pub world_terrain_frame_owner: u64,
+    pub world_terrain_frame_id: u64,
 }
 
 #[repr(C)]

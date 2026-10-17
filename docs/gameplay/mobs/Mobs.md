@@ -6,12 +6,53 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 
 ## Featured routes
 
+- **Shared encounter rules:** [natural spawning and despawning](../mechanics/NaturalSpawning.md): population caps, player distance, ticking terrain and retention differences
+
+- **Villager population:** [breeding and raising residents](Villager.md#breeding-and-population): food delivery/sharing, reachable spare homes, failed attempts, birth and growth
+
+- **Anteater care:** [Anteater](Anteater.md): honey breeding, baby riding, live-ant predation, Dirt/Sugar actions and current feeding/rendering limits
+
+- **Rain Frog care:** [Rain Frog](RainFrog.md): browser eggs, sand burrowing, Shovel persistence, baby offspring, and current food/weather/rendering limits
+- **Comb Jelly and Frilled Shark:** [Comb Jelly](CombJelly.md), [Frilled Shark](FrilledShark.md), and [Bucket of Frilled Shark](../items/BucketOfFrilledShark.md): aquatic care, predation, pressure appearance and distinct bucket-release limits
+
+- **Small mobs and night encounters:** [Bat](Bat.md), [Phantom](Phantom.md), [Silverfish](Silverfish.md), and [Endermite](Endermite.md): cave wildlife, default-off insomnia, infestation and Pearl-spawn lifetimes
+
+- **Potion and wind encounters:** [Witch](Witch.md), [Bogged](Bogged.md), [Stray](Stray.md), and [Breeze](Breeze.md): splash effects, special arrows, shearing and Trial Chamber wind attacks
+
+- **Nether encounters:** [Ghast](Ghast.md), [Hoglin](Hoglin.md), [Zoglin](Zoglin.md), and [Zombified Piglin](ZombifiedPiglin.md): fireball returns, breeding/repellents, conversion and group anger
+
+- **Imported water creatures:** [Alligator Snapping Turtle](AlligatorSnappingTurtle.md), [Catfish](Catfish.md), and [Lobster](Lobster.md): care, collection, bucket limitations and actual acquisition
+
+- **Fungal and mountain animals:** [Mooshroom](Mooshroom.md), [Goat](Goat.md), and [Polar Bear](PolarBear.md): food/variant care, horns, and cub-protection limits
+
+- **Allay collection:** [Allay](Allay.md): loose-item matching, player/Note Block deliveries, Jukebox dancing and duplication
+
+- **Mansion illagers:** [Evoker](Evoker.md), [Vindicator](Vindicator.md), [Vex](Vex.md), and [Woodland Mansion](../structures/WoodlandMansion.md): generated residents, spells, door hazards and loot
+
+- **Illusioner encounters:** [Illusioner](Illusioner.md): deliberate spawning, bow attacks, Invisibility/Blindness, raid-joining limits and drops
+
+- **Turtles and Terrapins:** [Turtle](Turtle.md) and [Terrapin](Terrapin.md): home beaches, egg lifecycles, Scutes, air and bucket limitations
+
+- **Fish and squid care:** [Cod](Cod.md), [Salmon](Salmon.md), [Tropical Fish](TropicalFish.md), [Pufferfish](Pufferfish.md), [Squid](Squid.md), and [Glow Squid](GlowSquid.md): water conditions, capture/retention, variants, sting and ink routes
+
+- **Raid encounters:** [Pillager](Pillager.md), [Ravager](Ravager.md), [Outposts](../structures/PillagerOutpost.md), and [Raids](../mechanics/Raid.md): natural selection, omen gates and event behavior
+
+- **Airborne bundled creatures:** [Spectre](Spectre.md), [Cosmaw](Cosmaw.md), and [Cosmic Cod](CosmicCod.md): lure, hunting, bucket and companion-integration limits
+
+- **Imported arthropods:** [Cave Centipede](CaveCentipede.md) and [Tarantula Hawk](TarantulaHawk.md): actual encounters, sting/loot behavior and resource limitations
+
+- **Bastion residents:** [Piglin](Piglin.md), [Piglin Brute](PiglinBrute.md), and [Bastion Remnant](../structures/BastionRemnant.md): gold, barter and looting limits
+- **Monument expeditions:** [Guardian](Guardian.md), [Elder Guardian](ElderGuardian.md), and [Ocean Monument](../structures/OceanMonument.md): spawning, attacks, fatigue and rewards
+
 - **Animal transport:** [Horse](Horse.md), [Donkey](Donkey.md), [Mule](Mule.md), [Llama](Llama.md), [Trader Llama](TraderLlama.md), and [Camel](Camel.md)
 - **Built defenders:** [Iron Golem](IronGolem.md) and [Snow Golem](SnowGolem.md), including creation, repair, targeting, and environmental limits
 - **Crocodile integration:** [Crocodile](Crocodile.md) and [Crocodile Scute](../items/CrocodileScute.md) distinguish active fish/egg behavior from imported placeholders
 
 - **Farm and companion care:** [Cow](Cow.md), [Sheep](Sheep.md), [Chicken](Chicken.md), [Bee](Bee.md), [Armadillo](Armadillo.md), [Wolf](Wolf.md), [Cat](Cat.md), [Ocelot](Ocelot.md), [Axolotl](Axolotl.md), [Dolphin](Dolphin.md), [Frog](Frog.md), and [Tadpole](Tadpole.md)
 - **Hostile encounters and bosses:** [Creeper](Creeper.md), [Skeleton](Skeleton.md), [Zombie](Zombie.md), [Spider](Spider.md), [Enderman](Enderman.md), [Blaze](Blaze.md), [Wither Skeleton](WitherSkeleton.md), [Slime](Slime.md), [Magma Cube](MagmaCube.md), [Wither](Wither.md), [Ender Dragon](EnderDragon.md), and [Shulker](Shulker.md)
+- **Sculk encounter:** [Warden](Warden.md), including vibration/smell detection, anger, sonic attacks and retreat limits
+- **Nautilus care and encounters:** [Nautilus](Nautilus.md) and [Zombie Nautilus](ZombieNautilus.md): listed eggs, taming, equipment and breathing limits
+- **Undead variants:** [Husk](Husk.md), [Drowned](Drowned.md), and [Zombie Villager](ZombieVillager.md): conversions, equipment drops and curing
 - **Bundled animals and caves:** use the [Alex's Mobs](../ContentGuide.md#alexs-mobs-additions) and [Alex's Caves](../ContentGuide.md#alexs-caves-additions) sections for reviewed feeding, ownership, resources, and availability limits
 
 ## Passive Mobs
@@ -108,6 +149,7 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 - [Mimic Octopus](MimicOctopus.md)
 - [Moose](Moose.md)
 - [Mudskipper](Mudskipper.md)
+- [Nautilus](Nautilus.md)
 - [Orca](Orca.md)
 - [Panda](Panda.md)
 - [Piglin](Piglin.md)
@@ -169,10 +211,12 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 - [Vallumraptor](Vallumraptor.md)
 - [Vex](Vex.md)
 - [Vindicator](Vindicator.md)
+- [Warden](Warden.md)
 - [Witch](Witch.md)
 - [Wither Skeleton](WitherSkeleton.md)
 - [Zoglin](Zoglin.md)
 - [Zombie](Zombie.md)
+- [Zombie Nautilus](ZombieNautilus.md)
 - [Zombie Villager](ZombieVillager.md)
 
 ## Bosses & Mini-Bosses
@@ -180,5 +224,4 @@ Use the [content guide](../ContentGuide.md) for curated source-reviewed routes t
 - [Elder Guardian](ElderGuardian.md)
 - [Ender Dragon](EnderDragon.md)
 - [Ravager](Ravager.md)
-- [Warden](Warden.md)
 - [Wither](Wither.md)

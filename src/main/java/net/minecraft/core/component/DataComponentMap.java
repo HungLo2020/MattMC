@@ -78,6 +78,12 @@ public interface DataComponentMap extends Iterable<TypedDataComponent<?>>, DataC
 		};
 	}
 
+	/** Exact managed default backing; custom maps never opt in implicitly. */
+	static net.minecraft.world.item.NativeItemState.DefaultMap nativeDefaults(DataComponentMap map) {
+		return map instanceof Builder.SimpleMap simple && simple.map() instanceof net.minecraft.world.item.NativeItemState.DefaultMap nativeMap
+			&& nativeMap.prepareNativeRoles() ? nativeMap : null;
+	}
+
 	static DataComponentMap.Builder builder() {
 		return new DataComponentMap.Builder();
 	}
@@ -154,9 +160,7 @@ public interface DataComponentMap extends Iterable<TypedDataComponent<?>>, DataC
 			if (map.isEmpty()) {
 				return DataComponentMap.EMPTY;
 			} else {
-				return map.size() < 8
-					? new DataComponentMap.Builder.SimpleMap(new Reference2ObjectArrayMap<>(map))
-					: new DataComponentMap.Builder.SimpleMap(new Reference2ObjectOpenHashMap<>(map));
+				return new DataComponentMap.Builder.SimpleMap(net.minecraft.world.item.NativeItemState.defaultMap(map));
 			}
 		}
 

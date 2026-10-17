@@ -1,17 +1,43 @@
 # Jungle Boat
 
+**Jungle Boat** (`minecraft:jungle_boat`) is a **two-seat** water vehicle without a cargo inventory. The item stacks to **one**. [Item registration][item] · [Capacity][capacity]
+
 ## Obtaining
 
-Jungle Boat is crafted from matching wood materials and can also be obtained from the Creative Menu.
+Craft **1 Jungle Boat from 5 [Jungle Planks](JunglePlanks.md)** in a [Crafting Table](../blocks/CraftingTable.md). Put planks at the two ends of one row and fill the row below with three more. No shovel is required. [Recipe][recipe] Use Jungle Planks in every occupied slot; another wood type or a mixed-plank pattern will not produce this boat.
+
+This item has a [Creative inventory entry][creative].
 
 ## Usage
 
-Jungle Boat is used for travel across water. Place it, enter it, and steer it like other boats.
+Use it to travel with another eligible passenger. Follow [placing and rowing](OakBoat.md#placing-and-rowing) for the controls and [carrying another passenger](OakBoat.md#carrying-another-passenger) for mob-loading restrictions. Two seats do not mean every mob can board. [Placement][placement] · [Passenger capacity][capacity]
+
+For cargo, craft **1 Jungle Boat with 1 [Chest](../blocks/Chest.md)** into a [Jungle Boat with Chest](JungleBoatWithChest.md). That exchanges the second seat for 27 storage slots; use the crafting grid rather than trying to attach a Chest to a placed boat. [Upgrade recipe][upgrade]
 
 ## Behavior
 
-It can carry riders and can be broken to return itself as an item. Chest variants also provide mobile storage and drop their contents when broken.
+Damaging the placed boat until it breaks returns a fresh matching item when **`doEntityDrops` is enabled**. Creative attacks discard the vehicle instead. See [recovery rules](OakBoat.md#recovering-and-dispensing) before collecting it. [Damage and item drop][damage]
+
+This item supplies **1,200 default furnace burn ticks** through the boat fuel tag. Burning it consumes the item. [Fuel table][fuel] · [Boat tag][boats-tag]
+
+Its [Dispenser](Dispenser.md) placement is registered. Follow the shared [water and fallback conditions](OakBoat.md#recovering-and-dispensing). [Dispenser registration][dispenser]
 
 ## Notes
 
-* This item is registered as `minecraft:jungle_boat`.
+The placed boat is registered separately from its inventory item and returns the matching `jungle_boat` item. [Entity registration][entity]
+
+Related: [Jungle Boat with Chest](JungleBoatWithChest.md) · [Oak Boat](OakBoat.md) · [Oak Boat with Chest](OakBoatWithChest.md) · [Transport](../mechanics/Transport.md#choosing-a-vehicle) · [Items](Items.md)
+
+Source-reviewed on **2026-10-04** at `f5473e41dc4af8ced756db517fada27288df07a3`. Registrations, recipes and their loader, fuel tags, and shared vehicle callbacks were checked. No in-game crafting, placement, rowing, cargo, recovery, dispenser, or appearance test was run.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/Items.java#L1225-L1227
+[entity]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/EntityType.java#L813-L816
+[creative]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1519
+[recipe]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/recipe/crafting/jungle_boat.json
+[capacity]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/vehicle/AbstractBoat.java#L730-L759
+[placement]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/BoatItem.java#L30-L87
+[upgrade]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/recipe/crafting/jungle_chest_boat.json
+[damage]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/entity/vehicle/VehicleEntity.java#L34-L75
+[fuel]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/level/block/entity/FuelValues.java#L38-L108
+[boats-tag]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/tags/item/boats.json
+[dispenser]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/core/dispenser/DispenseItemBehavior.java#L145-L164

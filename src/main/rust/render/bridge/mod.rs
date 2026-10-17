@@ -22,10 +22,12 @@ pub(crate) mod accounting;
 pub(crate) mod canonical;
 pub(crate) mod capabilities;
 pub(crate) mod context;
+pub(crate) mod dh_collector;
 pub(crate) mod frame;
 pub(crate) mod gui;
 pub(crate) mod layout;
 pub(crate) mod memory;
+pub(crate) mod pipeline;
 pub(crate) mod resources;
 pub(crate) mod shader_pack;
 pub(crate) mod sprite_animation;
@@ -42,6 +44,7 @@ pub(crate) use self::capabilities::*;
 pub(crate) use self::context::*;
 pub(crate) use self::gui::*;
 pub(crate) use self::memory::*;
+pub(crate) use self::pipeline::*;
 #[cfg(test)]
 pub(crate) use self::resources::*;
 pub(crate) use self::status::*;
@@ -70,12 +73,11 @@ use crate::render::vulkanic::frame::{
 };
 use crate::render::vulkanic::gal::VulkanicGal;
 use crate::render::guirender::frontend::{
-    GuiAffineQuadRequest, GuiAssetPayload, GuiFrontend, GuiRawImageAssetPayload, GuiRawImageFormat,
+    GuiAffineQuadRequest, GuiAssetPayload, GuiFrontend, GuiRawImageAssetPayload, GuiRawImageFormat, GuiRawImageSourceFormat,
     GuiSpriteRequest, GuiSubmitStats, GuiTiledQuadRequest, GUI_MAX_RAW_IMAGES,
     GUI_MAX_VIEWPORT_AXIS,
 };
 use crate::render::guirender::mesh::{
-    validate_batch as validate_gui_mesh_batch, validate_batches as validate_gui_mesh_batches,
     GuiMeshBatchRequest, GuiMeshLightingMode, GuiMeshMaterialMode, GuiMeshVertex,
     GUI_MESH_MAX_BATCHES, GUI_MESH_MAX_INDICES, GUI_MESH_MAX_VERTICES,
 };

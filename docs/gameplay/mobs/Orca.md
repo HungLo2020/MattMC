@@ -10,9 +10,11 @@ The verified setup route is the Creative spawn egg, or an administrator-provided
 
 ## Swimming together and Orca's Might
 
-Swim near an Orca that is not targeting you. Its companion goal looks for a nearby swimming player and moves alongside them; while that goal runs, it can apply **1,000 ticks of Orca's Might**, about **50 seconds at 20 TPS**. Later applications can maintain the effect. Feeding is not a prerequisite in this goal. [Companion goal][companion]
+Swim near an Orca that is not targeting you. Its companion goal selects the nearest non-spectator player within **24 blocks**, requires that player to be swimming, and only continues while they are swimming and **less than 16 blocks away**. While running, each goal update has a **1-in-6 chance** to grant **Orca's Might I for 1,000 ticks**, about **50 seconds at 20 TPS**. Feeding is not required. [Companion selection and grant][custom-orca-goal] · [Player selection][custom-orca-player]
 
-The granted effect adds **3 to the attack-speed attribute** at its supplied level. That attribute controls how quickly a player's attack strength recharges between attacks. It does not directly add damage to each hit. The active effect is registered as `minecraft:orcas_might`. [Effect registration][effects] · [Attribute modifier][might] · [Attack recharge][recharge]
+A later ordinary grant refreshes the remaining timer to 1,000 ticks when it is shorter; it does not add another 50 seconds or another level. Leaving the swimming encounter stops further grants but does not itself remove an existing timer. An angry Orca has a separate removal rule below. [Companion goal][custom-orca-goal] · [Same-effect refresh][custom-orca-refresh]
+
+The effect adds **3 attack-speed attribute points per level**: +3 at the companion's level I, or +6 at level II if another source supplies it. That attribute controls how quickly a player's attack strength recharges between attacks; it does not directly add damage to each hit. The active effect is `minecraft:orcas_might`. Its modifier is installed when the effect is applied and removed when it expires or is cleared, including by [Milk](../items/MilkBucket.md). [Effect modifier][custom-orca-modifier] · [Level scaling][custom-orca-scale] · [Attack recharge][recharge] · [Apply and remove][custom-orca-lifecycle] · [Milk removal][custom-orca-milk]
 
 An Orca targeting a player removes Orca's Might from that target. Treat the benefit as a reason to keep the encounter peaceful, not protection from the Orca itself. The companion goal can be interrupted by higher-priority behavior such as seeking air. [Effect removal and goal priorities][orca]
 
@@ -76,3 +78,13 @@ Related: [Orca Spawn Egg](../items/OrcaSpawnEgg.md) · [Hammerhead Shark](Hammer
 [loot-key]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/entity/EntityType.java#L2064-L2066
 [loot-fallback]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/server/ReloadableServerRegistries.java#L115-L121
 [death]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/entity/LivingEntity.java#L1466-L1527
+
+Orca's Might details additionally source-reviewed on **2026-10-02** at `8b9173b399a629578a7bf0168e4d3ea32b10e8a6`. No in-game effect or attack-timing test was run.
+
+[custom-orca-goal]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/alexsmobs/entity/EntityOrca.java#L413-L455
+[custom-orca-player]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/level/EntityGetter.java#L93-L100
+[custom-orca-refresh]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/effect/MobEffectInstance.java#L123-L147
+[custom-orca-modifier]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/alexsmobs/effect/EffectOrcaMight.java#L9-L18
+[custom-orca-scale]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/effect/MobEffect.java#L201-L204
+[custom-orca-lifecycle]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/entity/LivingEntity.java#L1046-L1090
+[custom-orca-milk]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/item/component/Consumables.java#L64

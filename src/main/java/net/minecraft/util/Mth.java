@@ -45,6 +45,11 @@ public class Mth {
 	private static final double[] ASIN_TAB = new double[257];
 	private static final double[] COS_TAB = new double[257];
 
+	/** A copy of the sine table {@link #sin} and {@link #cos} read, for native code that must match them. */
+	public static float[] sinTable() {
+		return SIN.clone();
+	}
+
 	public static float sin(float f) {
 		return SIN[(int)(f * 10430.378F) & 65535];
 	}

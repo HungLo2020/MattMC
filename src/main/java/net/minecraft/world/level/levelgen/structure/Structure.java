@@ -94,6 +94,17 @@ public abstract class Structure {
 		LevelHeightAccessor levelHeightAccessor,
 		Predicate<Holder<Biome>> predicate
 	) {
+		if (this.nativeStub() != null) {
+			StructureStart nativeStart = net.minecraft.world.level.levelgen.NativeStructureStubs.generate(this, registryAccess, chunkGenerator, biomeSource,
+				randomState, structureTemplateManager, l, chunkPos, i, levelHeightAccessor, predicate);
+			if (nativeStart != null) return nativeStart;
+		}
+		if (this instanceof net.minecraft.world.level.levelgen.structure.structures.JigsawStructure jigsaw) {
+			// Rust plans jigsaw starts when it can.
+			StructureStart nativeStart = net.minecraft.world.level.levelgen.NativeJigsaw.generate(jigsaw, registryAccess, chunkGenerator, biomeSource, randomState,
+				structureTemplateManager, l, chunkPos, i, levelHeightAccessor, predicate);
+			if (nativeStart != null) return nativeStart;
+		}
 		ProfiledDuration profiledDuration = JvmProfiler.INSTANCE.onStructureGenerate(chunkPos, resourceKey, holder);
 		Structure.GenerationContext generationContext = new Structure.GenerationContext(
 			registryAccess, chunkGenerator, biomeSource, randomState, structureTemplateManager, l, chunkPos, levelHeightAccessor, predicate
@@ -200,6 +211,46 @@ public abstract class Structure {
 	}
 
 	protected abstract Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext);
+
+	/**
+	 * For {@code NativeStructureStubs}: {@code [family, a, b]} when the start position draws no
+	 * randomness and Rust can find it (see {@code structure/stubs.rs}), else null.
+	 */
+	@org.jetbrains.annotations.Nullable
+	public int[] nativeStub() {
+		return null;
+	}
+
+	/** The pieces {@code findGenerationPoint}'s stub would build, with the context's random. */
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext,
+		net.minecraft.core.BlockPos stub, net.minecraft.world.level.block.Rotation rotation) {
+		throw new UnsupportedOperationException();
+	}
+
+	/** {@code small_plan.rs}'s params for this structure's pieces, or null when Java builds them. */
+	@org.jetbrains.annotations.Nullable
+	public int[] nativePlanParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager structureTemplateManager) {
+		return null;
+	}
+
+	/** Builds the pieces {@code small_plan.rs} planned. */
+	public void nativePlanPieces(StructurePiecesBuilder structurePiecesBuilder,
+		net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager structureTemplateManager, int[] words) {
+		throw new UnsupportedOperationException();
+	}
+
+	/** Further params after the stub's lists (see {@code stubs.rs}), or null for Java's path. */
+	@org.jetbrains.annotations.Nullable
+	public int[] nativeStubParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager structureTemplateManager,
+		ChunkGenerator chunkGenerator, LevelHeightAccessor levelHeightAccessor) {
+		return new int[0];
+	}
+
+	/** {@link #nativeStubPieces} with the family's extra words ({@code [setup, template, flags]} for ruined portals) and planned pieces (mineshafts). */
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext,
+		net.minecraft.core.BlockPos stub, net.minecraft.world.level.block.Rotation rotation, long[] extra, int[] pieces) {
+		this.nativeStubPieces(structurePiecesBuilder, generationContext, stub, rotation);
+	}
 
 	public Optional<Structure.GenerationStub> findValidGenerationPoint(Structure.GenerationContext generationContext) {
 		return this.findGenerationPoint(generationContext).filter(generationStub -> isValidBiome(generationStub, generationContext));

@@ -333,13 +333,13 @@ impl VulkanicGal {
         let view = self.texture_view_info(desc.texture_view)?;
         let sampler = self.samplers.get(desc.sampler)?;
         if trace_label_matches("MATTMC_GAL_TRACE_SAMPLER_LABEL", &desc.label) {
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "[MattMC sampler-trace] combined label={} view=0x{:016x} texture=0x{:016x} sampler=0x{:016x}",
                 desc.label,
                 desc.texture_view.raw(),
                 view.texture.raw(),
                 desc.sampler.raw(),
-            );
+            ));
         }
         if !view.usages.contains(&TextureUsage::Sampled) {
             return self.validation_error(GalError::resource(

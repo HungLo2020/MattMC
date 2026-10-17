@@ -1,5 +1,7 @@
 package net.alexscaves.server.block;
 
+import net.minecraft.world.level.block.state.properties.NativePropertyDefinitions;
+
 import net.alexscaves.server.entity.living.DinosaurEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -32,19 +34,23 @@ import java.util.List;
 
 public abstract class DinosaurEggBlock extends Block {
     public static final IntegerProperty HATCH = BlockStateProperties.HATCH;
-    public static final BooleanProperty NEEDS_PLAYER = BooleanProperty.create("needs_player");
+    public static final BooleanProperty NEEDS_PLAYER = NativePropertyDefinitions.booleanProperty("DINOSAUREGGBLOCK_NEEDS_PLAYER");
 
     private final VoxelShape voxelShape;
 
     protected DinosaurEggBlock(Properties properties, VoxelShape voxelShape) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(NEEDS_PLAYER, false));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(NEEDS_PLAYER, false));
+        }
         this.voxelShape = voxelShape;
     }
 
     protected DinosaurEggBlock(Properties properties, int widthPx, int heightPx) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(NEEDS_PLAYER, false));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(NEEDS_PLAYER, false));
+        }
         int px = (16 - widthPx) / 2;
         this.voxelShape = Block.box(px, 0, px, 16 - px, heightPx, 16 - px);
     }

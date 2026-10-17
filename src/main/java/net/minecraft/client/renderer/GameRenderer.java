@@ -556,7 +556,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		AABB aabb = cameraEntity.getBoundingBox().inflate(SCREEN_SHAKE_SEARCH_RADIUS);
 		
 		// Find nearby entities that implement ShakesScreen
-		for (Entity entity : this.minecraft.level.getEntities(cameraEntity, aabb)) {
+		for (Entity entity : this.minecraft.level.getScreenShakeSources(cameraEntity, aabb)) {
 			if (entity instanceof ShakesScreen shakesScreen) {
 				double entityDistance = entity.distanceTo(cameraEntity);
 				if (shakesScreen.canFeelShake(cameraEntity) && entityDistance < distance) {
@@ -618,6 +618,9 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public boolean renderRustVulkanWholeFrameShell(DeltaTracker deltaTracker, boolean bl) {
+		// Observe one common frame boundary even while a reload overlay skips
+		// GUI item collection; independent counters would otherwise drift.
+		net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.beginFrame();
 		net.minecraft.client.dev.GraphicsAuditHandFoilTiming.beginFrame();
 		net.minecraft.client.dev.GraphicsAuditGroundFoilTiming.beginFrame();
 		net.minecraft.client.dev.GraphicsAuditEquipmentFoilTiming.beginFrame();

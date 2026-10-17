@@ -9,6 +9,35 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GuiAtlasReferencePublicationTest {
+    @Test void retainedTemplateSourcesStayLiveThroughRebindingAndRetireAfterTheirLastInstance() {
+        var table = new GuiAtlasReferencePublication();
+        for (long id : new long[]{101,102,103}) table.stage(reference(id,7));
+        var vertices = List.of(new net.vulkanic.bridge.VulkanicGalBridge.GuiMeshVertexRecord(
+            new float[]{0,0,0},new float[]{0,0},new float[]{0,0},-1,0,6,0));
+        var bounds = new net.vulkanic.bridge.VulkanicGalBridge.GuiBlockItemRasterRecord(2,new double[]{0,0,0,1,1,1});
+        var batches = new java.util.ArrayList<net.vulkanic.bridge.VulkanicGalBridge.GuiMeshBatchRecord>();
+        for (int layer = 0; layer < 2; layer++) batches.add(new net.vulkanic.bridge.VulkanicGalBridge.GuiMeshBatchRecord(
+            420,layer,1,3,101+layer,9,0,new float[]{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1},
+            new float[]{1,0,0,1,0,0},0,0,16,16,320,180,0,0,0,0,0,0,0,0,
+            List.of(vertices.getFirst(),vertices.getFirst(),vertices.getFirst()),List.of(0,1,2),null,0,null,bounds,null));
+        try (var owner = net.vulkanic.bridge.VulkanicGalBridge.createGuiItemTemplate(batches,new int[]{-1,-1},2)) {
+            assertNotNull(owner);
+            var instance = net.vulkanic.bridge.VulkanicGalBridge.GuiMeshBatchRecord.nativeItem(owner,
+                new net.vulkanic.bridge.VulkanicGalBridge.StandardItemFoilRecord[2],420,91,new float[]{1,0,0,1,0,0},
+                0,0,16,16,320,180,0,0,0,0,0,null);
+            assertEquals(0,instance.assetId()); // dependencies belong to the retained layers
+            table.retainUsedCommands(List.of(),List.of(),List.of(instance));
+            table.flush(GuiAtlasReferencePublicationTest::accepted,(revision,refs) ->
+                assertEquals(List.of(101L,102L),refs.stream().map(GuiAtlasReferenceRecord::assetId).toList()));
+            table.stage(reference(102,8));
+            table.retainUsedCommands(List.of(),List.of(),List.of(instance.withSequence(92)));
+            table.flush(GuiAtlasReferencePublicationTest::accepted,(revision,refs) -> {
+                assertEquals(2,refs.size());assertEquals(8L,refs.getLast().atlasGeneration());
+            });
+            table.retainUsedCommands(List.of(),List.of(),List.of());
+            table.flush(GuiAtlasReferencePublicationTest::accepted,(revision,refs) -> assertTrue(refs.isEmpty()));
+        }
+    }
     @Test void nestedOnlyItemSourcesStayLiveUntilTheirLastSemanticUse() {
         var table = new GuiAtlasReferencePublication();
         table.stage(reference(101,7));
@@ -104,8 +133,9 @@ class GuiAtlasReferencePublicationTest {
 
     @Test void typedSourcesKeepAtlasReferencesSeparateFromImmutablePixels() {
         var pixels = new byte[] {1, 2, 3, 4};
+        // Asset adopts its (freshly produced) pixel array; its accessor hands out copies.
         var raw = new GuiItemTextureSource.Raw(new RustGalGuiRawImageAssets.Asset(11, "raw", 1, 1, pixels));
-        pixels[0] = 99;
+        raw.asset().pixels()[0] = 99;
         assertEquals(11L, raw.assetId());
         assertArrayEquals(new byte[] {1, 2, 3, 4}, raw.asset().pixels());
         var declaration = reference(101, 7);

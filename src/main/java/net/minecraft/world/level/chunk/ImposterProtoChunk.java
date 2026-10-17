@@ -34,7 +34,9 @@ public class ImposterProtoChunk extends ProtoChunk {
 	private final boolean allowWrites;
 
 	public ImposterProtoChunk(LevelChunk levelChunk, boolean bl) {
-		super(levelChunk.getPos(), UpgradeData.EMPTY, levelChunk.levelHeightAccessor, levelChunk.getLevel().palettedContainerFactory(), levelChunk.getBlendingData());
+		// Every section read goes to the wrapped chunk (getSections, getSection,
+		// getNoiseBiome), so the base allocates no placeholder sections.
+		super(levelChunk.getPos(), levelChunk.levelHeightAccessor, levelChunk.getLevel().palettedContainerFactory(), levelChunk.getBlendingData());
 		this.wrapped = levelChunk;
 		this.allowWrites = bl;
 	}
@@ -90,6 +92,12 @@ public class ImposterProtoChunk extends ProtoChunk {
 	@Override
 	public LevelChunkSection[] getSections() {
 		return this.wrapped.getSections();
+	}
+
+	@Override
+	public LevelChunkSection[] getSectionsForRead() {
+		// Subclasses may override the original getter; preserve their dispatch.
+		return this.getClass() == ImposterProtoChunk.class ? this.wrapped.getSectionsForRead() : this.getSections();
 	}
 
 	@Override

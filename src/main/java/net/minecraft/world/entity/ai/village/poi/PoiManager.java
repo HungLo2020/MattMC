@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.io.IOException;
@@ -19,6 +20,8 @@ import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.LongPredicate;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import net.minecraft.Util;
@@ -29,7 +32,6 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.SectionTracker;
 import net.minecraft.tags.PoiTypeTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.VisibleForDebug;
@@ -74,7 +76,7 @@ public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
 			chunkIOErrorReporter,
 			levelHeightAccessor
 		);
-		this.distanceTracker = new PoiManager.DistanceTracker();
+		this.distanceTracker = new PoiManager.DistanceTracker(this::isVillageCenter, this::loadedSectionKeys);
 		this.registryAccess = registryAccess;
 	}
 
@@ -336,12 +338,19 @@ public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
 	@Override
 	protected void setDirty(long l) {
 		super.setDirty(l);
-		this.distanceTracker.update(l, this.distanceTracker.getLevelFromSource(l), false);
+		this.distanceTracker.sectionChanged(l);
 	}
 
 	@Override
 	protected void onSectionLoad(long l) {
-		this.distanceTracker.update(l, this.distanceTracker.getLevelFromSource(l), false);
+		this.distanceTracker.sectionChanged(l);
+	}
+
+	/** Village membership is a POI type tag; after tags rebind, resynchronize the
+	 * native village-centre mirror with every loaded section without scheduling
+	 * graph work, as the original graph would read the new state lazily. */
+	public void refreshVillageCentres() {
+		this.distanceTracker.refreshCentres();
 	}
 
 	public void checkConsistencyWithBlocks(SectionPos sectionPos, LevelChunkSection levelChunkSection) {
@@ -382,25 +391,44 @@ public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
 			.forEach(chunkPos -> levelReader.getChunk(chunkPos.x, chunkPos.z, ChunkStatus.EMPTY));
 	}
 
-	final class DistanceTracker extends SectionTracker {
-		private final Long2ByteMap levels = new Long2ByteOpenHashMap();
+	/** Published level view of the native-owned section distance graph. Rust
+	 * owns propagation and mirrors {@link PoiManager#isVillageCenter}, which
+	 * changes only through setDirty/onSectionLoad or a tag rebind; each run
+	 * replays the original ordered {@code setLevel} calls into this map. */
+	static final class DistanceTracker {
+		final Long2ByteMap levels = new Long2ByteOpenHashMap();
+		private final PoiSectionDistance distance = new PoiSectionDistance();
+		private final PoiSectionDistance.LevelSink levelSink = this::setLevel;
+		private final LongPredicate villageCenter;
+		private final Supplier<LongIterator> loadedSections;
 
-		protected DistanceTracker() {
-			super(7, 16, 256);
+		/** {@code villageCenter} is {@link PoiManager#isVillageCenter}; {@code loadedSections}
+		 * enumerates the section entries a tag rebind may change. */
+		DistanceTracker(LongPredicate villageCenter, Supplier<LongIterator> loadedSections) {
+			this.villageCenter = villageCenter;
+			this.loadedSections = loadedSections;
 			this.levels.defaultReturnValue((byte)7);
 		}
 
-		@Override
-		protected int getLevelFromSource(long l) {
-			return PoiManager.this.isVillageCenter(l) ? 0 : 7;
+		/** {@code update(l, getLevelFromSource(l), false)}. */
+		void sectionChanged(long l) {
+			this.distance.sectionChanged(l, this.villageCenter.test(l));
 		}
 
-		@Override
+		void refreshCentres() {
+			this.distance.clearCentres();
+			for (LongIterator iterator = this.loadedSections.get(); iterator.hasNext(); ) {
+				long l = iterator.nextLong();
+				if (this.villageCenter.test(l)) {
+					this.distance.seed(l, true);
+				}
+			}
+		}
+
 		protected int getLevel(long l) {
 			return this.levels.get(l);
 		}
 
-		@Override
 		protected void setLevel(long l, int i) {
 			if (i > 6) {
 				this.levels.remove(l);
@@ -410,7 +438,7 @@ public class PoiManager extends SectionStorage<PoiSection, PoiSection.Packed> {
 		}
 
 		public void runAllUpdates() {
-			super.runUpdates(Integer.MAX_VALUE);
+			this.distance.runUpdates(Integer.MAX_VALUE, this.levelSink);
 		}
 	}
 

@@ -69,11 +69,28 @@ public final class GraphicsAuditTerrainParticleFixture {
         if (installedLevel == minecraft.level && particle != null) return;
         Vec3 origin = position(minecraft.player.getEyePosition(), minecraft.player.getLookAngle());
         if (cutoutRequested() || translucentRequested()) origin = origin.add(0,1,0);
+        // ClientLevel.hasChunk() always returns true. Require real packet-backed
+        // chunks, including biome blending and the fiddled quart lookup border,
+        // before the one-time constructor captures a biome-dependent leaf tint.
+        if (cutoutRequested() && !tintNeighborhoodReady(minecraft.level.getChunkSource(),
+            net.minecraft.core.BlockPos.containing(origin), minecraft.options.biomeBlendRadius().get())) return;
         final Vec3 particleOrigin = origin;
         particle = construct(() -> new TerrainParticle(minecraft.level, particleOrigin.x, particleOrigin.y, particleOrigin.z,
             0, 0, 0, fixtureBlock()));
         installedLevel = minecraft.level;
         minecraft.particleEngine.installGraphicsAuditParticle(particle);
+    }
+
+    static boolean tintNeighborhoodReady(net.minecraft.world.level.chunk.ChunkSource chunks,
+        net.minecraft.core.BlockPos position, int blendRadius) {
+        int minX = (position.getX() - blendRadius - 2) >> 4;
+        int minZ = (position.getZ() - blendRadius - 2) >> 4;
+        int maxX = (((position.getX() + blendRadius - 2) >> 2) + 1) >> 2;
+        int maxZ = (((position.getZ() + blendRadius - 2) >> 2) + 1) >> 2;
+        for (int z = minZ; z <= maxZ; z++) for (int x = minX; x <= maxX; x++) {
+            if (chunks.getChunk(x, z, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false) == null) return false;
+        }
+        return true;
     }
 
     public static String receipt(Minecraft minecraft) {

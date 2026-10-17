@@ -2,7 +2,17 @@
 
 Commands can inspect or change a world, give items, create entities, and manage player modes. This page covers selected commands verified in MattMC's active registration code; it is not a complete reference to every command or integrated editing tool.
 
+For commands stored in placed blocks, see [Command Blocks](../blocks/CommandBlocks.md) for Game Master permissions, trigger modes and conditional chains.
+
+For region selection, fill/replace, clipboard and undo/redo, see [WorldEdit basics](WorldEdit.md). Its operator checks and supported syntax are documented separately from the selected commands below.
+
 ## Start with help and permissions
+
+For the rule editor, values and saved-world scope, see [Game rules](../mechanics/GameRules.md).
+
+See [World data packs](../mechanics/WorldDataPacks.md) for `/datapack` and `/reload`, and [Dedicated servers](../mechanics/DedicatedServers.md) for console, stop and save controls.
+
+For enabling commands when creating a local world, see [Local-world settings](../mechanics/LocalWorlds.md#choose-modes-difficulty-and-commands). The [LAN command setting](../mechanics/MultiplayerAndLAN.md#allow-commands) applies to that shared session and leaves independent owner/operator permissions relevant.
 
 Use `/help` to request available command usage, or `/help give` for a specific command's syntax. The examples below are written for an in-game player source. A server console has no self-player for commands that require one.
 
@@ -19,13 +29,13 @@ These examples describe operations; the wiki does not execute them.
 | `/gamemode creative` | Changes your own mode; see the [mode guide](../gamemodes/Gamemodes.md) |
 | `/tp @s ~ ~1 ~` | Moves the executing player one block upward relative to the command position; check clearance |
 | `/time query daytime` | Reads daytime in the command source's level |
-| `/time set day` | Sets day time to 1,000 across the server's loaded levels in this implementation |
+| `/time set day` | Sets shared day time to 1,000; fixed-time dimension environments retain their own rules |
 | `/weather clear` | Changes the server Overworld weather, even when invoked from another dimension |
 | `/locate structure minecraft:stronghold` | Searches for a matching structure; world settings and availability can make the search fail |
 | `/locate biome minecraft:plains` | Searches for the registered biome rather than creating it |
 | `/gamerule keepInventory` | Queries the current rule without a new value |
 
-Time `set` and `add` iterate over all loaded server levels. A dimension with a fixed-time property, such as [Primordial Caves](../dimensions/PrimordialCaves.md), still has its own environmental rules; changing stored time does not promise ordinary daylight there.
+Time `set` and `add` iterate over all loaded server levels; the Overworld owns the stored day time and the other levels read that shared value. A dimension with a fixed-time property, such as [Primordial Caves](../dimensions/PrimordialCaves.md), still has its own environmental rules. See [Time, weather, and sleep](../mechanics/TimeWeatherAndSleep.md#dimensions-and-what-the-client-shows) for shared clocks and dimension-dependent weather.
 
 ## Targets and identifiers
 
@@ -40,6 +50,8 @@ A gamerule command without a value queries it; providing a value changes server 
 For experiments involving entities, portals, or block editing, use a separate test world or a recoverable world copy. This page deliberately does not present an unverified large-scale edit workflow.
 
 ## Related pages
+
+- [Locator Bar](../mechanics/LocatorBar.md): built-in waypoint listing/icon controls and permission limits
 
 - [Game modes](../gamemodes/Gamemodes.md)
 - [Dimensions](../dimensions/Dimensions.md)

@@ -885,7 +885,7 @@ impl WorldTextFrontend {
             }
             Err(error) => {
                 for handle in created.into_iter().rev() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
                 Err(error)
             }
@@ -895,7 +895,7 @@ impl WorldTextFrontend {
     fn destroy_resources(&mut self, gal: &mut VulkanicGal) {
         for (_, resources) in std::mem::take(&mut self.resources) {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -915,7 +915,7 @@ impl WorldTextFrontend {
         for key in stale {
             if let Some(resources) = self.resources.remove(&key) {
                 for handle in resources.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
         }

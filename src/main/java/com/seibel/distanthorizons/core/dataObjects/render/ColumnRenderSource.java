@@ -1,15 +1,15 @@
 package com.seibel.distanthorizons.core.dataObjects.render;
 
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.pooling.AbstractPhantomArrayList;
-import com.seibel.distanthorizons.core.pooling.PhantomArrayListPool;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
-import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnQuadView;
 import com.seibel.distanthorizons.core.util.ColorUtil;
 import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
+import net.vulkanic.world.NativeDhRenderSource;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.util.ArrayList;
@@ -22,7 +22,7 @@ import java.util.Map;
  *
  * @see RenderDataPointUtil
  */
-public class ColumnRenderSource extends AbstractPhantomArrayList
+public class ColumnRenderSource implements AutoCloseable
 {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	/** No exact source material survived this render-data entry. */
@@ -40,51 +40,19 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 	/** measured in data columns */
 	public static final int WIDTH = 64;
 	
-	public static final PhantomArrayListPool ARRAY_LIST_POOL = new PhantomArrayListPool("Render Source");
-	
-	
-	
 	/** will be zero if an empty data source was created */
 	public int verticalDataCount;
 	public long pos;
 	public int yOffset;
 	
-	public final LongArrayList renderDataContainer;
-	/**
-	 * Private provenance alongside the compact render-data points. The legacy
-	 * LOD vertex format intentionally remains unchanged: this table exists so a
-	 * later semantic renderer can distinguish a recoverable source material
-	 * from a color-only or mixed reduction without treating either as a sprite.
-	 */
-	/*
-	 * These are intentionally compact CPU semantics, not renderer state.  A
-	 * render source can contain millions of cells at high quality, so retaining
-	 * an int, byte, long and boolean for every cell multiplied the normal DH
-	 * source residency several times over. Material identities are capped at
-	 * 4096 and the mixed sentinel is -1, which fit in a short.  An exact model
-	 * seed is reconstructed from this source's section, cell and render-data
-	 * Y-min; it must not be retained as a second dense world-position table.
-	 */
-	private final short[] semanticMaterialByDataPoint;
-	/**
-	 * Ordered source intervals retained only when vertical LOD reduction made a
-	 * render-data entry ambiguous.  The compact render-data and legacy vertex
-	 * layouts remain unchanged; a later semantic material route can use these
-	 * intervals instead of assigning one arbitrary sprite to a mixed face.
-	 */
-	private final Map<Integer, List<SemanticMaterialSpan>> semanticMaterialSpansByDataPoint = new HashMap<>();
-	/**
-	 * Position provenance is deliberately separate from the semantic material
-	 * table. Weighted Minecraft models select parts from the block position, so
-	 * retaining only a block state would force a later renderer to guess a
-	 * sprite. The legacy compact render-data and vertex layouts remain unchanged.
-	 */
-	private final byte[] semanticVariantStateByDataPoint;
-	/** Copied proof that a coarse column's horizontal contributors were identical. */
-	private final boolean[] semanticHorizontalUniformByColumn;
+	public final LongList renderDataContainer;
+	private final NativeDhRenderSource nativeData;
+	/** Sparse ordered provenance for ambiguously reduced entries. Dense point,
+	 * material, variant and uniformity planes belong to the Rust CPU owner. */
+	private final Int2ObjectOpenHashMap<List<SemanticMaterialSpan>> semanticMaterialSpansByDataPoint = new Int2ObjectOpenHashMap<>();
 	/** Bounded raw source footprints for heterogeneous reduced columns. */
-	private final Map<Integer, LongArrayList[]> semanticHorizontalContributorsByColumn = new HashMap<>();
-	private final Map<Integer, SemanticHorizontalContributor[]> semanticHorizontalContributorSpansByDataPoint = new HashMap<>();
+	private final Int2ObjectOpenHashMap<LongList[]> semanticHorizontalContributorsByColumn = new Int2ObjectOpenHashMap<>();
+	private final Int2ObjectOpenHashMap<SemanticHorizontalContributor[]> semanticHorizontalContributorSpansByDataPoint = new Int2ObjectOpenHashMap<>();
 	private final List<SemanticMaterialIdentity> semanticMaterials = new ArrayList<>();
 	private final Map<SemanticMaterialIdentity, Integer> semanticMaterialIds = new HashMap<>();
 	
@@ -108,17 +76,14 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 	 */
 	private ColumnRenderSource(long pos, int maxVerticalSize, int yOffset)
 	{
-		super(ARRAY_LIST_POOL, 0, 0, 1);
 		
 		this.pos = pos;
 		this.yOffset = yOffset;
 		
 		this.verticalDataCount = maxVerticalSize;
 		
-		this.renderDataContainer = this.pooledArraysCheckout.getLongArray(0, WIDTH * WIDTH * this.verticalDataCount);
-		this.semanticMaterialByDataPoint = new short[WIDTH * WIDTH * this.verticalDataCount];
-		this.semanticVariantStateByDataPoint = new byte[WIDTH * WIDTH * this.verticalDataCount];
-		this.semanticHorizontalUniformByColumn = new boolean[WIDTH * WIDTH];
+		this.nativeData = new NativeDhRenderSource(this.verticalDataCount);
+		this.renderDataContainer = this.nativeData;
 		
 		this.debugSourceFlags = new DebugSourceFlag[WIDTH * WIDTH];
 	}
@@ -133,7 +98,7 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 
 	public int getSemanticMaterialId(int posX, int posZ, int verticalIndex)
 	{
-		return this.semanticMaterialByDataPoint[dataPointIndex(posX, posZ, verticalIndex)];
+		return this.nativeData.material(dataPointIndex(posX, posZ, verticalIndex));
 	}
 
 	public SemanticMaterialIdentity getSemanticMaterialIdentity(int materialId)
@@ -147,7 +112,7 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 
 	public byte getSemanticVariantState(int posX, int posZ, int verticalIndex)
 	{
-		return this.semanticVariantStateByDataPoint[dataPointIndex(posX, posZ, verticalIndex)];
+		return this.nativeData.variant(dataPointIndex(posX, posZ, verticalIndex));
 	}
 
 	public long getSemanticVariantPosition(int posX, int posZ, int verticalIndex)
@@ -165,20 +130,26 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 
 	public boolean hasSemanticHorizontalUniformity(int posX, int posZ, int verticalIndex)
 	{
-		return this.semanticHorizontalUniformByColumn[columnIndex(posX, posZ)];
+		return this.nativeData.uniform(columnIndex(posX, posZ));
 	}
 
 	public void setSemanticHorizontalUniformity(int posX, int posZ, int verticalIndex, boolean uniform)
 	{
-		this.semanticHorizontalUniformByColumn[columnIndex(posX, posZ)] = uniform;
+		this.nativeData.uniform(columnIndex(posX, posZ), uniform);
 	}
 
-	public void setSemanticHorizontalContributors(int posX, int posZ, LongArrayList[] contributors)
+	public void setSemanticHorizontalContributors(int posX, int posZ, LongList[] contributors)
 	{
 		int index = columnIndex(posX, posZ);
 		if (contributors == null || contributors.length != 4)
 		{
 			this.semanticHorizontalContributorsByColumn.remove(index);
+			return;
+		}
+		LongList[] nativeSnapshot = net.minecraft.world.level.chunk.NativeDhContributors.snapshot(contributors, null, Integer.MAX_VALUE);
+		if (nativeSnapshot != null)
+		{
+			this.semanticHorizontalContributorsByColumn.put(index, nativeSnapshot);
 			return;
 		}
 		LongArrayList[] copy = new LongArrayList[4];
@@ -191,7 +162,7 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 
 	public LongArrayList[] getSemanticHorizontalContributors(int posX, int posZ)
 	{
-		LongArrayList[] contributors = this.semanticHorizontalContributorsByColumn.get(columnIndex(posX, posZ));
+		LongList[] contributors = this.semanticHorizontalContributorsByColumn.get(columnIndex(posX, posZ));
 		if (contributors == null) return null;
 		LongArrayList[] copy = new LongArrayList[4];
 		for (int i = 0; i < 4; i++)
@@ -199,6 +170,14 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 			copy[i] = contributors[i] == null ? null : new LongArrayList(contributors[i]);
 		}
 		return copy;
+	}
+
+	/** Immutable CPU readers survive source replacement; compatibility lists are copied. */
+	public LongList[] getRetainedSemanticHorizontalContributors(int posX, int posZ)
+	{
+		LongList[] columns = this.semanticHorizontalContributorsByColumn.get(columnIndex(posX, posZ));
+		return net.minecraft.world.level.chunk.NativeDhContributors.isSnapshot(columns)
+			? columns.clone() : this.getSemanticHorizontalContributors(posX, posZ);
 	}
 
 	public void setSemanticHorizontalContributorSpans(int posX, int posZ, int verticalIndex,
@@ -221,6 +200,63 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 		SemanticHorizontalContributor[] contributors = this.semanticHorizontalContributorSpansByDataPoint.get(
 			dataPointIndex(posX, posZ, verticalIndex));
 		return contributors == null ? null : contributors.clone();
+	}
+
+	/** The Rust owner of this source's points and dense semantic planes. */
+	public NativeDhRenderSource nativeData() { return this.nativeData; }
+
+	public int semanticMaterialCount() { return this.semanticMaterials.size(); }
+
+	/**
+	 * Sparse reduced-entry spans as one table sorted by data-point index:
+	 * {@code [index, count, count x (minY|maxY<<32, id|variant<<32, position)]...};
+	 * null when there are none.
+	 */
+	public long[] flattenSemanticMaterialSpans()
+	{
+		if (this.semanticMaterialSpansByDataPoint.isEmpty()) return null;
+		int[] keys = this.semanticMaterialSpansByDataPoint.keySet().toIntArray();
+		java.util.Arrays.sort(keys);
+		var table = new it.unimi.dsi.fastutil.longs.LongArrayList();
+		for (int key : keys)
+		{
+			List<SemanticMaterialSpan> spans = this.semanticMaterialSpansByDataPoint.get(key);
+			table.add(key);
+			table.add(spans.size());
+			for (SemanticMaterialSpan span : spans) addSpanWords(table, span);
+		}
+		return table.toLongArray();
+	}
+
+	/**
+	 * Sparse coarse-cell contributor spans as one table sorted by data-point index:
+	 * {@code [index, then four times: count (-1 for none), count x span words]...};
+	 * null when there are none.
+	 */
+	public long[] flattenHorizontalContributorSpans()
+	{
+		if (this.semanticHorizontalContributorSpansByDataPoint.isEmpty()) return null;
+		int[] keys = this.semanticHorizontalContributorSpansByDataPoint.keySet().toIntArray();
+		java.util.Arrays.sort(keys);
+		var table = new it.unimi.dsi.fastutil.longs.LongArrayList();
+		for (int key : keys)
+		{
+			table.add(key);
+			for (SemanticHorizontalContributor contributor : this.semanticHorizontalContributorSpansByDataPoint.get(key))
+			{
+				if (contributor == null) { table.add(-1L); continue; }
+				table.add(contributor.spans().size());
+				for (SemanticMaterialSpan span : contributor.spans()) addSpanWords(table, span);
+			}
+		}
+		return table.toLongArray();
+	}
+
+	private static void addSpanWords(it.unimi.dsi.fastutil.longs.LongArrayList table, SemanticMaterialSpan span)
+	{
+		table.add((span.minY() & 0xffffffffL) | (long) span.maxY() << 32);
+		table.add((span.materialId() & 0xffffffffL) | (span.variantState() & 0xffL) << 32);
+		table.add(span.variantPosition());
 	}
 
 	public List<SemanticMaterialIdentity> semanticMaterials()
@@ -272,22 +308,21 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 	public void clearSemanticMaterialsForColumn(int posX, int posZ)
 	{
 		int firstIndex = dataPointIndex(posX, posZ, 0);
-		java.util.Arrays.fill(
-			this.semanticMaterialByDataPoint,
-			firstIndex,
-			firstIndex + this.verticalDataCount,
-			(short) SEMANTIC_MATERIAL_UNAVAILABLE
-		);
-		java.util.Arrays.fill(this.semanticVariantStateByDataPoint, firstIndex,
-			firstIndex + this.verticalDataCount, SEMANTIC_VARIANT_UNAVAILABLE);
-		this.semanticHorizontalUniformByColumn[columnIndex(posX, posZ)] = false;
+		int endIndex = firstIndex + this.verticalDataCount;
+		this.nativeData.clearSemantics(columnIndex(posX, posZ), this.verticalDataCount);
 		this.semanticHorizontalContributorsByColumn.remove(columnIndex(posX, posZ));
-		this.semanticMaterialSpansByDataPoint.keySet().removeIf(index ->
-			index >= firstIndex && index < firstIndex + this.verticalDataCount
-		);
-		this.semanticHorizontalContributorSpansByDataPoint.keySet().removeIf(index ->
-			index >= firstIndex && index < firstIndex + this.verticalDataCount
-		);
+		// Sparse sidecars use the same contiguous column range as the dense arrays.
+		// Scanning the entire section's maps for every column makes conversion
+		// quadratic as earlier columns accumulate provenance during a fresh build.
+		if (!this.semanticMaterialSpansByDataPoint.isEmpty()
+			|| !this.semanticHorizontalContributorSpansByDataPoint.isEmpty())
+		{
+			for (int index = firstIndex; index < endIndex; index++)
+			{
+				this.semanticMaterialSpansByDataPoint.remove(index);
+				this.semanticHorizontalContributorSpansByDataPoint.remove(index);
+			}
+		}
 	}
 
 	public void setSemanticMaterialId(int posX, int posZ, int verticalIndex, int materialId)
@@ -296,7 +331,7 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 		{
 			throw new IllegalArgumentException("Unknown semantic material id: " + materialId);
 		}
-		this.semanticMaterialByDataPoint[dataPointIndex(posX, posZ, verticalIndex)] = (short) materialId;
+		this.nativeData.material(dataPointIndex(posX, posZ, verticalIndex), (short) materialId);
 	}
 
 	public void setSemanticVariantProvenance(
@@ -310,7 +345,7 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 			throw new IllegalArgumentException("Unknown semantic variant state: " + state);
 		}
 		int index = dataPointIndex(posX, posZ, verticalIndex);
-		this.semanticVariantStateByDataPoint[index] = state;
+		this.nativeData.variant(index, state);
 	}
 
 	/** Packs the same semantic world position consumed by Minecraft's model seed. */
@@ -427,8 +462,6 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 				offset, this.verticalDataCount);
 	}
 	
-	public ColumnQuadView getFullQuadView() { return this.getQuadViewOverRange(0, 0, WIDTH, WIDTH); }
-	public ColumnQuadView getQuadViewOverRange(int quadX, int quadZ, int quadXSize, int quadZSize) { return new ColumnQuadView(this.renderDataContainer, WIDTH, this.verticalDataCount, quadX, quadZ, quadXSize, quadZSize); }
 	
 	
 	
@@ -453,22 +486,16 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 		}
 		
 		
-		for (int x = 0; x < WIDTH; x++)
+		if (this.verticalDataCount > 0 && this.renderDataContainer.size() == WIDTH * WIDTH * this.verticalDataCount)
 		{
-			for (int z = 0; z < WIDTH; z++)
-			{
-				ColumnArrayView columnArrayView = this.getVerticalDataPointView(x,z);
-				for (int i = 0; i < columnArrayView.size; i++)
-				{
-					long dataPoint = columnArrayView.get(i);
-					if (!RenderDataPointUtil.hasZeroHeight(dataPoint))
-					{
-						return true;
-					}
-				}
-			}
+			return NativeDhRenderSource.span(this.renderDataContainer, 0, this.renderDataContainer.size(), 2, 0L) != 0;
 		}
-		
+		// Keep the original traversal for zero/mutated compatibility dimensions.
+		for (int x = 0; x < WIDTH; x++) for (int z = 0; z < WIDTH; z++)
+		{
+			ColumnArrayView view = this.getVerticalDataPointView(x, z);
+			for (int i = 0; i < view.size; i++) if (!RenderDataPointUtil.hasZeroHeight(view.get(i))) return true;
+		}
 		return false;
 	}
 	
@@ -498,6 +525,9 @@ public class ColumnRenderSource extends AbstractPhantomArrayList
 	// base methods //
 	//==============//
 	
+	@Override
+	public void close() { this.nativeData.close(); }
+
 	@Override
 	public String toString()
 	{

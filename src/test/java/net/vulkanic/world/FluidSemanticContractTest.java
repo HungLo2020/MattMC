@@ -18,28 +18,7 @@ final class FluidSemanticContractTest {
 		return Files.readString(Path.of(relativePath));
 	}
 
-	@Test
-	void builtinWaterUsesExplicitStillFlowOrOverlayMaterialSelection() throws Exception {
-		String source = read("src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java");
-		int selector = source.indexOf("private static FluidSpriteAsset waterTextureForPrimitive");
-		int still = source.indexOf("allVerticesWithin(vertices, still)", selector);
-		int overlay = source.indexOf("allVerticesWithin(vertices, overlay)", still);
-		int flow = source.indexOf("allVerticesWithin(vertices, flow)", overlay);
-		int reject = source.indexOf("built-in water primitive UVs do not match still, flow, or overlay sprites", flow);
-		assertTrue(selector >= 0 && still > selector && overlay > still && flow > overlay && reject > flow,
-			"built-in water must select an explicit copied sprite or reject malformed UV semantics");
-	}
 
-	@Test
-	void waterVerticesAreRewrittenToRustLocalUvAndMaterialIdentity() throws Exception {
-		String source = read("src/main/java/net/vulkanic/world/RustGalTerrainRenderer.java");
-		int method = source.indexOf("private static int translucentTextureForPrimitive");
-		int rewrite = source.indexOf("vertices.set(index, new VulkanicGalBridge.WorldMeshVertexRecord", method);
-		int localU = source.indexOf("clamp01(asset.localU(original.u()))", rewrite);
-		int material = source.indexOf("waterShaderMaterialType(asset.textureId())", localU);
-		assertTrue(method >= 0 && rewrite > method && localU > rewrite && material > localU,
-			"water primitives must cross the boundary with Rust-local UVs and explicit material identity");
-	}
 
 	@Test
 	void unsupportedFluidMetadataIsRejectedBeforeSectionPublication() throws Exception {

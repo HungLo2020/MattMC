@@ -43,7 +43,9 @@ public class CakeBlock extends Block {
 
 	public CakeBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(BITES, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(BITES, 0));
+		}
 	}
 
 	@Override

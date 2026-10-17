@@ -2,15 +2,17 @@ package net.minecraft.world.item;
 
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
+import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
 import java.util.Optional;
-import java.util.function.Function;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 
 public record EitherHolder<T>(Either<Holder<T>, ResourceKey<T>> contents) {
@@ -23,10 +25,24 @@ public record EitherHolder<T>(Either<Holder<T>, ResourceKey<T>> contents) {
 	}
 
 	public static <T> Codec<EitherHolder<T>> codec(ResourceKey<Registry<T>> resourceKey, Codec<Holder<T>> codec) {
-		return Codec.either(
-				codec, ResourceKey.codec(resourceKey).comapFlatMap(resourceKeyx -> DataResult.error(() -> "Cannot parse as key without registry"), Function.identity())
-			)
-			.xmap(EitherHolder::new, EitherHolder::contents);
+		Codec<ResourceKey<T>> keys = ResourceKey.codec(resourceKey);
+		Codec<ResourceKey<T>> unresolvedKeys = new Codec<ResourceKey<T>>() {
+			@Override
+			public <O> DataResult<Pair<ResourceKey<T>, O>> decode(DynamicOps<O> dynamicOps, O object) {
+				// Validate the key before applying the bootstrap-only permission,
+				// as the original key codec did even when keys were disallowed.
+				return keys.decode(dynamicOps, object).flatMap(pair ->
+					dynamicOps instanceof RegistryOps<O> registryOps && registryOps.keepsUnresolvedKeys()
+						? DataResult.success(pair)
+						: DataResult.error(() -> "Cannot parse as key without registry"));
+			}
+
+			@Override
+			public <O> DataResult<O> encode(ResourceKey<T> key, DynamicOps<O> dynamicOps, O prefix) {
+				return keys.encode(key, dynamicOps, prefix);
+			}
+		};
+		return Codec.either(codec, unresolvedKeys).xmap(EitherHolder::new, EitherHolder::contents);
 	}
 
 	public static <T> StreamCodec<RegistryFriendlyByteBuf, EitherHolder<T>> streamCodec(

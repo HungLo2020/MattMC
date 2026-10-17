@@ -137,7 +137,7 @@ impl FabulousIntermediateTarget {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -285,7 +285,7 @@ impl FabulousAttachmentResources {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -432,7 +432,7 @@ impl FabulousAttachmentSet {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result

@@ -8,24 +8,12 @@ import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ColumnRenderBufferBuilderTest {
 	@Test
-	void legacyUnuploadedContainersStillClose() {
-		assertTrue(ColumnRenderBufferBuilder.shouldCloseUnuploadedContainer(false));
-	}
-
-	@Test
-	void selectedRustWholeFrameSemanticBuildDoesNotCloseItsCopiedAsset() {
-		assertFalse(ColumnRenderBufferBuilder.shouldCloseUnuploadedContainer(true));
-	}
-
-	@Test
 	void blockResolutionRustGeometryRetainsExactAtlasProvenance() {
-		ColumnRenderBufferBuilder.SemanticMaterialProvenance provenance =
-			ColumnRenderBufferBuilder.semanticMaterialProvenanceForDetailLevel(true, (byte) 0,
+		JavaSectionBuildReference.SemanticMaterialProvenance provenance =
+			JavaSectionBuildReference.semanticMaterialProvenanceForDetailLevel(true, (byte) 0,
 				42, (byte) 1, 123L);
 
 		assertEquals(42, provenance.materialId());
@@ -35,8 +23,8 @@ class ColumnRenderBufferBuilderTest {
 
 	@Test
 	void coarseRustGeometryRejectsSingleSpriteAtlasProvenance() {
-		ColumnRenderBufferBuilder.SemanticMaterialProvenance provenance =
-			ColumnRenderBufferBuilder.semanticMaterialProvenanceForDetailLevel(true, (byte) 1,
+		JavaSectionBuildReference.SemanticMaterialProvenance provenance =
+			JavaSectionBuildReference.semanticMaterialProvenanceForDetailLevel(true, (byte) 1,
 				42, (byte) 1, 123L);
 
 		assertEquals(ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE, provenance.materialId());
@@ -46,8 +34,8 @@ class ColumnRenderBufferBuilderTest {
 
 	@Test
 	void coarseRustGeometryAcceptsOnlyAnExplicitUniformContributorProof() {
-		ColumnRenderBufferBuilder.SemanticMaterialProvenance provenance =
-			ColumnRenderBufferBuilder.semanticMaterialProvenanceForDetailLevel(
+		JavaSectionBuildReference.SemanticMaterialProvenance provenance =
+			JavaSectionBuildReference.semanticMaterialProvenanceForDetailLevel(
 				true, (byte) 1, 42, (byte) 1, 123L, true
 			);
 
@@ -58,8 +46,8 @@ class ColumnRenderBufferBuilderTest {
 
 	@Test
 	void legacyGeometryKeepsItsExistingSemanticSidecars() {
-		ColumnRenderBufferBuilder.SemanticMaterialProvenance provenance =
-			ColumnRenderBufferBuilder.semanticMaterialProvenanceForDetailLevel(false, (byte) 3,
+		JavaSectionBuildReference.SemanticMaterialProvenance provenance =
+			JavaSectionBuildReference.semanticMaterialProvenanceForDetailLevel(false, (byte) 3,
 				42, (byte) 1, 123L);
 
 		assertEquals(42, provenance.materialId());
@@ -77,11 +65,11 @@ class ColumnRenderBufferBuilderTest {
 		var contributors = new ColumnRenderSource.SemanticHorizontalContributor[] {
 			contributor, contributor, contributor, contributor
 		};
-		var fallback = new ColumnRenderBufferBuilder.SemanticMaterialProvenance(
+		var fallback = new JavaSectionBuildReference.SemanticMaterialProvenance(
 			ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE,
 			ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE, 0L
 		);
-		var recovered = ColumnRenderBufferBuilder.recoverCommonHorizontalProvenance(
+		var recovered = JavaSectionBuildReference.recoverCommonHorizontalProvenance(
 			null, RenderDataPointUtil.createDataPoint(12, 4, 0xffffffff, 15, 0, 1), contributors, fallback
 		);
 		assertEquals(42, recovered.materialId());
@@ -94,7 +82,7 @@ class ColumnRenderBufferBuilderTest {
 					ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 123L)
 			)), contributor
 		};
-		assertEquals(fallback, ColumnRenderBufferBuilder.recoverCommonHorizontalProvenance(
+		assertEquals(fallback, JavaSectionBuildReference.recoverCommonHorizontalProvenance(
 				 null, RenderDataPointUtil.createDataPoint(12, 4, 0xffffffff, 15, 0, 1), mixed, fallback));
 	}
 
@@ -107,7 +95,7 @@ class ColumnRenderBufferBuilderTest {
 				ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 456L)
 		);
 		var contributor = new ColumnRenderSource.SemanticHorizontalContributor(layers);
-		var recovered = ColumnRenderBufferBuilder.recoverCommonHorizontalSpans(
+		var recovered = JavaSectionBuildReference.recoverCommonHorizontalSpans(
 			RenderDataPointUtil.createDataPoint(12, 4, 0xffffffff, 15, 0, 1),
 			new ColumnRenderSource.SemanticHorizontalContributor[] { contributor, contributor, contributor, contributor }
 		);

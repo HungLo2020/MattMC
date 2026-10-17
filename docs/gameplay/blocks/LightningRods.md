@@ -16,6 +16,20 @@ The weather path still requires rain/thunder and rain at the selected location. 
 
 Leave the rod exposed at the top of its column. The selection code does not require an upward-facing rod, so a wall-facing rod can qualify when that height condition is met. Lightning can still start nearby fire through its ordinary impact behavior; position valuable flammable material accordingly. [Height-only rod predicate][rod-target] · [Facing-independent registered states][rod-poi] · [Impact and fire dispatch][lightning] · [Nearby fire attempts][lightning-clean]
 
+## Deliberate strikes with Channeling
+
+To activate a rod without waiting for a naturally selected strike, throw a **Channeling Trident directly at the rod** during a **thunderstorm**, with the rod's position open to the sky. All eight bundled rod variants qualify, including waxed and fully Oxidized forms. This is a separate block-hit effect; it does not use the natural strike's nearest-rod search or 128-block attraction radius. [Channeling block-hit requirements][channeling-hit] · [Eligible rod tag][channeling-rods] · [Projectile impact dispatch][channeling-impact] · [Lightning creation][channeling-summon]
+
+If the throw produces no lightning, check these conditions:
+
+- **Hit the rod itself.** A shot into its support or a neighboring block does not satisfy the rod-location check. The Trident evaluates the impact inside the struck block; being close to a rod is insufficient. [Impact position][channeling-impact] · [Location requirement][channeling-hit]
+- **Check thunder and sky access.** Ordinary rain alone does not qualify, and a roof can fail the sky check. This branch checks thunder plus sky visibility, rather than the natural strike's local-rain test. [Weather predicate][channeling-weather] · [Sky visibility][channeling-sky]
+- **Check the projectile and its carried item.** An ordinary arrow or an unenchanted Trident does not provide this effect. A Trident already broken by its final release also skips the block-hit enchantments; the [last-throw explanation](../items/Trident.md#the-last-throw-and-broken-tridents) owns that durability edge case. [Projectile requirement][channeling-hit] · [Broken-item guard][channeling-broken]
+
+A successful summon creates ordinary lightning, with its entity effects and conditional fire attempts. Keep living targets and flammable surroundings clear; a rod is not a harmless redstone-only target. When the bolt resolves its strike block to the rod, it uses the normal [short pulse](#placement-water-and-redstone) and [wax-dependent copper-cleaning rules](#oxidation-and-lightning-cleaning). [Summoned entity][channeling-summon] · [Rod activation][channeling-strike] · [Entity and fire effects][channeling-hazards]
+
+For a deliberate pulse, aim at the rod's **top or an exposed side**. An exact underside impact is not guaranteed to activate the hit rod at every height: the impact clamp's lower edge can round to an integer, while lightning selects its strike block slightly below the summon position. This caution is source-derived, not an in-game reproduction. [Impact clamping][channeling-clamp] · [Strike position][channeling-hazards]
+
 ## Placement, water, and redstone
 
 A rod points along the **clicked face**, so floor, wall, and underside placements are supported. Its collision shape runs along that axis, and it has no continuing attachment-support rule. Source Water at placement sets its waterlogged state; bucket filling and collection use the shared waterlogged-block interface. [Placement and water state][rod] · [Axial shape][rod-shape] · [Default survival][default] · [Water handling][water]
@@ -47,7 +61,9 @@ The [shared lightning-cleaning guide](CopperConstruction.md#lightning-cleaning) 
 
 Source-reviewed on **2026-10-02** at `1879e5f54378351fd773b9a2c10839eb9259c504`. All eight rod variants, five recipes, eight loot tables, tool tags, exposed-column POI targeting, redstone, waterlogging, and the relevant oxidation/lightning dispatch were checked. No in-game test was run. Recipes, tags, loot, server rules, and later code changes can alter these results.
 
-Related: [Blocks](Blocks.md) · [Copper construction](CopperConstruction.md) · [Copper catalog](catalog/copper.md) · [Items](../items/Items.md)
+Channeling rod activation was additionally source-reviewed on **2026-10-15** at `522b1f8b84345d79cd51fb1c19b4d51ab37628cb`, including projectile dispatch, bundled requirements, broken-item suppression and lightning effects. No in-game throw, weather, fire, cleaning or redstone test was run.
+
+Related: [Blocks](Blocks.md) · [Copper construction](CopperConstruction.md) · [Copper catalog](catalog/copper.md) · [Items](../items/Items.md) · [Rain and thunder conditions](../mechanics/TimeWeatherAndSleep.md#rain-thunder-and-the-place-you-stand)
 
 [rod-reg]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/java/net/minecraft/world/level/block/Blocks.java#L6485-L6519
 [default]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/java/net/minecraft/world/level/block/state/BlockBehaviour.java#L309-L326
@@ -87,3 +103,14 @@ Related: [Blocks](Blocks.md) · [Copper construction](CopperConstruction.md) · 
 [loot-waxed_weathered_lightning_rod]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/loot_table/blocks/waxed_weathered_lightning_rod.json
 [r-waxed_weathered_lightning_rod_from_honeycomb]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/recipe/crafting/waxed_weathered_lightning_rod_from_honeycomb.json
 [loot-weathered_lightning_rod]: https://github.com/HungLo2020/MattMC/blob/1879e5f54378351fd773b9a2c10839eb9259c504/src/main/resources/data/minecraft/loot_table/blocks/weathered_lightning_rod.json
+
+[channeling-hit]: https://github.com/HungLo2020/MattMC/blob/522b1f8b84345d79cd51fb1c19b4d51ab37628cb/src/main/resources/data/minecraft/enchantment/channeling.json#L7-L50
+[channeling-rods]: https://github.com/HungLo2020/MattMC/blob/522b1f8b84345d79cd51fb1c19b4d51ab37628cb/src/main/resources/data/minecraft/tags/block/lightning_rods.json#L1-L12
+[channeling-impact]: https://github.com/HungLo2020/MattMC/blob/522b1f8b84345d79cd51fb1c19b4d51ab37628cb/src/main/java/net/minecraft/world/entity/projectile/ThrownTrident.java#L141-L159
+[channeling-summon]: https://github.com/HungLo2020/MattMC/blob/522b1f8b84345d79cd51fb1c19b4d51ab37628cb/src/main/java/net/minecraft/world/item/enchantment/effects/SummonEntityEffect.java#L27-L47
+[channeling-weather]: https://github.com/HungLo2020/MattMC/blob/522b1f8b84345d79cd51fb1c19b4d51ab37628cb/src/main/java/net/minecraft/world/level/storage/loot/predicates/WeatherCheck.java#L23-L28
+[channeling-sky]: https://github.com/HungLo2020/MattMC/blob/522b1f8b84345d79cd51fb1c19b4d51ab37628cb/src/main/java/net/minecraft/advancements/critereon/LocationPredicate.java#L44-L75
+[channeling-broken]: https://github.com/HungLo2020/MattMC/blob/522b1f8b84345d79cd51fb1c19b4d51ab37628cb/src/main/java/net/minecraft/world/item/enchantment/EnchantmentHelper.java#L318-L334
+[channeling-strike]: https://github.com/HungLo2020/MattMC/blob/522b1f8b84345d79cd51fb1c19b4d51ab37628cb/src/main/java/net/minecraft/world/entity/LightningBolt.java#L69-L99
+[channeling-hazards]: https://github.com/HungLo2020/MattMC/blob/522b1f8b84345d79cd51fb1c19b4d51ab37628cb/src/main/java/net/minecraft/world/entity/LightningBolt.java#L127-L184
+[channeling-clamp]: https://github.com/HungLo2020/MattMC/blob/522b1f8b84345d79cd51fb1c19b4d51ab37628cb/src/main/java/net/minecraft/core/BlockPos.java#L255-L261

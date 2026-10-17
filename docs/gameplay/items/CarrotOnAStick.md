@@ -18,6 +18,7 @@ This item only boosts the Pig entity type in its checked registration. A Warped 
 
 ## Related pages
 
+- [Warped Fungus on a Stick](WarpedFungusonaStick.md): the separate Strider steering tool
 - [Pig](../mobs/Pig.md)
 - [Saddle](Saddle.md)
 - [Carrot](Carrot.md)

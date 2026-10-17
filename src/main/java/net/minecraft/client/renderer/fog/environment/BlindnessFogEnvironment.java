@@ -7,7 +7,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.fog.FogData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.util.Mth;
+import net.minecraft.client.renderer.fog.NativeFog;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -26,11 +26,9 @@ public class BlindnessFogEnvironment extends MobEffectFogEnvironment {
 		if (entity instanceof LivingEntity livingEntity) {
 			MobEffectInstance mobEffectInstance = livingEntity.getEffect(this.getMobEffect());
 			if (mobEffectInstance != null) {
-				float g = mobEffectInstance.isInfiniteDuration() ? 5.0F : Mth.lerp(Math.min(1.0F, mobEffectInstance.getDuration() / 20.0F), f, 5.0F);
-				fogData.environmentalStart = g * 0.25F;
-				fogData.environmentalEnd = g;
-				fogData.skyEnd = g * 0.8F;
-				fogData.cloudEnd = g * 0.8F;
+                boolean infinite = mobEffectInstance.isInfiniteDuration();
+                float duration = infinite ? 0.0F : mobEffectInstance.getDuration();
+                NativeFog.ranges(fogData, 4, f, duration, 0.0F, infinite ? 1 : 0);
 			}
 		}
 	}
@@ -39,11 +37,8 @@ public class BlindnessFogEnvironment extends MobEffectFogEnvironment {
 	public float getModifiedDarkness(LivingEntity livingEntity, float f, float g) {
 		MobEffectInstance mobEffectInstance = livingEntity.getEffect(this.getMobEffect());
 		if (mobEffectInstance != null) {
-			if (mobEffectInstance.endsWithin(19)) {
-				f = Math.max(mobEffectInstance.getDuration() / 20.0F, f);
-			} else {
-				f = 1.0F;
-			}
+            boolean ending = mobEffectInstance.endsWithin(19);
+            f = NativeFog.effectDarkness(0, f, ending ? mobEffectInstance.getDuration() : 0.0F, ending);
 		}
 
 		return f;

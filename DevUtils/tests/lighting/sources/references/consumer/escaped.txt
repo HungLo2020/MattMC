@@ -1,0 +1,4 @@
+sample 15 lazy=false
+input 3 lazy=false copied=true
+escaped 51
+completed

@@ -165,6 +165,9 @@ final class NativeRegionFileBridge {
 		"mattmc_region_handle_read_chunk_nbt_tape",
 		HANDLE_READ_CHUNK_NBT_TAPE_DESCRIPTOR
 	);
+	private static final MethodHandle HANDLE_READ_OWNED_TAPE = downcall("mattmc_region_handle_read_owned_tape",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 	private static final MethodHandle HANDLE_WRITE_CHUNK_PAYLOAD = downcall(
 		"mattmc_region_handle_write_chunk_payload",
 		HANDLE_WRITE_CHUNK_PAYLOAD_DESCRIPTOR
@@ -257,6 +260,28 @@ final class NativeRegionFileBridge {
 			throw nativeFailure("Read region chunk NBT fingerprint", throwable);
 		}
 	}
+
+    record OwnedTapeResult(TapeMetadata result, NativeChunkTape tape) {}
+    static OwnedTapeResult readOwnedTape(long handle, int x, int z, boolean fingerprint) throws IOException {
+        try (var arena = Arena.ofConfined()) {
+            var result = arena.allocate(TAPE_RESULT_SIZE, 8);
+            var owner = arena.allocate(ValueLayout.ADDRESS);
+            MemorySegment pointer = MemorySegment.NULL;
+            boolean transferred = false;
+            try {
+                int status = (int)HANDLE_READ_OWNED_TAPE.invokeExact(handle, x, z, fingerprint ? 1 : 0, owner, result);
+                pointer = owner.get(ValueLayout.ADDRESS, 0);
+                var metadata = readTapeResult(result, status);
+                if (status != OK) throw ioFailure("Read region chunk NBT tape", status, metadata.errorKind());
+                if (!metadata.present()) return new OwnedTapeResult(metadata, null);
+                transferred = true; // adopt consumes the pointer, including on failure
+                return new OwnedTapeResult(metadata, NativeChunkTape.adopt(pointer, metadata.outputLength()));
+            } finally {
+                if (!transferred && pointer.address() != 0) NativeChunkTape.release(pointer);
+            }
+        } catch (IOException failure) { throw failure; }
+        catch (Throwable failure) { throw nativeFailure("Read region chunk NBT tape", failure); }
+    }
 
 	static TapeResult readNbtTape(
 		long handle,

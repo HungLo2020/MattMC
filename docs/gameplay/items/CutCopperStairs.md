@@ -1,17 +1,58 @@
 # Cut Copper Stairs
 
+**Cut Copper Stairs** (`minecraft:cut_copper_stairs`) is the **Unaffected, unwaxed** stair-shaped member of the copper building family. Use [Copper construction](../blocks/CopperConstruction.md) for the shared oxidation, waxing, placement and mining rules. [Item registration][item] · [Block registration][block]
+
 ## Obtaining
 
-Cut Copper Stairs can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+The following recipes produce this exact variant:
+
+| Method | Ingredients and layout | Output count | Evidence |
+| --- | --- | ---: | --- |
+| Crafting Table | [Cut Copper](CutCopper.md): 6 in rows of 1, 2, then 3 along one side | 4 | [Recipe][craft] |
+| Stonecutter | 1 [Block of Copper](BlockOfCopper.md) | 4 | [Recipe][stone-full] |
+| Stonecutter | 1 [Cut Copper](CutCopper.md) | 1 | [Recipe][stone-cut] |
+
+The copper inputs must have the named oxidation stage and wax state; other variants cannot replace or mix with them. The stair layout also accepts its horizontal mirror. [Pattern matching][pattern] See the [family recipe guide](../blocks/CopperConstruction.md#crafting-and-stonecutter-yields) for yields across other copper forms.
+
+To obtain this finish through block conversion, scrape placed [Exposed Cut Copper Stairs](ExposedCutCopperStairs.md) once with an unbroken axe, or remove the wax from placed [Waxed Cut Copper Stairs](WaxedCutCopperStairs.md) with an unbroken axe. Collect the changed block with the tool below. [Stage pairs][weather] · [Axe conversions][axe]
+
+For ordinary Survival collection, use an **unbroken Stone, Copper, Iron, Diamond or Netherite Pickaxe**. Mining the matching placed variant returns **1 stair item**. Wooden and Golden Pickaxes do not qualify; see [the complete mining rules](../blocks/CopperConstruction.md#mining-and-collection). [Pickaxe targets][pickaxe-tag] · [Tier][tier] · [Tool rules][tool] · [Broken-tool gate][broken-drop] · [Harvest dispatch][harvest] · [Loot][loot]
 
 ## Usage
 
-Cut Copper Stairs is used for stairways, rooflines, seating, trim, and angled details.
+Place the stair upright or upside down. Its facing and neighboring stairs determine straight, inner-corner or outer-corner shape; compatible stairs can connect across different oxidation stages and wax states. Stairs can be waterlogged. Use [stair placement controls](../blocks/WoodConstruction.md#stairs) and [copper stairs and waterlogging](../blocks/CopperConstruction.md#slabs-and-stairs). [Placement and corner rules][shape]
 
 ## Behavior
 
-Stairs connect into corner shapes depending on nearby stair blocks and placement direction.
+While placed, this variant can oxidize to [Exposed Cut Copper Stairs](ExposedCutCopperStairs.md). It has no earlier oxidation stage to scrape back to. Use **1 Honeycomb** on the placed block, or craft **1 of these items + 1 Honeycomb**, to make [Waxed Cut Copper Stairs](WaxedCutCopperStairs.md). [Stage pairs][weather] · [Axe conversion][axe] · [Waxing interaction][wax-use] · [Waxing recipe][wax-recipe]
+
+See [oxidation and spacing](../blocks/CopperConstruction.md#oxidation-and-spacing) for aging conditions and [waxing and scraping](../blocks/CopperConstruction.md#waxing-and-scraping) for controls. Aging is random rather than a fixed timer; the family guide also explains [lightning cleaning](../blocks/CopperConstruction.md#lightning-cleaning).
 
 ## Notes
 
-* This item is the item form of the `minecraft:cut_copper_stairs` block.
+This exact block item is listed in the **Building Blocks** catalog. For finding and requesting it, use the [inventory browser guide](../mechanics/InventoryBrowser.md#finding-and-requesting-an-item); its [mode limits](../mechanics/InventoryBrowser.md#mode-and-permission-limits) distinguish catalog visibility from item supply. [Category entry][category]
+
+Related: [Waxed Cut Copper Stairs](WaxedCutCopperStairs.md) · [Cut Copper Slab](CutCopperSlab.md) · [Copper block catalog](../blocks/catalog/copper.md) · [Items](Items.md)
+
+## Sources and verification
+
+Source-reviewed on **2026-10-04** at [`f5473e41dc4a`](https://github.com/HungLo2020/MattMC/tree/f5473e41dc4af8ced756db517fada27288df07a3). Recipes, loot, registrations and active shared callbacks were checked against bundled source data. These are source-reviewed results, not an in-game verification; enabled world data packs may change recipes or loot.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/Items.java#L192-L219
+[block]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/level/block/Blocks.java#L6175-L6238
+[craft]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/recipe/crafting/cut_copper_stairs.json
+[stone-full]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/recipe/stonecutting/cut_copper_stairs_from_copper_block_stonecutting.json
+[stone-cut]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/recipe/stonecutting/cut_copper_stairs_from_cut_copper_stonecutting.json
+[pattern]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/crafting/ShapedRecipePattern.java#L158-L193
+[weather]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/level/block/WeatheringCopper.java#L29-L34
+[axe]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/AxeItem.java#L61-L117
+[pickaxe-tag]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+[tier]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/tags/block/needs_stone_tool.json
+[tool]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/ToolMaterial.java#L23-L48
+[broken-drop]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/ItemStack.java#L587-L589
+[harvest]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L283-L292
+[loot]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/loot_table/blocks/cut_copper_stairs.json
+[shape]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/level/block/StairBlock.java#L94-L167
+[wax-use]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/HoneycombItem.java#L89-L119
+[wax-recipe]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/resources/data/minecraft/recipe/crafting/waxed_cut_copper_stairs_from_honeycomb.json
+[category]: https://github.com/HungLo2020/MattMC/blob/f5473e41dc4af8ced756db517fada27288df07a3/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L451-L535

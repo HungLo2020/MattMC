@@ -34,7 +34,9 @@ public class ChainBlock extends RotatedPillarBlock implements SimpleWaterloggedB
 
 	public ChainBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false).setValue(AXIS, Direction.Axis.Y));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, false).setValue(AXIS, Direction.Axis.Y));
+		}
 	}
 
 	@Override

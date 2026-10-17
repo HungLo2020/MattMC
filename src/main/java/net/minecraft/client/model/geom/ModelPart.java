@@ -153,6 +153,24 @@ public class ModelPart {  // Changed from final to support Citadel's BasicEntity
 		this.visitRenderable(poseStack, visitor, "");
 	}
 
+	/**
+	 * Visits, in {@link #visitRenderable} pre-order but ignoring {@code visible}
+	 * and {@code skipDraw}, every part that walk can reach: each with its
+	 * index, its parent's index (-1 for this part), its path and its cubes.
+	 * Rust model rigs mirror this structure and evaluate visibility per frame.
+	 */
+	public void visitStructure(ModelPart.StructureVisitor visitor) {
+		this.visitStructure(visitor, -1, "", new int[1]);
+	}
+
+	private void visitStructure(ModelPart.StructureVisitor visitor, int parent, String path, int[] next) {
+		if (this.cubes.isEmpty() && this.children.isEmpty()) return;
+		int index = next[0]++;
+		visitor.visit(index, parent, path, this, this.cubes);
+		String childPath = path + "/";
+		this.children.forEach((name, child) -> child.visitStructure(visitor, index, childPath + name, next));
+	}
+
 	private void visitRenderable(PoseStack poseStack, ModelPart.Visitor visitor, String path) {
 		if (!this.visible || this.cubes.isEmpty() && this.children.isEmpty()) return;
 		poseStack.pushPose();
@@ -336,9 +354,25 @@ public class ModelPart {  // Changed from final to support Citadel's BasicEntity
 			}
 		}
 
+		/**
+		 * A cube from already-built quads (Bedrock geometry, whose per-face UVs
+		 * and mirroring have no box-UV cuboid). Rendered by the polygon path.
+		 */
+		public Cube(ModelPart.Polygon[] polygons, float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+			this.polygons = polygons;
+			this.minX = minX;
+			this.minY = minY;
+			this.minZ = minZ;
+			this.maxX = maxX;
+			this.maxY = maxY;
+			this.maxZ = maxZ;
+			this.sodium$cuboid = null;
+		}
+
 		public void compile(PoseStack.Pose pose, VertexConsumer vertexConsumer, int i, int j, int k) {
 			// Sodium: Use fast cuboid rendering if available (merged from CubeMixin)
-			net.sodium.api.vertex.buffer.VertexBufferWriter writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
+			net.sodium.api.vertex.buffer.VertexBufferWriter writer = this.sodium$cuboid == null
+				? null : VertexConsumerUtils.convertOrLog(vertexConsumer);
 
 			if (writer != null) {
 				EntityRenderer.renderCuboid(pose, writer, this.sodium$cuboid, i, j, net.sodium.api.util.ColorARGB.toABGR(k));
@@ -416,6 +450,10 @@ public class ModelPart {  // Changed from final to support Citadel's BasicEntity
 
 	@FunctionalInterface
 	@Environment(EnvType.CLIENT)
+	public interface StructureVisitor {
+		void visit(int index, int parent, String path, ModelPart part, List<ModelPart.Cube> cubes);
+	}
+
 	public interface Visitor {
 		void visit(PoseStack.Pose pose, String string, int i, ModelPart.Cube cube);
 	}

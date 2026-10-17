@@ -3,7 +3,6 @@ package net.minecraft.world.level.biome;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import net.logging.LogUtils;
-import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -12,7 +11,6 @@ import java.util.Map.Entry;
 import net.minecraft.Util;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.ExtraCodecs;
-import net.minecraft.util.StringRepresentable;
 import net.minecraft.util.random.WeightedList;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -24,24 +22,6 @@ public class MobSpawnSettings {
 	private static final float DEFAULT_CREATURE_SPAWN_PROBABILITY = 0.1F;
 	public static final WeightedList<MobSpawnSettings.SpawnerData> EMPTY_MOB_LIST = WeightedList.of();
 	public static final MobSpawnSettings EMPTY = new MobSpawnSettings.Builder().build();
-	public static final MapCodec<MobSpawnSettings> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				Codec.floatRange(0.0F, 0.9999999F)
-					.optionalFieldOf("creature_spawn_probability", 0.1F)
-					.forGetter(mobSpawnSettings -> mobSpawnSettings.creatureGenerationProbability),
-				Codec.simpleMap(
-						MobCategory.CODEC,
-						WeightedList.codec(MobSpawnSettings.SpawnerData.CODEC).promotePartial(Util.prefix("Spawn data: ", LOGGER::error)),
-						StringRepresentable.keys(MobCategory.values())
-					)
-					.fieldOf("spawners")
-					.forGetter(mobSpawnSettings -> mobSpawnSettings.spawners),
-				Codec.simpleMap(BuiltInRegistries.ENTITY_TYPE.byNameCodec(), MobSpawnSettings.MobSpawnCost.CODEC, BuiltInRegistries.ENTITY_TYPE)
-					.fieldOf("spawn_costs")
-					.forGetter(mobSpawnSettings -> mobSpawnSettings.mobSpawnCosts)
-			)
-			.apply(instance, MobSpawnSettings::new)
-	);
 	private final float creatureGenerationProbability;
 	private final Map<MobCategory, WeightedList<MobSpawnSettings.SpawnerData>> spawners;
 	private final Map<EntityType<?>, MobSpawnSettings.MobSpawnCost> mobSpawnCosts;
@@ -59,6 +39,15 @@ public class MobSpawnSettings {
 	@Nullable
 	public MobSpawnSettings.MobSpawnCost getMobSpawnCost(EntityType<?> entityType) {
 		return (MobSpawnSettings.MobSpawnCost)this.mobSpawnCosts.get(entityType);
+	}
+
+	/** The spawner lists and spawn costs as decoded, for native definitions. */
+	Map<MobCategory, WeightedList<MobSpawnSettings.SpawnerData>> spawnerMap() {
+		return this.spawners;
+	}
+
+	Map<EntityType<?>, MobSpawnSettings.MobSpawnCost> costMap() {
+		return this.mobSpawnCosts;
 	}
 
 	public float getCreatureProbability() {
@@ -101,13 +90,6 @@ public class MobSpawnSettings {
 	}
 
 	public record MobSpawnCost(double energyBudget, double charge) {
-		public static final Codec<MobSpawnSettings.MobSpawnCost> CODEC = RecordCodecBuilder.create(
-			instance -> instance.group(
-					Codec.DOUBLE.fieldOf("energy_budget").forGetter(mobSpawnCost -> mobSpawnCost.energyBudget),
-					Codec.DOUBLE.fieldOf("charge").forGetter(mobSpawnCost -> mobSpawnCost.charge)
-				)
-				.apply(instance, MobSpawnSettings.MobSpawnCost::new)
-		);
 	}
 
 	public record SpawnerData(EntityType<?> type, int minCount, int maxCount) {

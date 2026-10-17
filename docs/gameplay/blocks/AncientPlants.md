@@ -14,7 +14,7 @@ Grow an **Ancient Sapling** into a branching Jungle Log tree with **Ancient Leav
 
 The four ordinary block items are explicitly registered. The potted form uses the Flower Pot interaction and has no separate ordinary item. No crafting recipes for these plants were found in the bundled recipe inventory. [Items and Creative entries][items] [creative] · [Potting][pot] · [Recipe loading][recipes]
 
-**A natural starter source was not established.** The bundled configured and placed Ancient Tree features exist, but none of the 68 bundled biome definitions references either Ancient Tree feature, and the checked generation paths do not place Flytraps or Tree Stars. No block from this family appeared in the 1,202 bundled structure palettes checked. Growing a supplied sapling and harvesting its leaves is a verified source path; it does not explain how an unmodified Survival world supplies the first one. [Tree feature registrations][custom-features] · [Configured/placed features][tree-config] [tree-placement] [giant-config] [giant-placement] · [Tree bodies][tree] [giant-tree]
+**A natural starter source was not established.** The bundled configured and placed Ancient Tree features exist, but none of the 68 bundled biome definitions references either Ancient Tree feature, and the checked generation paths do not place Flytraps or Tree Stars. No block from this family appeared in the 1,202 bundled structure palettes checked. Growing a supplied sapling and harvesting its leaves is a verified source path; it does not explain how an unmodified Survival world supplies the first one. [Tree feature registrations][custom-features] · [Configured/placed features][tree-config] [tree-placement][] [giant-config][] [giant-placement] · [Tree bodies][tree] [giant-tree]
 
 For Pewen trees and the separate Fiddlehead/Cycad/Archaic Vine behaviors, use the existing [Pewen](Pewen.md) and [Primordial decorative plants](PrimordialPlants.md) guides.
 
@@ -37,7 +37,7 @@ The active ordinary feature chooses a height parameter of **3–6**, places a **
 
 ## Ancient Leaves: decoration, decay and drops
 
-Ancient Leaves use the current leaves implementation with **distance**, **persistent** and **waterlogged** states. Leaves you place through their item become persistent and do not decay merely because there is no nearby log. The tree feature places non-persistent leaves. Their distance updates use six-direction connections to log-tag blocks and other blocks carrying the leaves distance property; at distance **7**, non-persistent leaves can decay on a random tick. Jungle Logs qualify as support through the logs tags. [Registered leaves class][blocks] [tinted-leaves] · [Persistence and distance][leaves] · [Tree placement][tree] · [Log tags][logs-tag] [logs-burn-tag] [jungle-logs-tag]
+Ancient Leaves use the current leaves implementation with **distance**, **persistent** and **waterlogged** states. Leaves you place through their item become persistent and do not decay merely because there is no nearby log. The tree feature places non-persistent leaves. Their distance updates use six-direction connections to log-tag blocks and other blocks carrying the leaves distance property; at distance **7**, non-persistent leaves can decay on a random tick. Jungle Logs qualify as support through the logs tags. [Registered leaves class][blocks] [tinted-leaves] · [Persistence and distance][leaves] · [Tree placement][tree] · [Log tags][logs-tag] [logs-burn-tag][] [jungle-logs-tag][]
 
 Use **Shears or Silk Touch** to recover one Ancient Leaves block. Without either, the sapling and stick pools are independent:
 
@@ -48,7 +48,7 @@ Use **Shears or Silk Touch** to recover one Ancient Leaves block. Without either
 | Fortune II | about 8.33% | 2.5% |
 | Fortune III | 10% | about 3.33% |
 
-The Shears/Silk Touch branch excludes those resource pools. Ordinary decay uses an empty tool, so it follows the no-Fortune chances. Explosions have separate survival/decay conditions, and item drops require `doTileDrops` to be enabled. [Exact leaves loot][loot-ancient-leaves] · [Fortune lookup][fortune] · [Decay and drop dispatch][leaves] [block] [rules]
+The Shears/Silk Touch branch excludes those resource pools. Ordinary decay uses an empty tool, so it follows the no-Fortune chances. Explosions have separate survival/decay conditions, and item drops require `doTileDrops` to be enabled. [Exact leaves loot][loot-ancient-leaves] · [Fortune lookup][fortune] · [Decay and drop dispatch][leaves] [block][] [rules][]
 
 Ancient Leaves are missing from the bundled **leaves tag** and **hoe-mining tag**. This does not disable their inherited decay or their explicit Shears loot rule, but it means the usual tag-driven Shears/hoe speed bonuses do not apply. It also matters for Tree Star support below. [Tags][leaves-tag] [hoe] · [Shears/tool rules][shears] [tool-material]
 
@@ -60,13 +60,13 @@ Flytrap is a non-colliding decorative plant with an **open** state, initially tr
 
 Use **one Bone Meal to produce one extra Flytrap item**, leaving the original plant in place. Its target and success checks both return true, and it drops the item at the plant rather than placing a neighboring plant. This item spawn is suppressed if `doTileDrops` is disabled. Once you have a starter plant, the callback is a source-backed propagation route. [Flytrap Bone Meal overrides][flytrap] · [Consumption and item spawning][bone-meal] [block]
 
-On a random tick, an open Flytrap closes and schedules reopening **100–199 game ticks** later, about **5–10 seconds at 20 ticks per second**. A random tick while closed opens it earlier; a pending scheduled tick also opens it. This is not a fixed open/closed cycle. Setting `randomTickSpeed` to zero stops new random toggles, but does not cancel a reopening already scheduled. Open Flytraps can emit fly particles; the active class has no prey-catching, feeding or entity-damage callback. [State and particles][flytrap] · [Random/scheduled dispatch][chunk-tick] [random-tick] [scheduled-tick]
+On a random tick, an open Flytrap closes and schedules reopening **100–199 game ticks** later, about **5–10 seconds at 20 ticks per second**. A random tick while closed opens it earlier; a pending scheduled tick also opens it. This is not a fixed open/closed cycle. Setting `randomTickSpeed` to zero stops new random toggles, but does not cancel a reopening already scheduled. Open Flytraps can emit fly particles; the active class has no prey-catching, feeding or entity-damage callback. [State and particles][flytrap] · [Random/scheduled dispatch][chunk-tick] [random-tick][] [scheduled-tick][]
 
 ## Tree Star
 
 Tree Star is a non-colliding decoration that can face all **six directions**. Click the top, bottom or side of a support to orient it outward from that face. It survives when the supporting block has a sturdy face toward it **or belongs to the leaves tag**. Removing or invalidating that support breaks the Tree Star, whose ordinary loot gives one item without a special tool. [Facing and support][star] · [Placement validation][placement] · [Loot][loot-tree-star]
 
-**Ancient Leaves cannot support it in the bundled data.** Their leaves implementation supplies an empty support shape, and their missing leaves-tag membership also fails Tree Star's alternate support condition. Use a suitable solid face such as a Jungle Log, or tagged ordinary leaves such as Oak Leaves. Ancient Tree generation does not place Tree Stars; both tree implementations leave out that decoration. [Support shape and tag][leaves] [leaves-tag] [support] · [Tree Star test][star] · [Tree generation][tree] [giant-tree]
+**Ancient Leaves cannot support it in the bundled data.** Their leaves implementation supplies an empty support shape, and their missing leaves-tag membership also fails Tree Star's alternate support condition. Use a suitable solid face such as a Jungle Log, or tagged ordinary leaves such as Oak Leaves. Ancient Tree generation does not place Tree Stars; both tree implementations leave out that decoration. [Support shape and tag][leaves] [leaves-tag][] [support][] · [Tree Star test][star] · [Tree generation][tree] [giant-tree]
 
 Tree Star can be **waterlogged**: placement in source water records that state, and the standard waterlogging interface handles later water interactions. It does not implement Bone Meal growth, random spreading or a harvesting cycle beyond recovering the placed item. [State, fluid and implemented interfaces][star] [waterlogged] · [Registration][blocks]
 

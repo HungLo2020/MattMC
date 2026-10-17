@@ -27,6 +27,7 @@ pub(super) enum SourceTransformSemantics {
     Entity,
     Hand,
     TexturedMaterial,
+    WorldGlyph,
     Weather,
     Cloud,
     Shadow,
@@ -44,7 +45,7 @@ impl SourceTransformSemantics {
             Self::Terrain | Self::Entity => "(gbufferModelView * vulkanic_source_model_transform)",
             Self::Shadow => "(shadowModelView * vulkanic_source_model_transform)",
             Self::DistantHorizons => "(dhModelView * vulkanic_source_model_transform)",
-            Self::TexturedMaterial | Self::Weather | Self::Cloud | Self::Fullscreen => {
+            Self::TexturedMaterial | Self::WorldGlyph | Self::Weather | Self::Cloud | Self::Fullscreen => {
                 "gbufferModelView"
             }
         }
@@ -56,6 +57,7 @@ impl SourceTransformSemantics {
             Self::Entity => "gbufferModelView",
             Self::Hand => "gbufferModelView",
             Self::TexturedMaterial => "gbufferModelView",
+            Self::WorldGlyph => "gbufferModelView",
             Self::Weather => "gbufferModelView",
             Self::Cloud => "gbufferModelView",
             Self::Shadow => "shadowModelView",
@@ -72,6 +74,7 @@ impl SourceTransformSemantics {
             // its legacy GL projection changes for first-person geometry.
             Self::Hand => "vulkanic_source_hand_projection",
             Self::TexturedMaterial => "gbufferProjection",
+            Self::WorldGlyph => "gbufferProjection",
             Self::Weather => "gbufferProjection",
             Self::Cloud => "gbufferProjection",
             Self::Shadow => "shadowProjection",
@@ -93,6 +96,8 @@ pub(super) fn lower_source_vertex_surface_with_contracts(
     lowered = strip_nonopaque_uniforms(&lowered)?;
     let uses_legacy_fog = lower_legacy_fog(&mut lowered);
     lowered = replace_identifier(&lowered, "varying", "out");
+    lowered = replace_identifier(&lowered, "gl_ModelViewProjectionMatrix",
+        &format!("({} * vulkanic_source_model_view)", transforms.projection_uniform()));
     for (legacy, explicit) in [
         ("gl_TextureMatrix", "vulkanic_source_texture_matrix"),
         ("gl_MultiTexCoord0", "vulkanic_source_atlas_uv"),
@@ -166,6 +171,9 @@ pub(super) fn lower_source_vertex_surface_with_contracts(
 }
 
 pub(super) fn vertex_semantic_preamble(transforms: SourceTransformSemantics) -> String {
+    if transforms == SourceTransformSemantics::WorldGlyph {
+        return format!("{TEXTURED_MATERIAL_VERTEX_SEMANTIC_PREAMBLE}\n{WORLD_GLYPH_VERTEX_SEMANTICS}");
+    }
     if transforms == SourceTransformSemantics::DistantHorizons {
         return DISTANT_HORIZONS_VERTEX_SEMANTIC_PREAMBLE.to_string();
     }
@@ -205,9 +213,30 @@ struct VulkanicSourceTerrainVertex {
     vec4 tangent;
     vec4 mid_block;
 };
+// Four packed words per vertex (TERRAIN_SOURCE_VERTEX_BYTES); decoded to the
+// exact semantic lanes the earlier float record carried.
 layout(set = 0, binding = 0, std430) readonly buffer VulkanicSourceTerrainVertices {
-    VulkanicSourceTerrainVertex vulkanic_source_vertices[];
+    uvec4 vulkanic_source_vertex_words[];
 };
+vec4 vulkanic_source_signed_bytes(uint word) {
+    return vec4(ivec4(word << 24u, word << 16u, word << 8u, word) >> 24);
+}
+VulkanicSourceTerrainVertex vulkanic_source_decode_vertex(int index) {
+    uvec4 a = vulkanic_source_vertex_words[index * 4];
+    uvec4 b = vulkanic_source_vertex_words[index * 4 + 1];
+    uvec4 c = vulkanic_source_vertex_words[index * 4 + 2];
+    uvec4 d = vulkanic_source_vertex_words[index * 4 + 3];
+    VulkanicSourceTerrainVertex vertex;
+    vertex.position = vec4(uintBitsToFloat(a.xyz), 1.0);
+    vertex.color = vec4((uvec4(a.w >> 16u, a.w >> 8u, a.w, a.w >> 24u) & 0xffu)) / 255.0;
+    vertex.normal_light = vec4(clamp(vulkanic_source_signed_bytes(b.z).xyz / 127.0, -1.0, 1.0), 0.0);
+    vertex.atlas_uv_lightmap = vec4(uintBitsToFloat(b.xy), float(b.w & 0xffu), float((b.w >> 16u) & 0xffu));
+    vertex.entity = vec4(float(int(c.x)), float((b.w >> 8u) & 0xffu), 0.0, 1.0);
+    vertex.mid_tex_coord = vec4(uintBitsToFloat(c.zw), 0.0, 1.0);
+    vertex.tangent = uintBitsToFloat(d);
+    vertex.mid_block = vulkanic_source_signed_bytes(c.y);
+    return vertex;
+}
 layout(set = 0, binding = 1, std140) uniform VulkanicSourceTerrainLegacyTransforms {
     mat4 vulkanic_source_texture_matrix[2];
     {hand_projection_field}
@@ -219,7 +248,7 @@ struct VulkanicSourceTerrainInstance {
 layout(set = 0, binding = 3, std430) readonly buffer VulkanicSourceTerrainInstances {
     VulkanicSourceTerrainInstance vulkanic_source_instances[];
 };
-#define vulkanic_source_vertex vulkanic_source_vertices[gl_VertexIndex]
+#define vulkanic_source_vertex vulkanic_source_decode_vertex(gl_VertexIndex)
 #define vulkanic_source_instance vulkanic_source_instances[gl_InstanceIndex]
 #define vulkanic_source_model_transform vulkanic_source_instance.model_transform
 #define vulkanic_source_model_view {model_view_expr}
@@ -239,9 +268,10 @@ layout(set = 0, binding = 3, std430) readonly buffer VulkanicSourceTerrainInstan
 "#;
 
 /// Compact Rust-owned stream for selected `gbuffers_textured` programs. It
-/// intentionally has no terrain material/entity/tangent lanes: the material
-/// contract rejects programs requiring those inputs before this lowering can
-/// be prepared. Positions are copied camera-relative semantics and therefore
+/// intentionally has no terrain material/entity/tangent lanes. Its entity
+/// input is the explicit generic value of a disabled compact GL attribute,
+/// observed on Frozen's particle draws; remaining terrain lanes are rejected.
+/// Positions are copied camera-relative semantics and therefore
 /// use the selected source `gbufferModelView`/`gbufferProjection` uniforms
 /// without a hidden Java pose-stack or Iris vertex-format dependency.
 pub(super) const TEXTURED_MATERIAL_VERTEX_SEMANTIC_PREAMBLE: &str = r#"struct VulkanicSourceTexturedMaterialVertex {
@@ -272,8 +302,13 @@ const int vulkanic_source_textured_quad_indices[6] = int[6](0, 1, 2, 2, 3, 0);
 #define vulkanic_source_normal vulkanic_source_vertex.normal_light.xyz
 #define vulkanic_source_atlas_uv vec4(vulkanic_source_vertex.texture_uv_lightmap.xy, 0.0, 1.0)
 #define vulkanic_source_lightmap_uv vec4(vulkanic_source_vertex.texture_uv_lightmap.zw, 0.0, 1.0)
+// Frozen's compact particle stream has no mc_Entity array. Three captured
+// MakeUp oak-leaves draws consume this generic value, including w = 1.
+#define vulkanic_source_entity vec4(0.0, 0.0, 0.0, 1.0)
 #define vulkanic_source_ftransform() (gbufferProjection * vulkanic_source_model_view * vulkanic_source_position)
 "#;
+
+const WORLD_GLYPH_VERTEX_SEMANTICS: &str = include_str!("glyph_vertex.glsl");
 
 /// Rust-owned source interface for the copied DH CPU stream. The storage
 /// layout matches `world_primitive_frontend::lod`'s 16-byte packed vertex
@@ -365,200 +400,6 @@ vec2 vulkanic_source_dh_packed_lightmap_coordinates() {
 #define vulkanic_source_normal_matrix transpose(inverse(mat3(vulkanic_source_model_view)))
 #define vulkanic_source_ftransform() (dhProjection * vulkanic_source_model_view * vulkanic_source_position)
 "#;
-
-pub(super) fn fullscreen_vertex_semantic_preamble(
-    raster_primitive: FullscreenSourceRasterPrimitive,
-) -> String {
-    let geometry = match raster_primitive {
-        FullscreenSourceRasterPrimitive::FullscreenTriangle => {
-            r#"
-vec2 vulkanic_source_fullscreen_position() {
-    const vec2 positions[3] = vec2[3](
-        vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0)
-    );
-    return positions[vulkanic_source_fullscreen_vertex_index()];
-}
-vec2 vulkanic_source_fullscreen_uv_coordinates() {
-    const vec2 coordinates[3] = vec2[3](
-        vec2(0.0, 0.0), vec2(2.0, 0.0), vec2(0.0, 2.0)
-    );
-    vec2 coordinate = coordinates[vulkanic_source_fullscreen_vertex_index()];
-    // Legacy source `texture2D` calls use Minecraft's OpenGL texture origin.
-    // Vulkan images are sampled with the opposite vertical convention, while
-    // integer texelFetch keeps its native image addressing. Preserve the
-    // source sampler contract here, at the owned fullscreen vertex boundary.
-    #ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
-        coordinate.y = 1.0 - coordinate.y;
-    #endif
-    return coordinate;
-}
-#define vulkanic_source_fullscreen_transform() vec4(vulkanic_source_fullscreen_position(), 0.0, 1.0)
-"#.to_string()
-        }
-        FullscreenSourceRasterPrimitive::VanillaSkyDisc => {
-            r#"
-// Expanded eight-wedge form of Minecraft's top SkyRenderer disc. The source
-// program's legacy ftransform() sees the same local-space sky geometry rather
-// than an approximation at synthetic fullscreen depth.
-vec4 vulkanic_source_fullscreen_sky_position() {
-    const vec3 outer[9] = vec3[9](
-        vec3(-512.0, 16.0, 0.0),
-        vec3(-362.03867, 16.0, -362.03867),
-        vec3(0.0, 16.0, -512.0),
-        vec3(362.03867, 16.0, -362.03867),
-        vec3(512.0, 16.0, 0.0),
-        vec3(362.03867, 16.0, 362.03867),
-        vec3(0.0, 16.0, 512.0),
-        vec3(-362.03867, 16.0, 362.03867),
-        vec3(-512.0, 16.0, 0.0)
-    );
-    int vertex = vulkanic_source_fullscreen_vertex_index();
-    int wedge = vertex / 3;
-    int corner = vertex - wedge * 3;
-    return corner == 0
-        ? vec4(0.0, 16.0, 0.0, 1.0)
-        : vec4(outer[wedge + corner - 1], 1.0);
-}
-vec2 vulkanic_source_fullscreen_uv_coordinates() { return vec2(0.0); }
-#define vulkanic_source_fullscreen_transform() (gbufferProjection * gbufferModelView * vulkanic_source_fullscreen_sky_position())
-"#.to_string()
-        }
-        FullscreenSourceRasterPrimitive::VanillaCelestialQuad => {
-            r#"
-// Matches SkyRenderer's indexed quad topology and semantic transform:
-// Y(-90) * X(sunAngle) * Z(sunPathRotation) * translate * scale. The moon
-// preserves vanilla's reversed position/UV ordering for its phase sheet.
-int vulkanic_source_celestial_corner() {
-    const int triangle_corners[6] = int[6](0, 1, 2, 0, 2, 3);
-    return triangle_corners[vulkanic_source_fullscreen_vertex_index() % 6];
-}
-int vulkanic_source_celestial_face() {
-    return vulkanic_source_fullscreen_vertex_index() / 6;
-}
-bool vulkanic_source_celestial_end_sky() {
-    return vulkanic_source_celestial_is_moon == 2;
-}
-vec3 vulkanic_source_rotate_x(vec3 value, float angle) {
-    float s = sin(angle);
-    float c = cos(angle);
-    return vec3(value.x, c * value.y - s * value.z, s * value.y + c * value.z);
-}
-vec3 vulkanic_source_rotate_y(vec3 value, float angle) {
-    float s = sin(angle);
-    float c = cos(angle);
-    return vec3(c * value.x + s * value.z, value.y, -s * value.x + c * value.z);
-}
-vec3 vulkanic_source_rotate_z(vec3 value, float angle) {
-    float s = sin(angle);
-    float c = cos(angle);
-    return vec3(c * value.x - s * value.y, s * value.x + c * value.y, value.z);
-}
-vec4 vulkanic_source_fullscreen_celestial_position() {
-    int face = vulkanic_source_celestial_face();
-    if (vulkanic_source_celestial_end_sky()) {
-        // SkyRenderer.buildEndSky: one +/-100 face per rotation.
-        const vec3 box_corners[4] = vec3[4](
-            vec3(-100.0, -100.0, -100.0), vec3(-100.0, -100.0, 100.0),
-            vec3(100.0, -100.0, 100.0), vec3(100.0, -100.0, -100.0)
-        );
-        vec3 corner = box_corners[vulkanic_source_celestial_corner()];
-        if (face == 1) corner = vulkanic_source_rotate_x(corner, 1.57079632679);
-        else if (face == 2) corner = vulkanic_source_rotate_x(corner, -1.57079632679);
-        else if (face == 3) corner = vulkanic_source_rotate_x(corner, 3.14159265359);
-        else if (face == 4) corner = vulkanic_source_rotate_z(corner, 1.57079632679);
-        else if (face == 5) corner = vulkanic_source_rotate_z(corner, -1.57079632679);
-        return vec4(corner, 1.0);
-    }
-    if (face != 0) {
-        // Sun and moon draw one quad; collapse the remaining faces.
-        return vec4(0.0, 100.0, 0.0, 1.0);
-    }
-    const vec2 sun_corners[4] = vec2[4](
-        vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0)
-    );
-    const vec2 moon_corners[4] = vec2[4](
-        vec2(-1.0, 1.0), vec2(1.0, 1.0), vec2(1.0, -1.0), vec2(-1.0, -1.0)
-    );
-    bool moon = vulkanic_source_celestial_is_moon == 1;
-    vec2 corner = moon ? moon_corners[vulkanic_source_celestial_corner()]
-                       : sun_corners[vulkanic_source_celestial_corner()];
-    float size = moon ? 20.0 : 30.0;
-    float height = moon ? -100.0 : 100.0;
-    vec3 position = vec3(corner.x * size, height, corner.y * size);
-    position = vulkanic_source_rotate_z(position, radians(vulkanic_source_celestial_sun_path_rotation));
-    position = vulkanic_source_rotate_x(position, sunAngle * 6.28318530718);
-    position = vulkanic_source_rotate_y(position, -1.57079632679);
-    return vec4(position, 1.0);
-}
-vec2 vulkanic_source_fullscreen_uv_coordinates() {
-    int corner = vulkanic_source_celestial_corner();
-    bool moon = vulkanic_source_celestial_is_moon == 1;
-    vec2 coordinate;
-    if (vulkanic_source_celestial_end_sky()) {
-        const vec2 end_uv[4] = vec2[4](
-            vec2(0.0, 0.0), vec2(0.0, 16.0), vec2(16.0, 16.0), vec2(16.0, 0.0)
-        );
-        coordinate = end_uv[corner];
-    } else if (moon) {
-        int phase = clamp(moonPhase, 0, 7);
-        float u0 = float(phase % 4) * 0.25;
-        float v0 = float(phase / 4) * 0.5;
-        const vec2 moon_uv[4] = vec2[4](
-            vec2(1.0, 1.0), vec2(0.0, 1.0), vec2(0.0, 0.0), vec2(1.0, 0.0)
-        );
-        coordinate = vec2(u0, v0) + moon_uv[corner] * vec2(0.25, 0.5);
-    } else {
-        const vec2 sun_uv[4] = vec2[4](
-            vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0)
-        );
-        coordinate = sun_uv[corner];
-    }
-#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
-    coordinate.y = 1.0 - coordinate.y;
-#endif
-    return coordinate;
-}
-#define vulkanic_source_fullscreen_transform() (gbufferProjection * gbufferModelView * vulkanic_source_fullscreen_celestial_position())
-"#.to_string()
-        }
-    };
-    let vertex_color = match raster_primitive {
-        // SkyRenderer builds its top disc with the extracted vanilla sky
-        // color. The selected source's sky vertex uses this for its legacy
-        // `gl_Color` semantic (including star discrimination), so it cannot
-        // be replaced with the generic procedural white value.
-        FullscreenSourceRasterPrimitive::VanillaSkyDisc => {
-            "#define vulkanic_source_fullscreen_vertex_color vec4(skyColor, 1.0)"
-        }
-        // The End sky box uses SkyRenderer's constant 0xFF282828 vertex color.
-        FullscreenSourceRasterPrimitive::VanillaCelestialQuad => {
-            "#define vulkanic_source_fullscreen_vertex_color (vulkanic_source_celestial_is_moon == 2 ? vec4(vec3(40.0 / 255.0), 1.0) : vec4(1.0, 1.0, 1.0, vulkanic_source_celestial_alpha))"
-        }
-        FullscreenSourceRasterPrimitive::FullscreenTriangle => {
-            "const vec4 vulkanic_source_fullscreen_vertex_color = vec4(1.0);"
-        }
-    };
-    r#"// Source stages use Rust-owned procedural geometry. This avoids
-// inheriting a Java/Iris vertex stream and stays compatible with the OpenGL
-// backend's intentionally storage-buffer-only mesh path.
-layout(set = 0, binding = 0, std140) uniform VulkanicSourceFullscreenFrame {
-    mat4 vulkanic_source_fullscreen_texture_matrix[2];
-};
-int vulkanic_source_fullscreen_vertex_index() {
-#ifdef VULKANIC_GAL_ZERO_TO_ONE_CLIP_DEPTH
-    return gl_VertexIndex;
-#else
-    return gl_VertexID;
-#endif
-}
-VULKANIC_SOURCE_FULLSCREEN_GEOMETRY
-#define vulkanic_source_fullscreen_uv vec4(vulkanic_source_fullscreen_uv_coordinates(), 0.0, 1.0)
-#define vulkanic_source_fullscreen_secondary_uv vec4(vulkanic_source_fullscreen_uv_coordinates(), 0.0, 1.0)
-VULKANIC_SOURCE_FULLSCREEN_VERTEX_COLOR
-"#
-    .replace("VULKANIC_SOURCE_FULLSCREEN_GEOMETRY", &geometry)
-    .replace("VULKANIC_SOURCE_FULLSCREEN_VERTEX_COLOR", vertex_color)
-}
 
 pub(super) const LEGACY_FOG_SEMANTIC_PREAMBLE: &str = r#"struct VulkanicSourceLegacyFogParameters {
     vec4 color;

@@ -90,7 +90,53 @@ public class NetherFortressPieces {
 		return netherBridgePiece;
 	}
 
+	/**
+	 * Adds the pieces Rust planned ({@code fortress_plan.rs}) in builder order: per piece
+	 * {@code [kind, genDepth, minX, minY, minZ, maxX, maxY, maxZ, orientation, fieldCount, fields...]}.
+	 * Kinds: 30 BridgeCrossing, 31 BridgeEndFiller (selfSeed), 32 BridgeStraight, 33 CastleCorridorStairsPiece,
+	 * 34 CastleCorridorTBalconyPiece, 35 CastleEntrance, 36 CastleSmallCorridorCrossingPiece,
+	 * 37 CastleSmallCorridorLeftTurnPiece (isNeedingChest), 38 CastleSmallCorridorPiece,
+	 * 39 CastleSmallCorridorRightTurnPiece (isNeedingChest), 40 CastleStalkRoom, 41 MonsterThrone, 42 RoomCrossing,
+	 * 43 StairsRoom, 44 StartPiece.
+	 */
+	public static void addNativePieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder structurePiecesBuilder, int[] words) {
+		int i = 0;
+		while (i < words.length) {
+			int kind = words[i];
+			int depth = words[i + 1];
+			BoundingBox box = new BoundingBox(words[i + 2], words[i + 3], words[i + 4], words[i + 5], words[i + 6], words[i + 7]);
+			Direction direction = words[i + 8] == -1 ? null : Direction.from2DDataValue(words[i + 8]);
+			int fieldCount = words[i + 9];
+			int field = fieldCount > 0 ? words[i + 10] : 0;
+			i += 10 + fieldCount;
+			StructurePiece piece = switch (kind) {
+				case 30 -> new NetherFortressPieces.BridgeCrossing(depth, box, direction);
+				case 31 -> new NetherFortressPieces.BridgeEndFiller(depth, box, direction, field);
+				case 32 -> new NetherFortressPieces.BridgeStraight(depth, box, direction);
+				case 33 -> new NetherFortressPieces.CastleCorridorStairsPiece(depth, box, direction);
+				case 34 -> new NetherFortressPieces.CastleCorridorTBalconyPiece(depth, box, direction);
+				case 35 -> new NetherFortressPieces.CastleEntrance(depth, box, direction);
+				case 36 -> new NetherFortressPieces.CastleSmallCorridorCrossingPiece(depth, box, direction);
+				case 37 -> new NetherFortressPieces.CastleSmallCorridorLeftTurnPiece(depth, box, direction, field != 0);
+				case 38 -> new NetherFortressPieces.CastleSmallCorridorPiece(depth, box, direction);
+				case 39 -> new NetherFortressPieces.CastleSmallCorridorRightTurnPiece(depth, box, direction, field != 0);
+				case 40 -> new NetherFortressPieces.CastleStalkRoom(depth, box, direction);
+				case 41 -> new NetherFortressPieces.MonsterThrone(depth, box, direction);
+				case 42 -> new NetherFortressPieces.RoomCrossing(depth, box, direction);
+				case 43 -> new NetherFortressPieces.StairsRoom(depth, box, direction);
+				case 44 -> new NetherFortressPieces.StartPiece(depth, box, direction);
+				default -> throw new IllegalStateException("Unknown native fortress piece kind " + kind);
+			};
+			structurePiecesBuilder.addPiece(piece);
+		}
+	}
+
 	public static class BridgeCrossing extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(30, 0);
+		}
+
 		private static final int WIDTH = 19;
 		private static final int HEIGHT = 10;
 		private static final int DEPTH = 19;
@@ -176,6 +222,11 @@ public class NetherFortressPieces {
 	}
 
 	public static class BridgeEndFiller extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(31, this.selfSeed);
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 10;
 		private static final int DEPTH = 8;
@@ -185,6 +236,13 @@ public class NetherFortressPieces {
 			super(StructurePieceType.NETHER_FORTRESS_BRIDGE_END_FILLER, i, boundingBox);
 			this.setOrientation(direction);
 			this.selfSeed = randomSource.nextInt();
+		}
+
+		/** A planned piece ({@link NetherFortressPieces#addNativePieces}). */
+		public BridgeEndFiller(int i, BoundingBox boundingBox, Direction direction, int selfSeed) {
+			super(StructurePieceType.NETHER_FORTRESS_BRIDGE_END_FILLER, i, boundingBox);
+			this.setOrientation(direction);
+			this.selfSeed = selfSeed;
 		}
 
 		public BridgeEndFiller(CompoundTag compoundTag) {
@@ -246,11 +304,22 @@ public class NetherFortressPieces {
 	}
 
 	public static class BridgeStraight extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(32, 0);
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 10;
 		private static final int DEPTH = 19;
 
 		public BridgeStraight(int i, RandomSource randomSource, BoundingBox boundingBox, Direction direction) {
+			super(StructurePieceType.NETHER_FORTRESS_BRIDGE_STRAIGHT, i, boundingBox);
+			this.setOrientation(direction);
+		}
+
+		/** A planned piece ({@link NetherFortressPieces#addNativePieces}). */
+		public BridgeStraight(int i, BoundingBox boundingBox, Direction direction) {
 			super(StructurePieceType.NETHER_FORTRESS_BRIDGE_STRAIGHT, i, boundingBox);
 			this.setOrientation(direction);
 		}
@@ -314,6 +383,11 @@ public class NetherFortressPieces {
 	}
 
 	public static class CastleCorridorStairsPiece extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(33, 0);
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 14;
 		private static final int DEPTH = 10;
@@ -386,6 +460,11 @@ public class NetherFortressPieces {
 	}
 
 	public static class CastleCorridorTBalconyPiece extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(34, 0);
+		}
+
 		private static final int WIDTH = 9;
 		private static final int HEIGHT = 7;
 		private static final int DEPTH = 9;
@@ -467,11 +546,22 @@ public class NetherFortressPieces {
 	}
 
 	public static class CastleEntrance extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(35, 0);
+		}
+
 		private static final int WIDTH = 13;
 		private static final int HEIGHT = 14;
 		private static final int DEPTH = 13;
 
 		public CastleEntrance(int i, RandomSource randomSource, BoundingBox boundingBox, Direction direction) {
+			super(StructurePieceType.NETHER_FORTRESS_CASTLE_ENTRANCE, i, boundingBox);
+			this.setOrientation(direction);
+		}
+
+		/** A planned piece ({@link NetherFortressPieces#addNativePieces}). */
+		public CastleEntrance(int i, BoundingBox boundingBox, Direction direction) {
 			super(StructurePieceType.NETHER_FORTRESS_CASTLE_ENTRANCE, i, boundingBox);
 			this.setOrientation(direction);
 		}
@@ -593,6 +683,11 @@ public class NetherFortressPieces {
 	}
 
 	public static class CastleSmallCorridorCrossingPiece extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(36, 0);
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 7;
 		private static final int DEPTH = 5;
@@ -649,6 +744,16 @@ public class NetherFortressPieces {
 	}
 
 	public static class CastleSmallCorridorLeftTurnPiece extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(37, this.isNeedingChest ? 1 : 0);
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
+			this.isNeedingChest = words[9] != 0;
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 7;
 		private static final int DEPTH = 5;
@@ -658,6 +763,13 @@ public class NetherFortressPieces {
 			super(StructurePieceType.NETHER_FORTRESS_CASTLE_SMALL_CORRIDOR_LEFT_TURN, i, boundingBox);
 			this.setOrientation(direction);
 			this.isNeedingChest = randomSource.nextInt(3) == 0;
+		}
+
+		/** A planned piece ({@link NetherFortressPieces#addNativePieces}). */
+		public CastleSmallCorridorLeftTurnPiece(int i, BoundingBox boundingBox, Direction direction, boolean isNeedingChest) {
+			super(StructurePieceType.NETHER_FORTRESS_CASTLE_SMALL_CORRIDOR_LEFT_TURN, i, boundingBox);
+			this.setOrientation(direction);
+			this.isNeedingChest = isNeedingChest;
 		}
 
 		public CastleSmallCorridorLeftTurnPiece(CompoundTag compoundTag) {
@@ -722,6 +834,11 @@ public class NetherFortressPieces {
 	}
 
 	public static class CastleSmallCorridorPiece extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(38, 0);
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 7;
 		private static final int DEPTH = 5;
@@ -779,6 +896,16 @@ public class NetherFortressPieces {
 	}
 
 	public static class CastleSmallCorridorRightTurnPiece extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(39, this.isNeedingChest ? 1 : 0);
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
+			this.isNeedingChest = words[9] != 0;
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 7;
 		private static final int DEPTH = 5;
@@ -788,6 +915,13 @@ public class NetherFortressPieces {
 			super(StructurePieceType.NETHER_FORTRESS_CASTLE_SMALL_CORRIDOR_RIGHT_TURN, i, boundingBox);
 			this.setOrientation(direction);
 			this.isNeedingChest = randomSource.nextInt(3) == 0;
+		}
+
+		/** A planned piece ({@link NetherFortressPieces#addNativePieces}). */
+		public CastleSmallCorridorRightTurnPiece(int i, BoundingBox boundingBox, Direction direction, boolean isNeedingChest) {
+			super(StructurePieceType.NETHER_FORTRESS_CASTLE_SMALL_CORRIDOR_RIGHT_TURN, i, boundingBox);
+			this.setOrientation(direction);
+			this.isNeedingChest = isNeedingChest;
 		}
 
 		public CastleSmallCorridorRightTurnPiece(CompoundTag compoundTag) {
@@ -852,6 +986,11 @@ public class NetherFortressPieces {
 	}
 
 	public static class CastleStalkRoom extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(40, 0);
+		}
+
 		private static final int WIDTH = 13;
 		private static final int HEIGHT = 14;
 		private static final int DEPTH = 13;
@@ -1014,6 +1153,16 @@ public class NetherFortressPieces {
 	}
 
 	public static class MonsterThrone extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(41, this.hasPlacedSpawner ? 1 : 0);
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
+			this.hasPlacedSpawner = words[9] != 0;
+		}
+
 		private static final int WIDTH = 7;
 		private static final int HEIGHT = 8;
 		private static final int DEPTH = 9;
@@ -1108,7 +1257,7 @@ public class NetherFortressPieces {
 		}
 	}
 
-	abstract static class NetherBridgePiece extends StructurePiece {
+	abstract static class NetherBridgePiece extends StructurePiece implements net.minecraft.world.level.levelgen.structure.NativeStructurePieces.Native {
 		protected NetherBridgePiece(StructurePieceType structurePieceType, int i, BoundingBox boundingBox) {
 			super(structurePieceType, i, boundingBox);
 		}
@@ -1119,6 +1268,17 @@ public class NetherFortressPieces {
 
 		@Override
 		protected void addAdditionalSaveData(StructurePieceSerializationContext structurePieceSerializationContext, CompoundTag compoundTag) {
+		}
+
+		/** {@link net.minecraft.world.level.levelgen.structure.NativeStructurePieces}: the header, then at most one field. */
+		protected long[] nativeFortressWords(int kind, long field) {
+			long[] words = net.minecraft.world.level.levelgen.structure.NativeStructurePieces.header(this, kind, 1);
+			words[9] = field;
+			return words;
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
 		}
 
 		private int updatePieceWeight(List<NetherFortressPieces.PieceWeight> list) {
@@ -1426,6 +1586,11 @@ public class NetherFortressPieces {
 	}
 
 	public static class RoomCrossing extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(42, 0);
+		}
+
 		private static final int WIDTH = 7;
 		private static final int HEIGHT = 9;
 		private static final int DEPTH = 7;
@@ -1493,6 +1658,11 @@ public class NetherFortressPieces {
 	}
 
 	public static class StairsRoom extends NetherFortressPieces.NetherBridgePiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeFortressWords(43, 0);
+		}
+
 		private static final int WIDTH = 7;
 		private static final int HEIGHT = 11;
 		private static final int DEPTH = 7;
@@ -1579,6 +1749,14 @@ public class NetherFortressPieces {
 				pieceWeight.placeCount = 0;
 				this.availableCastlePieces.add(pieceWeight);
 			}
+		}
+
+		/**
+		 * A planned start ({@link NetherFortressPieces#addNativePieces}). Like the random-drawing constructor it keeps
+		 * the bridge-crossing piece type; the planning lists stay unset.
+		 */
+		public StartPiece(int i, BoundingBox boundingBox, Direction direction) {
+			super(i, boundingBox, direction);
 		}
 
 		public StartPiece(CompoundTag compoundTag) {

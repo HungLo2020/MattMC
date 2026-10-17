@@ -136,7 +136,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
 			protoChunk.unpackBlockTicks(),
 			protoChunk.unpackFluidTicks(),
 			protoChunk.getInhabitedTime(),
-			protoChunk.getSections(),
+			protoChunk.getSectionsForRead(),
 			postLoadProcessor,
 			protoChunk.getBlendingData()
 		);

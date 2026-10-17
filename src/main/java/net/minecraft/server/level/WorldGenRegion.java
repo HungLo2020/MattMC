@@ -120,6 +120,11 @@ public class WorldGenRegion implements WorldGenLevel {
 			if (chunkStatus.isOrBefore(chunkStatus2)) {
 				ChunkAccess chunkAccess = generationChunkHolder.getChunkIfPresentUnchecked(chunkStatus2);
 				if (chunkAccess != null) {
+					// A chunk handed out inside the write radius may be written: it joins the
+					// FEATURES transaction (if any) before the caller can change it.
+					if (!this.nativeUntracked && k <= this.generatingStep.blockStateWriteRadius()) {
+						net.minecraft.world.level.chunk.DecorationTransaction.touchCurrent(chunkAccess);
+					}
 					return chunkAccess;
 				}
 			}
@@ -143,6 +148,45 @@ public class WorldGenRegion implements WorldGenLevel {
 		crashReportCategory.setDetail("Requested distance", k);
 		crashReportCategory.setDetail("Generating chunk", this.center.getPos()::toString);
 		throw new ReportedException(crashReport);
+	}
+
+	/** Native decoration: this step's block-state write radius. */
+	public int nativeBlockStateWriteRadius() {
+		return this.generatingStep.blockStateWriteRadius();
+	}
+
+	/** Native decoration: the largest chessboard distance {@link #getChunk} serves. */
+	public int nativeDependencyRadius() {
+		return this.generatingStep.directDependencies().size() - 1;
+	}
+
+	private boolean nativeUntracked;
+
+	/** {@link #getChunk(int, int)} for native binding, which only reads: no transaction capture. */
+	public ChunkAccess nativeChunkUntracked(int x, int z) {
+		this.nativeUntracked = true;
+		try {
+			return this.getChunk(x, z);
+		} finally {
+			this.nativeUntracked = false;
+		}
+	}
+
+	public ChunkAccess nativeCenter() {
+		return this.center;
+	}
+
+	/** Native decoration replays {@link #setBlock}'s POI notification after its call. */
+	public void nativeUpdatePoi(BlockPos blockPos, BlockState old, BlockState state) {
+		this.updatePoi(blockPos, old, state);
+	}
+
+	/** {@code updatePOIOnBlockStateChange}, after the FEATURES transaction commits when one is open. */
+	private void updatePoi(BlockPos blockPos, BlockState old, BlockState state) {
+		BlockPos pos = blockPos.immutable();
+		if (!net.minecraft.world.level.chunk.DecorationTransaction.defer(() -> this.level.updatePOIOnBlockStateChange(pos, old, state))) {
+			this.level.updatePOIOnBlockStateChange(pos, old, state);
+		}
 	}
 
 	@Override
@@ -276,13 +320,14 @@ public class WorldGenRegion implements WorldGenLevel {
 
 	@Override
 	public boolean setBlock(BlockPos blockPos, BlockState blockState, int i, int j) {
+		if (net.minecraft.world.level.levelgen.NativeDecoration.JAVA_FAIL_TEST) net.minecraft.world.level.levelgen.NativeDecoration.javaWriteHook();
 		if (!this.ensureCanWrite(blockPos)) {
 			return false;
 		} else {
 			ChunkAccess chunkAccess = this.getChunk(blockPos);
 			BlockState blockState2 = chunkAccess.setBlockState(blockPos, blockState, i);
 			if (blockState2 != null) {
-				this.level.updatePOIOnBlockStateChange(blockPos, blockState2, blockState);
+				this.updatePoi(blockPos, blockState2, blockState);
 			}
 
 			if (blockState.hasBlockEntity()) {

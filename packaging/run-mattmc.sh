@@ -80,10 +80,10 @@ fi
 if [[ "$(uname -s)" == "Darwin" ]]; then
     # macOS - use G1GC to avoid SIGBUS crashes in Arena/Chunk allocation
     # Additional stability flags for macOS to prevent crashes during shader loading
-    JVM_ARGS="-Xmx8G -Xms4G -XX:+UseG1GC -XX:ReservedCodeCacheSize=512m -XX:+DisableExplicitGC -XX:MaxMetaspaceSize=512m -Djava.awt.headless=false -XX:+UnlockExperimentalVMOptions -XX:G1NewSizePercent=20 -XX:G1MaxNewSizePercent=80 -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200"
+    JVM_ARGS="-Xmx8G -Xms4G -XX:+UseG1GC -XX:ReservedCodeCacheSize=512m -XX:+DisableExplicitGC -XX:MaxMetaspaceSize=512m -Djava.awt.headless=false -XX:+UnlockExperimentalVMOptions -XX:G1NewSizePercent=20 -XX:G1MaxNewSizePercent=80 -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200 -XX:Tier3InvocationThreshold=100 -XX:Tier4InvocationThreshold=600 -XX:Tier4MinInvocationThreshold=300 -XX:Tier4CompileThreshold=700"
 else
     # Linux/Unix - use ZGC with UseCompactObjectHeaders for better performance
-    JVM_ARGS="-Xmx8G -Xms4G -XX:+UseZGC -XX:+UseCompactObjectHeaders"
+    JVM_ARGS="-Xmx8G -Xms4G -XX:+UseZGC -XX:+UseCompactObjectHeaders -XX:Tier3InvocationThreshold=100 -XX:Tier4InvocationThreshold=600 -XX:Tier4MinInvocationThreshold=300 -XX:Tier4CompileThreshold=700"
 fi
 
 $JAVA_CMD $JVM_ARGS \

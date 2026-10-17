@@ -55,6 +55,7 @@ class EntityGrizzlyBearBreedingTest {
     void createLevel() {
         // Real entity factories, attributes and persistence; world I/O is mocked.
         level = mock(ServerLevel.class, RETURNS_DEEP_STUBS);
+        when(level.nativeEntityGeometry()).thenCallRealMethod();
         when(level.enabledFeatures()).thenReturn(FeatureFlags.DEFAULT_FLAGS);
         when(level.registryAccess()).thenReturn(RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY));
         when(level.getBlockState(any())).thenReturn(Blocks.AIR.defaultBlockState());

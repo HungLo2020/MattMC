@@ -53,5 +53,15 @@ nav:
           - Overview: development/world/index.md
           - Biomes: development/world/biome/index.md
           - World Generation: development/world/levelgen/index.md
+      - Audio:
+          - Overview: development/audio/index.md
+          - Sound Engine: development/audio/SOUND-ENGINE.md
+          - Client Sounds: development/audio/CLIENT-SOUNDS.md
+      - Resource Packs and Registries:
+          - Overview: development/resources/index.md
+          - Pack Access: development/resources/PACKS.md
+          - Resource Manager: development/resources/RESOURCE-MANAGER.md
+          - Tags and Registries: development/resources/TAGS-AND-REGISTRIES.md
+          - Verification: development/resources/VERIFICATION.md
   - Changelog: changelog/CHANGELOG.md
   - Changes: changes/changes.md

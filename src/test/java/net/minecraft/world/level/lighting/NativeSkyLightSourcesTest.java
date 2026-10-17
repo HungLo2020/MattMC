@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class NativeSkyLightSourcesTest {
     @BeforeAll static void bootstrap(){SharedConstants.tryDetectVersion();Bootstrap.bootStrap();}
     private static void compare(ChunkAccess chunk,long seed) {
-        var a=new ChunkSkyLightSources(chunk);var b=new ChunkSkyLightSources(chunk);
+        var a=new JavaSkyLightSources(chunk);var b=new ChunkSkyLightSources(chunk);
         SkyLightSourcesFixtures.randomize(a,seed);SkyLightSourcesFixtures.randomize(b,seed);
         JavaSkyLightSources.fill(a,chunk);
         assertTrue(NativeSkyLightSources.fill(chunk,chunk.getMinY()-1,SkyLightSourcesFixtures.storage(b)),"Must exercise Rust");
@@ -29,10 +29,20 @@ class NativeSkyLightSourcesTest {
         assertEquals(a.getHighestLowestSourceY(),b.getHighestLowestSourceY());
         b.fillFrom(chunk);assertArrayEquals(SkyLightSourcesFixtures.storage(a).getRaw(),SkyLightSourcesFixtures.storage(b).getRaw());
     }
-    @Test void exactOcclusionCatalogForEveryShapePair() throws Exception {
-        var field=NativeSkyLightSources.class.getDeclaredField("TABLES");field.setAccessible(true);var tables=field.get(null);
-        var methods=tables.getClass();var d=methods.getDeclaredMethod("descriptors");d.setAccessible(true);var f=methods.getDeclaredMethod("faces");f.setAccessible(true);var e=methods.getDeclaredMethod("edges");e.setAccessible(true);
-        int[] descriptors=(int[])d.invoke(tables);int count=(int)f.invoke(tables);var edges=(MemorySegment)e.invoke(tables);
+    @Test void exactOcclusionCatalogForEveryShapePair() throws Throwable {
+        // Rust derives the catalog from its block registry; compare it with Java's shapes.
+        var tablesCall=net.minecraft.util.NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_skylight_sources_tables",
+            java.lang.foreign.FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+        assertTrue(net.minecraft.world.level.block.NativeBlockRegistry.ready());
+        int states=Block.BLOCK_STATE_REGISTRY.size();
+        int count=(int)tablesCall.invokeExact(MemorySegment.NULL,0,MemorySegment.NULL,0);
+        int[] descriptors=new int[states];MemorySegment edges;
+        try(var arena=java.lang.foreign.Arena.ofConfined()){
+            var d=arena.allocate(states*4L,4);var e=arena.allocate(Math.max(1,(long)count*count));
+            assertEquals(count,(int)tablesCall.invokeExact(d,states,e,count*count));
+            MemorySegment.copy(d,ValueLayout.JAVA_INT,0,descriptors,0,states);
+            edges=java.lang.foreign.Arena.ofAuto().allocate(e.byteSize());edges.copyFrom(e);
+        }
         assertTrue(count>0);
         var ups=new IdentityHashMap<VoxelShape,Integer>();var downs=new IdentityHashMap<VoxelShape,Integer>();
         for(int id=0;id<descriptors.length;id++) {
@@ -96,10 +106,8 @@ class NativeSkyLightSourcesTest {
     }
     @Test void corruptedIdsAndCustomReadersKeepOriginalBehavior() throws Exception {
         var chunk=SkyLightSourcesFixtures.chunk("solid",-64,32,1);
-        var field=PalettedContainer.class.getDeclaredField("data");field.setAccessible(true);
-        var data=(PalettedContainer.Data<?>)field.get(chunk.getSection(1).getStates());
-        var words=data.storage().getRaw();words[words.length-1]|=15L<<60;
-        var a=new ChunkSkyLightSources(chunk);var b=new ChunkSkyLightSources(chunk);
+        var words=net.minecraft.world.level.chunk.SectionFingerprint.rawWords(chunk.getSection(1).getStates());words[words.length-1]|=15L<<60;
+        var a=new JavaSkyLightSources(chunk);var b=new ChunkSkyLightSources(chunk);
         var expected=assertThrows(RuntimeException.class,()->JavaSkyLightSources.fill(a,chunk));
         var actual=assertThrows(RuntimeException.class,()->b.fillFrom(chunk));
         assertEquals(expected.getClass(),actual.getClass());assertEquals(expected.getMessage(),actual.getMessage());
@@ -108,7 +116,7 @@ class NativeSkyLightSourcesTest {
         var custom=new ProtoChunk(source.getPos(),UpgradeData.EMPTY,source.getSections(),new net.minecraft.world.ticks.ProtoChunkTicks<>(),new net.minecraft.world.ticks.ProtoChunkTicks<>(),source,null,null) {
             @Override public LevelChunkSection getSection(int i){seen.add(i);return super.getSection(i);}
         };
-        var c=new ChunkSkyLightSources(custom);var d=new ChunkSkyLightSources(custom);
+        var c=new JavaSkyLightSources(custom);var d=new ChunkSkyLightSources(custom);
         assertFalse(NativeSkyLightSources.fill(custom,-65,SkyLightSourcesFixtures.storage(d)));assertTrue(seen.isEmpty());
         JavaSkyLightSources.fill(c,custom);var trace=List.copyOf(seen);seen.clear();d.fillFrom(custom);assertEquals(trace,seen);
         assertArrayEquals(SkyLightSourcesFixtures.storage(c).getRaw(),SkyLightSourcesFixtures.storage(d).getRaw());
@@ -116,7 +124,7 @@ class NativeSkyLightSourcesTest {
     }
     @Test void incrementalUpdatesAfterNativeFillStayEquivalent() {
         var chunk=SkyLightSourcesFixtures.chunk("shapes",-64,64,77);
-        var a=new ChunkSkyLightSources(chunk);var b=new ChunkSkyLightSources(chunk);
+        var a=new JavaSkyLightSources(chunk);var b=new ChunkSkyLightSources(chunk);
         JavaSkyLightSources.fill(a,chunk);b.fillFrom(chunk);
         var random=new Random(1977);
         BlockState[] values={Blocks.AIR.defaultBlockState(),Blocks.STONE.defaultBlockState(),Blocks.OAK_SLAB.defaultBlockState(),Blocks.GLASS.defaultBlockState(),Blocks.WATER.defaultBlockState()};
@@ -142,7 +150,7 @@ class NativeSkyLightSourcesTest {
                 @Override public BlockState getBlockState(int x,int y,int z){seen.add(x+y*256+z*16);return super.getBlockState(x,y,z);}
             };
             var custom=SkyLightSourcesFixtures.withSections(sections,-64,128);
-            var a=new ChunkSkyLightSources(custom);var b=new ChunkSkyLightSources(custom);
+            var a=new JavaSkyLightSources(custom);var b=new ChunkSkyLightSources(custom);
             assertFalse(NativeSkyLightSources.fill(custom,-65,SkyLightSourcesFixtures.storage(b)));assertTrue(seen.isEmpty());
             JavaSkyLightSources.fill(a,custom);var expected=List.copyOf(seen);seen.clear();b.fillFrom(custom);assertEquals(expected,seen);
             assertArrayEquals(SkyLightSourcesFixtures.storage(a).getRaw(),SkyLightSourcesFixtures.storage(b).getRaw());

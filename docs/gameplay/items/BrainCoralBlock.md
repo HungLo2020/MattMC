@@ -1,17 +1,34 @@
 # Brain Coral Block
 
+**Brain Coral Block** (`minecraft:brain_coral_block`) is a living reef block. [Item registration][item]
+
 ## Obtaining
 
-Brain Coral Block can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Mine the placed `minecraft:brain_coral_block` with an **unbroken Silk Touch pickaxe** to collect **1 Brain Coral Block**. An unbroken pickaxe without Silk Touch instead gives **1 [Dead Brain Coral Block](DeadBrainCoralBlock.md)** (`minecraft:dead_brain_coral_block`); the wrong tool gives nothing. [Block requirements][block] · [Loot][loot] · [Mining gate][mining] [tool-gate][]
+
+Look for it in [Warm Ocean reefs](../blocks/Coral.md#warm-ocean-reefs), or check [Wandering Trader offers](../blocks/Coral.md#wandering-trader-full-blocks). A trader can offer **1 Brain Coral Block for 3 Emeralds**, with **8 uses**, but does not always select that offer. [Trade entry][trades]
 
 ## Usage
 
-Brain Coral Block is used for aquatic decoration and reef-themed builds.
+Use it as a solid part of a reef build. It has no plant-style support requirement; see [placement and support](../blocks/Coral.md#placement-and-structural-support).
 
 ## Behavior
 
-Coral blocks and plants require water to remain alive; without water, many coral variants turn into dead coral.
+Keep water beside at least one of its six faces; full Coral Blocks cannot be waterlogged. If left without that water, it becomes [Dead Brain Coral Block](DeadBrainCoralBlock.md). Adding water after conversion does not revive it. See [water requirements](../blocks/Coral.md#keeping-living-coral-alive) and [drying](../blocks/Coral.md#drying-and-dead-forms). [Living block behavior][living]
 
 ## Notes
 
-* This item is the item form of the `minecraft:brain_coral_block` block.
+- An unbroken wooden pickaxe already meets the material requirement. [Pickaxe tag][pickaxe] · [Tool durability check][tool-durability] See the [coral harvest rules](../blocks/Coral.md#harvesting-coral) for the other forms and normal Survival drop conditions.
+- The checked built-in recipe data provides no recipe for this item. [Recipe resources][recipes]
+- Source-reviewed at `78e8e0423084f010bb47e36132550619b37644c2` on 2026-10-04; no gameplay test was run.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L888-L888
+[block]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Blocks.java#L4885-L4894
+[loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/brain_coral_block.json
+[mining]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L281-L295
+[tool-gate]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/player/Player.java#L655-L657
+[trades]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/npc/VillagerTrades.java#L806-L810
+[living]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/CoralBlock.java#L26-L82
+[recipes]: https://github.com/HungLo2020/MattMC/tree/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe
+[pickaxe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+[tool-durability]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/ItemStack.java#L587-L589

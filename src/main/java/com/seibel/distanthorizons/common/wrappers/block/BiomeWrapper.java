@@ -58,6 +58,17 @@ public class BiomeWrapper implements IBiomeWrapper
 	
 	/** technically final, but since it requires a method call to generate it can't be marked as such */
 	private String serialString;
+    private volatile net.minecraft.world.level.chunk.NativeDhTintCache.BiomeIdentity nativeTintIdentity;
+    public net.minecraft.world.level.chunk.NativeDhTintCache.BiomeIdentity nativeTintIdentity() {
+        if (getClass() != BiomeWrapper.class || serialString == null || serialString.length() > 65536) return null;
+        var cached = nativeTintIdentity;
+        if (cached != null && cached.matches(serialString)) return cached;
+        synchronized (this) {
+            if (nativeTintIdentity == null) nativeTintIdentity = new net.minecraft.world.level.chunk.NativeDhTintCache.BiomeIdentity(serialString, hashCode);
+            else nativeTintIdentity.update(serialString);
+            return nativeTintIdentity;
+        }
+    }
 	private final int hashCode;
 	
 	
@@ -193,6 +204,7 @@ public class BiomeWrapper implements IBiomeWrapper
 			this.serialString = resourceLocation.getNamespace() + ":" + resourceLocation.getPath();
 		}
 		
+		if (nativeTintIdentity != null) nativeTintIdentity.update(serialString);
 		return this.serialString;
 	}
 	

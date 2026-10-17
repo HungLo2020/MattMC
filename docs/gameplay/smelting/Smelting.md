@@ -28,6 +28,8 @@ Experience is tracked through recipe use and device-specific collection behavior
 3. Check source-reviewed integration caveats for imported content.
 4. Use the exact current recipe rather than assuming a recipe from another Minecraft or mod version.
 
+For a progress arrow that retreats or resets, see [unfinished cooking progress](../blocks/Furnace.md#unfinished-cooking-progress); for Hopper systems, see [collecting stored experience](../blocks/Furnace.md#collecting-stored-experience).
+
 ## Detailed examples
 
 - [Cooked Cod](../items/CookedCod.md)

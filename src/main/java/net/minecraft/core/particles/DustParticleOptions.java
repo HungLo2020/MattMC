@@ -12,13 +12,6 @@ import org.joml.Vector3f;
 public class DustParticleOptions extends ScalableParticleOptionsBase {
 	public static final int REDSTONE_PARTICLE_COLOR = 16711680;
 	public static final DustParticleOptions REDSTONE = new DustParticleOptions(16711680, 1.0F);
-	public static final MapCodec<DustParticleOptions> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				ExtraCodecs.RGB_COLOR_CODEC.fieldOf("color").forGetter(dustParticleOptions -> dustParticleOptions.color),
-				SCALE.fieldOf("scale").forGetter(ScalableParticleOptionsBase::getScale)
-			)
-			.apply(instance, DustParticleOptions::new)
-	);
 	public static final StreamCodec<RegistryFriendlyByteBuf, DustParticleOptions> STREAM_CODEC = StreamCodec.composite(
 		ByteBufCodecs.INT, dustParticleOptions -> dustParticleOptions.color, ByteBufCodecs.FLOAT, ScalableParticleOptionsBase::getScale, DustParticleOptions::new
 	);
@@ -32,6 +25,10 @@ public class DustParticleOptions extends ScalableParticleOptionsBase {
 	@Override
 	public ParticleType<DustParticleOptions> getType() {
 		return ParticleTypes.DUST;
+	}
+
+	public int color() {
+		return this.color;
 	}
 
 	public Vector3f getColor() {

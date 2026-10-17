@@ -32,15 +32,7 @@ public record ChunkStep(
 	}
 
 	private ChunkAccess completeChunkGeneration(ChunkAccess chunkAccess, @Nullable ProfiledDuration profiledDuration) {
-		if (chunkAccess instanceof ProtoChunk protoChunk && protoChunk.getPersistedStatus().isBefore(this.targetStatus)) {
-			protoChunk.setPersistedStatus(this.targetStatus);
-		}
-
-		if (profiledDuration != null) {
-			profiledDuration.finish(true);
-		}
-
-		return chunkAccess;
+		return net.minecraft.server.level.NativeChunkGeneration.completeStage(chunkAccess, this.targetStatus, profiledDuration);
 	}
 
 	public static class Builder {

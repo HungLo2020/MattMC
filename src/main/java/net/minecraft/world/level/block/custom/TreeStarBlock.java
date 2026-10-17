@@ -41,7 +41,9 @@ public class TreeStarBlock extends Block implements SimpleWaterloggedBlock {
 
     public TreeStarBlock(BlockBehaviour.Properties properties) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, Boolean.valueOf(false)).setValue(FACING, Direction.UP));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, Boolean.valueOf(false)).setValue(FACING, Direction.UP));
+        }
     }
 
     public boolean canSurvive(BlockState state, LevelReader level, BlockPos pos) {

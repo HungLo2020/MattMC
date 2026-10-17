@@ -246,6 +246,19 @@ pub struct FfiWorldMeshInstanceRecord {
     /// Copied packed vanilla UV2 light. This is an instance semantic lane, not
     /// a Java lightmap object or backend resource.
     pub packed_light: u32,
+    /// Bounded immutable entity-culling CPU data; zero mode is canonical absent.
+    pub entity_culling_mode: u32,
+    pub entity_culling_flags: u32,
+    pub entity_culling_bounds: [f64; 6],
+    pub entity_culling_leash_bounds: [f64; 6],
+    pub entity_culling_camera: [f64; 3],
+    /// ABI77: immutable authored CPU owner; parent transform stays inline.
+    pub native_item_transform: u64,
+    /// 0 inline; 1/2 authored right/left; 3/4 prepared right/left.
+    pub native_item_transform_mode: u32,
+    pub native_item_parent_properties: u32,
+    pub native_item_parent_normal: [f32;9],
+    pub native_item_parent_trusted: u32,
 }
 
 #[repr(C)]
@@ -275,6 +288,11 @@ pub struct FfiWorldBackgroundRequest {
     pub sky_end_flash_x_angle: f32,
     pub sky_end_flash_y_angle: f32,
     pub sky_color_argb: u32,
+    /// 1 when decoding expands the published star field (see
+    /// `bridge/world/stars.rs`) under `sky_star_transform`, the sky rotation
+    /// JOML stores column-major, instead of Java sending star quads.
+    pub sky_native_stars: u32,
+    pub sky_star_transform: [f32; 16],
 }
 
 /// Coarse, backend-neutral world and camera semantics for a future
@@ -393,6 +411,10 @@ pub struct FfiWorldShaderEnvironmentFrame {
     /// Appended vanilla CLOUDS pipeline fog range. It is distinct from the
     /// sky range in Frozen and remains copied gameplay data only.
     pub fog_clouds_end: f32,
+    /// Appended in ABI v67: copied user max-shadow distance in chunks.
+    /// Rust combines this setting with source directives; no Iris culler or
+    /// renderer state crosses the bridge.
+    pub configured_shadow_distance_chunks: i32,
 }
 
 /// Coarse inventory of Java feature families observed during the same real
@@ -479,6 +501,92 @@ pub struct FfiWorldDistantHorizonsGenericBoxRecord {
     pub shading: [f32; 6],
 }
 
+/// ABI v69: one off-camera static-terrain shadow caster. Java copies only the
+/// section's resident mesh identity, integer origin and layer depth policy;
+/// Rust expands it into a shadow-only terrain instance against the frame's
+/// terrain camera. No transform, flags or per-instance record is transported.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiStaticTerrainShadowCaster {
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+    pub origin: [i32; 3],
+    pub depth_policy: u32,
+}
+
+/// ABI v70: one camera-visible static-terrain section layer. Rust places it
+/// with the frame's terrain camera and draws the generation it has
+/// acknowledged for `mesh_key`; Java builds no per-section instance record.
+/// One node of a registered model rig (a `ModelPart`, in `visitRenderable`
+/// pre-order). `parent` is an earlier node index or -1 for the root.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiModelRigNode {
+    pub parent: i32,
+    /// Bit 0: the node has cubes and `mesh_key`/`mesh_generation` name its
+    /// local-space mesh asset.
+    pub flags: u32,
+    pub mesh_key: u64,
+    pub mesh_generation: u64,
+}
+
+/// One rig node's raw `ModelPart` pose fields after `setupAnim`: offset in
+/// model pixels, ZYX rotation angles, scale, and visibility flags.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiModelRigPose {
+    pub offset: [f32; 3],
+    pub rotation: [f32; 3],
+    pub scale: [f32; 3],
+    /// Bit 0 `visible`, bit 1 `skipDraw`.
+    pub flags: u32,
+}
+
+/// ABI v72: one box of a retained DH generic group, in the group's own
+/// coordinates (DH `DhApiRenderableBox`). Sent only when the group changes.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiDhGenericGroupBox {
+    pub min: [f64; 3],
+    pub max: [f64; 3],
+    pub color_argb: u32,
+    /// DH `EDhApiBlockMaterial` index.
+    pub material: u32,
+}
+
+/// ABI v72: one active DH generic group this frame, in draw order: the
+/// retained group's identity plus its per-frame origin, light and shading.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiDhGenericGroupInstance {
+    pub group_id: u64,
+    pub generation: u64,
+    pub origin: [f64; 3],
+    pub packed_light: u32,
+    /// Bit 0: SSAO. Bit 1: origin comes from the native CPU cloud owner.
+    pub flags: u32,
+    /// North, south, east, west, top, bottom directional multipliers.
+    pub shading: [f32; 6],
+    /// ABI v75: pinned CPU cloud owner address; zero for API-supplied origins.
+    pub cloud_state: u64,
+    /// Requested immutable pose generation, copied before async execution.
+    pub cloud_pose_epoch: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FfiStaticTerrainSection {
+    pub mesh_key: u64,
+    /// The newest copied generation (diagnostic; Rust draws its own
+    /// acknowledged generation for the key).
+    pub mesh_generation: u64,
+    pub origin: [i32; 3],
+    pub depth_policy: u32,
+    /// `WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS` or zero.
+    pub flags: u32,
+    pub reserved: u32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FfiWorldExperienceOrbInstanceRecord {
@@ -491,6 +599,12 @@ pub struct FfiWorldExperienceOrbInstanceRecord {
     pub camera_orientation: [f32; 4],
     pub entity_id: i32,
     pub reserved0: u32,
+    pub entity_culling_mode: u32,
+    pub entity_culling_flags: u32,
+    pub entity_culling_bounds: [f64; 6],
+    pub entity_culling_leash_bounds: [f64; 6],
+    pub shadow_only: u32,
+    pub entity_culling_camera: [f64; 3],
 }
 
 #[repr(C)]

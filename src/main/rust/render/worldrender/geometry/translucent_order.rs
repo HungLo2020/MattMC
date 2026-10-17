@@ -134,6 +134,14 @@ fn prepare(asset: &MeshAssetStore) -> GalResult<CachedOrder> {
     })
 }
 
+pub(in crate::render::worldrender) fn validate_geometry(asset: &MeshAssetStore) -> GalResult<()> {
+    let mut cache = asset.translucent_order.borrow_mut();
+    if cache.is_none() {
+        *cache = Some(prepare(asset)?);
+    }
+    Ok(())
+}
+
 pub(in crate::render::worldrender) fn append_batches(
     instance: &WorldMeshInstanceRequest,
     asset: &MeshAssetStore,

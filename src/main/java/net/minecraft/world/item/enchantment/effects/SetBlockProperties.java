@@ -16,14 +16,9 @@ import net.minecraft.world.phys.Vec3;
 
 public record SetBlockProperties(BlockItemStateProperties properties, Vec3i offset, Optional<Holder<GameEvent>> triggerGameEvent)
 	implements EnchantmentEntityEffect {
-	public static final MapCodec<SetBlockProperties> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				BlockItemStateProperties.CODEC.fieldOf("properties").forGetter(SetBlockProperties::properties),
-				Vec3i.CODEC.optionalFieldOf("offset", Vec3i.ZERO).forGetter(SetBlockProperties::offset),
-				GameEvent.CODEC.optionalFieldOf("trigger_game_event").forGetter(SetBlockProperties::triggerGameEvent)
-			)
-			.apply(instance, SetBlockProperties::new)
-	);
+	/** The native codec's `set_block_properties` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<SetBlockProperties> CODEC = (MapCodec<SetBlockProperties>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:set_block_properties");
 
 	public SetBlockProperties(BlockItemStateProperties blockItemStateProperties) {
 		this(blockItemStateProperties, Vec3i.ZERO, Optional.of(GameEvent.BLOCK_CHANGE));

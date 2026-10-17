@@ -29,7 +29,9 @@ public class NetherWartBlock extends VegetationBlock {
 
 	public NetherWartBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		}
 	}
 
 	@Override

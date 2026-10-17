@@ -15,6 +15,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class RustGalTiledCallsiteTest {
+    @org.junit.jupiter.api.BeforeAll
+    static void bootstrapRegistries() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+    }
+
     @Test
     void vulkanNoErrorContextControlDoesNotQueryAJavaBackend() throws Exception {
         String property = "mattmc.dev.rustGalVulkanWholeFrame";

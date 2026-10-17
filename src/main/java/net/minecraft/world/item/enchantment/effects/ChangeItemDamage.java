@@ -12,10 +12,9 @@ import net.minecraft.world.item.enchantment.LevelBasedValue;
 import net.minecraft.world.phys.Vec3;
 
 public record ChangeItemDamage(LevelBasedValue amount) implements EnchantmentEntityEffect {
-	public static final MapCodec<ChangeItemDamage> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(LevelBasedValue.CODEC.fieldOf("amount").forGetter(changeItemDamage -> changeItemDamage.amount))
-			.apply(instance, ChangeItemDamage::new)
-	);
+	/** The native codec's `change_item_damage` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<ChangeItemDamage> CODEC = (MapCodec<ChangeItemDamage>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:change_item_damage");
 
 	@Override
 	public void apply(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3) {

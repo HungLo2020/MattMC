@@ -291,7 +291,14 @@ pub(crate) struct MeshResources {
     pub(in crate::render::worldrender) pipeline_layout: Handle,
     pub(in crate::render::worldrender) pipeline: Handle,
     pub(in crate::render::worldrender) shadow_pipeline: Option<Handle>,
-    pub(in crate::render::worldrender) resource_set: Handle,
+    /// Per-mesh binding, created on first use by `ensure_mesh_resource_set`.
+    /// Ordinary opaque/cutout terrain draws through the shared page set and
+    /// never needs one, so creating it eagerly cost a descriptor set per new
+    /// section key while moving through the world.
+    pub(in crate::render::worldrender) resource_set: Option<Handle>,
+    /// Inputs for creating `resource_set` later; owned by the pipeline cache.
+    pub(in crate::render::worldrender) resource_layout: Handle,
+    pub(in crate::render::worldrender) observation_buffer: Option<Handle>,
     /// Borrowed from `mesh_page_resource_sets`; cleared whenever that owner
     /// retires its sets or the instance-stream binding changes.
     pub(in crate::render::worldrender) page_resource_set: Option<Handle>,
@@ -322,7 +329,7 @@ impl MeshPipelineResources {
 
 impl MeshResources {
     pub(crate) fn handles_in_destroy_order(&self) -> Vec<Handle> {
-        vec![self.resource_set]
+        self.resource_set.into_iter().collect()
     }
 }
 

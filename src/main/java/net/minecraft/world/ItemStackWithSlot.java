@@ -1,16 +1,16 @@
 package net.minecraft.world;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.util.ExtraCodecs;
 import net.minecraft.world.item.ItemStack;
 
 public record ItemStackWithSlot(int slot, ItemStack stack) {
-	public static final Codec<ItemStackWithSlot> CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				ExtraCodecs.UNSIGNED_BYTE.fieldOf("Slot").orElse(0).forGetter(ItemStackWithSlot::slot), ItemStack.MAP_CODEC.forGetter(ItemStackWithSlot::stack)
-			)
-			.apply(instance, ItemStackWithSlot::new)
+	/** Rust decodes, validates and encodes slotted stacks (`content/data/items.rs`). */
+	public static final net.minecraft.resources.NativeValues.ValueCodec<ItemStackWithSlot> CODEC = net.minecraft.resources.NativeValues.codec(
+		net.minecraft.resources.NativeValues.Kind.ITEM_STACK_WITH_SLOT,
+		(value, context) -> {
+			Object[] f = net.minecraft.resources.NativeData.record(value);
+			return new ItemStackWithSlot((Integer)f[0], net.minecraft.world.item.NativeItemStacks.project(f[1], context));
+		},
+		(slotted, builder) -> new Object[]{slotted.slot(), net.minecraft.world.item.NativeItemStacks.unproject(slotted.stack(), builder)}
 	);
 
 	public boolean isValidInContainer(int i) {

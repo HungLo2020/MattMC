@@ -17,6 +17,11 @@ public class HeightRangePlacement extends PlacementModifier {
 	);
 	private final HeightProvider height;
 
+	/** For native placement programs. */
+	public HeightProvider heightProvider() {
+		return this.height;
+	}
+
 	private HeightRangePlacement(HeightProvider heightProvider) {
 		this.height = heightProvider;
 	}

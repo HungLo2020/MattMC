@@ -63,7 +63,7 @@ use crate::render::shaderpack::contracts::entity::{
 };
 use crate::render::shaderpack::runtime::fullscreen::{FullscreenSourceExecutionPlan, FullscreenSourcePassFrame};
 use crate::render::shaderpack::contracts::fullscreen::{
-    derive_fullscreen_source_chain, derive_sky_source_stage, derive_sky_textured_source_stage,
+    derive_fullscreen_source_chain, derive_pre_terrain_fullscreen_source_chain, derive_sky_source_stage, derive_sky_textured_source_stage,
     FullscreenSourceStage, FullscreenSourceStageKind,
 };
 use crate::render::shaderpack::contracts::hand::{
@@ -110,7 +110,7 @@ use crate::render::shaderpack::source::ShaderPackSource;
 use crate::render::shaderpack::resources::assets::TerrainSourceAssetResources;
 use crate::render::shaderpack::resources::color_targets::{
     resolve_terrain_source_color_attachments, source_color_clear_color,
-    ShaderPackColorBootstrapClearValues, ShaderPackColorBootstrapPlan, ShaderPackColorFramePlan,
+    ShaderPackColorClearValues, ShaderPackColorFramePlan,
     ShaderPackColorSamplingPlan, ShaderPackColorTargetCache, ShaderPackColorTargetIdentity,
     ShaderPackColorTargetManifest, ShaderPackColorTargets, ShaderPackSourceColorResourceCache,
     TerrainSourceColorAttachment,
@@ -121,7 +121,7 @@ use crate::render::shaderpack::uniforms::source::{
 #[cfg(test)]
 use crate::render::shaderpack::contracts::terrain::TerrainPassOutput;
 use crate::render::shaderpack::contracts::terrain::{
-    derive_complementary_translucent_terrain_contract_for_scope, shadow_source_stages_for_scope,
+    derive_translucent_terrain_contract_for_scope, shadow_source_stages_for_scope,
     TerrainPassContract, TerrainPassRequiredResource, TerrainProgramScope,
 };
 use crate::render::shaderpack::resources::bindings::{
@@ -156,6 +156,9 @@ pub(crate) struct ShaderPackRuntimeExecutor {
     /// that prepared them. A dimension whose terrain program samples no
     /// shadow map can still ship a writer that declares one.
     writer_required_roles: std::cell::RefCell<(u64, BTreeSet<TerrainSourceResourceRole>)>,
+    /// Required source roles per DH flag, keyed by both candidate epochs and
+    /// the noted writer roles (which only grow within an epoch).
+    required_roles_memo: std::cell::RefCell<[Option<((u64, u64, usize), std::sync::Arc<BTreeSet<TerrainSourceResourceRole>>)>; 2]>,
     /// Discovery expands a whole pack and lowers several independent source
     /// families. Keep that work generation-and-scope keyed: source discovery
     /// is immutable until either input changes and must not recur on every
@@ -264,6 +267,7 @@ impl ShaderPackRuntimeExecutor {
             source_candidate_epoch: 0,
             prepared_program_memos: PreparedSourceProgramMemos::default(),
             writer_required_roles: Default::default(),
+            required_roles_memo: Default::default(),
             source_candidate_scope: None,
             distant_horizons_source_candidate: DistantHorizonsSourceCandidateState::Unavailable,
             distant_horizons_source_candidate_epoch: 0,
@@ -297,6 +301,22 @@ impl ShaderPackRuntimeExecutor {
 
     fn fullscreen_pipeline_epochs(&self) -> (u64, u64) {
         (self.source_candidate_epoch, self.distant_horizons_source_candidate_epoch)
+    }
+
+    /// Parked fullscreen plans keep pack-resources sets that bind this
+    /// runtime's sampled inputs (voxel volumes, source depth/shadow/color
+    /// samplers, source assets). Drop them before any of those inputs is
+    /// destroyed or replaced; the GAL refuses to destroy a sampler that a
+    /// live set still binds (world unload, reload, resize). Plans staged
+    /// before the release are refused when they try to park.
+    pub(crate) fn release_parked_fullscreen_plans(&self, gal: &mut VulkanicGal) {
+        self.fullscreen_pipeline_cache.destroy_parked(gal);
+    }
+
+    /// Drops every cached fullscreen plan, stage and pipeline: they bind
+    /// targets and textures that teardown or runtime replacement destroys.
+    pub(crate) fn release_fullscreen_consumers(&self, gal: &mut VulkanicGal) {
+        self.fullscreen_pipeline_cache.release_all(gal);
     }
 
     pub(crate) fn destroy(mut self, gal: &mut VulkanicGal) -> GalResult<()> {
@@ -340,4 +360,3 @@ impl ShaderPackRuntimeExecutor {
 
 #[cfg(test)]
 mod tests;
-

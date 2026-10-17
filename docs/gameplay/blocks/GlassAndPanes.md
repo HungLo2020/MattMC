@@ -86,6 +86,8 @@ This section covers glass's effect on the beam. It does not replace the beacon's
 
 Related: [Glass](../items/Glass.md) · [Glass Pane](../items/GlassPane.md) · [Tinted Glass](../items/TintedGlass.md) · [Furnace](Furnace.md) · [Blocks](Blocks.md) · [Items](../items/Items.md)
 
+For how opacity and block shapes affect light reaching another position, see [Light propagation](../mechanics/Light.md#opaque-transparent-and-shaped-blocks).
+
 ## Sources and verification
 
 Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. Checked all 35 block/item registrations and loot tables, all 48 stained-glass/pane recipes, ordinary-glass smelting, ordinary-pane crafting, Tinted Glass crafting, and the active placement, waterlogging, light, and Beacon callbacks. All bundled recipe JSON files were scanned for these outputs before describing the available color conversions. World-generation, trade, and structure acquisition routes are outside this guide. No in-game crafting, Silk Touch, placement, waterlogging, lighting, renderer, or beacon test was run. Data packs can change recipes, tags, and loot.

@@ -1,12 +1,69 @@
 # Java bridge
 
-Java drives the native renderer through a C ABI: the exported
+In the current migration, Java drives the native renderer through a C ABI: the exported
 `mattmc_vulkanic_gal_*` functions, which
 [`VulkanicGalBridge.java`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java)
 binds by name with FFM downcalls. The Rust side is
 [`render/bridge/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge) (see its README for the file map). It decodes
-and copies what Java sends, calls the GAL or a renderer, and writes a status
-back. It makes no rendering decisions.
+and copies Java inputs or resolves owned native CPU references, calls the GAL
+or a renderer, and writes a status back. It makes no rendering decisions.
+
+This is a current compatibility boundary. The [completed runtime target](../PROJECT-ARCHITECTURE.md) has no Java dependency; [Goal 5 status](GOAL-5-STATUS.md) keeps current ownership and verified progress distinct.
+
+## Immutable launch inputs
+
+`NativeRenderLaunchConfiguration` reads one scalar flag projection from
+[`render/shared/launch_configuration.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/shared/launch_configuration.rs)
+on first use. Rust owns parsing and caches the process launch input; ordinary
+Java consumers perform no environment lookup or FFM call per query. Source
+capture requests accept untrimmed `1`, case-insensitive `true` or `yes`;
+graphics audit accepts only `1` or case-insensitive `true`. Source override
+presence is separate from its value, preserving automatic shader admission
+when absent. Java's `equalsIgnoreCase` also admits long-s in `yeſ`; preserve it.
+
+Runtime options and diagnostic system properties remain live at their original
+callsites. The shader execution route has a different trimmed override grammar
+(including `on`) and retains its existing path. These predicates must not be
+merged. This scalar CPU export changes no GAL resources or record layouts.
+Rebuild the native library before testing the new symbol. Use
+`cargo test ... launch_configuration` and `NativeRenderLaunchConfigurationTest`;
+the latter checks the actual process inputs against the original Java predicates.
+The profile target is recorded in the [item-layer guide](RUST-ITEM-LAYERS.md);
+release `d650bb27` passes 76 focused Java cases and 12 isolated JVM predicate
+cases. A valid moving-DH profile records source-flag `getenv` allocation falling
+from 194.0 MB to zero sampled bytes over 15 seconds. Total sampled allocation
+falls from 2.736 to 2.228 GB across Java checkpoints that also include upstream
+DH/capture fixes; no isolated total or FPS gain is established. Source/library,
+exact measurement window and cleanup checks pass. Receipt:
+`goal5/native-launch-policy-profile-20261009/current/allocation-comparison.json`.
+
+## GUI text input preparation
+
+[`RustGalGuiRenderer` at `d8e6b8f4`](https://github.com/HungLo2020/MattMC/blob/d8e6b8f477b9c6f55aef3030260a3e2af4b10212/src/main/java/net/vulkanic/gui/RustGalGuiRenderer.java)
+still extracts semantic glyphs and copied font-atlas inputs in Java.
+Text preparation constructs each affine request with its final source
+layer and clipping fields, avoiding the subsequent layer-copy list and clip
+record copy. Rust's existing frontend receives the same ordered fields; this
+cleanup does not migrate font layout or GUI scheduling ownership.
+
+Preserve the glyph corner order (TL, BL, BR, TR), source-layer admission and
+asset publication after the complete request enters the scheduler. Invalid
+source-layer overflow still fails after glyph extraction at the existing
+admission point; do not move checked layer arithmetic ahead of callbacks.
+Use `RustGalGuiRendererTest`, `TextGlyphQuadTest`, real Frozen GUI/world
+captures and the [performance protocol](GAMEPLAY-PERFORMANCE.md#local-visible-tracking-checkpoint).
+The paired warmed JFR at native `9c9f085c` identified the redundant copies;
+first per-thread allocation samples carried pre-recording weights and are
+excluded from the author's scoped analysis. The author reports fresh CPU and
+bounded lifecycle/world/GUI item checks passing, with all twenty timing runs
+clean and all eight aggregate FPS/p99 floors passing. Native `9c9f085c` is
+unchanged; the earlier same-native vanilla p99 failure remains historical.
+This documentation review inspected source only, without rerunning native/Java
+suites or viewing/replaying untracked captures. No isolated speedup or
+vanilla-tail cause is established. The thinner cow-leash strict-crop failure
+and missing crosshair in plain/static/oversized GUI fixtures remain open,
+including their published-registry/older plain-image controls; moving foil
+retains the crosshair. Full renderer parity and Java removal remain open.
 
 ## How the ABI stays in sync
 
@@ -18,9 +75,110 @@ back. It makes no rendering decisions.
   alignment and field offsets (`mattmc_vulkanic_gal_abi_struct_layout`, backed
   by the table in [`bridge/layout.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/layout.rs)) by struct id,
   then writes fields by index.
-- **Versions:** Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
+- **Versions:** the current whole-frame ABI is **81**. Java's `ABI_VERSION` must equal Rust's `FFI_ABI_VERSION`
   ([`abi/version.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/abi/version.rs)), which also records what
   each version changed.
+
+## Vanilla sky semantics
+
+World material quads are camera-relative and the frame's view matrix carries
+the camera rotation, so sky geometry uses only Frozen's local `SkyRenderer`
+transforms on a fresh pose. Applying the camera translation or rotation again
+moved the sunrise/sunset fan and the End sky; [`SkyProceduralAdmissionTest`](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/vulkanic/world/SkyProceduralAdmissionTest.java)
+pins the fan, dark disc and stars as camera-independent.
+
+ABI 81 moves the star field to Rust. `RustGalWorldPrimitiveRenderer` computes
+the 780 stars' local corners once with Frozen's arithmetic and publishes them
+(`mattmc_vulkanic_world_star_field_publish`); each night frame sets the world
+background's `sky_native_stars` and 16-float `sky_star_transform` (JOML's
+column-major sky rotation) instead of sending star quads. Decoding
+([`bridge/world/stars.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/stars.rs))
+inserts them after the sun and moon with JOML's `transformPosition` order.
+Java's own star quads remain the fallback when publishing fails;
+`-Dmattmc.dev.javaStarQuads=true` forces them for A/B checks.
+
+## Native GUI item templates
+
+ABI 80 separately adds [GUI item template instances](RUST-GUI-ITEM-TEMPLATES.md):
+batch struct 97 appends CPU template identity and source-layer foil facts at
+fields 42/43; struct 118 defines a foil fact. Registration copies semantic inputs,
+including resolving authored CPU poses synchronously. Templates and inline
+batch semantics are mutually exclusive: instance records zero inline material,
+geometry and transform fields; inline records omit both template fields.
+
+Caller-side queued decoding acquires immutable geometry before returning.
+The worker-decode route instead pins Java template leases and request storage
+until join or context destruction; failed handoff clears those pins. Explicit
+close before worker decode is not made safe by a reachability pin. Expanded
+batches and geometry still count toward frame admission. Registration's `-14`
+capacity result permits the existing inline semantic route; malformed inputs
+are errors. These are CPU owners, with separate atlas-generation publication;
+GPU ownership and the existing presentation route are unchanged.
+
+## Native terrain selection frames
+
+ABI 79 appends CPU owner/frame identities to whole-frame request fields 56/57.
+The [reviewed producer](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/render/chunk/terrain_frames.rs)
+validates selection records and constructs shared immutable CPU arrays.
+Java passes identities and the exact terrain camera rather
+than copying selection records into pending and request buffers. The decoder
+acquires shared array ownership before queueing. Inline terrain/caster records
+and a native reference are mutually exclusive; unknown, evicted, closed-owner
+or camera-mismatched references reject without dereferencing inline data.
+
+Each graph retains at most three selections for later lookup. Owner/frame IDs
+are positive identities, never native addresses or GPU handles; zero means no
+native reference. Camera matching is bit-exact, including signed zero. The
+combined terrain/caster/mesh count is still bounded at 65,536. Resource reload
+invalidates unresolved references without reusing frame IDs; acquired arrays
+survive reload, eviction and graph closure. The three-entry history does not
+bound arrays already acquired by in-flight frames.
+
+Legacy/diagnostic selection still uses record encoding. Native publication
+constructs its arrays and sorts casters, so removing Java copies does not imply
+allocation-free production. Mesh generation admission, resource ownership,
+passes and presentation remain in the existing renderer/GAL path. The private
+graph selection view grows from 80 to 96 bytes, so rebuild Java and the native
+library together.
+
+The following is the implementation author’s recorded checkpoint, not a new
+verification run of the reviewed source. This implementation has no final runtime
+acceptance. Initial lifecycle launches
+failed before world entry during an unattended NVIDIA update: installed libraries
+595.99.02 disagreed with the loaded595.91.07 kernel module, only llvmpipe was
+enumerated and X11 reported DRI3 BadDrawable. The owned invocation was stopped,
+with failure logs and copied worlds retained. The [later reported preflight](RENDER-VERIFICATION.md#check-the-hardware-driver-before-runtime-captures)
+clears the driver blocker; repeat MattMC hardware lifecycle/parity/profile/timing
+checks on the restored driver. Further DH storage changes
+require their own final source/library checks. The earlier ABI79 CPU checkpoint: FullRust2,489pass
+(three ignored) and Java1,854tests (two skipped) pass; six observed Java workers
+map release7cf545b2. Actual populated graph and encoding JNI checks pass.
+Previous release839ff128 tests,
+images and timing results do not verify ABI79. Focused checks:
+`cargo test ... terrain_frames`, `cargo test ... whole_frame_native_terrain`,
+and the terrain-frame JNI/encoding tests. Final release runtime/performance
+receipts are required before claiming this handoff improves frame time.
+
+## Raw GUI image generations
+
+ABI 78 appends a retained asset-ID manifest to raw GUI image request 91. A
+nonempty manifest sends only changed pixel payloads and retains the other native
+images; omitted IDs are evicted. An empty manifest preserves full-replacement
+semantics, including clearing all images. Combined resident bounds and identity
+validation complete before mutation; rejected updates preserve the generation
+for retry. Every incoming payload must appear in the nonempty manifest;
+unchanged IDs need resident pixels, IDs must be nonzero and unique, and the
+combined resident set must fit the image-count and expanded-byte bounds.
+Only changed or evicted images lose their cached native resources.
+
+The [request layout](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/rust/render/bridge/abi/gui.rs#L226-L236)
+appends `retained_asset_ids` as field 4 of struct 91. The
+[frontend admission](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/rust/render/guirender/frontend/assets.rs#L93-L247)
+owns retention and replacement; the bridge copies/validates the wire input.
+Java clears pending changes only after acceptance and sends all resident pixels
+when `uploadedRawImageGeneration` is zero, including after context recreation.
+See [gameplay performance](GAMEPLAY-PERFORMANCE.md#image-and-dh-allocation-constraints)
+for dirty publication, focused checks and remaining runtime evidence limits.
 
 ## Changing the ABI
 
@@ -34,25 +192,295 @@ back. It makes no rendering decisions.
    note in `abi/version.rs`.
 5. Bound the new input: payload limits live in `abi/limits.rs`, and per-request
    input-byte bounds in the checked readers in `bridge/memory.rs`.
-6. Decode into renderer types in the matching module (`gui/`, `world/`, ...)
-   and keep it decode-and-copy only; rendering decisions belong to renderers.
+6. Decode into renderer types in the matching module (`gui/`, `world/`, ...).
+   Copy Java input or acquire owned native CPU scene data before queueing;
+   rendering decisions belong to renderers.
 
 Never rename an exported function or change its signature without the matching
 Java change: Java binds by name and fails at load if a symbol is missing.
+
+ABI 67 appends `configured_shadow_distance_chunks` to the shader environment
+record (struct 73, field 64). Java copies the CPU user setting without clamping
+or interpreting negative values; Rust combines it with copied normal render
+distance and pack policy. Rebuild the native library before using the new Java
+writer. `WorldShaderEnvironmentEncodingTest` verifies the appended field and
+adjacent fog range against the exported native layout, including dirty storage.
+The layout-query result has a fixed 72-field capacity (312 bytes), mirrored by
+Java's query allocation. Each table entry checks its field count at compile time;
+the bridge regression queries all exported records, including the 65-field shader
+environment. Update the native capacity and Java allocation together when growing it.
+
+ABI 68 appends entity culling mode, flags, absolute double bounds, optional
+leash-holder bounds and double camera origin to mesh instances (struct 69,
+fields 31–35). Orb instances (struct 110, 248 bytes, fields 8–13) carry the same facts plus
+an explicit shadow-only role. Absent metadata actively zeroes every appended
+field. The decoder rejects unknown flags, malformed bounds, inconsistent holder
+roles and metadata in first-person, terrain or block-entity domains. Nested Java
+CPU extraction scopes retain immutable records; an inner null scope masks its
+parent and cleanup restores it. Rust owns pack selection and geometry creation.
+Rebuild before running `WorldEntityCullingEncodingTest`; its native checks cover
+large camera origins, exact double values and dirty storage.
+
+ABI 69 appends `world_static_terrain_shadow_casters` (struct 112, 32-byte
+records: mesh key, generation, section origin, depth policy) and the frame's
+`static_terrain_camera` to the whole-frame request (struct 53, fields 47–48).
+The camera is required whenever casters are present. The legacy compact producer
+packs caster records before request encoding; Rust validates them and sorts them by key. Eligible
+resident casters stay compact for the shader-route scene; other resident
+casters expand into shadow-only instances. Rebuild Java and native code together.
+
+ABI 70 appends `world_static_terrain_sections` (struct 113, 40-byte records:
+mesh key, newest copied generation, section origin, depth policy, flags) as
+field 49. This legacy compact route sends every camera-visible section layer in
+draw order (translucent back to front); only the camera-sort flag is allowed.
+Ordinary ABI 79 selection uses the [native frame reference](#native-terrain-selection-frames)
+instead of copying these arrays through Java.
+Rust draws the generation it has acknowledged for each key, so the previous
+generation keeps drawing while a replacement uploads. Eligible sections stay
+compact for the [shader-route scene](RETAINED-SCENE.md#current-scene-terrain-on-the-shader-route).
+Leftover sections, and compact terrain on ordinary routes, expand into instances:
+camera sections precede the existing instance list and shadow casters follow it.
+Keys with no acknowledged generation are skipped until upload. Diagnostic,
+fault-injection and resource-reload frames still send per-section instance records;
+`-Dmattmc.dev.perRecordStaticTerrain=true` forces that path for A/B checks.
+
+ABI 71 appends `world_model_rig_poses` (struct 115, 40-byte records: raw
+`ModelPart` offset, rotation and scale, plus visible/skipDraw flags) as field 50.
+A cached entity model registers its part tree once as a rig
+(`mattmc_vulkanic_world_model_rig_register`, struct 114 nodes: parent index and
+part mesh key/generation) and sends one mesh instance per model each frame,
+flagged `0x4000_0000`, with `mesh_key` = rig id and `mesh_generation - 1` = its
+first pose. Rust composes the hierarchy like `ModelPart.visitRenderable` and
+expands one ordinary instance per drawn part before validation
+([`model_rigs.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/model_rigs.rs)).
+Java retires a rig when its topology is evicted or a part generation changes.
+Release uses a [three-semantic-frame delay](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L12578-L12621)
+for registered topology; that delay is not a GPU-completion fence or per-rig
+completion receipt. [Native model frames](RUST-MODEL-FRAMES.md) replace the Java
+pose ring with explicitly scoped CPU pose/instance owners. Queued submission
+decodes/copies on the caller before return, while the optional single in-flight route decodes later on its worker
+and retains the request arena until join. Preserve these separate contracts
+when changing queue depth or lifetime. A rig instance may carry standard item foil: enchanted armor and trident
+glint passes are rigs over the same parts with the glint texture and material,
+so they no longer bake a new posed mesh asset each frame. First-person frames,
+uncacheable dynamic textures and per-part mesh diagnostics keep Java-posed part
+instances; `-Dmattmc.dev.modelRigs=false`
+forces that path for A/B checks. `ModelRigTransformParityTest` compares Rust's
+part transforms with Java's on vanilla models under random poses.
+
+Java still extracts local-space cubes and selects textures/materials. Rig
+registration validates nonzero identities, parent-before-child order and known
+flags, with 1–1,024 nodes and at most 4,096 registered rigs. Expansion validates
+pose spans, skips hidden subtrees, keeps children of `skipDraw` nodes and clears
+the transport flag before ordinary instance validation. [Rig implementation](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/main/rust/render/bridge/world/model_rigs.rs).
+[Admission and upload proof](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L12623-L12745)
+observe a topology once per semantic frame and reuse proof until withdrawal,
+readmission or registration invalidates it; changed part generations replace
+the registration. These mechanisms do not supply geometry for Citadel's empty
+proxy root: both structural extraction and the posed fallback remain empty
+([#803](https://github.com/HungLo2020/MattMC/issues/803)).
+
+ABI 72 appends retained DH generic-group instances as whole-frame field 51 and
+the double camera origin as field 52. Group boxes use struct 116 (56 bytes:
+double min/max bounds, color and material); struct 117 uses the 88-byte layout
+introduced in ABI 75 and retained in the current ABI 79:
+group id/generation, double origin, packed light, SSAO flag and six shading
+multipliers, CPU cloud owner and pose generation. Native cloud instances set
+flag bit 1 and carry zero origin lanes; ordinary API instances carry zero native
+fields. See [cloud preparation and lifetime](RUST-DH-CLOUDS.md). Java registers changed boxes through `setDhGenericGroup`; Rust
+copies them into its CPU registry, then expands each frame's instances into
+ordinary camera-relative boxes in draw order. This is retained input data,
+not a retained GPU scene or a borrowed Java array. Both id and generation must
+be nonzero. Rebuild Java and native code together; see
+[registration and expansion](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/render/bridge/world/dh_generic_groups.rs#L91-L143)
+and [group lifetime and bounds](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
+The Java group allocator can supply id 0 to this nonzero-only path;
+[#820](https://github.com/HungLo2020/MattMC/issues/820) tracks that admission
+mismatch when the first allocated group reaches active rendering. It is not
+a claim that every default world fails.
+
+Typed orb placements name a boundary in the collected mesh stream. When the
+shadow-only CPU capture removes foil or outline meshes, map those boundaries
+through its kept-mesh prefix before the later source-admission mapping.
+Preserve equal-boundary order, camera placements, culling facts and shadow roles;
+appearance residency and published immutable records must remain unchanged.
+See [the semantic collector](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/world/ExperienceOrbSemanticCollector.java).
+That existing filtering/admission remap does not cover subsequent native rig
+expansion: an input rig is one mesh row but may emit zero or many. The unchanged
+orb boundary can split the expanded parts or exceed the resulting stream
+([#819](https://github.com/HungLo2020/MattMC/issues/819), source-predicted).
+
+ABI 73 adds raw GUI source format 3 for indexed map colors. Input bytes stay
+compact; Rust frontend admission counts expanded RGBA residency, then converts
+before creating ordinary GAL textures. Resident texture formats remain Alpha8
+and RGBA8. Java and Rust reject malformed sizes and excessive expanded totals.
+World-map PNG encoding is a bounded standalone CPU asset call, not a GPU resource
+route. This map migration also introduces the semantic map-text material with
+blended-cutout mode 7; both compact whole-frame decoding and ordinary quad
+validation must admit that mode. Rust resolves its depth/lightmap/fog/order
+policy; see [map colors](../game-model/MAP-COLORS.md). Rebuild both sides together.
+
+ABI 74 appends native DH CPU frame identity, lifecycle and count as whole-frame
+fields 53–55. The collector exports these with layer counts through
+`mattmc_dh_collector_consume_retained`; readback is explicit. Production Java
+sends no inline LOD stream for a native reference. Decode rejects mixed streams,
+missing/oversized metadata, stale identities/lifecycles or changed decisions,
+then owns the immutable list before queued execution. Queued input accounting
+still charges its declared segment count. This is a bounded semantic CPU
+transaction, not a GPU handle or presenter; see
+[native frame ownership](RETAINED-SCENE.md#native-dh-visibility-frame-ownership).
+Rebuild Java/native together. Capture observers may copy records, but the
+renderer consumes the retained native snapshot directly.
+
+## Standalone query handles
+
+Some render-thread questions are answered by handles that share no context
+state with a pipelined frame, so asking never joins it. They use standalone pointer-based calls outside the context request protocol.
+
+- **Entity shadow query**
+  ([`EntityShadowQuery.java`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/vulkanic/bridge/EntityShadowQuery.java),
+  [`world/entity_shadow_query.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/world/entity_shadow_query.rs)).
+  It shares only the active pack's overworld shadow policy, refreshed by each
+  shader-pack source update. Before extracting off-camera entities for the
+  shadow pass, Java sends their copied culling facts with the frame's copied
+  environment, matrices and sky type; Rust returns which ones Iris's shadow
+  pass admits. The frame plan applies the same admission again. "Undecided"
+  (no policy, unresolved hooks) means Java keeps every candidate. The bridge
+  owns the handle and destroys it before its context.
+- **Section graph** (Frozen's camera terrain search and ordinary compact terrain
+  selection): Rust owns readiness/build/urgent/in-flight/stale bookkeeping;
+  Java reports column/build events and requests a native sync from the
+  [terrain publication registry](#terrain-publication-registry), replacing its
+  earlier per-section mesh-row packing. After camera search, `select_terrain`
+  publishes an immutable native camera/caster frame and returns its CPU
+  owner/frame identities, along with graph-owned views and producer counters.
+  The borrowed views still expire at the next selection; Java consumes animated
+  sprite IDs and receipts synchronously. Ordinary submission passes the retained
+  frame identity, with no pending/request camera/caster copy. Decode must acquire
+  its arrays before eviction or reload; acquired data remains valid for queued
+  work. Legacy compact buffers retain their ABI 70/69 layouts and copy path.
+  See [native frame lifetime](#native-terrain-selection-frames), the
+  [current graph view](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/java/net/vulkanic/world/RustSectionGraph.java)
+  and [selection scope](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
+
+### Terrain publication registry
+
+[`RustTerrainPublication`](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/java/net/vulkanic/world/RustTerrainPublication.java)
+binds standalone `mattmc_terrain_*` calls for publishing/removing a layer,
+replacing/clearing all rows, synchronizing a section graph and copying rows for
+Java shadow candidates. These render-thread calls use primitive arguments and
+long arrays, outside the context request/layout-query protocol. Rebuild Java
+and native code together when changing them.
+
+The process-wide, mutex-protected
+[registry](https://github.com/HungLo2020/MattMC/blob/697b0a3c6200151830a565c73aaee88d323eb484/src/main/rust/render/worldrender/terrain/publication.rs)
+stores each section's solid/cutout/translucent key and generation, plus the
+translucent camera-sort flag. Duplicate keys belonging to another section layer
+reject publication or replacement without changing the registry. A row changes
+when Java registers the layer, before upload acknowledgement. Graph sync drains
+changed rows directly in Rust; clear/reload replacement or an explicit new-graph
+republish sends a full reset under the same lock. This is one shared change
+queue, not an independent cursor per graph. Shadow-row reads copy six longs per
+requested section into Java storage, with zeros for missing layers.
+
+Java retains the asset objects, upload acknowledgement and reload staging. The
+native identity registry does not own vertex/index payloads or GPU completion;
+compact frame records still follow the copying contract above. See
+[ownership and retries](RENDER-ARCHITECTURE.md#resource-ownership-and-retries).
+
+### Terrain layer intake
+
+At `4740f8fa`, the standalone `mattmc_terrain_assemble_layer` call replaces
+the earlier decode-only export. The [bridge export](https://github.com/HungLo2020/MattMC/blob/4740f8fabffd878286850083e2d86ff733c9121e/src/main/rust/render/bridge/world/terrain_intake.rs)
+keeps wire layout handling outside `worldrender`; native intake/assembly returns
+vertices, indices, ranges, identities and accounting receipts. Invalid arguments
+or capacity return `-2`; a rejected mesh returns `-3` with a bounded error string.
+That checkpoint's encoded-vertex copy is now the fallback. Since `1d609f12`,
+ordinary intake leaves assembled vertices in Rust's
+[staging map](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/rust/render/worldrender/terrain/staging.rs),
+with one generation per mesh key and at most 32,768 keys. Java receives the
+vertex count/key/generation, copied index bytes, draw ranges and receipts.
+`StagedWorldMeshVertices` cannot be read as a Java vertex list. Asset records
+set `reserved0` bit 0 and carry an empty vertex slice; the native decoder
+requires the exact staged generation and clones it, preserving retry data until
+Java discards it after acceptance, removal or rollback.
+
+If staging cannot admit a new key, [Java intake](https://github.com/HungLo2020/MattMC/blob/f13239e10d0f66d244c4311c091d0d60819fb391/src/main/java/net/vulkanic/world/RustTerrainIntake.java)
+repeats assembly with copied vertex output. Fault injection, active texture
+probes and the appearance trace always require vertex copies. Detailed terrain
+diagnostics also copy unless `-Dmattmc.dev.forceTerrainVertexStaging=true` is
+set; that switch does not override the other vertex readers. The map's limit
+counts layers, not bytes. Java retains build/sort/atlas inputs, worker
+dispatch and asset-publication bookkeeping; indices and ranges still cross the
+boundary. Native assembly still performs the water/material classification and
+rewrites. The staged route removes a vertex round trip, not all copying or Java
+ownership. After acceptance, Java drops static-terrain payloads including
+translucent layers; per-frame translucent ordering uses native resident geometry.
+The resource-reload commit now releases the Java CPU payloads of every staged
+layer after all staged generations are uploaded; their earlier acknowledgements
+could only find published layers. The fully omitted translucent path still has
+a separate cleanup gap when no prior layer asset exists: assembly may stage
+vertices before Java returns no asset, and removal
+has no asset identity to discard. [#821](https://github.com/HungLo2020/MattMC/issues/821)
+tracks that source-derived retention; ordinary acknowledgement cleanup does not
+cover it. No runtime growth or exhausted budget was observed by this review.
+
+### DH collector ledger
+
+[`DhCollectorLedger.java`](https://github.com/HungLo2020/MattMC/blob/6324cd1ddd9a281588cbb93bae1a2a1b94040f51/src/main/java/net/vulkanic/world/DhCollectorLedger.java)
+binds the standalone `mattmc_dh_collector_*` exports. These calls use the
+collector's Java lock and Rust's ledger mutex. Effects, text, payload copies and
+legacy/diagnostic segment readback use thread-local native result buffers and
+must be taken immediately on the calling thread. Ordinary ABI 74 consumption
+returns the native identity, lifecycle and scalar counts instead of segment
+records; frame decode retains its immutable `Arc` before queued execution.
+Keep build-segment staging and `record_built` together; the latter takes the
+staged payload even when recording fails.
+
+`mattmc_vulkanic_gal_world_lod_collector_flush` also enters the context registry:
+it selects and applies a ledger-owned update, then returns identities for
+Java's acknowledgement. An apply failure releases its in-flight selection;
+a provenance-bearing selection stays on Java's packed asset path. Neither
+selection nor asset acceptance is a presentation receipt. The ordinary visible
+query uses a [retained CPU topology](RUST-DH-VISIBILITY.md) maintained through
+`mattmc_dh_visibility_*` mutation/state calls. `mattmc_dh_collector_visible_tree`
+borrows 24 normalized frustum floats and four writable statistic longs, traverses
+under the owner lock, releases that lock before ledger admission and retains no
+Java address or GPU handle. Explicit close drops bulk topology immediately;
+automatic FFM scope cleanup releases the wrapper after scoped users finish.
+The compatibility batched visible query receives `(column key, generation)`
+pairs; its input count is the number of pairs. Both routes filter stale
+generations before requesting publication, sorting and admitting segments.
+Both return a nine-long header, including the stale-container count, followed
+by sorted keys. This changed standalone buffer contract requires
+matching Java/native builds; it is separate from the whole-frame ABI version.
+Native traversal candidates do not make a Java round trip, but sorted result
+keys still cross the Java boundary; ordinary consumed segment records stay
+in Rust. Explicit diagnostics and legacy inline frames retain copied records. See
+[ledger publication and selection](RENDER-ARCHITECTURE.md#resource-ownership-and-retries)
+for route gating, protection, bounds and the remaining Java producers.
 
 ## Rules the boundary tests enforce
 
 - The bridge uses only the public GAL modules and is the only code that creates
   GALs (`VulkanicGal::create*`).
-- `gui/` and `world/` only decode and copy records; they never build GAL
-  resources or commands themselves.
+- `gui/` and `world/` decode/copy records or acquire native CPU scene owners;
+  they never build GAL resources or commands themselves.
 - Record names extend shared families (GUI, world, material) rather than naming
   individual producers (no `Hotbar`, `BossBar`, ...).
 
+Presenter-admission fixtures in `context.rs` share a test mutex because they
+exercise one process-wide reservation. Run them together when changing teardown:
+`cargo test --manifest-path src/main/rust/Cargo.toml --lib render::bridge::context::tests`.
+They check cross-registry rejection, rejected-owner drop and admission after
+release; they do not replace a real window/presentation lifecycle run.
+
 ## Verifying an ABI change
 
+Run from the repository root; the subshell leaves the Gradle command there.
+
 ```sh
-cd src/main/rust && cargo test --release render::bridge
+(cd src/main/rust && cargo test --release render::bridge)
 ./gradlew test --tests net.vulkanic.bridge.VulkanicGalBridgeAbiTest
 ```
 
@@ -69,6 +497,172 @@ Checked FFI readers charge all nested reads against a 512 MiB budget per bridge
 request. Counts and byte limits are checked before constructing foreign slices;
 profiling does not dereference nested pointers ahead of decoding. The byte
 counter measures validated reads (including repeated reads), not unique Java
-allocation size. Java must still supply live memory for the duration of the call.
+allocation size. Java must supply live memory while native code can read it:
+through the call for synchronous and caller-decoded queued requests, and
+through the join for the single in-flight pipelined fallback described below.
 Failed resource creation batches release successful creates before reporting
 failure, and result alignment/capacity are checked before execution.
+
+## Pipelined frames
+
+Ordinary whole frames use the [queued route](#queued-frames) by default when
+both pipelining and queuing are enabled. Queued submissions decode/copy Java
+records and resolve native terrain/DH owners on the calling thread; they do not retain
+borrowed Java request memory after the call. `MATTMC_PIPELINED_FRAMES=0` or
+`-Dmattmc.rustGal.pipelinedFrames=false` disables both asynchronous routes.
+
+### Single in-flight fallback
+
+When queuing is disabled but pipelining remains enabled, the older
+`mattmc_vulkanic_gal_whole_frame_submit_pipelined` route copies and validates the
+small present request on the calling thread, but hands the whole-frame request
+pointer to a per-context worker. That worker decodes the nested request, then
+executes and presents the frame. Java retains the request arena alive and
+unmodified until the join; acceptance is not completion or a deep copy of all
+request bytes. Java can collect the next frame while native work runs, but
+cannot pack another whole-frame request before joining because the requests
+also share persistent instance arrays. This was the default at the earlier
+`54611cfc` checkpoint; it remains the fallback contract, not the queued route.
+[Native handoff and worker decode](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/rust/render/bridge/world/exports.rs#L36-L110)
+· [Java retention and release after join](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L2378-L2453)
+· [Java repacking guard](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L1892-L1900)
+· [`bridge/pipeline.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/pipeline.rs)
+
+- GUI mesh batches whose vertex and index lists come from a long-lived cache
+  (item topology caches, cached TACZ captures) are encoded once into the
+  context's persistent arena. `reserved0` bit 0 marks such a batch and the
+  upper bits carry the store generation. Rust keys decoded geometry by both
+  addresses, both counts and that generation instead of re-decoding it.
+  Never rewrite persistent GUI geometry in place. The Java store admits at most
+  4,096 topologies; the separate thread-local Rust decode cache clears at 1,024
+  entries before inserting another. Cache hits share Rust-owned vertex/index
+  arrays through `SharedVec` (`Arc<Vec<T>>`), check each batch's metadata and
+  skip per-vertex validation only after
+  a successful check under the same block-raster-presence state.
+  [Decoder](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/bridge/gui/mesh.rs#L11-L30)
+  · [Validation](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/rust/render/bridge/gui/mesh.rs#L254-L270)
+  [Shared arrays](https://github.com/HungLo2020/MattMC/blob/7a6009f84d966263293f864933f4da06b1823dfa/src/main/rust/render/guirender/mesh/model.rs#L178-L235)
+  remove repeated deep clones on cache hits. Misses copy Java input; mutable
+  access uses copy-on-write, consuming a still-shared vector clones it, and draw
+  preparation can create transformed vertices and copy indices. This is not a
+  zero-copy path. The generation belongs to each Java bridge instance and advances on its close;
+  the native thread-local key contains no new-context identity. Same-thread
+  context recreation with address reuse is an unverified lifecycle case, not
+  a demonstrated defect or a guarantee supplied by the generation field.
+- `PackedDhGenericBoxes` carries retained-group instances and camera data
+  introduced in ABI 72, with native cloud fields added in ABI 75, for the
+  ordinary DH generic producer (up to 10,000 boxes per frame).
+  Its primitive per-box arrays remain available for direct box input; unchanged
+  groups no longer resend those arrays every frame. The pending buffer rotates
+  through a ring of three; a consumed frame takes the buffer itself, and the
+  encoder copies its arrays into native layout. Reuse relies on the coordinator
+  draining queued work down to one prior frame and queued submission decoding
+  on the caller before return; preserve both when changing queue depth.
+  Registration copies group-local boxes separately, and whole-frame decode
+  expands the matching registry generation into owned frame boxes. The optional
+  worker-decode route therefore resolves groups later; registration/release and
+  request-arena lifetime are separate concerns. Existing packed-box tests assert
+  ABI equality and value validation, not ring-wraparound or queue-lifetime
+  behavior. See [Render Architecture](RENDER-ARCHITECTURE.md).
+  [Pending ring](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/vulkanic/world/RustGalWorldPrimitiveRenderer.java#L467-L483)
+  · [Queue drain](https://github.com/HungLo2020/MattMC/blob/20e157cab7962140b30b83f40374cdeb1e6a8b19/src/main/java/net/vulkanic/gui/RustGalFrameCoordinator.java#L745-L761)
+- Non-queued context-registry entry points join pending work first (`with_registry*`),
+  preventing concurrent access to a context. Keep context access behind these
+  wrappers. Selection through the [standalone query handles](#standalone-query-handles)
+  does not join an in-flight frame. Creating the entity-shadow query still
+  [uses the context registry](https://github.com/HungLo2020/MattMC/blob/54611cfc25dbdf60ae4b11dc17557d2bec77469d/src/main/rust/render/bridge/world/entity_shadow_query.rs#L17-L25).
+- `mattmc_vulkanic_gal_whole_frame_join` returns the frame's submit and present
+  results. `RustGalFrameCoordinator.completePendingPipelinedFrame` runs the
+  same post-submit work (`completeSubmittedFrame`) when the next frame starts.
+- If worker decode or execution returns an error, the worker attempts frame
+  cancellation and Java throws the error at join. A retryable selected-source
+  failure drops that frame instead of resubmitting it. This does not establish
+  complete panic recovery or cancellation semantics.
+- Attachment captures, screenshots and RenderDoc captures stay synchronous.
+  Atlas pumps during an in-flight frame are deferred to the next frame.
+- The worker restricts itself to the highest-frequency CPUs; on hybrid CPUs an
+  efficiency core lengthened every frame by ~10%.
+
+### Queued frames
+
+With pipelining enabled, this is the default ordinary whole-frame route
+(disable just queuing with `MATTMC_QUEUED_FRAMES=0` or
+`-Dmattmc.rustGal.queuedFrames=false`). Java no longer waits for frame N before
+handing over frame N+1. The worker runs a FIFO of jobs
+([`bridge/pipeline.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/render/bridge/pipeline.rs)):
+
+- `mattmc_vulkanic_gal_whole_frame_submit_queued` decodes the request on the
+  calling thread (Java closes the request arena after the call) and queues a
+  frame whose job acquires the swapchain image itself, executes the decoded
+  frame with that image's frame id and target, and presents. `..._whole_frame_join_queued` returns the
+  oldest queued frame (acquire, submit and present results) and waits only for
+  the jobs up to it.
+- `..._world_mesh_update_assets_queued` and `..._atlas_animation_tick_queued`
+  copy and decode on the calling thread and apply in a job, in submission
+  order. The first non-frame job failure is reported by the next queued-frame
+  join (fail closed); it does not automatically cancel later queued jobs.
+- Queued entry points use `with_queue`, which never joins; other
+  context-registry entry points still join all queued work first, so rare
+  context operations cannot overlap the worker. Standalone query handles
+  remain independent.
+  A rejected queued call joins and stores its message, so Java's
+  `failed with status` errors carry the Rust reason (`lastError`).
+
+`RustGalFrameCoordinator` keeps at most one frame queued ahead of the one it
+prepares. This is Java-side backpressure; the native FIFO channel itself is
+unbounded. Capture, screenshot and RenderDoc frames drain the queue and run synchronously. While a
+frame is queued, completion takes retirement from the present result instead
+of querying the bridge. Submission acceptance is not presentation completion.
+
+A queued frame can complete after the world it was prepared for is gone (save
+and quit, resource reload). Completion receipts must not assert current
+renderer state: the DH material-route receipt carries the collector lifecycle
+captured when the frame was consumed (`PrimitiveFrame.distantHorizonsLifecycle`)
+and is dropped and counted (`staleRouteExecutionReceipts`, also in capture and
+benchmark JSON) when that lifecycle has been reset.
+The caller-side decode and arena closure are visible in
+[`world/exports.rs`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/rust/render/bridge/world/exports.rs#L200-L239)
+and [`VulkanicGalBridge.java`](https://github.com/HungLo2020/MattMC/blob/121ad13c84e45555c34814d54a8199194b37f39c/src/main/java/net/vulkanic/bridge/VulkanicGalBridge.java#L2394-L2437).
+Earlier queued worker-decode/double-staging descriptions are superseded by this
+caller-decode path; they do not require two live Java request arenas today.
+
+## Chunk rebuild color ownership
+
+Color-owner transport was introduced in private compact meshing header 4
+(136 bytes), with a final CPU color-owner identity. Ordinary snapshots use Rust-owned shared fields and copied
+literal-provider rows; zero-owner literal tensors remain for compatibility
+fixtures. Sharing is per resolver within each section capture. That color
+transport left the then-current whole-frame ABI 74 unchanged; the current ABI
+is 80. See [section color snapshots](../world/biome/RUST-SECTION-COLORS.md)
+for construction, sealing, lifetime and provider compatibility.
+
+Ordinary block-state inputs now borrow [Rust loaded-section snapshots](../world/chunk/RUST-SECTION-SNAPSHOTS.md).
+Rust fills the state-ID halo directly. The local
+[bulk terrain-light boundary](RUST-TERRAIN-LIGHTING.md) borrows 54 CPU generation
+leases plus eight-byte contextual records to write the mesher light span directly;
+Java retains contextual predicates/shade and model admission. Those standalone
+CPU calls left compact header 4 and the then-current whole-frame ABI 78 unchanged. The
+later [native face policy](RUST-TERRAIN-CULLING.md) adds private compact header5
+for direct mesher admission; it left whole-frame ABI 78 unchanged. ABI 79’s
+terrain-selection change and ABI 80's GUI templates are separate contracts.
+Unsupported/debug containers retain their original CPU compatibility
+path. Canonical mutation now has its separate [Rust live section owner](../world/chunk/RUST-LIVE-SECTIONS.md); GPU ownership remains with Rust/GAL.
+
+## Native item transform owners
+
+ABI 76 appends a CPU owner address and hand mode to GUI mesh batch struct 97
+(fields 40/41). Mode 0 uses the inline matrix; modes 1/2 select immutable
+right/left poses, with zero inline model lanes. Rust copies the selected pose
+during decoding. See [item-layer preparation](RUST-ITEM-LAYERS.md) for admission,
+compatibility and synchronous/pipelined pinning rules.
+
+ABI 77 appends CPU item owner, operation mode, parent matrix properties, parent
+normal matrix and trust flag to world mesh struct 69 (fields 36–40). Modes 1/2
+apply right/left authored transforms for world items; 3/4 compose prepared poses
+for hands. Existing transform lanes carry the copied parent. Ordinary inline
+records zero every appended lane. Native special foil keeps its inline model
+and normal lanes zero; Rust resolves both before ordinary semantic validation.
+The [native decoder](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/render/bridge/world/item_poses.rs#L5-L93)
+resolves the pinned immutable CPU owner into a copied pose, then clears the
+owner fields before frontend admission. Worker-decoded requests pin owners
+separately from caller lists until join/error/destruction. GPU ownership is unchanged.

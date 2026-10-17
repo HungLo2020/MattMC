@@ -460,26 +460,11 @@ pub(crate) fn apply_exact_atlas_distant_horizons_fragment_probe(
 }
 
 pub(crate) fn main_function_closing_brace(source: &str) -> Option<usize> {
-    let main = source.find("void main()")?;
-    let open = source[main..].find('{')? + main;
-    let mut depth = 0usize;
-    for (offset, character) in source[open..].char_indices() {
-        match character {
-            '{' => depth += 1,
-            '}' => {
-                depth = depth.checked_sub(1)?;
-                if depth == 0 {
-                    return Some(open + offset);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
+    crate::render::shaderpack::lowering::source_main_function_closing_brace(source)
 }
 
 pub(crate) fn insert_before_main(source: &str, declarations: &str) -> GalResult<String> {
-    let main = source.find("void main()").ok_or_else(|| {
+    let main = crate::render::shaderpack::lowering::main_function_declaration_start(source).ok_or_else(|| {
         GalError::invalid_argument("lowered shader source has no void main function")
     })?;
     let mut output = String::with_capacity(source.len() + declarations.len());

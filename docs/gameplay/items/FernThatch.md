@@ -1,6 +1,6 @@
 # Fern Thatch
 
-**Fern Thatch** (`minecraft:fern_thatch`) is a full green building block, not a soil-dependent plant. It is also explicitly listed in Natural Blocks Creative. [Registration][blocks] [items] [creative]
+**Fern Thatch** (`minecraft:fern_thatch`) is a full green building block, not a soil-dependent plant. It is also explicitly listed in Natural Blocks Creative. [Registration][blocks] [items][] [creative][]
 
 ## Obtaining
 

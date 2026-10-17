@@ -5,6 +5,9 @@
 mod atlas;
 mod quads;
 mod mesh;
+mod item_templates;
+#[cfg(test)]
+pub(crate) use self::item_templates::*;
 mod frame;
 mod assets;
 

@@ -2,16 +2,17 @@ package net.minecraft.client.resources.sounds;
 
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.client.sounds.SoundEngine;
-import net.minecraft.client.sounds.Weighted;
 import net.minecraft.resources.FileToIdConverter;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.SampledFloat;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * One resolved playable sound. The `sounds.json` weighting, nesting and
+ * preload policy that produce it are owned by Rust (`audio/policy/events.rs`).
+ */
 @Environment(EnvType.CLIENT)
-public class Sound implements Weighted<Sound> {
+public class Sound {
 	public static final FileToIdConverter SOUND_LISTER = new FileToIdConverter("sounds", ".ogg");
 	private final ResourceLocation location;
 	private final SampledFloat volume;
@@ -49,20 +50,8 @@ public class Sound implements Weighted<Sound> {
 		return this.pitch;
 	}
 
-	@Override
 	public int getWeight() {
 		return this.weight;
-	}
-
-	public Sound getSound(RandomSource randomSource) {
-		return this;
-	}
-
-	@Override
-	public void preloadIfRequired(SoundEngine soundEngine) {
-		if (this.preload) {
-			soundEngine.requestPreload(this);
-		}
 	}
 
 	public Sound.Type getType() {

@@ -23,6 +23,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class DistantHorizonsLodWaterReductionTest {
+	// Parent merges read Config.Common.LodBuilding, whose initializer needs the
+	// shared Minecraft wrapper; do not rely on another suite having bound it.
+	@org.junit.jupiter.api.BeforeAll
+	static void bindEnvironment()
+	{
+		var injector = com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector.INSTANCE;
+		var type = com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper.class;
+		if (injector.get(type) != null) return;
+		injector.bind(type, (com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper)
+			java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (p, m, a) -> switch (m.getName()) {
+				case "getInstallationDirectory" -> java.nio.file.Path.of("run").toFile();
+				case "isDedicatedServer" -> false;
+				case "getDelayedSetupComplete" -> true;
+				default -> throw new UnsupportedOperationException("Unexpected fixture environment callback " + m);
+			}));
+	}
+
 
     @Test
     public void reduceToOneKeepsWaterBelowTransparentOceanPlants() {
@@ -198,9 +215,7 @@ public class DistantHorizonsLodWaterReductionTest {
             inputPos, mapping, columns, steps, modes);
         FullDataSourceV2 output = FullDataSourceV2.createEmpty(outputPos);
         try {
-            java.lang.reflect.Field uniformity = FullDataSourceV2.class.getDeclaredField("semanticHorizontalUniform");
-            uniformity.setAccessible(true);
-            ((boolean[]) uniformity.get(input))[mappedInputIndex] = true;
+            input.nativeSource().uniform(mappedInputIndex, true);
             Method downsample = FullDataSourceV2.class.getDeclaredMethod(
                 "downsampleFromOneAboveDetailLevel", FullDataSourceV2.class, int[].class);
             downsample.setAccessible(true);
@@ -371,23 +386,27 @@ public class DistantHorizonsLodWaterReductionTest {
         return mapping;
     }
 
+    /** The parent cell's material when four one-point child columns hold {@code ids}, through the Rust parent update. */
     private static int selectParentSliceId(int[] ids, FullDataPointIdMap mapping) throws Exception {
-        Method method = FullDataSourceV2.class.getDeclaredMethod(
-            "determineMostCommonValueInColumnSlice",
-            int[].class,
-            FullDataPointIdMap.class);
-        method.setAccessible(true);
-        return (Integer) method.invoke(null, ids, mapping);
+        LongArrayList[] columns = emptyFullDataColumns();
+        for (int x = 0; x < 2; x++) for (int z = 0; z < 2; z++)
+            columns[FullDataSourceV2.relativePosToIndex(x, z)].add(FullDataPointUtil.encode(ids[x * 2 + z], 4, 60, (byte) 0, (byte) 15));
+        LongArrayList merged = mergeParentColumn(FullDataSourceV2.createWithData(0, mapping, columns,
+            fullDataGenerationSteps(), fullDataCompressionModes()), 0, 0);
+        assertEquals(1, merged.size());
+        return FullDataPointUtil.getId(merged.getLong(0));
     }
 
+    /** The parent column reduced from the child cells (x..x+1, z..z+1), through the Rust parent update. */
     private static LongArrayList mergeParentColumn(FullDataSourceV2 source, int x, int z) throws Exception {
-        Method method = FullDataSourceV2.class.getDeclaredMethod(
-            "mergeInputTwoByTwoDataColumn",
-            FullDataSourceV2.class,
-            int.class,
-            int.class);
-        method.setAccessible(true);
-        return (LongArrayList) method.invoke(null, source, x, z);
+        try (source; var parent = FullDataSourceV2.createEmpty(DhSectionPos.getParentPos(source.getPos()))) {
+            // An empty parent mapping takes the child's IDs in order, so the remap is the identity.
+            parent.updateFromDataSource(source);
+            long childZero = DhSectionPos.getChildByIndex(parent.getPos(), 0);
+            int ox = DhSectionPos.getX(source.getPos()) == DhSectionPos.getX(childZero) ? 0 : 32;
+            int oz = DhSectionPos.getZ(source.getPos()) == DhSectionPos.getZ(childZero) ? 0 : 32;
+            return new LongArrayList(parent.getColumnAtRelPos(ox + x / 2, oz + z / 2));
+        }
     }
 
     private enum TestBiome implements IBiomeWrapper {

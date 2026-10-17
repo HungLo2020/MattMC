@@ -1,0 +1,182 @@
+{
+  "vanilla_reference": "7a4d181717dc0c7da9086f1a17687dfd522ce417",
+  "extension_reference": "5e933129855fd5b82198204a1f093cb541127e04",
+  "scope": "Original Frozen7a4 public trace bytes plus original literal-operation Source extension traces. Original execution/build/trace provenance below. Extension Source implementation5e is unchanged in the actually executed retained3eeb+S31 runtime; do not label that wholeapplication5e. No Current trace substituted or baseline regenerated. Current-only native ownership/retirement observers have no Frozen-scope API reference.",
+  "cases": {
+    "update": {
+      "main": "VerifySkySourcePublicUpdateContracts",
+      "rows": 13,
+      "prefix": "SKY_UPDATE "
+    },
+    "fill": {
+      "main": "VerifySkySourcePublicFillContracts",
+      "rows": 10,
+      "prefix": "SKY_FILL "
+    },
+    "canonical": {
+      "main": "VerifySkyCanonicalEffects",
+      "rows": 4,
+      "prefix": "SKY_CANONICAL "
+    },
+    "bounds": {
+      "main": "VerifySkySourceBounds",
+      "rows": 20,
+      "prefix": "SKY_BOUNDS "
+    },
+    "bulk": {
+      "main": "VerifySkyBulkPublic",
+      "rows": 50,
+      "prefix": "SKY_BULK "
+    }
+  },
+  "extensions": {
+    "transport": {
+      "main": "VerifySkySourceTransportContracts",
+      "rows": 34,
+      "prefix": "SKY_TRANSPORT "
+    },
+    "escaped": {
+      "main": "VerifySourceColumnsEscaped",
+      "rows": 4,
+      "prefix": "SOURCE_COLUMNS_ESCAPED "
+    }
+  },
+  "engine_consumer": {
+    "main": "VerifyOwnedSkySeedContracts",
+    "cases": 9,
+    "reference": "consumer/*.txt",
+    "scope": "OriginalFrozen publicproducersetup actualrealengine/maps/queues; originalprivatefill setup removed beforeFrozenbaseline2."
+  },
+  "trace_provenance": {
+    "update": {
+      "file": "update.trace",
+      "rows": 13,
+      "sha256": "87bbbe1e53acf89b1ab8ff70d8361574f11e3671eef8abc2b23f578c8bda89b3",
+      "bytes": 12287,
+      "original_receipt": "build/lighting/s0031-sky-public-update-baseline-1/result.json",
+      "original_receipt_sha256": "9a9299e2b16bc2ad2f340ff8b3ed3652764f0d7c0c0257ba991e8c40f1932649",
+      "original_trace": "build/lighting/s0031-sky-public-update-baseline-1/originalFrozen.trace",
+      "reference_kind": "original Frozen public observer",
+      "original_run_label": "originalFrozen",
+      "original_exit": 0,
+      "original_guards_pass": true,
+      "original_native_mappings": {},
+      "trace_matches_original_bytes": true,
+      "reference_source": "7a4d181717dc0c7da9086f1a17687dfd522ce417"
+    },
+    "fill": {
+      "file": "fill.trace",
+      "rows": 10,
+      "sha256": "deae1753fd296de9de5d3683961c947220b99b1437dd5b81bd4acbcea3e839e9",
+      "bytes": 76095,
+      "original_receipt": "build/lighting/s0031-sky-public-fill-baseline-1/result.json",
+      "original_receipt_sha256": "0202512a2d65684b5165508821e266b5dbd2e13824fb2e04936ac136efb7027e",
+      "original_trace": "build/lighting/s0031-sky-public-fill-baseline-1/originalFrozen.trace",
+      "reference_kind": "original Frozen public observer",
+      "original_run_label": "originalFrozen",
+      "original_exit": 0,
+      "original_guards_pass": true,
+      "original_native_mappings": {},
+      "trace_matches_original_bytes": true,
+      "reference_source": "7a4d181717dc0c7da9086f1a17687dfd522ce417"
+    },
+    "canonical": {
+      "file": "canonical.trace",
+      "rows": 4,
+      "sha256": "1ddc5728e32c8fbb10cb9e68eb52c60c55734bc393ea29704cb91b4b7517e7cc",
+      "bytes": 8734,
+      "original_receipt": "build/lighting/s0031-sky-canonical-effects-baseline-1/result.json",
+      "original_receipt_sha256": "9ce53b93672912c9f36d9c63c6b581bb5839e3397d299871374a115c67241900",
+      "original_trace": "build/lighting/s0031-sky-canonical-effects-baseline-1/originalFrozen.trace",
+      "reference_kind": "original Frozen public observer",
+      "original_run_label": "originalFrozen",
+      "original_exit": 0,
+      "original_guards_pass": true,
+      "original_native_mappings": {},
+      "trace_matches_original_bytes": true,
+      "reference_source": "7a4d181717dc0c7da9086f1a17687dfd522ce417"
+    },
+    "bounds": {
+      "file": "bounds.trace",
+      "rows": 20,
+      "sha256": "317adaf46fc02656f1f8242b1126061632fcd3abe06aabe3f7100dcc31a7f31d",
+      "bytes": 3184,
+      "original_receipt": "build/lighting/s0031-sky-bounds-baseline-1/result.json",
+      "original_receipt_sha256": "c2919d919864cfd8545683b37c9ab375cadfd98dc297efb984a3ec55c7123baa",
+      "original_trace": "build/lighting/s0031-sky-bounds-baseline-1/originalFrozen.trace",
+      "reference_kind": "original Frozen public observer",
+      "original_run_label": "originalFrozen",
+      "original_exit": 0,
+      "original_guards_pass": true,
+      "original_native_mappings": {},
+      "trace_matches_original_bytes": true,
+      "reference_source": "7a4d181717dc0c7da9086f1a17687dfd522ce417"
+    },
+    "bulk": {
+      "file": "bulk.trace",
+      "rows": 50,
+      "sha256": "6c9da17bcfbcbc18b027e7c2ab59b85a8f2a670090dabc3290c472dbc3490d99",
+      "bytes": 89621,
+      "original_receipt": "build/lighting/s0031-sky-bulk-public-baseline-3/result.json",
+      "original_receipt_sha256": "cb343d151bb76c09574e8f4631cf0f7fb978276efb65cf2e877f33ffac35459b",
+      "original_trace": "build/lighting/s0031-sky-bulk-public-baseline-3/originalFrozen.trace",
+      "reference_kind": "original Frozen public observer",
+      "original_run_label": "originalFrozen",
+      "original_exit": 0,
+      "original_guards_pass": true,
+      "original_native_mappings": {},
+      "trace_matches_original_bytes": true,
+      "reference_source": "7a4d181717dc0c7da9086f1a17687dfd522ce417"
+    },
+    "transport": {
+      "file": "transport.trace",
+      "rows": 34,
+      "sha256": "69f7593b2b6c51e54c6cb4e07f7eaacf39966bd9b4decd8c9d6a40f91116c320",
+      "bytes": 4835,
+      "original_receipt": "build/lighting/s0031-source-transport-contracts-5/result.json",
+      "original_receipt_sha256": "45fd4d02a5ae427d098df6cad3ad99169a8fc9b0bae928a87e461b8fad1ee0c9",
+      "original_trace": "build/lighting/s0031-source-transport-contracts-5/published5e.trace",
+      "reference_kind": "MattMC literal-operation extension observer",
+      "original_run_label": "published5e",
+      "original_exit": 0,
+      "original_guards_pass": true,
+      "original_native_mappings": {
+        "/home/matt/Documents/Repos/MattMC/build/lighting/s0031-live-sky-inputs-9/native/mattmc_rust-linux-x64.so": "ed529d8801733fdab9c811783effd1d48d27679ecb1aacf52dd3d765f4e6fa20"
+      },
+      "trace_matches_original_bytes": true,
+      "source_implementation_reference": "5e933129855fd5b82198204a1f093cb541127e04",
+      "actual_runtime_base": "3eeb5f02dac4d38a6a5ce3e9fb850a882c39b4fe",
+      "actual_runtime_scope": "Live custom/escaped sky-source Rust cursor retaining actual work queue; original conditional VM effects and failure-prefix order, original checked Throwable identity retained; combined with published3eebdouble-destination/0f2bcomposites/b993menus/870dslots/c24item/8200/c8PerlinNormal and published4c request/level lifecycle",
+      "actual_native_sha256": "ed529d8801733fdab9c811783effd1d48d27679ecb1aacf52dd3d765f4e6fa20",
+      "actual_main_class_count": 13923,
+      "actual_source_class_sha256": "bb207d5e93fd318c2343451abc7f910a740eeb84530ae2caf6babb415202307f",
+      "unchanged_source_git_blob": "7274db6053ce64f5f9c403bf478837da2f27de0a",
+      "qualification": "Original run label published5e identifies the unchanged Source extension implementation. Complete runtime is the retained3eeb+S31 image above, not a wholeapplication5e build. Historical raw receipt labels unchanged."
+    },
+    "escaped": {
+      "file": "escaped.trace",
+      "rows": 4,
+      "sha256": "15846e3af81e365e143ab2b40366c0a9445e74bcba3cc34d6789c46f107a1345",
+      "bytes": 209,
+      "original_receipt": "build/lighting/s0031-source-consumer-escaped-2/result.json",
+      "original_receipt_sha256": "95a5631e184bd5014dd90d174f2f4e61e10641b2901bc2a88f42eedd89241b37",
+      "original_trace": "build/lighting/s0031-source-consumer-escaped-2/published5e.trace",
+      "reference_kind": "MattMC literal-operation extension observer",
+      "original_run_label": "published5e",
+      "original_exit": 0,
+      "original_guards_pass": true,
+      "original_native_mappings": {
+        "/home/matt/Documents/Repos/MattMC/build/lighting/s0031-live-sky-inputs-9/native/mattmc_rust-linux-x64.so": "ed529d8801733fdab9c811783effd1d48d27679ecb1aacf52dd3d765f4e6fa20"
+      },
+      "trace_matches_original_bytes": true,
+      "source_implementation_reference": "5e933129855fd5b82198204a1f093cb541127e04",
+      "actual_runtime_base": "3eeb5f02dac4d38a6a5ce3e9fb850a882c39b4fe",
+      "actual_runtime_scope": "Live custom/escaped sky-source Rust cursor retaining actual work queue; original conditional VM effects and failure-prefix order, original checked Throwable identity retained; combined with published3eebdouble-destination/0f2bcomposites/b993menus/870dslots/c24item/8200/c8PerlinNormal and published4c request/level lifecycle",
+      "actual_native_sha256": "ed529d8801733fdab9c811783effd1d48d27679ecb1aacf52dd3d765f4e6fa20",
+      "actual_main_class_count": 13923,
+      "actual_source_class_sha256": "bb207d5e93fd318c2343451abc7f910a740eeb84530ae2caf6babb415202307f",
+      "unchanged_source_git_blob": "7274db6053ce64f5f9c403bf478837da2f27de0a",
+      "qualification": "Original run label published5e identifies the unchanged Source extension implementation. Complete runtime is the retained3eeb+S31 image above, not a wholeapplication5e build. Historical raw receipt labels unchanged."
+    }
+  }
+}

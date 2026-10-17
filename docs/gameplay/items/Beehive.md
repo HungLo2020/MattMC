@@ -16,9 +16,11 @@ A fresh crafted hive has **no Bees and honey level 0**. You need an existing col
 
 ## Placement and recovery
 
-Place the hive with its front face clear so Bees can exit. A normal mine drops an ordinary Beehive item but does not preserve stored Bees or honey. Mining without Silk Touch can also release occupants and anger nearby Bees. [Exit check][exit] · [Loot branches][loot] · [Mining response][mining]
+Place the hive with its front face clear so Bees can exit. Ordinary Survival mining drops an ordinary Beehive item but does not preserve stored Bees or honey. Mining without Silk Touch can also release occupants and anger nearby Bees. [Exit check][exit] · [Loot branches][loot] · [Mining response][mining]
 
-Use **Silk Touch** to move an occupied hive. Its Silk Touch loot branch copies the stored Bees and honey level into the dropped item, and placement restores those components. Wait until the Bees you intend to move are inside; flying Bees are not automatically included. [Silk Touch loot][loot] · [Placement restoration][placement] · [Bee components][components]
+In Survival, use **Silk Touch** to move an occupied hive. Its Silk Touch loot branch copies the stored Bees and honey level into the dropped item, and placement restores those components. Wait until the Bees you intend to move are inside; flying Bees are not automatically included. [Silk Touch loot][loot] · [Placement restoration][placement] · [Bee components][components]
+
+Creative breaking can preserve occupied or honey-bearing housing without Silk Touch; see the [Creative recovery conditions](../blocks/BeeHousing.md#creative-recovery).
 
 At honey level 5, collect Honeycomb with Shears or a Honey Bottle with a Glass Bottle. Follow [the harvesting instructions](../blocks/BeeHousing.md#harvesting) for smoke and tool behavior before collecting. [Harvest handler][harvest]
 
@@ -31,6 +33,8 @@ At honey level 5, collect Honeycomb with Shears or a Honey Bottle with a Glass B
 - [Items](Items.md)
 
 ## Verification scope
+
+The mode qualification and Creative recovery route were reviewed against `c357b63cd5afcc0951344c33ad2f4568d5c77e4f` on 2026-10-13; the canonical housing guide holds the active callback/component evidence. No runtime test was run.
 
 Source-reviewed at MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. Registration, recipe, default item data, capacity, placement, harvesting, and mining loot were inspected. No in-game crafting, colony, or Silk Touch test was run.
 

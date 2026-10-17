@@ -1,6 +1,36 @@
 # World lighting
 
-Server-side light-source data and propagation are separate from rendering.
+World light-source data, live light storage and propagation are separate from
+rendering. Live layers also support independent client packet imports. The
+renderer’s [bulk terrain-light consumer](../../rendering/RUST-TERRAIN-LIGHTING.md)
+borrows retained generations. Rust owns threaded server batch coordination;
+Java retains contextual callbacks; the per-engine native coordinator candidate
+is undergoing connected verification and performance review.
 
+- [Threaded lighting coordination](RUST-THREADED-LIGHTING.md): native live task
+  batches, PRE/POST phases, scheduling admission, lifetime and verification.
+- [Per-engine coordinator development](RUST-LIGHT-COORDINATOR.md): candidate
+  node/section/publication ownership, compatibility constraints and cost gate.
+
+- [Rust DH lighting pass](RUST-DH-LIGHTING.md): whole native producer and
+  direct CPU light consumers, executable Frozen stale-counter/escape regressions
+  and separate current runtime acceptance.
+- [Rust saved DH lighting](RUST-DH-SAVED-LIGHT.md): borrowed saved nibbles,
+  native field ownership, deferred emitter caches and direct generation consumers.
 - [Rust skylight-source reconstruction](RUST-SKYLIGHT-SOURCES.md): packed scans,
   exact occlusion tables, ownership and focused acceptance checks.
+- [Rust light-map publication](RUST-LIGHT-MAPS.md): shared 64-shard snapshots,
+  direct block/sky scalar reads, CPU identity pins, sky metadata and compatibility
+  contracts.
+- [Rust live light layers](RUST-LIVE-LAYERS.md): retained light ownership, direct
+  propagation handoffs, array compatibility and current verification scope.
+- [Rust light propagation](RUST-LIGHT-PROPAGATION.md): block and sky light
+  queues and sky-source seeding in Rust, section callbacks, parity and benchmarks.
+- [Direct Rust light-section inputs](RUST-LIGHT-SECTION-INPUTS.md): primary-owner
+  capture, typed CPU leases and first-use snapshot compatibility.
+- [Rust light work ownership](RUST-LIGHT-WORK.md): retained pending queues,
+  direct sky-seed handoff, callback admission and verification.
+- [Rust block-light sources](RUST-BLOCK-LIGHT-SOURCES.md): direct retained-section
+  enumeration and enqueueing, order, stale counters and compatibility.
+- [Rust leveled work queue](RUST-PRIORITY-QUEUE.md): the queue behind the Rust
+  chunk/section distance graphs, its contracts and tests.

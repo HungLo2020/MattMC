@@ -8,14 +8,14 @@ import static net.vulkanic.bridge.VulkanicGalBridge.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ModelSubmissionOrderTest {
-    private static WorldMeshInstanceRecord instance(int stratum) {
+    private static WorldMeshInstance instance(int stratum) {
         return new WorldMeshInstanceRecord(stratum,17,1,0,1,1,0,-1,
             new float[]{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1},128,128,0,0,0,0,-1);
     }
     @Test void nestedExtractionScopesRestoreAndRecordsKeepTheirCopiedOrder() {
         assertNull(instance(WORLD_MESH_ENTITY_STRATUM).modelSubmissionOrder());
         beginSemanticModelOrder(-3);
-        WorldMeshInstanceRecord outer;
+        WorldMeshInstance outer;
         try {
             outer=instance(WORLD_MESH_ENTITY_STRATUM);
             beginSemanticModelOrder(7);

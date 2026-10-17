@@ -1,6 +1,5 @@
 package net.minecraft.network.chat.contents.objects;
 
-import com.mojang.serialization.MapCodec;
 import net.minecraft.network.chat.FontDescription;
 
 public interface ObjectInfo {
@@ -8,5 +7,4 @@ public interface ObjectInfo {
 
 	String description();
 
-	MapCodec<? extends ObjectInfo> codec();
 }

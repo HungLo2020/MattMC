@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use crate::render::vulkanic::error::{GalError, GalResult};
 
-use crate::render::shaderpack::properties::item_ids::canonical_resource_location;
+use crate::render::shaderpack::properties::item_ids::{canonical_resource_location, is_canonical_resource_location};
 use crate::render::shaderpack::source::preprocess::preprocess_artifact_with_runtime_options;
 use crate::render::shaderpack::source::ShaderPackSource;
 
@@ -97,6 +97,11 @@ impl ShaderPackEntityIdMap {
     /// Resolves copied canonical entity identity. A missing mapping preserves
     /// the source convention of `-1`, never a fabricated pack-specific ID.
     pub fn resolve(&self, resource_location: &str) -> GalResult<i32> {
+        // Producers copy canonical identities; look those up without
+        // formatting a new string per entity per frame.
+        if is_canonical_resource_location(resource_location) {
+            return Ok(self.ids.get(resource_location).copied().unwrap_or(UNMAPPED_ENTITY_ID));
+        }
         let resource_location =
             canonical_resource_location(resource_location).map_err(|reason| {
                 GalError::invalid_argument(format!(

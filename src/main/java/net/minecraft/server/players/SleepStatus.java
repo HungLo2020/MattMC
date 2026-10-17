@@ -2,8 +2,8 @@ package net.minecraft.server.players;
 
 import java.util.List;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.storage.NativeWeatherTime;
 
 public class SleepStatus {
 	private int activePlayers;
@@ -19,7 +19,7 @@ public class SleepStatus {
 	}
 
 	public int sleepersNeeded(int i) {
-		return Math.max(1, Mth.ceil(this.activePlayers * i / 100.0F));
+		return NativeWeatherTime.sleepersNeeded(this.activePlayers, i);
 	}
 
 	public void removeAllSleepers() {

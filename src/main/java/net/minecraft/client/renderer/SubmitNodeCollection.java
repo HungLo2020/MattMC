@@ -1543,6 +1543,15 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 	}
 
 	@Override
+	public boolean submitMapTexturedQuadSemantic(PoseStack poseStack, net.minecraft.resources.ResourceLocation textureIdentity,
+		float[] vertices, float[] uvs, int color, int lightCoords) {
+		if (!net.vulkanic.world.RustGalWorldPrimitiveRenderer.enqueueMapTexturedQuad(
+			poseStack.last().pose(), textureIdentity, vertices, uvs, color, lightCoords
+		)) throw new IllegalStateException("Rust whole-frame map route rejected semantic quad");
+		return true;
+	}
+
+	@Override
 	public boolean submitTranslucentTexturedQuad(
 		PoseStack poseStack, RenderType renderType, net.minecraft.resources.ResourceLocation textureIdentity,
 		float[] vertices, float[] uvs, int color, int lightCoords

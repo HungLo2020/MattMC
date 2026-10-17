@@ -2,9 +2,12 @@
 
 use super::*;
 
-pub(super) fn submission_trace(message: &str) {
-    if std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some() {
-        eprintln!("{message}");
+/// Whole-frame submission tracing (`MATTMC_TRACE_WHOLE_FRAME`, read once).
+/// The message is built only when tracing is on.
+pub(super) fn submission_trace(message: impl FnOnce() -> String) {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if *ENABLED.get_or_init(|| std::env::var_os("MATTMC_TRACE_WHOLE_FRAME").is_some()) {
+        crate::core::console::stderr(format_args!("{}", message()));
     }
 }
 
@@ -64,6 +67,10 @@ impl VulkanicGal {
                 }
             });
         }
+        // Command, handle and hazard checks guard against producer bugs. Normal
+        // play skips them (see `per_frame_validation`); upload capture needs
+        // the hazard walk to observe watched writes.
+        let validate = per_frame_validation() || self.buffer_upload_capture.is_watching();
         for list in &batch.command_lists {
             if list.operations.len() > capabilities.limits.max_commands_per_list as usize {
                 return self.unsupported(format!(
@@ -73,6 +80,9 @@ impl VulkanicGal {
                     capabilities.name,
                     capabilities.limits.max_commands_per_list
                 ));
+            }
+            if !validate {
+                continue;
             }
             let validate_ops_started = std::time::Instant::now();
             self.validate_command_ops(&list.label, &list.operations)?;
@@ -132,10 +142,21 @@ impl VulkanicGal {
                 .gal_redundant_index_buffer_binds_removed
                 .saturating_add(normalization.index_buffer_binds_removed);
         }
+        // Gather host buffer writes at the start of their lists so the GPU
+        // does not drain between passes for each one.
+        for list in &mut batch.command_lists {
+            host_write_hoist::hoist_host_writes(list, |set, buffer| {
+                self.resource_sets.get(set).map_or(true, |record| {
+                    record.desc.bindings.iter().any(|binding| binding.resource == buffer)
+                })
+            });
+        }
         let referenced = referenced_handles(&batch);
         let validate_handles_started = std::time::Instant::now();
-        for handle in &referenced {
-            self.validate_any_resource(*handle)?;
+        if validate {
+            for handle in &referenced {
+                self.validate_any_resource(*handle)?;
+            }
         }
         if let Some(profile) = profile.as_deref_mut() {
             profile.gal_validate_handles_nanos = profile
@@ -143,7 +164,9 @@ impl VulkanicGal {
                 .saturating_add(elapsed_nanos_u64(validate_handles_started));
         }
         let hazards_started = std::time::Instant::now();
-        self.validate_submission_hazards(&batch, profile.as_deref_mut())?;
+        if validate {
+            self.validate_submission_hazards(&batch, profile.as_deref_mut())?;
+        }
         if let Some(profile) = profile.as_deref_mut() {
             profile.gal_hazard_analysis_nanos = profile
                 .gal_hazard_analysis_nanos
@@ -153,7 +176,7 @@ impl VulkanicGal {
         let validated = ValidatedSubmissionBatch::from(batch);
         let id = SubmissionId(self.next_submission);
         self.next_submission += 1;
-        submission_trace(&format!(
+        submission_trace(|| format!(
             "gal.submit.encode.begin id={} label={} pre_encode_nanos={}",
             id.0,
             validated.label,
@@ -161,7 +184,7 @@ impl VulkanicGal {
         ));
         let backend_encode_started = std::time::Instant::now();
         self.backend.encode_passes(&validated)?;
-        submission_trace(&format!(
+        submission_trace(|| format!(
             "gal.submit.encode.end id={} elapsed_nanos={}",
             id.0,
             elapsed_nanos_u64(backend_encode_started)
@@ -172,14 +195,14 @@ impl VulkanicGal {
                 .saturating_add(elapsed_nanos_u64(backend_encode_started));
         }
         let backend_submit_started = std::time::Instant::now();
-        submission_trace(&format!("gal.submit.queue.begin id={}", id.0));
+        submission_trace(|| format!("gal.submit.queue.begin id={}", id.0));
         self.backend.submit(id, &validated)?;
         self.latest_accepted_submission = id;
         self.buffer_upload_capture.accept(id);
         for usage in &submission_usages {
             usage.accept(id);
         }
-        submission_trace(&format!(
+        submission_trace(|| format!(
             "gal.submit.queue.end id={} elapsed_nanos={}",
             id.0,
             elapsed_nanos_u64(backend_submit_started)
@@ -190,9 +213,14 @@ impl VulkanicGal {
                 .saturating_add(elapsed_nanos_u64(backend_submit_started));
         }
         self.metrics.submissions += 1;
+        // Shared dependencies (layouts, samplers, textures behind several
+        // sets) are marked once per submission instead of once per referrer.
+        let mut marked = std::mem::take(&mut self.in_flight_scratch);
+        marked.clear();
         for handle in referenced {
-            self.mark_in_flight(handle, id)?;
+            self.mark_in_flight(handle, id, &mut marked)?;
         }
+        self.in_flight_scratch = marked;
         if let Some(profile) = profile.as_deref_mut() {
             profile.gal_submit_total_nanos = profile
                 .gal_submit_total_nanos
@@ -287,20 +315,29 @@ impl VulkanicGal {
         self.backend.completed_host_reads()
     }
 
-    pub(super) fn mark_in_flight(&mut self, handle: Handle, id: SubmissionId) -> GalResult<()> {
+    pub(super) fn mark_in_flight(
+        &mut self,
+        handle: Handle,
+        id: SubmissionId,
+        marked: &mut HashSet<Handle, AccessHashBuilder>,
+    ) -> GalResult<()> {
+        if !marked.insert(handle) {
+            // Already marked with its whole dependency closure for `id`.
+            return Ok(());
+        }
         // A command references resource sets and pipelines, while their
         // descriptor/layout dependency edges own the sampler, image view,
         // texture, and shader handles they contain.  Retire the complete
         // dependency closure with the submission; marking only the directly
         // encoded set allowed a replaced sampler to be destroyed while its
         // descriptor set was still executing on Vulkan.
-        let dependencies = self
+        let dependencies: smallvec::SmallVec<[Handle; 8]> = self
             .reverse_dependencies
             .get(&handle)
-            .cloned()
+            .map(|dependencies| dependencies.iter().copied().collect())
             .unwrap_or_default();
         for dependency in dependencies {
-            self.mark_in_flight(dependency, id)?;
+            self.mark_in_flight(dependency, id, marked)?;
         }
         match handle.kind() {
             Some(HandleKind::Buffer) => {
@@ -316,14 +353,18 @@ impl VulkanicGal {
                 self.samplers.get_mut_record(handle)?.last_submission = Some(id)
             }
             Some(HandleKind::CombinedTextureSampler) => {
-                let pair = self.combined_texture_samplers.get(handle)?.desc.clone();
+                // Copy the two handles; cloning the descriptor allocated its label.
+                let pair = {
+                    let desc = &self.combined_texture_samplers.get(handle)?.desc;
+                    (desc.texture_view, desc.sampler)
+                };
                 self.combined_texture_samplers
                     .get_mut_record(handle)?
                     .last_submission = Some(id);
                 self.texture_views
-                    .get_mut_record(pair.texture_view)?
+                    .get_mut_record(pair.0)?
                     .last_submission = Some(id);
-                self.samplers.get_mut_record(pair.sampler)?.last_submission = Some(id);
+                self.samplers.get_mut_record(pair.1)?.last_submission = Some(id);
             }
             Some(HandleKind::ShaderModule) => {
                 self.shaders.get_mut_record(handle)?.last_submission = Some(id)
@@ -371,8 +412,22 @@ impl VulkanicGal {
     }
 }
 
-pub(super) fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
-    let mut handles = BTreeSet::new();
+/// Every handle the batch names directly, sorted and deduplicated.
+/// Whether submissions are validated every frame (command ops, handles and
+/// hazards). Always in tests and debug builds; in release builds only with
+/// `MATTMC_GAL_VALIDATION=1` (captures and validation runs set it). Normal
+/// play trusts its producers, as Vulkan itself does without validation layers.
+pub(crate) fn per_frame_validation() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        cfg!(test)
+            || cfg!(debug_assertions)
+            || matches!(std::env::var("MATTMC_GAL_VALIDATION").as_deref(), Ok("1" | "true" | "on"))
+    })
+}
+
+pub(super) fn referenced_handles(batch: &SubmissionBatch) -> Vec<Handle> {
+    let mut handles = ReferencedHandles(Vec::with_capacity(batch.command_lists.iter().map(|list| list.operations.len() * 2).sum()));
     for list in &batch.command_lists {
         for op in &list.operations {
             match op {
@@ -452,7 +507,19 @@ pub(super) fn referenced_handles(batch: &SubmissionBatch) -> BTreeSet<Handle> {
             }
         }
     }
+    let mut handles = handles.0;
+    handles.sort_unstable();
+    handles.dedup();
     handles
+}
+
+/// Collects handles; `insert` keeps the call sites of the former set.
+struct ReferencedHandles(Vec<Handle>);
+
+impl ReferencedHandles {
+    fn insert(&mut self, handle: Handle) {
+        self.0.push(handle);
+    }
 }
 
 /// Diagnostic tracing selected by label: the environment variable holds a

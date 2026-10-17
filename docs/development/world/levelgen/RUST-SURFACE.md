@@ -2,31 +2,60 @@
 
 ## Production path
 
-`SurfaceSystem.buildSurface` compiles its rule tree into a private, forward-only
-native program once per chunk. Ordinary `ProtoChunk` columns are scanned and
-evaluated in Rust. Java prepares the column and commits the resulting block
-states in the original descending order. The native library is required; there
-is no benchmark selector or Java arithmetic fallback in this production path.
+`SurfaceSystem.buildSurface` uses a private, forward-only native rule program.
+Eligible batched programs are cached per `SurfaceSystem` and reused across
+chunk contexts; extension rules and continuations still compile per context.
+See the [cache inputs and comparison switches](RUST-SURFACE-STORAGE.md#compiled-rule-programs).
+Ordinary `ProtoChunk` columns are scanned and
+evaluated in Rust. For those chunks Rust also owns the chunk's sections and
+world-generation heightmaps for the whole stage, commits blocks in the original
+descending order and installs the results once; see
+[surface chunk storage](RUST-SURFACE-STORAGE.md). The native library is
+required; there is no Java arithmetic fallback in this production path.
 
 The migrated operations are the solid/fluid/air column scan, stone-depth and
 water tracking, rule sequencing and negation, stone/water/Y/hole/preliminary
 surface predicates, vertical-gradient bounds, biome membership, and
 terracotta-band selection. Biome
 Voronoi corner selection runs once per column in Rust and reuses corner jitter
-within each group of four block heights. Java resolves the selected quart biome
-holders and their registry IDs.
+within each group of four block heights. On Rust-owned storage the selected
+quarts are read from a per-chunk table of registry IDs Java fills once;
+otherwise Java resolves the selected quart biome holders per column.
 
-Java still owns registry bindings, noise/random objects, temperature and custom
-callbacks, badlands and frozen-ocean extensions, and chunk storage. The existing
+On eligible Rust-storage chunks the 16×16 X/Z column loop, its per-column
+context update (surface depth), the column biome lookup and the eroded
+badlands and frozen ocean extensions run in Rust
+([column pass](RUST-SURFACE-STORAGE.md#column-pass)). Java still owns them on
+other chunks, and everywhere owns registry bindings, noise/random objects,
+temperature caller bindings (see [Temperature](#temperature)), including the frozen ocean's
+melt check, and custom callbacks. The existing
 `SurfaceRules` Java bindings remain available to extensions and provide a test
-oracle. Carvers' `topMaterial` uses the native rule evaluator through a scalar
-adapter; these contexts retain their supplied Java biome lookup and predicate.
+oracle. Carvers' `topMaterial` runs entirely in Rust on eligible chunks
+([carvers](carver/RUST-CARVERS.md)); other carving keeps the scalar adapter
+with its supplied Java biome lookup and predicate.
 
 Unknown extension rules/conditions, specialized chunk/system/biome-manager
 subclasses, and unusually large/deep rule trees use the incremental Java column
 traversal with native rule evaluation. This preserves callbacks that inspect or
 mutate the chunk. These compatibility paths are not covered by the performance
 claim for shipped rules on ordinary chunks.
+
+## Temperature
+
+`SurfaceRules.Temperature` calls the shared `Biome` temperature service at its
+original evaluation point on every route. Rust now owns that service's
+arithmetic, frozen modifier, thresholds and actual per-Biome/per-thread cache.
+The key remains position alone; sea-level history, first-in eviction, NaN
+misses and reentrant insertion are observable across all callers. Java performs
+genuine ordered position observations and binds immutable native noise states.
+See [shared biome temperature](../biome/RUST-TEMPERATURE.md).
+
+The carvers' native top material still calls `coldEnoughToSnow`, and native
+`freeze_top_layer` still invokes `warmEnoughToRain` at its existing ordered
+callback points. Both reach the same native cache as precipitation, structures,
+entities and rendering on that calling thread. Preserve the
+[decoration call-order and cache-history contract](feature/RUST-DECORATION.md#what-runs-in-rust);
+these adapters must not memoize or create an independent stage cache.
 
 ## Ordering and arithmetic
 
@@ -42,13 +71,19 @@ point expression order, saturating float-to-integer conversion, biome distance
 comparison, and first-match rule order are preserved. The native evaluator does
 not reorder predicates or eagerly evaluate noise/random conditions. Vertical
 gradients first check the lower bound, then the upper bound, exactly as Java
-does; only heights strictly between those bounds request the Java random test.
+does; only heights strictly between those bounds need the random test.
+Eligible Rust-owned storage answers that test with the condition's native
+positional random factory. Other routes request the Java answer, preserving
+the same order.
 
 ## Boundary and ownership
 
-The FFM interface borrows Java-owned arrays for one call and retains no pointers.
-Each compiled evaluator owns its mutable buffers; evaluators are confined to
-their chunk/task. Only the FFI entry points construct slices from raw pointers.
+The scalar evaluator interface borrows Java-owned arrays for one call and
+retains no pointers into those arrays. Rust-owned stage storage can retain
+native noise-state and preliminary-level pointers between column calls;
+[`NativeSurfaceChunk`](https://github.com/HungLo2020/MattMC/blob/5c02fd8215f4c1dde624dbe3d21a476d38b16708/src/main/java/net/minecraft/world/level/levelgen/NativeSurfaceChunk.java#L85-L124)
+keeps their Java owners live until the stage is closed. Evaluator buffers
+remain confined to their chunk/task while eligible immutable programs are shared. Only the FFI entry points construct slices from raw pointers.
 Their safety contracts specify lengths, alignment, disjoint buffers, and the
 validated immutable program required from the Java caller.
 
@@ -70,6 +105,11 @@ continuations. Large program validation uses a regular downcall and native
 memory instead of a long heap-pinning critical call.
 
 ## Reproducing verification
+
+For the later storage, native-condition and program-cache changes, use the
+[current stage drivers](RUST-SURFACE-STORAGE.md#compiled-rule-programs) as well.
+The recorded validation and measurements below describe the original surface
+evaluator migration, not independent acceptance of those later changes.
 
 Use JDK 25 and a release native library. No copied Java implementation is kept
 in production or test source: the driver extracts the original `SurfaceSystem`

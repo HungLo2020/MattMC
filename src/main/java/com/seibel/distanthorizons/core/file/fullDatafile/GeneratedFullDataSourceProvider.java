@@ -302,7 +302,7 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 	public void clearRetrievalQueue() { this.worldGenQueueRef.set(null); }
 	
 	
-	public boolean isFullyGenerated(ByteArrayList columnGenerationSteps)
+	public boolean isFullyGenerated(it.unimi.dsi.fastutil.bytes.ByteList columnGenerationSteps)
 	{
 		return IntStream.range(0, columnGenerationSteps.size())
 				.noneMatch(i ->
@@ -467,6 +467,16 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 			return (dataSource) ->
 			{
 				GeneratedFullDataSourceProvider.this.delayedFullDataSourceSaveCache.writeDataSourceToMemoryAndQueueSave(dataSource);
+			};
+		}
+		
+		@Override
+		public java.util.function.Predicate<net.minecraft.world.level.chunk.NativeDhColumns> getNativeColumnsConsumer()
+		{
+			return (columns) ->
+			{
+				GeneratedFullDataSourceProvider.this.delayedFullDataSourceSaveCache.writeNativeColumnsToMemoryAndQueueSave(columns);
+				return true;
 			};
 		}
 		

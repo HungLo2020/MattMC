@@ -16,6 +16,24 @@ public class StrongholdStructure extends Structure {
 	}
 
 	@Override
+	public int[] nativeStub() {
+		return new int[]{9, 0, 0};
+	}
+
+	@Override
+	public int[] nativeStubParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager structureTemplateManager,
+		net.minecraft.world.level.chunk.ChunkGenerator chunkGenerator, net.minecraft.world.level.LevelHeightAccessor levelHeightAccessor) {
+		return new int[]{chunkGenerator.getMinY()};
+	}
+
+	@Override
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext,
+		net.minecraft.core.BlockPos stub, net.minecraft.world.level.block.Rotation rotation, long[] extra, int[] pieces) {
+		// Rust planned the pieces and their retries (structure/stronghold_plan.rs).
+		StrongholdPieces.addNativePieces(structurePiecesBuilder, pieces);
+	}
+
+	@Override
 	public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext) {
 		return Optional.of(
 			new Structure.GenerationStub(

@@ -10,6 +10,47 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GuiFlatItemMeshCollectorTest {
+    @Test void cachedFlatLayersTransferOwnershipAndRefreshOnlyFrameFacts() throws Exception {
+        var layerType = Class.forName("net.vulkanic.gui.GuiFlatItemMeshCollector$FlatLayer");
+        var constructor = layerType.getDeclaredConstructors()[0]; constructor.setAccessible(true);
+        var vertex = new GuiMeshVertexRecord(new float[]{0,0,0}, new float[]{0,0}, new float[]{0,0}, -1, 0);
+        var vertices = List.of(vertex, vertex, vertex, vertex);
+        var indices = List.of(0,1,2,2,3,0);
+        float[] transform = {1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+        Object base = constructor.newInstance(2,17L,transform,vertices,indices,false,false,null);
+        Object glint = constructor.newInstance(4,18L,transform,vertices,indices,true,true,null);
+        var topologyType = Class.forName("net.vulkanic.gui.GuiFlatItemMeshCollector$FlatTopology");
+        var topologyConstructor = topologyType.getDeclaredConstructor(List.class,List.class);
+        topologyConstructor.setAccessible(true);
+        Object topology = topologyConstructor.newInstance(List.of(base,glint),List.of());
+        var instantiate = GuiFlatItemMeshCollector.class.getDeclaredMethod("instantiate",GuiItemRenderState.class,
+            int.class,int.class,int.class,int.class,topologyType,StandardItemFoilRecord.class,GuiItemCacheRecord.class);
+        instantiate.setAccessible(true);
+        var item = new GuiItemRenderState("flat",new Matrix3x2f(),new TrackingItemStackRenderState(),12,34,null);
+        var cache = new GuiItemCacheRecord(19,true,true);
+        var first = (GuiFlatItemMeshCollector.Snapshot)instantiate.invoke(null,item,320,180,2,420,topology,
+            new StandardItemFoilRecord(17,0.25,0.5F),cache);
+        assertEquals(1,first.batches().size());
+        var owner = first.batches().getFirst().nativeTemplate(); assertNotNull(owner);
+        try {
+            assertEquals(2,owner.batchCount()); assertEquals(8,owner.vertexCount());
+            assertArrayEquals(new long[]{17,18},owner.assetIds());
+            var layers = topologyType.getDeclaredField("layers"); layers.setAccessible(true);
+            assertTrue(((List<?>)layers.get(topology)).isEmpty(),"Java geometry must be released after native retention");
+            var moved = new GuiItemRenderState("moved",new Matrix3x2f().translation(3,5),
+                new TrackingItemStackRenderState(),24,48,new net.minecraft.client.gui.navigation.ScreenRectangle(1,2,100,120));
+            var next = (GuiFlatItemMeshCollector.Snapshot)instantiate.invoke(null,moved,640,360,2,430,topology,
+                new StandardItemFoilRecord(99,0.5,0.75F),cache);
+            var batch = next.batches().getFirst();
+            assertSame(owner,batch.nativeTemplate()); assertEquals(99,batch.layerFoils()[0].clockMillis());
+            assertEquals(17,first.batches().getFirst().layerFoils()[0].clockMillis());
+            assertEquals(24,batch.left()); assertEquals(48,batch.top()); assertEquals(640,batch.guiWidth());
+            assertArrayEquals(new float[]{1,0,0,1,3,5},batch.guiPose());
+            assertEquals(1,batch.clipMode()); assertEquals(100,batch.clipWidth());
+            assertTrue(batch.vertices().isEmpty()); assertTrue(batch.indices().isEmpty());
+        } finally { owner.close(); }
+    }
+
     @Test void foilPresenceTracksResolvedLayersWithoutCreatingSemanticSnapshots() {
         var state = new TrackingItemStackRenderState();
         assertFalse(state.hasFoil());

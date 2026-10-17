@@ -52,6 +52,32 @@ Closing and reopening the menu, removing and reinserting the same unchanged item
 
 ## Related pages
 
+- [Feather Falling](FeatherFalling.md): eligible Boots, fall-source damage, protection levels and acquisition
+
+- [Looting, Fire Aspect and Knockback](MeleeUtilityEnchantments.md): loot counts and equipment chances, ignition and cooked-loot conditions, push strength, supported weapons and retained broken stacks
+- [Crossbow enchantments](../items/Crossbow.md): Quick Charge, Multishot and Piercing in the existing weapon guide
+- [Trident enchantments](../items/Trident.md#enchantment-choices-and-conditions): Loyalty, Riptide, Channeling and Impaling conditions
+- [Mace enchantments](../items/Mace.md#choosing-enchantments): Density, Breach and Wind Burst choices
+- [Spear Lunge](../mechanics/Spears.md#lunge-and-other-enchantments): release movement and ordinary Spear eligibility
+- [Lure and Luck of the Sea](../mechanics/Fishing.md#waiting-weather-and-enchantments): waiting counters, fishing luck and open-water limits
+
+- [Aqua Affinity, Respiration and Thorns](UnderwaterAndThornsEnchantments.md): underwater mining, air consumption, retaliation, supported slots, acquisition and retained broken equipment
+- [Curse of Binding and Curse of Vanishing](EquipmentCurses.md): supported equipment, removal restrictions, death rules, stored books and repair limits
+
+- [Power, Punch, Flame and Infinity](BowEnchantments.md): Bow support, damage and knockback scaling, burning arrows, ammunition limits and acquisition
+
+- [Depth Strider, Frost Walker, Soul Speed and Swift Sneak](MobilityEnchantments.md): equipment choices, active movement conditions, broken gear and acquisition
+
+- [Sharpness, Smite and Bane](MeleeDamageEnchantments.md): damage bonuses, exact targets, slowing, support and exclusions
+
+- [Unbreaking and Mending](DurabilityEnchantments.md): wear chances, supported equipment, XP-repair selection, broken stacks and acquisition
+
+- [Protection enchantments](ProtectionEnchantments.md): four armor choices, damage tags, combined cap, secondary attributes and retained broken gear
+
+- [Efficiency, Fortune and Silk Touch](MiningEnchantments.md): tool eligibility, speed bonuses, loot choices and collection limits
+
+- [Experience points, levels, and Mending](../mechanics/Experience.md)
+
 - [Enchanting Table block](../blocks/EnchantingTable.md)
 - [Enchanting Table item](../items/EnchantingTable.md)
 - [Enchanted Book](../items/EnchantedBook.md)

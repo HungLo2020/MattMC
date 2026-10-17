@@ -762,8 +762,7 @@ final class DistantHorizonsFaceMaterialResolver {
 	}
 
 	private static boolean isGraphicsAudit() {
-		String value = System.getenv("MATTMC_GRAPHICS_AUDIT");
-		return "1".equals(value) || "true".equalsIgnoreCase(value);
+		return NativeRenderLaunchConfiguration.graphicsAuditEnabled();
 	}
 
 	private static Resolution unavailable() {

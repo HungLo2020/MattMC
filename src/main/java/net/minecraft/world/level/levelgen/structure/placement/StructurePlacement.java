@@ -85,12 +85,48 @@ public abstract class StructurePlacement {
 		return !(this.frequency < 1.0F) || this.frequencyReductionMethod.shouldGenerate(l, this.salt, i, j, this.frequency);
 	}
 
+	/** The exclusion zone's other set, or null. */
+	@org.jetbrains.annotations.Nullable
+	public net.minecraft.core.Holder<net.minecraft.world.level.levelgen.structure.StructureSet> nativeExclusionSet() {
+		return this.exclusionZone.map(StructurePlacement.ExclusionZone::otherSet).orElse(null);
+	}
+
 	public boolean applyInteractionsWithOtherStructures(ChunkGeneratorStructureState chunkGeneratorStructureState, int i, int j) {
 		return !this.exclusionZone.isPresent()
 			|| !((StructurePlacement.ExclusionZone)this.exclusionZone.get()).isPlacementForbidden(chunkGeneratorStructureState, i, j);
 	}
 
 	protected abstract boolean isPlacementChunk(ChunkGeneratorStructureState chunkGeneratorStructureState, int i, int j);
+
+	/**
+	 * {@code structure/placement.rs}'s words for this placement: kind (0 random spread, 1
+	 * rings, 2 Java's), frequency, reducer, salt, the exclusion zone's set index (or -1) and
+	 * chunk count, then the kind's own words ({@code rings}: the ring chunks, or null).
+	 */
+	public void nativePlacementWords(java.util.List<Integer> words, int exclusionIndex, @org.jetbrains.annotations.Nullable java.util.List<net.minecraft.world.level.ChunkPos> rings) {
+		boolean spread = this.getClass() == RandomSpreadStructurePlacement.class;
+		boolean ringed = this.getClass() == ConcentricRingsStructurePlacement.class;
+		words.add(spread ? 0 : ringed ? 1 : 2);
+		words.add(Float.floatToRawIntBits(this.frequency));
+		words.add(this.frequencyReductionMethod.ordinal());
+		words.add(this.salt);
+		words.add(this.exclusionZone.isPresent() ? exclusionIndex : -1);
+		words.add(this.exclusionZone.map(StructurePlacement.ExclusionZone::chunkCount).orElse(0));
+		if (spread) {
+			var random = (RandomSpreadStructurePlacement)this;
+			words.add(random.spacing());
+			words.add(random.separation());
+			words.add(random.spreadType() == RandomSpreadType.TRIANGULAR ? 1 : 0);
+		} else if (ringed) {
+			words.add(rings == null ? 0 : rings.size());
+			if (rings != null) {
+				for (var chunk : rings) {
+					words.add(chunk.x);
+					words.add(chunk.z);
+				}
+			}
+		}
+	}
 
 	public BlockPos getLocatePos(ChunkPos chunkPos) {
 		return new BlockPos(chunkPos.getMinBlockX(), 0, chunkPos.getMinBlockZ()).offset(this.locateOffset());

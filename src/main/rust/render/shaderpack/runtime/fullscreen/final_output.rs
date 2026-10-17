@@ -132,7 +132,7 @@ impl SourceOverlayTarget {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -164,7 +164,7 @@ impl SourceOverlayTarget {
 
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
         for handle in [self.target, self.color_view, self.color_texture] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -392,7 +392,7 @@ impl SourceFinalOutputPlan {
         ) {
             Ok(copy) => copy,
             Err(error) => {
-                let _ = gal.destroy(overlay_pass);
+                let _ = gal.retire(overlay_pass);
                 overlay.destroy(gal);
                 return Err(error);
             }
@@ -409,7 +409,7 @@ impl SourceFinalOutputPlan {
             Ok(copy) => copy,
             Err(error) => {
                 source_copy.destroy(gal);
-                let _ = gal.destroy(overlay_pass);
+                let _ = gal.retire(overlay_pass);
                 overlay.destroy(gal);
                 return Err(error);
             }
@@ -591,7 +591,7 @@ impl SourceFinalOutputPlan {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -608,7 +608,7 @@ impl SourceFinalOutputPlan {
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
         self.present_copy.destroy(gal);
         self.source_copy.destroy(gal);
-        let _ = gal.destroy(self.overlay_pass);
+        let _ = gal.retire(self.overlay_pass);
         self.overlay.destroy(gal);
     }
 }
@@ -648,7 +648,7 @@ impl SourceFinalPresentationCapture {
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
         self.copy.destroy(gal);
         for handle in [self.target, self.color_view, self.color_texture] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -764,7 +764,7 @@ impl SourceColorCopyPlan {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -813,7 +813,7 @@ impl SourceColorCopyPlan {
             self.combined_sampler,
             self.sampler,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }

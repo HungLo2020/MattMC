@@ -12,6 +12,8 @@ use crate::render::vulkanic::error::{GalError, GalResult};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum FullscreenSourceStageKind {
+    Begin { ordinal: u32 },
+    Prepare { ordinal: u32 },
     /// A source-defined world-sky initializer. Unlike deferred/composite
     /// stages, it must run after the named-color bootstrap and before opaque
     /// terrain writes so terrain can load the pack's initialized primary
@@ -54,6 +56,15 @@ pub fn derive_sky_source_stage(
     };
     if source.get(&scope_path).is_none() {
         return Ok(None);
+    }
+    // Frozen's sky directive disables both its disc and Iris's horizon;
+    // it does not disable the separately selected sun/moon writer.
+    if let Some((properties, _)) = resolved_source_properties(source, scope)? {
+        let sky = properties.lines().filter_map(|line| {
+            let (key, value) = line.trim().split_once('=')?;
+            (key.trim() == "sky").then_some(value.trim())
+        }).last();
+        if matches!(sky, Some("false" | "0")) { return Ok(None); }
     }
     let source_stages = terrain_source_stages(&scope_path)?;
     if source.get(&source_stages.vertex.path).is_none() {
@@ -107,12 +118,44 @@ pub fn derive_fullscreen_source_chain(
     source: &ShaderPackSource,
     scope: TerrainProgramScope,
 ) -> GalResult<Vec<FullscreenSourceStage>> {
+    let stages = derive_scoped_fullscreen_stages(source, scope, false)?;
+    if stages.is_empty() {
+        return Err(GalError::unsupported_feature(format!(
+            "selected shader-pack scope {scope:?} has no post-terrain fullscreen source stages",
+        )));
+    }
+    if !matches!(
+        stages.last().map(|stage| stage.kind),
+        Some(FullscreenSourceStageKind::Final)
+    ) {
+        return Err(GalError::unsupported_feature(format!(
+            "selected shader-pack scope {scope:?} has no final fullscreen source stage",
+        )));
+    }
+    Ok(stages)
+}
+
+/// Optional ordered begin/prepare writers. An absent chain is valid; an
+/// enabled declaration must have its vertex pair and later lower completely.
+pub fn derive_pre_terrain_fullscreen_source_chain(
+    source: &ShaderPackSource,
+    scope: TerrainProgramScope,
+) -> GalResult<Vec<FullscreenSourceStage>> {
+    derive_scoped_fullscreen_stages(source, scope, true)
+}
+
+fn derive_scoped_fullscreen_stages(
+    source: &ShaderPackSource,
+    scope: TerrainProgramScope,
+    pre_terrain: bool,
+) -> GalResult<Vec<FullscreenSourceStage>> {
     let program_gates = source_program_gates(source, scope)?;
     let mut stages = source
         .files()
         .into_iter()
         .filter_map(|file| {
             let kind = fullscreen_stage_kind(&file.path)?;
+            if matches!(kind, FullscreenSourceStageKind::Begin { .. } | FullscreenSourceStageKind::Prepare { .. }) != pre_terrain { return None; }
             belongs_to_scope(&file.path, scope).then_some((file.path, kind))
         })
         .map(
@@ -146,19 +189,6 @@ pub fn derive_fullscreen_source_chain(
         .flatten()
         .collect::<Vec<_>>();
     stages.sort_by_key(|stage| stage.kind);
-    if stages.is_empty() {
-        return Err(GalError::unsupported_feature(format!(
-            "selected shader-pack scope {scope:?} has no post-terrain fullscreen source stages",
-        )));
-    }
-    if !matches!(
-        stages.last().map(|stage| stage.kind),
-        Some(FullscreenSourceStageKind::Final)
-    ) {
-        return Err(GalError::unsupported_feature(format!(
-            "selected shader-pack scope {scope:?} has no final fullscreen source stage",
-        )));
-    }
     Ok(stages)
 }
 
@@ -441,6 +471,15 @@ fn macro_gate_value(name: &str, value: &str) -> GalResult<bool> {
 
 fn fullscreen_stage_kind(path: &str) -> Option<FullscreenSourceStageKind> {
     let name = path.rsplit('/').next()?.strip_suffix(".fsh")?;
+    for (prefix, begin) in [("begin", true), ("prepare", false)] {
+        if let Some(suffix) = name.strip_prefix(prefix) {
+            return parse_ordinal(suffix).map(|ordinal| if begin {
+                FullscreenSourceStageKind::Begin { ordinal }
+            } else {
+                FullscreenSourceStageKind::Prepare { ordinal }
+            });
+        }
+    }
     if name == "final" {
         return Some(FullscreenSourceStageKind::Final);
     }
@@ -580,6 +619,23 @@ mod tests {
         .unwrap();
 
         assert!(derive_fullscreen_source_chain(&source, TerrainProgramScope::Overworld).is_err());
+    }
+
+    #[test]
+    fn sky_directive_disables_disc_and_horizon_without_disabling_celestial() {
+        for (properties, enabled) in [("sky=false", false), ("sky=0", false),
+            ("sky=true", true), ("sky=1", true), ("#if 0\nsky=false\n#endif", true),
+            ("sky=false\nsky=invalid", true)] {
+            let mut files = vec![ShaderSourceFile::new("shaders.properties", properties)];
+            for name in ["gbuffers_skybasic", "gbuffers_skytextured"] {
+                for extension in ["vsh", "fsh"] {
+                    files.push(ShaderSourceFile::new(format!("world0/{name}.{extension}"), "void main() {}"));
+                }
+            }
+            let source = ShaderPackSource::new("sky-gates", 1, files).unwrap();
+            assert_eq!(enabled, derive_sky_source_stage(&source, TerrainProgramScope::Overworld).unwrap().is_some());
+            assert!(derive_sky_textured_source_stage(&source, TerrainProgramScope::Overworld).unwrap().is_some());
+        }
     }
 
     #[test]

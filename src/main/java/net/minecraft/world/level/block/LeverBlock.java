@@ -46,7 +46,9 @@ public class LeverBlock extends FaceAttachedHorizontalDirectionalBlock {
 
 	public LeverBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(FACE, AttachFace.WALL));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(FACE, AttachFace.WALL));
+		}
 		this.shapes = this.makeShapes();
 	}
 

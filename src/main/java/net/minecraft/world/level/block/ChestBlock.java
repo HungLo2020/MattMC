@@ -134,7 +134,9 @@ public class ChestBlock extends AbstractChestBlock<ChestBlockEntity> implements 
 		super(properties, supplier);
 		this.openSound = soundEvent;
 		this.closeSound = soundEvent2;
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(TYPE, ChestType.SINGLE).setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(TYPE, ChestType.SINGLE).setValue(WATERLOGGED, false));
+		}
 	}
 
 	public static DoubleBlockCombiner.BlockType getBlockType(BlockState blockState) {

@@ -44,7 +44,9 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
 
     public BlockSkunkSpray(BlockBehaviour.Properties properties) {
         super(properties);
-        this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, Boolean.valueOf(false)).setValue(AGE, 0));
+        if (!this.hasNativeStateDefinition()) {
+	        this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, Boolean.valueOf(false)).setValue(AGE, 0));
+        }
     }
 
     @Override

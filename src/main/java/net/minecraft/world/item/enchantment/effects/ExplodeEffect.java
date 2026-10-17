@@ -39,23 +39,9 @@ public record ExplodeEffect(
 	WeightedList<ExplosionParticleInfo> blockParticles,
 	Holder<SoundEvent> sound
 ) implements EnchantmentEntityEffect {
-	public static final MapCodec<ExplodeEffect> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				Codec.BOOL.optionalFieldOf("attribute_to_user", false).forGetter(ExplodeEffect::attributeToUser),
-				DamageType.CODEC.optionalFieldOf("damage_type").forGetter(ExplodeEffect::damageType),
-				LevelBasedValue.CODEC.optionalFieldOf("knockback_multiplier").forGetter(ExplodeEffect::knockbackMultiplier),
-				RegistryCodecs.homogeneousList(Registries.BLOCK).optionalFieldOf("immune_blocks").forGetter(ExplodeEffect::immuneBlocks),
-				Vec3.CODEC.optionalFieldOf("offset", Vec3.ZERO).forGetter(ExplodeEffect::offset),
-				LevelBasedValue.CODEC.fieldOf("radius").forGetter(ExplodeEffect::radius),
-				Codec.BOOL.optionalFieldOf("create_fire", false).forGetter(ExplodeEffect::createFire),
-				Level.ExplosionInteraction.CODEC.fieldOf("block_interaction").forGetter(ExplodeEffect::blockInteraction),
-				ParticleTypes.CODEC.fieldOf("small_particle").forGetter(ExplodeEffect::smallParticle),
-				ParticleTypes.CODEC.fieldOf("large_particle").forGetter(ExplodeEffect::largeParticle),
-				WeightedList.codec(ExplosionParticleInfo.CODEC).optionalFieldOf("block_particles", WeightedList.of()).forGetter(ExplodeEffect::blockParticles),
-				SoundEvent.CODEC.fieldOf("sound").forGetter(ExplodeEffect::sound)
-			)
-			.apply(instance, ExplodeEffect::new)
-	);
+	/** The native codec's `explode` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<ExplodeEffect> CODEC = (MapCodec<ExplodeEffect>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:explode");
 
 	@Override
 	public void apply(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3) {

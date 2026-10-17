@@ -15,6 +15,76 @@ import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 public final class RandomState {
     private volatile Boolean aquiferBatchSafe;
+    // The shared native preliminary surface program: unset, a program, or UNSUPPORTED.
+    private static final Object UNSUPPORTED = new Object();
+    private volatile Object nativeSurfaceLevel, nativeFluidSources, nativeBiomeFill;
+    // The per-seed chunk noise programs, for the settings they were compiled with.
+    private volatile Object nativeChunkNoise;
+    private volatile NoiseGeneratorSettings nativeChunkNoiseSettings;
+    @org.jetbrains.annotations.Nullable
+    NativeChunkNoise nativeChunkNoise(NoiseGeneratorSettings settings) {
+        if (!NativeChunkNoise.enabled()) return null;
+        Object result = nativeChunkNoise;
+        if (result == null) {
+            synchronized (this) {
+                result = nativeChunkNoise;
+                if (result == null) {
+                    NativeChunkNoise compiled = NativeChunkNoise.compile(this, settings, this.cellPrograms);
+                    nativeChunkNoiseSettings = settings;
+                    nativeChunkNoise = result = compiled == null ? UNSUPPORTED : compiled;
+                }
+            }
+        }
+        // Ore veins and aquifers come from the settings; other settings keep Java.
+        return result == UNSUPPORTED || nativeChunkNoiseSettings != settings ? null : (NativeChunkNoise)result;
+    }
+    // The shared native aquifer noise source program, or null to keep Java's sources.
+    @org.jetbrains.annotations.Nullable
+    NativeFluidSources nativeFluidSources() {
+        if (!NativeFluidSources.enabled()) return null;
+        Object result = nativeFluidSources;
+        if (result == null) {
+            synchronized (this) {
+                result = nativeFluidSources;
+                if (result == null) {
+                    NativeFluidSources compiled = NativeFluidSources.compile(this.router);
+                    nativeFluidSources = result = compiled == null ? UNSUPPORTED : compiled;
+                }
+            }
+        }
+        return result == UNSUPPORTED ? null : (NativeFluidSources)result;
+    }
+    // The shared native climate program for chunk biome fills, or null to keep Java's fill.
+    @org.jetbrains.annotations.Nullable
+    NativeBiomeFill nativeBiomeFill() {
+        if (!NativeBiomeFill.enabled()) return null;
+        Object result = nativeBiomeFill;
+        if (result == null) {
+            synchronized (this) {
+                result = nativeBiomeFill;
+                if (result == null) {
+                    NativeBiomeFill compiled = NativeBiomeFill.compile(this.router);
+                    nativeBiomeFill = result = compiled == null ? UNSUPPORTED : compiled;
+                }
+            }
+        }
+        return result == UNSUPPORTED ? null : (NativeBiomeFill)result;
+    }
+    @org.jetbrains.annotations.Nullable
+    NativeSurfaceLevel nativeSurfaceLevel() {
+        if (!NativeSurfaceLevel.enabled()) return null;
+        Object result = nativeSurfaceLevel;
+        if (result == null) {
+            synchronized (this) {
+                result = nativeSurfaceLevel;
+                if (result == null) {
+                    NativeSurfaceLevel compiled = NativeSurfaceLevel.compile(this.router.preliminarySurfaceLevel());
+                    nativeSurfaceLevel = result = compiled == null ? UNSUPPORTED : compiled;
+                }
+            }
+        }
+        return result == UNSUPPORTED ? null : (NativeSurfaceLevel)result;
+    }
     boolean aquiferBatchSafe() {
         Boolean result=aquiferBatchSafe;
         if(result==null)aquiferBatchSafe=result=NativeAquiferSources.safe(router);

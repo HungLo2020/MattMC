@@ -333,6 +333,13 @@ public interface OrderedSubmitNodeCollector {
 		return submitTexturedQuad(poseStack, renderType, textureIdentity, vertices, uvs, color, lightCoords);
 	}
 
+	/** Copied map image or decoration, with text-material policy owned by Rust. */
+	default boolean submitMapTexturedQuadSemantic(
+		PoseStack poseStack, ResourceLocation textureIdentity, float[] vertices, float[] uvs, int color, int lightCoords
+	) {
+		return false;
+	}
+
 	/** Explicit semantic translucent textured billboard quad. */
 	default boolean submitTranslucentTexturedQuad(
 		PoseStack poseStack, RenderType renderType, ResourceLocation textureIdentity,

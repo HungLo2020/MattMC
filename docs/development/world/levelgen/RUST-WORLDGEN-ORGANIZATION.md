@@ -2,15 +2,17 @@
 
 ## Ownership
 
-World generation lives under `src/main/rust/world/level/levelgen/`. Noise
-synthesis (`synth`), density evaluation (`density`), aquifer evaluation (`aquifer`),
-surface evaluation (`surface`), and feature geometry (`feature`) are separate domains. Biome corner selection and
-[climate lookup](../biome/RUST-CLIMATE.md) live under `world/level/biome/`.
-Surface evaluation consumes biome corner selection's column results.
+World generation lives under `src/main/rust/world/level/levelgen/`, with
+separate evaluator and stage domains. Biome corner selection and
+[climate lookup](../biome/RUST-CLIMATE.md) live under `world/level/biome/`;
+the [biome-fill stage](../biome/RUST-BIOME-FILL.md) lives in `levelgen/biome_fill/`.
 
-The original organization change was a structural refactor. Seed construction, Java graph/cache ownership,
-native state layouts, exported symbol names, array bounds, and callback/write
-order are preserved. The native library is still one Cargo `cdylib`.
+The original organization change was a structural refactor that preserved
+then-current seed construction, Java graph/cache ownership, native state
+layouts, exported symbols, array bounds and callback/write order. Later
+migrations changed the ownership described below. The original refactor
+measurements remain historical evidence, not verification of those changes.
+The native library is still one Cargo `cdylib`.
 
 ```text
 world/level/
@@ -21,9 +23,18 @@ world/level/
     ├── math.rs
     ├── synth/       # Noise families, their optimized kernels, state and FFI
     ├── density/     # Programs, evaluation, cell kernels, End islands and FFI
-    ├── feature/     # Ore sphere construction, pruning, rasterization and FFI
-    ├── aquifer/     # Center search, material/fluid decisions, cell batches and FFI
-    └── surface/     # Rule program, resumable frame, evaluation and FFI
+    ├── feature/     # Ore/geode geometry and FFI
+    ├── decoration/  # Native placed features: placement, ore, region binding
+    ├── router/      # Slice/template and point programs, preliminary levels
+    ├── noise_fill/  # Cell traversal, block fill and generated sections
+    ├── biome_fill/  # Climate sampling, search order and biome-container replay
+    ├── aquifer/     # Centers, materials, fluid sources and carver substance
+    ├── surface/     # Rule evaluation and column processing over chunk storage
+    ├── proto_chunk/ # Shared SURFACE/CARVERS sections, counters and heightmaps
+    ├── carver/      # Eligible carving stage and Java-route canyon geometry
+    ├── blending/   # Old-terrain height grids
+    ├── heightmap/   # Packed chunk-column reconstruction
+    └── random.rs   # Native positional and carver random draws
 ```
 
 ### Synthesis
@@ -73,8 +84,43 @@ the noise module for generic interpolation.
 the existing 24-word resumable frame slots. `evaluator.rs` retains the fused
 column scan and rule loop, including its yields before external requests.
 `ffi.rs` owns the existing surface exports, including the compatibility adapter
-for biome column selection. Java still owns ordered block commits and external
-conditions/rules.
+for biome column selection. On eligible chunks, `chunk.rs` evaluates columns
+and commits blocks over [shared native chunk storage](RUST-SURFACE-STORAGE.md);
+Rust also answers eligible gradient/noise/minimum-level requests there. Eligible storage also uses the native [column pass](RUST-SURFACE-STORAGE.md#column-pass)
+and badlands/frozen-ocean extensions. Compatibility paths retain Java traversal,
+shared temperature caller bindings and custom callbacks as described in the
+[surface guide](RUST-SURFACE.md). Batched rule
+programs are cached per surface system; extension/continuation programs remain
+per context. Compatibility paths retain Java block commits while using the
+native rule evaluator.
+
+### Native stage integration
+
+The [noise router](RUST-NOISE-ROUTER.md) supplies interpolation slices and
+shared point programs for [preliminary levels](RUST-PRELIMINARY-SURFACE.md) and
+[aquifer fluid sources](RUST-AQUIFER.md#native-fluid-sources).
+[Chunk-noise templates](RUST-CHUNK-NOISE.md) are compiled once per `RandomState`
+and instantiated per eligible chunk. [NOISE fill](RUST-NOISE-FILL.md) keeps
+slices and cell traversal in Rust on that route. Rust prepares aquifer materials
+itself for aquifers on the native route and yields other aquifers' requests
+to Java before continuing.
+
+[Biome fill](../biome/RUST-BIOME-FILL.md) combines climate sampling, ordered
+search and container replay; Java installs the containers and previous leaf.
+[Carving](carver/RUST-CARVERS.md) owns eligible cave/Nether-cave/canyon loops
+over `proto_chunk/` storage, with Java neighbour/configuration preparation and
+a top-material upcall. Java retains registry/chunk facades and genuine VM lifecycle effects.
+[Retained chunk generation](../chunk-loading/RUST-CHUNK-GENERATION.md) owns
+request/holder/task progression, stage admission/completion and native invocation,
+pending-consumer and callback binding leases. This is an intermediate connected
+checkpoint, not completion of world generation: Java compatibility algorithms,
+other composite noise construction, random-source state and other documented generation
+dependencies remain. The [leaf noise constructors](RUST-NOISE.md) now produce
+and store permutations in Rust while preserving actual VM RNG effects. The
+subsequent [Perlin graph/factory](RUST-PERLIN.md) and metadata readers also run in Rust, with
+genuine VM list/RNG effects and public octave facade identity projections. The [shared biome weather policy](../biome/RUST-WEATHER.md)
+now owns precipitation, freezing and snow decisions with an embedded temperature child. The [shared biome temperature/cache](../biome/RUST-TEMPERATURE.md)
+now lives in Rust behind the existing public callers. Each guide defines its actual ownership and gates.
 
 ### Heightmaps
 
@@ -84,9 +130,10 @@ compatibility paths and complete-caller verification.
 
 ### Feature geometry
 
-`feature/ore/` owns ore spheres and ordered spans. Java retains random sources,
-block rules and writes. See [ore geometry](feature/RUST-ORE.md) for compatibility
-constraints and focused verification.
+`feature/ore/` owns ore spheres and ordered spans. On the Java route, Java keeps
+random sources, block rules and writes; see [ore geometry](feature/RUST-ORE.md).
+[Native decoration](feature/RUST-DECORATION.md) in `decoration/` runs whole ore
+placed features, including their modifiers, draws, rules and section writes.
 
 ### Java integration
 
@@ -98,6 +145,45 @@ existing state object and identity, with no new per-call allocation. Changed
 amplitudes still publish a new snapshot; the old snapshot remains immutable.
 
 ## Verification
+
+Use each current stage guide's driver and its stated limits for parity and
+timing. In particular, the [cell-traversal timing route](RUST-NOISE-FILL.md#cell-traversal-verification)
+has a source-identified route-assertion problem, and current
+[preliminary-level timing](RUST-PRELIMINARY-SURFACE.md#verify-and-measure)
+also changes template and fluid-source eligibility. The
+[climate oracle's Java hooks](../biome/RUST-CLIMATE.md#verify-a-change) do not
+observe the native BIOMES fill's internal sampling or searches.
+The seven drivers added with [the native-stage migration](https://github.com/HungLo2020/MattMC/commit/365de0289bfb03fa828889de1bcab315b7a19c6c)
+shared an exact rewrite audit against `da1109de6` at the reviewed `54611cfc`
+snapshot: 41 existing production files and 144 rewrites. Those counts describe
+that historical review; they are not current-driver audit totals. The [2026-10-06 source review](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6010282862)
+matched that reconstruction to
+[`54611cfc`](https://github.com/HungLo2020/MattMC/commit/54611cfc25dbdf60ae4b11dc17557d2bec77469d).
+The drivers hash their selected additional bridge/native/test files and the
+built library; those hashes do not reconstruct a Java oracle or cover every
+new source file. The rewrite audit checks the recorded edit boundary, not
+runtime parity.
+
+The [later 2026-10-06 review for #775](https://github.com/HungLo2020/MattMC/issues/775#issuecomment-6025163587)
+checked `5c02fd82` and the two new drivers, `VerifyRustFillAquifer.py` and
+`VerifyRustSurfaceConditions.py`. Each reconstructs the same 14 production
+files from 71 exact rewrites against `54611cfc`; both declarations cover one
+shared production file set. That bounded check did not complete a current
+audit of the broader older-driver set.
+
+The review did not run Java/Rust suites, mutation tests, benchmarks or live
+worlds, or verify the unbundled measurement artifacts. Author-recorded stage
+results do not establish current FULL-chunk, custom/blended/retrogen,
+failure/cancellation, concurrency or native-memory acceptance. The BIOMES and
+CARVERS fixtures use selected multi-noise presets across noise settings, not
+every dimension's actual generator. Earlier native helpers remain in the
+Java comparison routes; those routes are not a wholly Java worldgen baseline.
+
+The new drivers use Linux affinity and library paths. Choose available,
+distinct CPU IDs for `--cpu` and at least two `--background-cpus`, even with
+`--parity-only`. Their process-wide CPU mask does not prove separate
+measured-thread and worker affinity; calling-thread CPU counters omit
+background fill work. Use the recorded elapsed time for workload comparisons.
 
 Focused Rust tests can run without compiling renderer/audio dependencies:
 

@@ -51,7 +51,10 @@ final class GuiAtlasReferencePublication {
             for (var layer : quad.itemRasterLayers()) retainIfPresent(active, layer.assetId());
         }
         for (GuiTiledQuadRecord quad : tiled) retainIfPresent(active, quad.assetId());
-        for (GuiMeshBatchRecord mesh : meshes) retainIfPresent(active, mesh.assetId());
+        for (GuiMeshBatchRecord mesh : meshes) {
+            if (mesh.nativeTemplate() == null) retainIfPresent(active, mesh.assetId());
+            else mesh.nativeTemplate().forEachAssetId(id -> retainIfPresent(active, id));
+        }
         retainOnly(active);
     }
 

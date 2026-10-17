@@ -1,5 +1,6 @@
 package net.minecraft.world.level.chunk;
 
+import org.junit.jupiter.api.Tag;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.*;
@@ -13,6 +14,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+@Tag("parity")
 class NativePaletteResizeTest {
     @BeforeAll static void bootstrap() { NativePalettePackingTest.bootstrap(); }
 
@@ -233,7 +235,7 @@ class NativePaletteResizeTest {
         assertFalse(NativePaletteResize.copy(owner, wide, fresh(owner, 9)));
     }
 
-    @Test void independentThreadsAndGcRetainNoPaletteValues() throws Exception {
+    @Tag("slow") @Test void independentThreadsAndGcRetainNoPaletteValues() throws Exception {
         var pool = Executors.newFixedThreadPool(4);
         try {
             var tasks = new ArrayList<Callable<Void>>();

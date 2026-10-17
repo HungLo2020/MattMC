@@ -152,7 +152,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.resources
@@ -379,7 +379,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.crack_resources
@@ -671,7 +671,7 @@ impl WorldPrimitiveFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.border_resources
@@ -744,7 +744,7 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.crack_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }
@@ -753,7 +753,7 @@ impl WorldPrimitiveFrontend {
         let resources = std::mem::take(&mut self.border_resources);
         for (_, resources) in resources {
             for handle in resources.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
     }

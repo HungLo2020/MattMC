@@ -148,24 +148,68 @@ public final class RustShaderPackSourceCollector {
 	 * produce a complete immutable snapshot.
 	 */
 	public static Optional<String> activeConfiguredPackName() {
+		Optional<String> postEffect = activeVanillaPostEffectId();
+		DiskState disk = diskState();
+		if (disk.error() || (!disk.shadersEnabled() && postEffect.isEmpty())) {
+			return Optional.empty();
+		}
+		if (disk.configuredPack().isEmpty()) {
+			return postEffect;
+		}
+		if (!disk.packPresent()) {
+			return Optional.empty();
+		}
+		return Optional.of(sourceGenerationKey(disk.configuredPack().get(), postEffect));
+	}
+
+	/** The Iris configuration as read from disk: enabled flag, configured pack and its presence. */
+	private record DiskState(boolean error, boolean shadersEnabled, Optional<String> configuredPack, boolean packPresent) {}
+
+	private record DiskStateMemo(long epoch, long checkedNanos, DiskState state) {}
+
+	private static final long DISK_STATE_RECHECK_NANOS = 250_000_000L;
+	private static volatile long frameEpoch;
+	private static volatile DiskStateMemo diskStateMemo;
+
+	/** Starts a render frame; configuration reads within it share one disk check. */
+	public static void beginFrameEpoch() {
+		frameEpoch++;
+	}
+
+	/**
+	 * Render frames reuse one disk check for up to 250 ms; in-process settings
+	 * writes invalidate it at once (Iris itself rereads the file only on startup
+	 * or its own settings changes). Epoch 0 (no frame begun, e.g. tests) always
+	 * rechecks. The vanilla post effect is never cached.
+	 */
+	private static DiskState diskState() {
+		long epoch = frameEpoch;
+		DiskStateMemo memo = diskStateMemo;
+		long now = System.nanoTime();
+		if (epoch != 0L && memo != null
+				&& (memo.epoch() == epoch || now - memo.checkedNanos() < DISK_STATE_RECHECK_NANOS)) {
+			return memo.state();
+		}
+		DiskState state = readDiskState();
+		if (epoch != 0L) {
+			diskStateMemo = new DiskStateMemo(epoch, now, state);
+		}
+		return state;
+	}
+
+	private static DiskState readDiskState() {
 		try {
-			Optional<String> postEffect = activeVanillaPostEffectId();
-			if (!wholeFrameShaderConfigEnabled() && postEffect.isEmpty()) {
-				return Optional.empty();
-			}
+			boolean enabled = wholeFrameShaderConfigEnabled();
 			Optional<String> configured = configuredPackNameFromDisk();
 			if (configured.isEmpty()) {
-				return postEffect;
+				return new DiskState(false, enabled, configured, false);
 			}
 			Path shaderpacks = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
 				.resolve("shaderpacks").toAbsolutePath().normalize();
 			Path pack = shaderpacks.resolve(configured.get()).normalize();
-			if (!pack.startsWith(shaderpacks) || !Files.exists(pack)) {
-				return Optional.empty();
-			}
-			return Optional.of(sourceGenerationKey(configured.get(), activeVanillaPostEffectId()));
+			return new DiskState(false, enabled, configured, pack.startsWith(shaderpacks) && Files.exists(pack));
 		} catch (IOException error) {
-			return Optional.empty();
+			return new DiskState(true, false, Optional.empty(), false);
 		}
 	}
 
@@ -408,14 +452,49 @@ public final class RustShaderPackSourceCollector {
 	private static boolean wholeFrameShaderConfigEnabled() throws IOException {
 		Path config = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
 			.resolve("config").resolve("iris.properties");
-		if (!Files.isRegularFile(config)) {
-			return true;
+		Properties values = irisProperties(config);
+		return values == null || !"false".equals(values.getProperty("enableShaders"));
+	}
+
+	private record IrisPropertiesSnapshot(Path path, java.nio.file.attribute.FileTime modified, long size,
+			Properties values) {
+	}
+
+	private static volatile IrisPropertiesSnapshot irisPropertiesSnapshot;
+
+	/** Called after an in-process settings write. */
+	public static void invalidateIrisProperties() {
+		irisPropertiesSnapshot = null;
+		diskStateMemo = null;
+	}
+
+	/**
+	 * The frame coordinator asks for the active pack every frame. Reparse the
+	 * Iris settings only when the file's identity changes, so a frame costs one
+	 * stat instead of opening and parsing the file. Returns null when absent.
+	 */
+	private static Properties irisProperties(Path config) throws IOException {
+		java.nio.file.attribute.BasicFileAttributes attributes;
+		try {
+			attributes = Files.readAttributes(config, java.nio.file.attribute.BasicFileAttributes.class);
+		} catch (java.nio.file.NoSuchFileException missing) {
+			return null;
+		}
+		if (!attributes.isRegularFile()) {
+			return null;
+		}
+		IrisPropertiesSnapshot cached = irisPropertiesSnapshot;
+		if (cached != null && cached.path().equals(config) && cached.size() == attributes.size()
+				&& cached.modified().equals(attributes.lastModifiedTime())) {
+			return cached.values();
 		}
 		Properties values = new Properties();
 		try (var input = Files.newInputStream(config)) {
 			values.load(input);
 		}
-		return !"false".equals(values.getProperty("enableShaders"));
+		irisPropertiesSnapshot = new IrisPropertiesSnapshot(config, attributes.lastModifiedTime(),
+			attributes.size(), values);
+		return values;
 	}
 
 	private static Optional<String> configuredPackNameFromDisk() throws IOException {
@@ -539,12 +618,9 @@ public final class RustShaderPackSourceCollector {
 	}
 
 	static Optional<String> configuredPackNameFromProperties(Path config) throws IOException {
-		if (!Files.isRegularFile(config)) {
+		Properties values = irisProperties(config);
+		if (values == null) {
 			return Optional.empty();
-		}
-		Properties values = new Properties();
-		try (var input = Files.newInputStream(config)) {
-			values.load(input);
 		}
 		// Iris retains the last selected filename when shaders are switched off.
 		// That preference is not an active source pack: a vanilla post effect

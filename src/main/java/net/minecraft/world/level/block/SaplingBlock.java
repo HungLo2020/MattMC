@@ -34,7 +34,9 @@ public class SaplingBlock extends VegetationBlock implements BonemealableBlock {
 	public SaplingBlock(TreeGrower treeGrower, BlockBehaviour.Properties properties) {
 		super(properties);
 		this.treeGrower = treeGrower;
-		this.registerDefaultState(this.stateDefinition.any().setValue(STAGE, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(STAGE, 0));
+		}
 	}
 
 	@Override

@@ -8,6 +8,7 @@ import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -36,14 +37,26 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 public class SpawnEggItem extends Item {
-	private static final Map<EntityType<?>, SpawnEggItem> BY_ID = Maps.<EntityType<?>, SpawnEggItem>newIdentityHashMap();
+	/** Eggs by the entity type their default components spawn; built once default components are bound. */
+	private static final class Index {
+		static final Map<EntityType<?>, SpawnEggItem> BY_ID = build();
+
+		private static Map<EntityType<?>, SpawnEggItem> build() {
+			Map<EntityType<?>, SpawnEggItem> map = Maps.<EntityType<?>, SpawnEggItem>newIdentityHashMap();
+			for (Item item : BuiltInRegistries.ITEM) {
+				if (item instanceof SpawnEggItem egg) {
+					TypedEntityData<EntityType<?>> typedEntityData = egg.components().get(DataComponents.ENTITY_DATA);
+					if (typedEntityData != null) {
+						map.put(typedEntityData.type(), egg);
+					}
+				}
+			}
+			return map;
+		}
+	}
 
 	public SpawnEggItem(Item.Properties properties) {
 		super(properties);
-		TypedEntityData<EntityType<?>> typedEntityData = this.components().get(DataComponents.ENTITY_DATA);
-		if (typedEntityData != null) {
-			BY_ID.put(typedEntityData.type(), this);
-		}
 	}
 
 	@Override
@@ -133,11 +146,12 @@ public class SpawnEggItem extends Item {
 
 	@Nullable
 	public static SpawnEggItem byId(@Nullable EntityType<?> entityType) {
-		return (SpawnEggItem)BY_ID.get(entityType);
+		return (SpawnEggItem)Index.BY_ID.get(entityType);
 	}
 
+	/** Every spawn egg item; available during bootstrap, before default components are bound. */
 	public static Iterable<SpawnEggItem> eggs() {
-		return Iterables.unmodifiableIterable(BY_ID.values());
+		return Iterables.unmodifiableIterable(Iterables.filter(BuiltInRegistries.ITEM, SpawnEggItem.class));
 	}
 
 	@Nullable

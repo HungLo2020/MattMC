@@ -32,6 +32,8 @@ Arrows generated without consuming ammunition are marked intangible for pickup a
 
 Other bundled Bow enchantments include **Power** for arrow damage, **Punch** for knockback, and **Flame** for burning projectiles. Use the [Enchanting guide](../enchanting/Enchanting.md) and Anvil rules for obtaining and combining compatible enchantments; a listed enchantment is not a promise that every enchantment can coexist. [Power][power] · [Punch][punch] · [Flame][flame]
 
+For ordinary levels, the Infinity/Mending choice, exact effect limits and verified acquisition routes, use [Power, Punch, Flame and Infinity](../enchanting/BowEnchantments.md).
+
 ## Broken bows and repair
 
 MattMC keeps a fully damaged Bow as a broken item stack. Normal use, release, and projectile firing check that state and refuse further shots. Keeping a bow in inventory does not mean it remains functional after its durability reaches zero. [Broken-use guard][stack] · [Release guard][bow] · [Firing guard][weapon]

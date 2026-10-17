@@ -10,7 +10,7 @@ Craft one from five Iron Ingots and one ordinary Chest: ingots in the upper corn
 
 Place its outlet toward the destination container; it can point down or sideways. The placed Hopper pulls from above and pushes toward the outlet. Redstone power stops its own automatic transfers, but does not prevent every outside access to its inventory.
 
-See the [Hopper block guide](../blocks/Hopper.md) for timing, loose-item pickup, locking, inventory handling, and Furnace connections. Its five inventory slots are not carried inside the ordinary dropped block item.
+See the [Hopper block guide](../blocks/Hopper.md) for timing, loose-item pickup, locking, inventory handling, and Furnace connections. Its [item-filtering guide](../blocks/Hopper.md#item-filtering) explains reserved slots, matching item data and Comparator thresholds. Its five inventory slots are not carried inside the ordinary dropped block item.
 
 ## Related pages
 

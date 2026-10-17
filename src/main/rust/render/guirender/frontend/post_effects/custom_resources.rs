@@ -244,7 +244,7 @@ impl GuiFrontend {
         if pass_index == 0 {
             for previous in std::mem::take(&mut self.custom_post_effect_resources) {
                 for handle in previous.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
             self.custom_post_effect_snapshot_initialized.clear();
@@ -260,7 +260,7 @@ impl GuiFrontend {
                 .collect::<Vec<_>>();
             for previous in stale_resources {
                 for handle in previous.handles_in_destroy_order() {
-                    let _ = gal.destroy(handle);
+                    let _ = gal.retire(handle);
                 }
             }
             self.custom_post_effect_snapshot_initialized
@@ -617,7 +617,7 @@ impl GuiFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.custom_post_effect_resources.push(result?);
@@ -663,7 +663,7 @@ impl GuiFrontend {
         }
         if let Some(previous) = self.custom_post_effect_intermediates.remove(target_name) {
             for handle in previous.handles_in_destroy_order() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let label =
@@ -730,7 +730,7 @@ impl GuiFrontend {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         let intermediate = result?;

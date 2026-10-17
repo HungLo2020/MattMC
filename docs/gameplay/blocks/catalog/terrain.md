@@ -2,15 +2,15 @@
 
 Dirt and spreading soils, falling terrain, snow and ice, water and lava.
 
-This catalog contains **29 registered forms**. Names and IDs identify blocks; the links in the last column lead to related placed-block guides where available. Read each guide’s scope and limitations before applying it to a variant.
+This catalog contains **29 registered forms**. Names and IDs identify blocks; the last column links related placed-block guides where available. Read each guide’s scope before applying it to a variant.
 
-Names use English localization where available. A † marks a readable registry-name label where no separate English entry exists; the exact ID is authoritative.
+Names use English localization where available. A † marks a readable registry-name label without a separate English entry; the exact ID is authoritative.
 
 [All block categories](index.md) · [Blocks and practical guides](../Blocks.md)
 
 | Block | Registry ID / source | Related placed-block guide |
 | --- | --- | --- |
-| Bedrock | [`minecraft:bedrock`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L276) | Article needed |
+| Bedrock | [`minecraft:bedrock`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L276) | [Bedrock](../Bedrock.md) |
 | Blue Ice | [`minecraft:blue_ice`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L5175) | [Ice, Packed Ice, Blue Ice and Frosted Ice](../Ice.md#registered-ice-blocks) |
 | Clay | [`minecraft:clay`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1962) | [Clay and Bricks](../ClayAndBricks.md) |
 | Coarse Dirt | [`minecraft:coarse_dirt`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L131) | [Soil, Sand, and Gravel](../SoilSandAndGravel.md#coarse-dirt-recipe) |
@@ -22,11 +22,11 @@ Names use English localization where available. A † marks a readable registry-
 | Gravel | [`minecraft:gravel`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L333) | [Soil, Sand, and Gravel](../SoilSandAndGravel.md#gravel-and-flint) |
 | Ice | [`minecraft:ice`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L1930) | [Ice, Packed Ice, Blue Ice and Frosted Ice](../Ice.md#ordinary-ice-melting-and-breaking) |
 | Lava | [`minecraft:lava`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L298) | [Water and Lava](../WaterAndLava.md) |
-| Mud | [`minecraft:mud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6652) | Article needed |
+| Mud | [`minecraft:mud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6652) | [Mud, Packed Mud and Mud Bricks](../MudAndMudBricks.md#mud) |
 | Muddy Mangrove Roots | [`minecraft:muddy_mangrove_roots`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L417) | [Tree logs and roots](../TreeLogsAndRoots.md#muddy-mangrove-roots) |
 | Mycelium | [`minecraft:mycelium`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2440) | [Soil, Sand, and Gravel](../SoilSandAndGravel.md#grass-block-and-mycelium) |
 | Packed Ice | [`minecraft:packed_ice`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L3282) | [Ice, Packed Ice, Blue Ice and Frosted Ice](../Ice.md#registered-ice-blocks) |
-| Packed Mud | [`minecraft:packed_mud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2264) | Article needed |
+| Packed Mud | [`minecraft:packed_mud`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L2264) | [Mud, Packed Mud and Mud Bricks](../MudAndMudBricks.md#packed-mud) |
 | Podzol | [`minecraft:podzol`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L132) | [Soil, Sand, and Gravel](../SoilSandAndGravel.md#podzol-and-mushroom-support) |
 | Powder Snow | [`minecraft:powder_snow`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L6051) | [Snow and Powder Snow](../Snow.md#powder-snow-buckets-and-collision) |
 | Red Sand | [`minecraft:red_sand`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java#L328) | [Soil, Sand, and Gravel](../SoilSandAndGravel.md#sand-red-sand-and-gravel-falling) |
@@ -42,4 +42,4 @@ Names use English localization where available. A † marks a readable registry-
 
 ## Inventory source
 
-Registration inventory checked on **2026-10-02**, pinned to [`c87803e7`](https://github.com/HungLo2020/MattMC/blob/c87803e75d339e5d643ca812efc70a6def06a401/src/main/java/net/minecraft/world/level/block/Blocks.java). This is a source inventory, not an in-game availability or Survival acquisition test. Block states such as facing, age, waterlogging, or power are not additional registry IDs.
+Registration inventory checked on **2026-10-02**, using source snapshot [`f9e4a4c9`](https://github.com/HungLo2020/MattMC/blob/f9e4a4c96fcf7fb744bce869c085cdfab189810e/src/main/java/net/minecraft/world/level/block/Blocks.java). Direct declarations and helper registrations are counted; see the [inventory-method correction](index.md#registration-method-correction). This is a source inventory, not an in-game availability or Survival acquisition test. Block states are not separate registry IDs.

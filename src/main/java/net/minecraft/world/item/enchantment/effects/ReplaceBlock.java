@@ -16,15 +16,9 @@ import net.minecraft.world.phys.Vec3;
 
 public record ReplaceBlock(Vec3i offset, Optional<BlockPredicate> predicate, BlockStateProvider blockState, Optional<Holder<GameEvent>> triggerGameEvent)
 	implements EnchantmentEntityEffect {
-	public static final MapCodec<ReplaceBlock> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				Vec3i.CODEC.optionalFieldOf("offset", Vec3i.ZERO).forGetter(ReplaceBlock::offset),
-				BlockPredicate.CODEC.optionalFieldOf("predicate").forGetter(ReplaceBlock::predicate),
-				BlockStateProvider.CODEC.fieldOf("block_state").forGetter(ReplaceBlock::blockState),
-				GameEvent.CODEC.optionalFieldOf("trigger_game_event").forGetter(ReplaceBlock::triggerGameEvent)
-			)
-			.apply(instance, ReplaceBlock::new)
-	);
+	/** The native codec's `replace_block` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<ReplaceBlock> CODEC = (MapCodec<ReplaceBlock>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:replace_block");
 
 	@Override
 	public void apply(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3) {

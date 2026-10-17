@@ -34,7 +34,7 @@ class SectionCopy {
 		if (levelChunk instanceof EmptyLevelChunk) {
 			this.section = null;
 		} else {
-			LevelChunkSection[] levelChunkSections = levelChunk.getSections();
+			LevelChunkSection[] levelChunkSections = levelChunk.getSectionsForRead();
 			if (i >= 0 && i < levelChunkSections.length) {
 				LevelChunkSection levelChunkSection = levelChunkSections[i];
 				this.section = levelChunkSection.hasOnlyAir() ? null : levelChunkSection.getStates().copy();

@@ -158,6 +158,39 @@ public final class JigsawStructure extends Structure {
 	}
 
 	@VisibleForTesting
+	/** For {@code NativeJigsaw}: the settings {@code findGenerationPoint} reads. */
+	public java.util.Optional<net.minecraft.resources.ResourceLocation> nativeStartJigsawName() {
+		return this.startJigsawName;
+	}
+
+	public int nativeMaxDepth() {
+		return this.maxDepth;
+	}
+
+	public net.minecraft.world.level.levelgen.heightproviders.HeightProvider nativeStartHeight() {
+		return this.startHeight;
+	}
+
+	public boolean nativeUseExpansionHack() {
+		return this.useExpansionHack;
+	}
+
+	public java.util.Optional<net.minecraft.world.level.levelgen.Heightmap.Types> nativeProjectStartToHeightmap() {
+		return this.projectStartToHeightmap;
+	}
+
+	public JigsawStructure.MaxDistance nativeMaxDistance() {
+		return this.maxDistanceFromCenter;
+	}
+
+	public net.minecraft.world.level.levelgen.structure.pools.DimensionPadding nativeDimensionPadding() {
+		return this.dimensionPadding;
+	}
+
+	public net.minecraft.world.level.levelgen.structure.templatesystem.LiquidSettings nativeLiquidSettings() {
+		return this.liquidSettings;
+	}
+
 	public Holder<StructureTemplatePool> getStartPool() {
 		return this.startPool;
 	}

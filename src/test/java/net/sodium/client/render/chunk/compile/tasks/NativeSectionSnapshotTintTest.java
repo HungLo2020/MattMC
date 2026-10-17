@@ -9,6 +9,100 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NativeSectionSnapshotTintTest {
     @Test
+    void untintedLatticeCopiesEveryAuthoredMinusOneWithoutWorldQueries() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+        var colors = BlockColors.createDefault();
+        long address = org.lwjgl.system.MemoryUtil.nmemAlloc(64L * Integer.BYTES);
+        try {
+            for (var block : new net.minecraft.world.level.block.Block[] {
+                    net.minecraft.world.level.block.Blocks.STONE,
+                    net.minecraft.world.level.block.Blocks.DIRT,
+                    net.minecraft.world.level.block.Blocks.GLASS}) {
+                var state = block.defaultBlockState();
+                assertFalse(colors.hasColorProvider(block));
+                org.lwjgl.system.MemoryUtil.memSet(address, 0xA5, 64L * Integer.BYTES);
+                var origin = new net.minecraft.core.BlockPos(-17, 80, -33);
+                NativeSectionSnapshot.writeTintLattice(address, null, state, origin, colors);
+                int sample = 0;
+                for (int y = -1; y <= 2; y++) for (int z = -1; z <= 2; z++) for (int x = -1; x <= 2; x++) {
+                    var pos = origin.offset(x, y, z);
+                    assertEquals(colors.getColor(state, null, pos, 0),
+                            org.lwjgl.system.MemoryUtil.memGetInt(address + (long) sample++ * Integer.BYTES));
+                }
+            }
+        } finally {
+            org.lwjgl.system.MemoryUtil.nmemFree(address);
+        }
+    }
+
+    @Test
+    void registeredCoordinateProviderStillSamplesNeighborsWhenOriginHasNoTint() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+        var colors = BlockColors.createDefault();
+        var block = net.minecraft.world.level.block.Blocks.STONE;
+        var state = block.defaultBlockState();
+        var origin = new net.minecraft.core.BlockPos.MutableBlockPos(-17, 80, -33);
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        colors.register((s, view, pos, index) -> {
+            calls.incrementAndGet();
+            return pos.equals(origin) ? -1 : (pos.getX() & 255) << 16 | (pos.getY() & 255) << 8 | (pos.getZ() & 255);
+        }, block);
+        long address = org.lwjgl.system.MemoryUtil.nmemAlloc(64L * Integer.BYTES);
+        try {
+            NativeSectionSnapshot.writeTintLattice(address, null, state, origin, colors);
+            assertEquals(64, calls.get(), "registered providers retain all extended-model sample queries");
+            int sample = 0;
+            for (int y = -1; y <= 2; y++) for (int z = -1; z <= 2; z++) for (int x = -1; x <= 2; x++) {
+                var pos = origin.offset(x, y, z);
+                assertEquals(NativeSectionSnapshot.normalizeBlockTintColor(colors.getColor(state, null, pos, 0)),
+                        org.lwjgl.system.MemoryUtil.memGetInt(address + (long) sample++ * Integer.BYTES));
+            }
+            assertEquals(new net.minecraft.core.BlockPos(-17, 80, -33), origin);
+        } finally {
+            org.lwjgl.system.MemoryUtil.nmemFree(address);
+        }
+    }
+
+    @Test
+    void copiedLatticeMatchesAuthoredColorsThroughExtendedVerticesWithoutMovingTheBlock() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+        var colors = BlockColors.createDefault();
+        var getter = (net.minecraft.world.level.BlockAndTintGetter) java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[] {net.minecraft.world.level.BlockAndTintGetter.class},
+                (proxy, method, arguments) -> {
+                    if (!method.getName().equals("getBlockTint")) throw new AssertionError(method);
+                    var pos = (net.minecraft.core.BlockPos) arguments[0];
+                    int variation = (pos.getX() & 255) << 16 | (pos.getY() & 255) << 8 | (pos.getZ() & 255);
+                    return variation ^ (arguments[1] == net.minecraft.client.renderer.BiomeColors.DRY_FOLIAGE_COLOR_RESOLVER
+                            ? 0x986034 : 0x389824);
+                });
+        long address = org.lwjgl.system.MemoryUtil.nmemAlloc(64L * Integer.BYTES);
+        try {
+            for (var block : new net.minecraft.world.level.block.Block[] {
+                    net.minecraft.world.level.block.Blocks.LEAF_LITTER,
+                    net.minecraft.world.level.block.Blocks.OAK_LEAVES,
+                    net.minecraft.world.level.block.Blocks.GRASS_BLOCK}) {
+                var state = block.defaultBlockState();
+                var origin = new net.minecraft.core.BlockPos.MutableBlockPos(-17, 80, -33);
+                NativeSectionSnapshot.writeTintLattice(address, getter, state, origin);
+                int index = 0;
+                for (int y = -1; y <= 2; y++) for (int z = -1; z <= 2; z++) for (int x = -1; x <= 2; x++) {
+                    var pos = new net.minecraft.core.BlockPos(-17 + x, 80 + y, -33 + z);
+                    assertEquals(colors.getColor(state, getter, pos, 0) | 0xFF000000,
+                            org.lwjgl.system.MemoryUtil.memGetInt(address + (long) index++ * Integer.BYTES),
+                            "authored tint at " + pos);
+                }
+                assertEquals(new net.minecraft.core.BlockPos(-17, 80, -33), origin);
+            }
+        } finally {
+            org.lwjgl.system.MemoryUtil.nmemFree(address);
+        }
+    }
+
+    @Test
     void stonecutterTintedSawHasVanillaWhiteTintWithoutAColorProvider() {
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();

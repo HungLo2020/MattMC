@@ -1,0 +1,158 @@
+# Rust game model (proposal)
+
+> **Status: proposal with implemented ownership slices.** Phase 1's
+> [Rust block registry](RUST-BLOCK-REGISTRY.md) and Phase 2's native state
+> graphs, properties, fluids, registered block definitions, physical settings,
+> intrinsic state rules, sound-event/profile/instrument definitions, block
+> sound/offset settings, block-family configuration, map palette/shading and
+> state policy are current. Java still
+> supplies block factories, objects/codecs, shapes, blocked light, contextual
+> predicates, sound policy/resource callbacks and world callbacks.
+> [Entity type definitions](ENTITY-TYPES.md), [content identities](CONTENT-IDENTITIES.md)
+> (component types, entity data serializers, synchronized data),
+> [item definitions](ITEM-DEFINITIONS.md) and the decoded
+> [data-driven definitions](DATA-DEFINITIONS.md) (biomes, entity variants,
+> enchantments and other entity and item registries) are also Rust-owned. Behavior and the general component store are proposals.
+> “Implemented” describes source ownership, not completion of every acceptance
+> check. See the [verification scope](BLOCK-REGISTRY-VERIFICATION.md).
+> The surveys behind the proposal are dated 2026-10-07.
+
+## End state
+
+The completed target is one Rust executable supporting client and dedicated-server
+modes, at most one separately loaded Rust library, and no Java. Rust owns the
+block, item and entity definitions, and the gameplay that uses them. The Java↔Rust
+stages in the
+[migration plan](MIGRATION-PLAN.md) are only a way to get there with parity
+checked at every step. Design choices are made for the Rust-only game, not
+for the bridge.
+
+## Goals
+
+1. **Adding content stays easy.** A new block or item should take one Rust
+   file plus its assets. It should not mean edits across a dozen registries.
+2. **Rust-native.** Use plain data, IDs, traits and composition, not
+   inheritance chains or object graphs.
+3. **Fast hot paths.** Lighting, collision, meshing, worldgen and saving read
+   compact per-state tables and never make virtual calls.
+4. **Exact parity.** Rust and Java agree on every ID, state, property value
+   and saved byte. Behavior stays identical to vanilla until well after the
+   migration; no deliberate deviations are planned before then.
+5. **Vanilla worlds stay compatible.** The save format (Anvil regions, NBT)
+   stays as it is, and old worlds keep loading, including through the data
+   fixers.
+
+## Decisions (2026-10-07)
+
+| Question | Decision |
+|---|---|
+| Save compatibility | Required, long term. The format does not change; data fixers are eventually ported too. |
+| Network compatibility with vanilla | Not a goal. MattMC already has blocks vanilla lacks, so only MattMC clients and servers talk to each other. |
+| Behavior parity | Exact, through the migration and well beyond it. |
+| Extensibility | No third-party mods or plugin API. Content is added in this repository, and that must stay easy. |
+| Data vs code | What vanilla defines in data files (models, loot, recipes, tags, datapack registries) stays in data files. What Java defines in code (`Blocks.java`, `Items.java`) becomes Rust definitions. |
+| Integrated mods | Alex's Caves, Alex's Mobs and TaCZ content stays in the `minecraft` namespace as first-class content, not a separate layer. |
+| Threading | Follow Java's model as it is. |
+| Client and server | Like vanilla: an integrated server in single-player, with separate client and server worlds sharing the same definitions. |
+| State ID width | 16 bits (`StateId(u16)`), with a startup check against the 65,536 ceiling in the original proposal. See the implemented limit below. |
+| Dependencies | No off-the-shelf ECS. New crates need the user's approval; the component store is written in-house. |
+| Rendering | The rendering agent keeps working. Once this plan is final, it is reconciled with that agent's work before Phase 1 touches render tables. |
+| Scope now | Blocks, block states and items in detail. Entities stay high-level. |
+
+The original 16-bit decision described the theoretical 65,536-value space.
+The [implemented registry](RUST-BLOCK-REGISTRY.md#constraints) reserves
+`0xffff` for “no state,” so it permits at most **65,535 registered states**.
+The lazy remaining-fact registry installation can decline and preserve its
+consumers' compatibility routes. Native declaration/graph construction has
+separate bounds and fails invalid or oversized definitions; a missing
+registered declaration does not fall back to a Java definition.
+
+Rendering reconciliation has since reached terrain meshing: block facts come
+from the shared registry, while rendering keeps models, materials, passes,
+shader-pack IDs, tint and sprites, with a separate cache lifecycle. This updates
+the implementation status without changing the recorded coordination decision.
+
+## Core idea in one paragraph
+
+Content is **data in registries**: blocks, states, items and entity types are
+dense IDs into frozen tables, built once at startup. Hot code reads the
+tables. Rare and complex **behavior** (ticks, interaction, placement) lives in
+small trait implementations, one per behavior family. The proposed reuse is
+roughly a hundred behaviors for the 1,235 registered blocks; the original
+Java class survey is described in [block behavior](BLOCK-BEHAVIOR.md). **Per-instance data**
+(a chest's items, a mob's health, a sign's text) lives in **components**. Mobs,
+items on the ground, minecarts *and* block entities are all entities in the
+same component store. A block entity is simply an entity with a `BlockAnchor`
+component, so a chest and a chest minecart share one `Inventory` component and
+one set of systems.
+
+## Pages
+
+- [Registries and IDs](REGISTRIES-AND-IDS.md): ID types, registry layout,
+  ordering and the single source of truth.
+- [Block states](BLOCK-STATES.md): property encoding, per-state tables and
+  shapes.
+- [Block behavior](BLOCK-BEHAVIOR.md): behavior traits, families, the world
+  context, and keeping hot paths free of dispatch.
+- [Components and entities](COMPONENTS-AND-ENTITIES.md): the component store,
+  block entities as anchored entities, tick order and persistence.
+- [Items](ITEMS.md): item definitions, stacks and data components.
+- [Adding content](ADDING-CONTENT.md): what adding a block or item looks like,
+  compared with today.
+- [Migration plan](MIGRATION-PLAN.md): the order to build this alongside Java,
+  parity checks, and open decisions.
+- [Entity type definitions](ENTITY-TYPES.md) (current): the Rust catalog of every
+  entity type's identity and intrinsic settings, and how Java projects it.
+- [Content identities](CONTENT-IDENTITIES.md) (current): data component types,
+  entity data serializers and synchronized entity data IDs.
+- [Item definitions](ITEM-DEFINITIONS.md) (current): the Rust item catalog,
+  default components as SNBT and the two-step Java projection.
+- [Retained item runtime cost review](ITEM-STATE-COSTS.md) (S0024/r6 accepted temporary cost exception and bounded resource evidence): exact costs, confidence limits, attribution and ownership debt.
+- [Retained item runtime state](ITEM-STATE.md) (in progress): connected
+  stack/component/chest ownership, alias and callback contracts, and focused probes.
+- [Data-driven definitions](DATA-DEFINITIONS.md) (current): biomes and the
+  data-driven entity and item registries, parsed, stored and encoded by Rust.
+- [Native value types](NATIVE-VALUES.md) (current): int and float providers,
+  level-based values, particle options and position sources, decoded,
+  validated and encoded by Rust with DFU's error and partial-result rules.
+- [Persistent item component codecs](ITEM-COMPONENTS.md) (current): native
+  component structures, original Java leaves, bootstrap and encoder-cache
+  constraints, and component-specific parity checks.
+- [Rust block registry](RUST-BLOCK-REGISTRY.md) (current): how Phase 1 works,
+  how to add a column or consumer, constraints and tests.
+- [Native block state definitions](BLOCK-DEFINITIONS.md) (current work): ordered
+  block catalog, shared domain/default sets and bounded graph reuse.
+- [Native block physical settings](BLOCK-PHYSICS.md) (current work): shared
+  intrinsic configurations, Java views and directly derived native flags.
+- [Native intrinsic state rules](BLOCK-INTRINSICS.md) (current work): map colors,
+  emitted light, fluid associations and temporary compatibility projections.
+- [Native state policy](STATE-POLICY.md) (current work): tick/light-shape eligibility, leaf/entity markers and immutable compatibility views.
+- [Map colors and image processing](MAP-COLORS.md) (current work): palette/shading ownership, compact indexed inputs and bounded native image processing.
+- [Native sound definitions](SOUND-DEFINITIONS.md) (current work): event identities,
+  block sound profiles and note instruments.
+- [Block sounds and model offsets](BLOCK-SOUND-AND-OFFSETS.md) (current work):
+  state sound rules, finite offset tables and shared coordinate arithmetic.
+- [Block-family configuration](BLOCK-FAMILY-TYPES.md) (current work): shared
+  block sets, wood types and typed door/button/plate/gate/sign parameters.
+- [Native state graphs](STATE-GRAPHS.md) (current work): shared state construction,
+  temporary Java projections, CPU buffer ownership and verification.
+- [Shared property definitions](PROPERTY-DEFINITIONS.md) (current work): native
+  names/domains, compatibility views and block/fluid schemas.
+- [Native fluid definitions](FLUID-DEFINITIONS.md) (current work): Rust-owned
+  registry, intrinsic state facts, Java compatibility views and Frozen checks.
+- [Block registry verification](BLOCK-REGISTRY-VERIFICATION.md) (current):
+  historical Phase 1 parity/benchmarks and the current evidence boundary.
+
+## Where it lives in the crate
+
+`content/` (registries and definitions) and `gameplay/` (behavior and systems)
+are the owners in the [project architecture](../PROJECT-ARCHITECTURE.md).
+`content/block/` holds the implemented block registry, definitions, offsets and
+shared `family/` configuration and state policy; `content/map_color/` owns palette
+identities, RGB and shading arithmetic. `content/sound/` owns event/profile/instrument
+identities, separate from audio playback resources. `content/fluid/` owns
+built-in fluid definitions and intrinsic state facts. `content/property/` owns
+property declarations and immutable schemas. `gameplay/tacz/` already
+contains the TaCZ function-modifier kernel; the proposed block-behavior and
+component systems are not implemented. `world/`, `storage/` and terrain meshing
+read shared block facts from `content/`, while each consumer owns its view.

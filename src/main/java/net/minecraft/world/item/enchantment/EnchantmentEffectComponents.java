@@ -20,7 +20,10 @@ import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 
 public interface EnchantmentEffectComponents {
 	Codec<DataComponentType<?>> COMPONENT_CODEC = Codec.lazyInitialized(() -> BuiltInRegistries.ENCHANTMENT_EFFECT_COMPONENT_TYPE.byNameCodec());
-	Codec<DataComponentMap> CODEC = DataComponentMap.makeCodec(COMPONENT_CODEC);
+	/** Rust decodes, validates and encodes the effects map and every component in it (`content/data/enchant.rs`). */
+	Codec<DataComponentMap> CODEC = net.minecraft.resources.NativeValues.codec(
+		net.minecraft.resources.NativeValues.Kind.ENCHANTMENT_EFFECTS, NativeEnchantmentEffects::effects, NativeEnchantmentEffects::effectsOut
+	);
 	DataComponentType<List<ConditionalEffect<EnchantmentValueEffect>>> DAMAGE_PROTECTION = register(
 		"damage_protection", builder -> builder.persistent(ConditionalEffect.codec(EnchantmentValueEffect.CODEC, LootContextParamSets.ENCHANTED_DAMAGE).listOf())
 	);

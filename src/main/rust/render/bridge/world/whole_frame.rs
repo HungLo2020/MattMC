@@ -1,6 +1,31 @@
 //! Decoding a whole-frame submit: world primitives, meshes, GUI streams and frame-level records.
 
 use super::*;
+use crate::render::scene::material::WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT;
+
+/// `MATTMC_TRACE_PARTICLE_QUADS=N` logs the first N decoded particle quads of
+/// each frame (texture, surface, UV bounds, ARGB colour, packed light,
+/// centre) to stderr, so a colour can be followed from Java to the GPU.
+fn trace_particle_quads(particles: &[FfiWorldParticleQuadRequest]) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static LIMIT: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    static FRAME: AtomicU64 = AtomicU64::new(0);
+    let limit = *LIMIT.get_or_init(|| {
+        crate::core::environment::var_os("MATTMC_TRACE_PARTICLE_QUADS")
+            .and_then(|value| value.to_str().and_then(|value| value.parse().ok()))
+            .unwrap_or(0)
+    });
+    if limit == 0 {
+        return;
+    }
+    let frame = FRAME.fetch_add(1, Ordering::Relaxed);
+    for (index, p) in particles.iter().take(limit).enumerate() {
+        eprintln!(
+            "[mattmc particle-trace] frame={frame} index={index} texture={} surface={} uv={:?} argb={:08x} light={:08x} center={:?} size={}",
+            p.texture_id, p.surface_kind, p.uv_bounds, p.color_argb, p.packed_light, p.center, p.size
+        );
+    }
+}
 
 pub(crate) fn merge_particle_semantics(
     materials: Vec<WorldMaterialQuadRequest>,
@@ -18,6 +43,7 @@ pub(crate) fn merge_particle_semantics(
     let mut source = materials.into_iter();
     let mut output = Vec::with_capacity(count);
     let mut cursor = 0;
+    trace_particle_quads(particles);
     for p in particles {
         validate_item_size::<FfiWorldParticleQuadRequest>(p.byte_size, "particle semantics")?;
         let index = p.material_index as usize;
@@ -164,9 +190,13 @@ pub(crate) fn merge_experience_orb_instances(
         .checked_add(orbs.len())
         .filter(|&count| count <= FFI_MAX_BATCH_ITEMS)
         .ok_or_else(|| GalError::invalid_argument("combined mesh/orb frame bound exceeded"))?;
+    if orbs.is_empty() {
+        // Most frames carry no orbs; keep the decoded vector instead of
+        // copying every mesh instance into a new one.
+        return Ok(meshes);
+    }
     let mesh_count = meshes.len();
-    let mut source = meshes.into_iter();
-    let mut output = Vec::with_capacity(count);
+    let mut placed = Vec::with_capacity(orbs.len());
     let mut cursor = 0;
     for orb in orbs {
         validate_item_size::<FfiWorldExperienceOrbInstanceRecord>(orb.byte_size, "orb placement")?;
@@ -176,17 +206,38 @@ pub(crate) fn merge_experience_orb_instances(
                 "invalid orb placement ordering or reserved bits",
             ));
         }
-        let instance = crate::render::worldrender::features::experience_orb::ExperienceOrbPlacement {
+        let mut instance = crate::render::worldrender::features::experience_orb::ExperienceOrbPlacement {
             entity_transform: orb.entity_transform,
             camera_orientation: orb.camera_orientation,
             entity_id: orb.entity_id,
         }.instance(orb.mesh_key, orb.mesh_generation, viewport)?;
-        output.extend(source.by_ref().take(index - cursor));
+        instance.entity_culling = decode_entity_culling_record(orb.entity_culling_mode,
+            orb.entity_culling_flags,orb.entity_culling_bounds,orb.entity_culling_leash_bounds,orb.entity_culling_camera)?;
+        if orb.shadow_only > 1 || (orb.shadow_only == 1 && instance.entity_culling.is_none()) {
+            return Err(GalError::invalid_argument("invalid orb shadow-only extraction role"));
+        }
+        if orb.shadow_only == 1 {
+            instance.stratum = crate::render::scene::strata::WORLD_STRATUM_ENTITY_SHADOW_CASTER;
+        }
         cursor = index;
-        output.push(instance);
+        placed.push((index, instance));
     }
-    output.extend(source);
-    Ok(output)
+    // Merge in place from the back: only instances after the first orb move,
+    // instead of copying the whole (mostly terrain) frame into a new vector.
+    let mut meshes = meshes;
+    meshes.extend(placed.iter().map(|(_, instance)| instance.clone()));
+    let mut remaining_meshes = mesh_count;
+    let mut write = count;
+    while let Some(&(index, _)) = placed.last() {
+        write -= 1;
+        if index >= remaining_meshes {
+            meshes[write] = placed.pop().expect("orb checked above").1;
+        } else {
+            remaining_meshes -= 1;
+            meshes.swap(remaining_meshes, write);
+        }
+    }
+    Ok(meshes)
 }
 
 pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
@@ -509,6 +560,22 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             "DH generic box semantic count exceeds expanded frame bound",
         ));
     }
+    let raw_dh_generic_group_instances = read_slice(
+        request.world_dh_generic_group_instances,
+        true,
+        "DH generic group instances",
+    )?;
+    let retained_dh_generic_boxes = super::dh_generic_groups::expand_dh_generic_groups(
+        raw_dh_generic_group_instances,
+        request.dh_generic_camera,
+    )?;
+    if raw_dh_generic_boxes.len() + retained_dh_generic_boxes.len()
+        > FFI_MAX_BATCH_ITEMS / DH_GENERIC_BOX_FACE_COUNT
+    {
+        return Err(GalError::invalid_argument(
+            "DH generic box semantic count exceeds expanded frame bound",
+        ));
+    }
     // Material quads have their own frame bound (clouds at the default
     // cloud range exceed the generic 65,536 FFI item bound).
     let max_material_quads = crate::render::worldrender::WORLD_MAX_MATERIAL_QUADS;
@@ -546,7 +613,11 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         .len()
         .checked_add(raw_compact_materials.len())
         .and_then(|count| count.checked_add(raw_particles.len()))
-        .and_then(|count| count.checked_add(raw_dh_generic_boxes.len() * DH_GENERIC_BOX_FACE_COUNT))
+        .and_then(|count| {
+            count.checked_add(
+                (raw_dh_generic_boxes.len() + retained_dh_generic_boxes.len()) * DH_GENERIC_BOX_FACE_COUNT,
+            )
+        })
         .ok_or_else(|| {
             GalError::ffi(
                 StatusCode::LengthOverflow,
@@ -612,6 +683,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         if quad.material_mode != WORLD_MATERIAL_MODE_OPAQUE
             && quad.material_mode != WORLD_MATERIAL_MODE_CUTOUT
             && quad.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT
+            && quad.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
         {
             return Err(GalError::ffi(
                 StatusCode::UnknownEnum,
@@ -812,6 +884,7 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             if record.material_mode != WORLD_MATERIAL_MODE_OPAQUE
                 && record.material_mode != WORLD_MATERIAL_MODE_CUTOUT
                 && record.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT
+                && record.material_mode != WORLD_MATERIAL_MODE_TRANSLUCENT_CUTOUT
             {
                 return Err(GalError::ffi(
                     StatusCode::UnknownEnum,
@@ -992,7 +1065,9 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             });
         }
     }
-    let decoded_dh_generic_boxes = decode_dh_generic_box_semantics(raw_dh_generic_boxes)?;
+    super::stars::expand_stars(&request.world_background, &background, &mut material_quads, max_material_quads)?;
+    let mut decoded_dh_generic_boxes = decode_dh_generic_box_semantics(raw_dh_generic_boxes)?;
+    decoded_dh_generic_boxes.extend(retained_dh_generic_boxes);
     if !raw_particles.is_empty() {
         material_quads = merge_particle_semantics(
             material_quads,
@@ -1025,73 +1100,110 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         ));
     }
     let raw_orbs = read_slice(request.world_experience_orbs, true, "orb placements")?;
-    let mut mesh_instances = Vec::with_capacity(raw_mesh_instances.len());
-    for instance in raw_mesh_instances {
+    // Reserve for the orbs merged below and the shadow casters the frontend
+    // appends after decoding, so neither reallocates the decoded stream.
+    let appended_capacity = usize::try_from(
+        request
+            .world_static_terrain_shadow_casters
+            .count
+            .saturating_add(request.world_experience_orbs.count),
+    )
+    .unwrap_or(FFI_MAX_BATCH_ITEMS)
+    .min(FFI_MAX_BATCH_ITEMS);
+    let raw_rig_poses = read_slice(request.world_model_rig_poses, true, "model rig poses")?;
+    let mut mesh_instances = Vec::with_capacity(raw_mesh_instances.len() + appended_capacity);
+    let mut rig_parts = Vec::new();
+    let mut rig_models = Vec::new();
+    // Locked once, on the frame's first rig instance.
+    let mut rig_table: Option<super::model_rigs::ModelRigTable> = None;
+    for raw_instance in raw_mesh_instances {
         validate_item_size::<FfiWorldMeshInstanceRecord>(
-            instance.byte_size,
+            raw_instance.byte_size,
             "world primitive mesh instance",
         )?;
-        validate_mesh_instance_semantic_identity(instance, "world primitive mesh instance")?;
-        if !is_world_mesh_stratum(instance.stratum) {
-            return Err(GalError::ffi(
-                StatusCode::UnknownEnum,
-                format!("unknown world mesh stratum {}", instance.stratum),
-            ));
+        let resolved_item = unsafe { super::item_poses::resolve_item_pose(raw_instance,false)? };
+        let raw_instance = &*resolved_item;
+        // A model-rig instance stands for its drawn parts, in place.
+        let expanded = if raw_instance.flags & super::model_rigs::WORLD_MESH_INSTANCE_FLAG_MODEL_RIG != 0 {
+            rig_parts.clear();
+            if rig_table.is_none() {
+                rig_table = Some(super::model_rigs::lock_model_rigs()?);
+            }
+            let rigs = rig_table.as_deref().expect("model rig table locked above");
+            super::model_rigs::expand_model_rig(rigs, raw_instance, raw_rig_poses, &mut rig_models, &mut rig_parts)?;
+            mesh_instances.reserve(rig_parts.len());
+            if mesh_instances.len() + rig_parts.len() > FFI_MAX_BATCH_ITEMS {
+                return Err(GalError::invalid_argument("expanded model rig instances exceed the frame bound"));
+            }
+            &rig_parts[..]
+        } else {
+            std::slice::from_ref(raw_instance)
+        };
+        for instance in expanded {
+            validate_mesh_instance_semantic_identity(instance, "world primitive mesh instance")?;
+            if !is_world_mesh_stratum(instance.stratum) {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world mesh stratum {}", instance.stratum),
+                ));
+            }
+            if instance.depth_policy != WORLD_DEPTH_POLICY_DISABLED
+                && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
+                && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+                && !(instance.depth_policy == WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE
+                    && instance.stratum == WORLD_STRATUM_ENTITY_MESH)
+            {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world mesh depth policy {}", instance.depth_policy),
+                ));
+            }
+            if instance.cull_policy != WORLD_CULL_NONE
+                && instance.cull_policy != WORLD_CULL_BACK
+                && instance.cull_policy != WORLD_CULL_FRONT
+            {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world mesh cull policy {}", instance.cull_policy),
+                ));
+            }
+            if instance.winding != WORLD_WINDING_CCW && instance.winding != WORLD_WINDING_CW {
+                return Err(GalError::ffi(
+                    StatusCode::UnknownEnum,
+                    format!("unknown world mesh winding {}", instance.winding),
+                ));
+            }
+            let viewport_width =
+                decode_world_viewport_axis(instance.viewport_width, "world mesh viewport width")?;
+            let viewport_height =
+                decode_world_viewport_axis(instance.viewport_height, "world mesh viewport height")?;
+            let transform = decode_mesh_instance_transform(instance)?;
+            mesh_instances.push(WorldMeshInstanceRequest {
+                entity_culling: decode_entity_culling(instance, false)?,
+
+                model_submission_order: decode_model_submission_order(instance)?,
+                item_foil: decode_world_item_foil(instance)?,
+                decal_foil: decode_world_decal_foil(instance, false)?,
+                stratum: instance.stratum,
+                mesh_key: instance.mesh_key,
+                mesh_generation: instance.mesh_generation,
+                mesh_section_index: instance.mesh_section_index,
+                terrain_visible_facing_mask: terrain_visible_facing_mask(instance),
+                depth_policy: instance.depth_policy,
+                cull_policy: instance.cull_policy,
+                winding: instance.winding,
+                color_argb: instance.color_argb,
+                entity_id: instance.entity_id,
+                entity_color_argb: instance.entity_color_argb,
+                packed_light: instance.packed_light,
+                transform,
+                outline_color_argb: instance.outline_color_argb,
+                flags: instance.flags,
+                block_entity_id: instance.block_entity_id,
+                viewport_width,
+                viewport_height,
+            });
         }
-        if instance.depth_policy != WORLD_DEPTH_POLICY_DISABLED
-            && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
-            && instance.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
-            && !(instance.depth_policy == WORLD_DEPTH_POLICY_TEST_EQUAL_WRITE
-                && instance.stratum == WORLD_STRATUM_ENTITY_MESH)
-        {
-            return Err(GalError::ffi(
-                StatusCode::UnknownEnum,
-                format!("unknown world mesh depth policy {}", instance.depth_policy),
-            ));
-        }
-        if instance.cull_policy != WORLD_CULL_NONE
-            && instance.cull_policy != WORLD_CULL_BACK
-            && instance.cull_policy != WORLD_CULL_FRONT
-        {
-            return Err(GalError::ffi(
-                StatusCode::UnknownEnum,
-                format!("unknown world mesh cull policy {}", instance.cull_policy),
-            ));
-        }
-        if instance.winding != WORLD_WINDING_CCW && instance.winding != WORLD_WINDING_CW {
-            return Err(GalError::ffi(
-                StatusCode::UnknownEnum,
-                format!("unknown world mesh winding {}", instance.winding),
-            ));
-        }
-        let viewport_width =
-            decode_world_viewport_axis(instance.viewport_width, "world mesh viewport width")?;
-        let viewport_height =
-            decode_world_viewport_axis(instance.viewport_height, "world mesh viewport height")?;
-        let transform = decode_mesh_instance_transform(instance)?;
-        mesh_instances.push(WorldMeshInstanceRequest {
-            model_submission_order: decode_model_submission_order(instance)?,
-            item_foil: decode_world_item_foil(instance)?,
-            decal_foil: decode_world_decal_foil(instance, false)?,
-            stratum: instance.stratum,
-            mesh_key: instance.mesh_key,
-            mesh_generation: instance.mesh_generation,
-            mesh_section_index: instance.mesh_section_index,
-            terrain_visible_facing_mask: terrain_visible_facing_mask(instance),
-            depth_policy: instance.depth_policy,
-            cull_policy: instance.cull_policy,
-            winding: instance.winding,
-            color_argb: instance.color_argb,
-            entity_id: instance.entity_id,
-            entity_color_argb: instance.entity_color_argb,
-            packed_light: instance.packed_light,
-            transform,
-            outline_color_argb: instance.outline_color_argb,
-            flags: instance.flags,
-            block_entity_id: instance.block_entity_id,
-            viewport_width,
-            viewport_height,
-        });
     }
     if !raw_orbs.is_empty() {
         mesh_instances = merge_experience_orb_instances(
@@ -1103,6 +1215,24 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             ],
         )?;
     }
+    let (static_terrain_sections, static_terrain_shadow_casters) =
+        if request.world_terrain_frame_owner != 0 || request.world_terrain_frame_id != 0 {
+            if request.world_static_terrain_sections.count != 0 || request.world_static_terrain_shadow_casters.count != 0 {
+                return Err(GalError::invalid_argument("native terrain frame excludes inline terrain records"));
+            }
+            let (sections, casters) = crate::render::chunk::terrain_frames::resolve(
+                request.world_terrain_frame_owner, request.world_terrain_frame_id, request.static_terrain_camera)
+                .ok_or_else(|| GalError::invalid_argument("unknown, expired or camera-mismatched native terrain frame"))?;
+            if sections.sections.len().saturating_add(casters.casters.len())
+                > FFI_MAX_BATCH_ITEMS.saturating_sub(mesh_instances.len()) {
+                return Err(GalError::invalid_argument("combined mesh/native-terrain frame bound exceeded"));
+            }
+            (sections, casters)
+        } else {
+            let casters = decode_static_terrain_shadow_casters(&request, mesh_instances.len())?;
+            let sections = decode_static_terrain_sections(&request, mesh_instances.len() + casters.casters.len())?;
+            (sections, casters)
+        };
     let raw_text_quads = read_slice(request.world_text_quads, true, "world text quads")?;
     if raw_text_quads.len() > FFI_MAX_BATCH_ITEMS {
         return Err(GalError::ffi(
@@ -1188,36 +1318,36 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             block_entity_id: quad.block_entity_id,
         });
     }
-    let raw_lod_instances = read_slice(
-        request.world_lod_instances,
-        true,
-        "world primitive LOD instances",
-    )?;
-    if raw_lod_instances.len() > WORLD_LOD_MAX_VISIBLE_SEGMENTS {
-        return Err(GalError::ffi(
-            StatusCode::InvalidArgument,
-            format!(
-                "world primitive LOD instance count {} exceeds max {}",
-                raw_lod_instances.len(),
-                WORLD_LOD_MAX_VISIBLE_SEGMENTS
-            ),
-        ));
-    }
-    let mut lod_instances = Vec::with_capacity(raw_lod_instances.len());
-    for instance in raw_lod_instances {
-        validate_item_size::<FfiWorldLodColumnInstanceRecord>(
-            instance.byte_size,
-            "world primitive LOD instance",
-        )?;
-        lod_instances.push(WorldLodColumnInstanceRequest {
-            column_key: instance.column_key,
-            column_generation: instance.column_generation,
-            layer: instance.layer,
-            segment_index: instance.segment_index,
-            order: instance.order,
-        });
-    }
     let lod_render_frame = decode_world_lod_render_frame(request.world_lod_render_frame)?;
+    let lod_instances = if request.world_lod_frame_id != 0 {
+        if request.world_lod_instances.count != 0 || request.world_lod_frame_count == 0
+            || request.world_lod_frame_count > WORLD_LOD_MAX_VISIBLE_SEGMENTS as u64 {
+            return Err(GalError::invalid_argument("invalid native DH frame reference or mixed inline LOD work"));
+        }
+        let ledger = crate::render::dh_collector::ledger().lock()
+            .map_err(|_| GalError::invalid_argument("DH frame ledger is poisoned"))?;
+        ledger.resolve_retained_frame(request.world_lod_frame_id, request.world_lod_frame_lifecycle,
+            request.world_lod_frame_count, lod_render_frame.enabled, lod_render_frame.flags)
+            .ok_or_else(|| GalError::invalid_argument("native DH frame identity, lifecycle, count or selection is stale"))?
+    } else {
+        if request.world_lod_frame_lifecycle != 0 || request.world_lod_frame_count != 0 {
+            return Err(GalError::invalid_argument("absent native DH frame has reference metadata"));
+        }
+        let raw_lod_instances = read_slice(request.world_lod_instances, true, "world primitive LOD instances")?;
+        if raw_lod_instances.len() > WORLD_LOD_MAX_VISIBLE_SEGMENTS {
+            return Err(GalError::ffi(StatusCode::InvalidArgument, format!(
+                "world primitive LOD instance count {} exceeds max {}",
+                raw_lod_instances.len(), WORLD_LOD_MAX_VISIBLE_SEGMENTS)));
+        }
+        let mut instances = Vec::with_capacity(raw_lod_instances.len());
+        for instance in raw_lod_instances {
+            validate_item_size::<FfiWorldLodColumnInstanceRecord>(instance.byte_size, "world primitive LOD instance")?;
+            instances.push(WorldLodColumnInstanceRequest { column_key: instance.column_key,
+                column_generation: instance.column_generation, layer: instance.layer,
+                segment_index: instance.segment_index, order: instance.order });
+        }
+        instances.into()
+    };
     // DH may publish generic-object callbacks during the transition before
     // its private route is selected for this exact world frame. The copied
     // records are validated above, but have no admitted destination yet.
@@ -1317,6 +1447,8 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
             text_quads,
             lod_instances,
             lod_render_frame,
+            static_terrain_shadow_casters,
+            static_terrain_sections,
         },
         gui_sprites,
         gui_affine_quads,
@@ -1326,4 +1458,116 @@ pub(crate) unsafe fn decode_whole_frame_submit_with_backend_policy(
         post_effect_id,
         gui_tiled_quads,
     ))
+}
+
+/// Copies the compact caster stream. Expansion into shadow-only instances
+/// needs the frontend's acknowledged mesh generations, so it happens there.
+fn decode_static_terrain_sections(
+    request: &FfiWholeFrameSubmitRequest,
+    instance_count: usize,
+) -> GalResult<crate::render::worldrender::StaticTerrainSections> {
+    if request.world_static_terrain_sections.count
+        > FFI_MAX_BATCH_ITEMS.saturating_sub(instance_count) as u64
+    {
+        return Err(GalError::invalid_argument(
+            "combined mesh/static-terrain frame bound exceeded",
+        ));
+    }
+    let raw = unsafe {
+        read_slice(
+            request.world_static_terrain_sections,
+            true,
+            "static terrain sections",
+        )?
+    };
+    if raw.is_empty() {
+        return Ok(Default::default());
+    }
+    let camera = request.static_terrain_camera;
+    if camera.iter().any(|axis| !axis.is_finite()) {
+        return Err(GalError::invalid_argument(
+            "static terrain sections require a finite terrain camera",
+        ));
+    }
+    let mut sections = Vec::with_capacity(raw.len());
+    for section in raw {
+        if section.mesh_key == 0 || section.mesh_generation == 0 {
+            return Err(GalError::invalid_argument(
+                "static terrain section key and generation must be non-zero",
+            ));
+        }
+        if section.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
+            && section.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+        {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown static terrain section depth policy {}", section.depth_policy),
+            ));
+        }
+        if section.flags & !WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0 || section.reserved != 0 {
+            return Err(GalError::ffi(
+                StatusCode::InvalidArgument,
+                format!("static terrain section has unsupported flags {:#x}", section.flags),
+            ));
+        }
+        sections.push(crate::render::worldrender::StaticTerrainSection {
+            mesh_key: section.mesh_key,
+            depth_policy: section.depth_policy,
+            origin: section.origin,
+            flags: section.flags,
+        });
+    }
+    Ok(crate::render::worldrender::StaticTerrainSections { camera, sections: sections.into() })
+}
+
+fn decode_static_terrain_shadow_casters(
+    request: &FfiWholeFrameSubmitRequest,
+    mesh_instance_count: usize,
+) -> GalResult<crate::render::worldrender::StaticTerrainShadowCasters> {
+    if request.world_static_terrain_shadow_casters.count
+        > FFI_MAX_BATCH_ITEMS.saturating_sub(mesh_instance_count) as u64
+    {
+        return Err(GalError::invalid_argument(
+            "combined mesh/shadow-caster frame bound exceeded",
+        ));
+    }
+    let raw = unsafe {
+        read_slice(
+            request.world_static_terrain_shadow_casters,
+            true,
+            "static terrain shadow casters",
+        )?
+    };
+    if raw.is_empty() {
+        return Ok(Default::default());
+    }
+    let camera = request.static_terrain_camera;
+    if camera.iter().any(|axis| !axis.is_finite()) {
+        return Err(GalError::invalid_argument(
+            "static terrain shadow casters require a finite terrain camera",
+        ));
+    }
+    let mut casters = Vec::with_capacity(raw.len());
+    for caster in raw {
+        if caster.mesh_key == 0 || caster.mesh_generation == 0 {
+            return Err(GalError::invalid_argument(
+                "static terrain shadow caster key and generation must be non-zero",
+            ));
+        }
+        if caster.depth_policy != WORLD_DEPTH_POLICY_TEST_WRITE
+            && caster.depth_policy != WORLD_DEPTH_POLICY_TEST_NO_WRITE
+        {
+            return Err(GalError::ffi(
+                StatusCode::UnknownEnum,
+                format!("unknown shadow caster depth policy {}", caster.depth_policy),
+            ));
+        }
+        casters.push(crate::render::worldrender::StaticTerrainShadowCaster {
+            mesh_key: caster.mesh_key,
+            mesh_generation: caster.mesh_generation,
+            origin: caster.origin,
+            depth_policy: caster.depth_policy,
+        });
+    }
+    Ok(crate::render::worldrender::StaticTerrainShadowCasters { camera, casters: casters.into() })
 }

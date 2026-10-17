@@ -18,6 +18,8 @@ The item-placement predicate requires water-tagged fluid with **amount 8**. A no
 
 Growth uses a different check: the next space must be the **Water block**, including its flowing states. Every Kelp tip or stem supplies a **Water source fluid state** at its own position. Thus growing or placing Kelp can turn its occupied water cells into sources; it does not allow growth into air or arbitrary waterlogged blocks. Kelp itself has no bucket-pickup or fill interaction. [Growth target and fluid state][kelp] · [Stem fluid state][body]
 
+For a water elevator, follow [preparing a Bubble Column with temporary Kelp](BubbleColumns.md#preparing-source-water-with-kelp). That sequence clears the plants before installing the column base; leaving Kelp in place blocks bubble conversion even though its fluid is source Water.
+
 ## Growth, Bone Meal, and trimming
 
 Only the tip grows. On each of its random ticks, an unfinished tip has a **14% growth chance**, provided the next block above is Water. A new tip starts at a random **age from 0 through 24**. Each successful natural growth step increases age by one; **age 25 stops natural growth**. [Kelp probability and target][kelp] · [Age and random growth][head] · [Server random ticks][random]
@@ -37,6 +39,8 @@ Placed **Dried Kelp Blocks** (`minecraft:dried_kelp_block`) are ordinary full bu
 Related: [Ocean biomes](../biomes/Oceans.md) · [Kelp item](../items/Kelp.md) · [Dried Kelp](../items/DriedKelp.md) · [Dried Kelp Block](../items/DriedKelpBlock.md) · [Seagrass](Seagrass.md) · [Sea Pickle](SeaPickle.md) · [Blocks](Blocks.md)
 
 ## Sources and verification
+
+The Bubble Column preparation route was added from the [2026-10-14 source review](BubbleColumns.md#verification-and-related-pages), including current native fluid definitions and fluid-preserving removal. It was not tested in game; the remaining plant review below retains its earlier scope.
 
 Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. Checked plant/tip/stem registrations, the Ocean generation chain, exact water/support predicates, natural growth, Bone Meal, Shears use, support updates, loot, and the packed block's properties. No in-game generation, planting, source-water conversion, harvesting, growth, trimming, or mining test was run. Data packs can change world generation, tags, recipes, and loot.
 

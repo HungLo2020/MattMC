@@ -26,7 +26,8 @@ public class HookRegistry {
     private static final List<AtlasManagerHooks> atlasManagerHooks = new ArrayList<>();
     private static final List<TextureAtlasHooks> textureAtlasHooks = new ArrayList<>();
     private static final List<GuiGraphicsHooks> guiGraphicsHooks = new ArrayList<>();
-    private static final List<EntityRendererHooks> entityRendererHooks = new ArrayList<>();
+    private static final List<EntityRendererHooks> entityRendererHooks = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private static final List<EntityRendererHooks> ENTITY_RENDERER_HOOKS_VIEW = java.util.Collections.unmodifiableList(entityRendererHooks);
     private static final List<ModelBlockRendererHooks> modelBlockRendererHooks = new ArrayList<>();
     private static final List<ParticleRenderHooks> particleRenderHooks = new ArrayList<>();
     private static final List<ClientPacketListenerHooks> clientPacketListenerHooks = new ArrayList<>();
@@ -435,8 +436,19 @@ public class HookRegistry {
      *
      * @return List of registered EntityRendererHooks
      */
+    /** Whether any registered entity hook can hide an entity from the shadow pass. */
+    public static boolean entityRendererHooksAffectShadowPass() {
+        for (EntityRendererHooks hook : entityRendererHooks) {
+            if (hook.affectsShadowPass()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static List<EntityRendererHooks> getEntityRendererHooks() {
-        return new ArrayList<>(entityRendererHooks);
+        // Read on every entity culling check; hooks register only at startup.
+        return ENTITY_RENDERER_HOOKS_VIEW;
     }
 
     /**

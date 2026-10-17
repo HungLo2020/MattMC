@@ -75,35 +75,35 @@ public final class TaczGunDefinitions {
     public static final Map<String, Gun> GUN_BY_ID = GUNS.stream().collect(Collectors.toUnmodifiableMap(Gun::id, Function.identity()));
 
     public static final List<Ammo> AMMO = List.of(
-        new Ammo("12g", 36),
-        new Ammo("22wmr", 64),
-        new Ammo("30c", 50),
-        new Ammo("30_06", 36),
-        new Ammo("308", 48),
-        new Ammo("338", 30),
-        new Ammo("357mag", 48),
-        new Ammo("40mm", 6),
-        new Ammo("45_70", 48),
-        new Ammo("45acp", 60),
-        new Ammo("46x30", 60),
-        new Ammo("500mag", 42),
-        new Ammo("50ae", 48),
-        new Ammo("50bmg", 30),
-        new Ammo("545x39", 60),
-        new Ammo("556x45", 60),
-        new Ammo("57x28", 60),
-        new Ammo("58x42", 60),
-        new Ammo("68x51fury", 60),
-        new Ammo("762x25", 60),
-        new Ammo("762x39", 60),
-        new Ammo("762x54", 60),
-        new Ammo("792x33", 60),
-        new Ammo("792x57", 36),
-        new Ammo("9mm", 60),
-        new Ammo("raygun_ammo", 64),
-        new Ammo("rifles_ammo", 64),
-        new Ammo("rpg_rocket", 6),
-        new Ammo("trs_bull_ammo", 64)
+        new Ammo("12g"),
+        new Ammo("22wmr"),
+        new Ammo("30c"),
+        new Ammo("30_06"),
+        new Ammo("308"),
+        new Ammo("338"),
+        new Ammo("357mag"),
+        new Ammo("40mm"),
+        new Ammo("45_70"),
+        new Ammo("45acp"),
+        new Ammo("46x30"),
+        new Ammo("500mag"),
+        new Ammo("50ae"),
+        new Ammo("50bmg"),
+        new Ammo("545x39"),
+        new Ammo("556x45"),
+        new Ammo("57x28"),
+        new Ammo("58x42"),
+        new Ammo("68x51fury"),
+        new Ammo("762x25"),
+        new Ammo("762x39"),
+        new Ammo("762x54"),
+        new Ammo("792x33"),
+        new Ammo("792x57"),
+        new Ammo("9mm"),
+        new Ammo("raygun_ammo"),
+        new Ammo("rifles_ammo"),
+        new Ammo("rpg_rocket"),
+        new Ammo("trs_bull_ammo")
     );
     public static final Map<String, Ammo> AMMO_BY_ID = AMMO.stream().collect(Collectors.toUnmodifiableMap(Ammo::id, Function.identity()));
 
@@ -216,6 +216,6 @@ public final class TaczGunDefinitions {
         public int extendedMagazineSize(int level) { return level > 0 && level <= this.extendedMagSizes.length ? this.extendedMagSizes[level - 1] : this.magazineSize; }
         @Override public String toString() { return this.id; }
     }
-    public record Ammo(String id, int stackSize) {}
+    public record Ammo(String id) {}
     public record Attachment(String id, TaczAttachmentType type, int level) {}
 }

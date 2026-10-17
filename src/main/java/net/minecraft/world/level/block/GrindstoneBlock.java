@@ -39,7 +39,9 @@ public class GrindstoneBlock extends FaceAttachedHorizontalDirectionalBlock {
 
 	public GrindstoneBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(FACE, AttachFace.WALL));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(FACE, AttachFace.WALL));
+		}
 		this.shapes = this.makeShapes();
 	}
 

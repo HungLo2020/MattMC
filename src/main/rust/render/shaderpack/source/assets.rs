@@ -111,9 +111,25 @@ pub struct TerrainShaderPackAssetBindings {
 
 impl TerrainShaderPackAssetBindings {
     pub fn from_source(source: &ShaderPackSource) -> GalResult<Self> {
-        let Some(properties) = source.get(SHADER_PROPERTIES_PATH) else {
+        Self::from_properties_text(source.get(SHADER_PROPERTIES_PATH).unwrap_or(""))
+    }
+
+    /// Runtime declarations use the selected stage's effective defines.
+    /// The raw constructor remains useful for unconditional fixture metadata.
+    pub fn from_source_with_defines(source: &ShaderPackSource, defines: &[(&str, &str)]) -> GalResult<Self> {
+        if source.get(SHADER_PROPERTIES_PATH).is_none() {
             return Ok(Self::default());
-        };
+        }
+        // Resolve selected property branches before duplicate/path checks.
+        // Pass-local PNG identities come from each lowered binding plan;
+        // this table supplies the shared noise and legacy declarations.
+        let properties = super::preprocess::preprocess_artifact_with_runtime_options(
+            source, SHADER_PROPERTIES_PATH, defines,
+        )?;
+        Self::from_properties_text(properties.expanded_source())
+    }
+
+    fn from_properties_text(properties: &str) -> GalResult<Self> {
         let mut sampler_paths = BTreeMap::new();
         for (line_number, raw_line) in properties.lines().enumerate() {
             let line = raw_line.trim();

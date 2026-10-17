@@ -37,6 +37,11 @@ public class MultiNoiseBiomeSource extends BiomeSource {
 		return new MultiNoiseBiomeSource(Either.right(holder));
 	}
 
+	/** The resolved parameter list, for a chunk-wide native biome fill. */
+	public Climate.ParameterList<Holder<Biome>> nativeParameters() {
+		return this.parameters();
+	}
+
 	private Climate.ParameterList<Holder<Biome>> parameters() {
 		return this.parameters.map(parameterList -> parameterList, holder -> ((MultiNoiseBiomeSourceParameterList)holder.value()).parameters());
 	}
@@ -54,6 +59,21 @@ public class MultiNoiseBiomeSource extends BiomeSource {
 	public boolean stable(ResourceKey<MultiNoiseBiomeSourceParameterList> resourceKey) {
 		Optional<Holder<MultiNoiseBiomeSourceParameterList>> optional = this.parameters.right();
 		return optional.isPresent() && ((Holder)optional.get()).is(resourceKey);
+	}
+
+	@Override
+	public Pair<BlockPos, Holder<Biome>> findBiomeHorizontal(
+		int i, int j, int k, int l, net.minecraft.core.HolderSet<Biome> biomes, net.minecraft.util.RandomSource randomSource, Climate.Sampler sampler
+	) {
+		var search = net.minecraft.world.level.levelgen.NativeBiomeSearch.horizontal(this, i, j, k, l, biomes::contains, randomSource, sampler);
+		return search.handled() ? search.result() : super.findBiomeHorizontal(i, j, k, l, biomes, randomSource, sampler);
+	}
+
+	@Override
+	protected Pair<BlockPos, Holder<Biome>> findClosestBiome3d(BlockPos blockPos, int i, int j, java.util.Set<Holder<Biome>> set, int[] is,
+		Climate.Sampler sampler) {
+		var search = net.minecraft.world.level.levelgen.NativeBiomeSearch.closest(this, blockPos, i, j, set, is, sampler);
+		return search.handled() ? search.result() : super.findClosestBiome3d(blockPos, i, j, set, is, sampler);
 	}
 
 	@Override

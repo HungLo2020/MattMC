@@ -17,6 +17,8 @@ Eating [Blobfish food](../items/Blobfish.md) applies Poison I for 120 ticks. The
 
 Drink a [Honey Bottle](../items/HoneyBottle.md) to remove Poison specifically, or [Milk](../items/MilkBucket.md) to clear all removable current effects through the general removal path. Milk also clears beneficial effects.
 
+For hostile delivery routes, see [Witch splash potions](../mobs/Witch.md#which-potion-it-throws) and [Bogged arrows](../mobs/Bogged.md#poison-arrows-and-fighting); their delivery rules and durations differ.
+
 ## Related pages
 
 - [Wither](Wither.md), which has a different low-health rule

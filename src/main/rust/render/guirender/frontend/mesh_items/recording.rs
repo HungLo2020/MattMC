@@ -27,19 +27,6 @@ impl GuiFrontend {
             self.destroy_render_resources(gal);
             self.generation = generation;
         }
-        let mut needed_targets = Vec::new();
-        for batch in &mesh_batches {
-            let (extent, _, _) = resolve_gui_mesh_item_raster(batch)?;
-            needed_targets.push((batch.item_cache.map(|cache| cache.identity).unwrap_or(0),
-                Extent3d { width: extent[0], height: extent[1], depth: 1 }));
-        }
-        if self.mesh_targets.has_obsolete_items(generation, &needed_targets) {
-            // Composite programs may be shared: release borrowers before owners.
-            let mut composites: Vec<_> = std::mem::take(&mut self.mesh_composites).into_values().collect();
-            composites.sort_by_key(|resources| resources.owns_shared_resources());
-            for resources in composites { resources.destroy(gal); }
-            self.mesh_targets.retain_items(gal, generation, &needed_targets);
-        }
         // Static item rasters are already retained by the Rust-owned target
         // cache. Once a prior submission has accepted that raster, composing
         // it does not require transforming every source vertex again. Keep
@@ -74,11 +61,9 @@ impl GuiFrontend {
                 reusable_items.insert(item_key);
             }
         }
-        let mut prepared = if reusable_items.is_empty() {
-            prepare_gui_mesh_draws(&mesh_batches)?
-        } else {
-            prepare_gui_mesh_draws_with_reuse(&mesh_batches, &reusable_items)?
-        };
+        let mut prepared = self
+            .prepared_geometry
+            .prepare_draws_with_reuse(&mesh_batches, &reusable_items)?;
         // Resolve exact owner incarnations before allocating any mesh resources.
         // The geometry keeps original sprite-local UVs until this native boundary.
         for (batch, draw) in mesh_batches.iter().zip(&mut prepared) {
@@ -96,6 +81,8 @@ impl GuiFrontend {
             let reference = self
                 .atlas_references
                 .resolve(draw.asset_id, |id| owner.accepted_gui_atlas_incarnation(id))?;
+            // Remapped UVs depend on the atlas incarnation, not the memo key.
+            draw.geometry_identity = None;
             for vertex in &mut draw.vertices {
                 vertex.local_uv = reference.atlas_uv(vertex.local_uv)?;
             }
@@ -196,20 +183,29 @@ impl GuiFrontend {
                     self.mesh_rasters.insert(raster_key, raster);
                     stats.resource_creates = stats.resource_creates.saturating_add(1);
                 }
-                let geometry_key = (
-                    raster_key,
-                    gui_mesh_geometry_fingerprint(first),
-                    self.mesh_geometry_transaction,
-                );
+                // Content-keyed: unchanged geometry stays resident across frames.
+                let fingerprint = first
+                    .geometry_identity
+                    .unwrap_or_else(|| gui_mesh_geometry_fingerprint(first));
+                let geometry_key = (raster_key, fingerprint, 0);
                 let vertex_bytes = (first.vertices.len()
                     * crate::render::guirender::mesh::GUI_MESH_GPU_VERTEX_BYTES)
                     as u64;
                 let index_bytes = (first.indices.len() * std::mem::size_of::<u32>()) as u64;
+                self.retire_unwritten_pending_mesh_geometry(&geometry_key);
+                let transaction = self.mesh_geometry_transaction;
                 let (stream, reused) = if let Some(residency) =
                     self.mesh_geometry_cache.get_mut(&geometry_key)
                 {
+                    // Only an accepted submission (or this frame's own upload)
+                    // proves the range holds this geometry; a discarded earlier
+                    // preparation never wrote it, so rewrite the same range.
+                    let written = residency.last_transaction == transaction
+                        || residency.usage.last_submission()
+                            != crate::render::vulkanic::sync::SubmissionId::default();
+                    residency.last_transaction = transaction;
                     operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
-                    (residency.stream, true)
+                    (residency.stream, written)
                 } else {
                     let residency =
                         self.allocate_mesh_geometry(gal, raster_key, vertex_bytes, index_bytes)?;
@@ -339,20 +335,29 @@ impl GuiFrontend {
                     self.mesh_rasters.insert(raster_key, raster);
                     stats.resource_creates = stats.resource_creates.saturating_add(1);
                 }
-                let geometry_key = (
-                    raster_key,
-                    gui_mesh_geometry_fingerprint(draw),
-                    self.mesh_geometry_transaction,
-                );
+                // Content-keyed: unchanged geometry stays resident across frames.
+                let fingerprint = draw
+                    .geometry_identity
+                    .unwrap_or_else(|| gui_mesh_geometry_fingerprint(draw));
+                let geometry_key = (raster_key, fingerprint, 0);
                 let vertex_bytes = (draw.vertices.len()
                     * crate::render::guirender::mesh::GUI_MESH_GPU_VERTEX_BYTES)
                     as u64;
                 let index_bytes = (draw.indices.len() * std::mem::size_of::<u32>()) as u64;
+                self.retire_unwritten_pending_mesh_geometry(&geometry_key);
+                let transaction = self.mesh_geometry_transaction;
                 let (stream, reused) = if let Some(residency) =
                     self.mesh_geometry_cache.get_mut(&geometry_key)
                 {
+                    // Only an accepted submission (or this frame's own upload)
+                    // proves the range holds this geometry; a discarded earlier
+                    // preparation never wrote it, so rewrite the same range.
+                    let written = residency.last_transaction == transaction
+                        || residency.usage.last_submission()
+                            != crate::render::vulkanic::sync::SubmissionId::default();
+                    residency.last_transaction = transaction;
                     operations.push(CommandOp::TrackSubmission(residency.usage.clone()));
-                    (residency.stream, true)
+                    (residency.stream, written)
                 } else {
                     let residency =
                         self.allocate_mesh_geometry(gal, raster_key, vertex_bytes, index_bytes)?;

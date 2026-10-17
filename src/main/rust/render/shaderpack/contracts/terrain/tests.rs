@@ -1,6 +1,42 @@
 use crate::render::shaderpack::source::{RUNTIME_BLOCK_STATE_IDENTITIES_PATH, RUNTIME_OPTIONS_PATH};
 use crate::render::shaderpack::contracts::terrain::*;
 
+#[test]
+fn single_color_terrain_keeps_its_selected_slot_and_original_lighting() {
+    let source = ShaderPackSource::new("single-color", 3, vec![
+        ShaderSourceFile::new("world0/gbuffers_terrain.vsh", concat!(
+            "#version 120\nvarying vec2 texcoord;\nvarying vec4 tintColor;\n",
+            "void main() { gl_Position = ftransform(); texcoord = gl_MultiTexCoord0.xy; tintColor = gl_Color; }\n"
+        )),
+        ShaderSourceFile::new("world0/gbuffers_terrain.fsh", concat!(
+            "#version 120\nuniform sampler2D tex;\nvarying vec2 texcoord;\nvarying vec4 tintColor;\n",
+            "/* DRAWBUFFERS:1 */\nvoid main() { vec4 pixel = texture2D(tex, texcoord) * tintColor; ",
+            "pixel.rgb *= pow(vec3(0.8), vec3(2.0)); gl_FragData[0] = pixel; }\n"
+        )),
+        ShaderSourceFile::new("block.properties", "block.10201=minecraft:grass_block\n"),
+    ]).unwrap();
+    let contract = derive_terrain_contract_for_scope(&source, TerrainProgramScope::Overworld).unwrap();
+    assert_eq!(contract.outputs, std::collections::BTreeSet::from([TerrainPassOutput::LitTerrainColor]));
+    assert_eq!(contract.output_color_slot(TerrainPassOutput::LitTerrainColor), Some(1));
+    assert_eq!(contract.material_ids[&10201], ["minecraft:grass_block"]);
+    assert!(contract.required_resources.is_empty());
+    let stages = contract.source_stages().unwrap();
+    let artifacts = crate::render::shaderpack::source::preprocess::preprocess_terrain_sources(&source, &stages).unwrap();
+    let lowered = crate::render::shaderpack::lowering::lower_terrain_source_pair(&artifacts.vertex, &artifacts.fragment).unwrap();
+    assert!(lowered.fragment().source().contains("pow(vec3(0.8), vec3(2.0))"));
+    assert!(!lowered.fragment().source().contains("DoLighting("));
+}
+
+#[test]
+fn single_color_discovery_requires_a_complete_paired_source() {
+    let source = ShaderPackSource::new("fragment-only", 1, vec![
+        ShaderSourceFile::new("gbuffers_terrain.fsh",
+            "#version 120\n/* DRAWBUFFERS:1 */\nvoid main() { gl_FragData[0] = vec4(1.0); }"),
+    ]).unwrap();
+    let error = derive_terrain_contract_for_scope(&source, TerrainProgramScope::Default).unwrap_err();
+    assert!(error.to_string().contains("missing shader source"));
+}
+
 fn source() -> ShaderPackSource {
     ShaderPackSource::new("test", 1, vec![
         ShaderSourceFile::new("program/gbuffers_terrain.glsl", "#include \"/lib/common.glsl\"\nvoid DoLighting() {}\n/* DRAWBUFFERS:06 */\nvoid main() { vec4 color = texture2D(tex, texCoord); if (color.a <= 0.00001) discard; color.rgb *= glColor.rgb; DoLighting(); gl_FragData[0] = color; gl_FragData[1] = vec4(smoothnessD, materialMask, skyLightFactor, 1.0); }"),
@@ -216,7 +252,7 @@ fn translucent_contract_derives_only_explicit_source_alpha_raster_state() {
         .translucent_raster_state
         .expect("explicit source raster directives must survive contract derivation");
     assert_eq!(TerrainTranslucentBlend::SourceAlphaOver, raster.blend);
-    assert!((raster.alpha_test.greater_than() - 0.0001).abs() < f32::EPSILON);
+    assert!((raster.alpha_test.unwrap().greater_than() - 0.0001).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -325,7 +361,7 @@ fn translucent_contract_uses_standard_blend_when_source_declares_only_alpha_test
         .translucent_raster_state
         .expect("an explicit alpha test admits the standard terrain translucent blend");
     assert_eq!(TerrainTranslucentBlend::SourceAlphaOver, raster.blend);
-    assert!((raster.alpha_test.greater_than() - 0.0001).abs() < f32::EPSILON);
+    assert!((raster.alpha_test.unwrap().greater_than() - 0.0001).abs() < f32::EPSILON);
 
     let blend_only = ShaderPackSource::new(
         "translucent-raster-blend-only",

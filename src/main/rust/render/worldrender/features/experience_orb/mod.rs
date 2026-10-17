@@ -94,6 +94,8 @@ impl ExperienceOrbPlacement {
             ));
         }
         Ok(WorldMeshInstanceRequest {
+            entity_culling: None,
+
             model_submission_order: None,
             item_foil: None,
             decal_foil: None,

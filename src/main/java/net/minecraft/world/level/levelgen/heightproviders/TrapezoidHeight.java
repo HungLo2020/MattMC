@@ -24,6 +24,19 @@ public class TrapezoidHeight extends HeightProvider {
 	private final VerticalAnchor maxInclusive;
 	private final int plateau;
 
+	/** For native placement programs. */
+	public VerticalAnchor minInclusive() {
+		return this.minInclusive;
+	}
+
+	public VerticalAnchor maxInclusive() {
+		return this.maxInclusive;
+	}
+
+	public int plateau() {
+		return this.plateau;
+	}
+
 	private TrapezoidHeight(VerticalAnchor verticalAnchor, VerticalAnchor verticalAnchor2, int i) {
 		this.minInclusive = verticalAnchor;
 		this.maxInclusive = verticalAnchor2;

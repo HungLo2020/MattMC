@@ -42,7 +42,9 @@ public class CropBlock extends VegetationBlock implements BonemealableBlock {
 
 	public CropBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(this.getAgeProperty(), 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(this.getAgeProperty(), 0));
+		}
 	}
 
 	@Override

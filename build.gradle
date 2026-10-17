@@ -1,3 +1,6 @@
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
 plugins {
     id 'java'
     id 'application'
@@ -460,6 +463,10 @@ tasks.register('buildRustNative', Exec) {
     inputs.files(rustSourceFiles)
     inputs.property('mattmcRustProfile', rustCargoProfile)
     inputs.property('mattmcRustTracy', rustTracyRequested())
+    // Profiling changes the native artifact even when Rust source is unchanged.
+    // Never reuse stripped output for a symbol-enabled validation launch.
+    inputs.property('mattmcRustReleaseDebug', providers.environmentVariable('CARGO_PROFILE_RELEASE_DEBUG').orElse('cargo-default'))
+    inputs.property('mattmcRustReleaseStrip', providers.environmentVariable('CARGO_PROFILE_RELEASE_STRIP').orElse('cargo-default'))
     outputs.file(rustBuiltNativesDir.map { it.file(rustNativeFileName) })
 
     environment 'CARGO_TARGET_DIR', rustTargetDir.get().asFile.absolutePath
@@ -474,10 +481,20 @@ tasks.register('buildRustNative', Exec) {
             throw new GradleException("Cargo did not produce expected Rust native library: ${cargoLibrary}")
         }
 
-        copy {
-            from cargoLibrary
-            into rustBuiltNativesDir.get().asFile
-            rename { rustNativeFileName }
+        // A running client can still map the previous library. Copying over
+        // its inode can corrupt those mappings or fault while the file is
+        // truncated. Publish a complete replacement in the same directory;
+        // existing clients retain their original mapping until they exit.
+        def nativeDirectory = rustBuiltNativesDir.get().asFile.toPath()
+        Files.createDirectories(nativeDirectory)
+        def stagedLibrary = Files.createTempFile(nativeDirectory, ".${rustNativeFileName}.", '.tmp')
+        try {
+            Files.copy(cargoLibrary.toPath(), stagedLibrary,
+                StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+            Files.move(stagedLibrary, nativeDirectory.resolve(rustNativeFileName),
+                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(stagedLibrary)
         }
 
         delete fileTree(rustBuiltNativesDir.get().asFile) {
@@ -494,7 +511,20 @@ tasks.register('testRustNative', Exec) {
     group = 'verification'
     description = 'Runs Rust unit tests for src/main/rust.'
 
+    // A stamp written only after cargo succeeds lets Gradle skip an unchanged
+    // passing suite (~5 min serial) on every later Test task. Inputs cover the
+    // crate plus the repository files its tests read (resources, shader pack,
+    // DevUtils fixtures). Use --rerun-tasks or `--rerun` to force a rerun,
+    // e.g. after a GPU driver change.
     inputs.files(rustSourceFiles)
+    inputs.files(fileTree(rustSourceDir) { exclude 'target/**' }).withPropertyName('mattmcRustTestData')
+    inputs.dir('src/main/resources').withPropertyName('mattmcRustTestResources')
+    inputs.dir('DevUtils/tests/rendering/fixtures').withPropertyName('mattmcRustTestFixtures')
+    def testStamp = layout.buildDirectory.file('rust/testRustNative.stamp')
+    outputs.file(testStamp)
+    doLast {
+        testStamp.get().asFile.text = "passed ${new Date()}\n"
+    }
 
     environment 'CARGO_TARGET_DIR', rustTargetDir.get().asFile.absolutePath
     // CI/release builders are often headless. The Rust audio tests need an
@@ -505,7 +535,7 @@ tasks.register('testRustNative', Exec) {
     // The Rust suite includes native OpenAL/EGL/Vulkan tests with process-global
     // driver state. Keep the full launch/check gate, but run the native test
     // binary serially so those subsystems cannot race each other.
-    commandLine 'cargo', 'test', '--manifest-path', rustManifest.absolutePath, '--locked', '--', '--test-threads=1'
+    commandLine 'cargo', 'test', '--manifest-path', rustManifest.absolutePath, '--locked', '--profile', 'suite', '--', '--test-threads=1'
     doFirst {
         configureRustBuildPython(delegate)
     }
@@ -515,8 +545,25 @@ tasks.named('classes') {
     dependsOn 'buildRustNative'
 }
 
+// Test tasks given a --tests filter on the command line (it applies to the task
+// named just before it), and whether slow-tagged cases run; see TESTING CONFIGURATION.
+def filteredTestTasks = gradle.startParameter.taskRequests.collectMany { request ->
+    def names = []
+    String task = null
+    request.args.eachWithIndex { arg, index ->
+        boolean optionValue = index > 0 && request.args[index - 1] == '--tests'
+        if (arg == '--tests' || arg.startsWith('--tests=')) { if (task != null) names << task }
+        else if (!arg.startsWith('-') && !optionValue) task = arg.replaceFirst(/^.*:/, '')
+    }
+    names
+} as Set
+def includeSlowTests = (findProperty('mattmcSlowTests') ?: 'false').toString().toBoolean()
+
 tasks.withType(Test).configureEach {
-    dependsOn 'buildRustNative', 'testRustNative'
+    dependsOn 'buildRustNative'
+    // A filtered iteration run skips the full serial Rust suite (~5 min after
+    // any crate change); check and unfiltered runs keep it as their gate.
+    if (!filteredTestTasks.contains(name)) dependsOn 'testRustNative'
     // Architecture tests inspect source text and ABI tests load the Rust
     // library. Java classpath changes alone cannot invalidate those results.
     inputs.files(rustSourceFiles).withPropertyName('mattmcRustSourceContracts')
@@ -526,6 +573,8 @@ tasks.withType(Test).configureEach {
     inputs.file(rustBuiltNativesDir.map { it.file(rustNativeFileName) })
             .withPropertyName('mattmcRustNativeLibrary')
     systemProperty 'mattmc.rust.natives.dir', rustBuiltNativesDir.get().asFile.absolutePath
+    // Sound engine tests open OpenAL's silent null device, never real hardware.
+    environment 'ALSOFT_DRIVERS', 'null'
     jvmArgs rustNativeJvmArgs
     def corpusReplayInput = providers.gradleProperty('mattmcMeshingCorpusReplayInput')
     if (corpusReplayInput.isPresent()) {
@@ -754,6 +803,18 @@ if (isMacOS) {
 	clientJvmArgs += '-XX:ZUncommitDelay=5'
 }
 
+// Per-frame render code runs once per frame, so with HotSpot's default tiers it
+// stays in profiling C1 code for the first ~5,000 frames after a world loads.
+// Earlier C2 compilation cut the 1,800-frame moving vanilla benchmark's Java
+// frame time ~20% (588 -> 679/749 FPS); steady state is unchanged. Keep in step
+// with packaging/run-mattmc.{sh,bat}.
+clientJvmArgs += [
+    '-XX:Tier3InvocationThreshold=100',
+    '-XX:Tier4InvocationThreshold=600',
+    '-XX:Tier4MinInvocationThreshold=300',
+    '-XX:Tier4CompileThreshold=700'
+]
+
 // Add macOS-specific JVM arguments for LWJGL/GLFW
 if (isMacOS) {
     clientJvmArgs += '-XstartOnFirstThread'
@@ -952,7 +1013,21 @@ tasks.register('runClient', JavaExec) {
     if (extraRunArgs) {
         args(extraRunArgs.trim().split(/\s+/) as List)
     }
-    
+    // Extra client JVM arguments for scripted dev runs, e.g.
+    // -PmattmcRunJvmArgs="-Dmattmc.dev.scriptedCamera=true" (RunScriptedLook.py).
+    def extraRunJvmArgs = providers.gradleProperty('mattmcRunJvmArgs').getOrNull()
+    if (extraRunJvmArgs) {
+        jvmArgs(extraRunJvmArgs.trim().split(/\s+/) as List)
+    }
+    // `python3 DevUtils/RunDev.py --record`: per-frame session recording and a
+    // JFR profile of the client JVM only, written into this directory.
+    def recordDir = providers.gradleProperty('mattmcRecordDir').getOrNull()
+    if (recordDir) {
+        def recordPath = file(recordDir).absolutePath
+        jvmArgs "-Dmattmc.dev.recordDir=${recordPath}",
+            "-XX:StartFlightRecording=filename=${recordPath}/client.jfr,settings=profile,dumponexit=true"
+    }
+
     doFirst {
         workingDir.mkdirs()
         file("${runGameDir}/resourcepacks").mkdirs()
@@ -1519,9 +1594,29 @@ tasks.register('clientDistZip', Zip) {
 
 // ===== TESTING CONFIGURATION =====
 
+// Test tiers, by JUnit tag:
+// - `test`: ordinary tests, without @Tag("parity") or @Tag("slow").
+// - `parityTest`: large Frozen-vs-Rust parity workloads (@Tag("parity")), without slow cases.
+// - `slowTest`: exhaustive or corpus-sized cases (@Tag("slow")), usually single methods.
+// `check` runs all three. A --tests filter on a task (it applies to the task
+// named just before it) also selects its parity classes, so per-slice commands
+// such as `test --tests '*NativeHeightmapTest'` work; slow cases stay excluded
+// unless -PmattmcSlowTests=true. Filtered runs skip the automatic full serial
+// Rust suite (testRustNative); run the Rust tests for the change separately.
+// filteredTestTasks and includeSlowTests are defined above the Test defaults.
+// Each fork is a 2 GB JVM. Override with -PmattmcTestForks=N.
+def javaTestForks = (findProperty('mattmcTestForks')
+    ?: Math.max(1, Math.min(3, Runtime.runtime.availableProcessors().intdiv(4)))).toString().toInteger()
+
 // Configure JUnit 5 test platform for standard tests
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        def excluded = []
+        if (!filteredTestTasks.contains('test')) excluded << 'parity'
+        if (!includeSlowTests) excluded << 'slow'
+        if (excluded) excludeTags(*excluded)
+    }
+    maxParallelForks = javaTestForks
     
     // Configure test output
     testLogging {
@@ -1545,12 +1640,65 @@ test {
     
     // Set max heap for tests
     maxHeapSize = "2g"
+
+    // Mockito 5.8 bundles Byte Buddy 1.14, which predates Java 25 class
+    // files; without this flag inline mocks of game classes fail to load.
+    systemProperty 'net.bytebuddy.experimental', 'true'
     
     // Exclude performance tests from regular test runs
     // Performance tests are identified by naming convention: *PerformanceTest or *Benchmark
     exclude '**/*PerformanceTest.class'
     exclude '**/*Benchmark.class'
 }
+
+tasks.register('parityTest', Test) {
+    group = 'verification'
+    description = 'Runs the large @Tag("parity") Frozen-vs-Rust parity workloads in parallel JVMs.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'parity'
+        if (!includeSlowTests) excludeTags 'slow'
+    }
+    maxParallelForks = javaTestForks
+    maxHeapSize = "2g"
+    systemProperty 'net.bytebuddy.experimental', 'true'
+    testLogging {
+        events "failed"
+        exceptionFormat "full"
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nParity Test Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, Skipped: ${result.skippedTestCount}"
+            }
+        }
+    }
+}
+tasks.register('slowTest', Test) {
+    group = 'verification'
+    description = 'Runs the exhaustive and corpus-sized @Tag("slow") cases in parallel JVMs.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'slow' }
+    maxParallelForks = javaTestForks
+    maxHeapSize = "2g"
+    systemProperty 'net.bytebuddy.experimental', 'true'
+    exclude '**/*PerformanceTest.class'
+    exclude '**/*Benchmark.class'
+    testLogging {
+        events "failed"
+        exceptionFormat "full"
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nSlow Test Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, Skipped: ${result.skippedTestCount}"
+            }
+        }
+    }
+}
+tasks.named('check') { dependsOn 'parityTest', 'slowTest' }
 
 // Separate task for performance tests
 tasks.register('performanceTest', Test) {

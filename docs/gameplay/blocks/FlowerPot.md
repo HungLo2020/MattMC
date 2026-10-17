@@ -72,6 +72,26 @@ The list comes from the registered pot contents, not from the `flower_pots` bloc
 
 Pots break instantly and have no correct-tool requirement. Their registered piston reaction is **destroy**, rather than ordinary block movement. See [Pistons](Pistons.md#what-can-move) for the shared movement limits and destruction handling. [Pot properties][properties]
 
+## Cactus and Wither Rose displays
+
+For a Cactus or Wither Rose beside a walkway, use its **filled Flower Pot**:
+`minecraft:potted_cactus` does not inflict the ordinary Cactus's contact damage,
+and `minecraft:potted_wither_rose` does not apply the planted Rose's Wither effect.
+These are Flower Pot blocks; displaying the plant does not run that plant's
+contact callback. [Filled registrations][display-register] · [Pot behavior][display-pot] ·
+[Active contact dispatch][display-dispatch] · [Inherited empty callback][display-contact]
+
+This distinction applies to the two potted forms, not to an ordinary
+[Cactus](Cactus.md#contact-and-loose-item-hazards) or
+[Wither Rose](Flowers.md#wither-rose-creation-and-hazard) planted nearby. Follow
+[the usual removal steps](#adding-and-removing-plants) when changing the display;
+potting does not remove hazards from other blocks around the path.
+
+Source-reviewed on **2026-10-16** at `a429c0216d34d8c87e005c9587be9ac1b2342038`, including the
+[native definitions][display-native] and Java contact path. This is a
+source-derived building recommendation; no in-game contact, damage or status-effect
+test was run.
+
 ## Mining and drops
 
 Under ordinary Survival block-drop rules, mining by hand or with a tool returns:
@@ -119,3 +139,9 @@ Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`.
 [night-helper]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/CreakingHeartBlock.java#L69-L70
 [night]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/Level.java#L365-L372
 [tick]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/server/level/ServerLevel.java#L487-L507
+
+[display-register]: https://github.com/HungLo2020/MattMC/blob/a429c0216d34d8c87e005c9587be9ac1b2342038/src/main/java/net/minecraft/world/level/block/Blocks.java#L1811-L1819
+[display-pot]: https://github.com/HungLo2020/MattMC/blob/a429c0216d34d8c87e005c9587be9ac1b2342038/src/main/java/net/minecraft/world/level/block/FlowerPotBlock.java
+[display-dispatch]: https://github.com/HungLo2020/MattMC/blob/a429c0216d34d8c87e005c9587be9ac1b2342038/src/main/java/net/minecraft/world/level/block/state/BlockBehaviour.java#L851-L853
+[display-contact]: https://github.com/HungLo2020/MattMC/blob/a429c0216d34d8c87e005c9587be9ac1b2342038/src/main/java/net/minecraft/world/level/block/state/BlockBehaviour.java#L370-L373
+[display-native]: https://github.com/HungLo2020/MattMC/blob/a429c0216d34d8c87e005c9587be9ac1b2342038/src/main/rust/content/block/definitions/catalog.rs#L467-L471

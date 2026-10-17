@@ -25,6 +25,16 @@
 | Red | [`minecraft:red_terracotta`](../items/RedTerracotta.md) | [`minecraft:red_glazed_terracotta`](../items/RedGlazedTerracotta.md) |
 | Black | [`minecraft:black_terracotta`](../items/BlackTerracotta.md) | [`minecraft:black_glazed_terracotta`](../items/BlackGlazedTerracotta.md) |
 
+## Choosing an acquisition route
+
+For a planned color palette, start with **uncolored Terracotta**: smelt [Clay blocks](../items/Clay.md#obtaining-and-use) or collect the uncolored material from Badlands terrain, then use the [dye and glazing recipes](#crafting-and-smelting). Collecting an already colored block saves that conversion only when it is the color you want. [Clay smelting][base-recipe] · [Badlands surface rules][badlands-surface] · [Band materials][band-materials]
+
+In the normal Overworld, **Badlands, Eroded Badlands and Wooded Badlands** share terracotta-banding rules. The band palette contains **uncolored Terracotta plus Orange, Yellow, Brown, Red, White and Light Gray Terracotta**. These bands do not supply the other ten dyed colors or Glazed Terracotta. The exact exposed layers vary; this is a palette to look for, not a promise of every color in one cliff. Bring an [unbroken pickaxe](#mining-and-drops), and keep uncolored blocks separate if you intend to dye them later. See [Badlands and its variants](../biomes/DesertsBadlandsAndSavannas.md#badlands) for the terrain search. [Normal world preset][normal-preset] · [Loaded surface rules][badlands-surface] · [Band generation][band-materials] · [Active native band evaluation][native-bands]
+
+A **Mason at trading level 4** offers another possible route to a desired dyed or glazed color. Its level-4 pool contains **one entry for each of the 16 dyed colors, one for each of the 16 glazed colors, and one Quartz-buying entry**. The villager selects **two entries** from that pool, so neither a particular color nor both finishes of that color are guaranteed. Each selected terracotta offer has a **base price of 1 Emerald for 1 block** and **12 uses before restocking**. It does not sell uncolored Terracotta. Check the actual offers before relying on this route; [Trading](../trading/Trading.md#stock-and-restocking) owns replenishment and [price changes](../trading/Trading.md#prices-can-change). [Mason listings][mason-offers] · [Active table and level selection][villager-offers] · [Random selection][offer-selection] · [Sale quantities and stock][sale-constructor]
+
+The optional Trade Rebalance feature retains this Mason pool through its ordinary-table fallback. This is a selected acquisition guide, not an inventory of every structure containing terracotta. [Table fallback][villager-offers] · [Experimental profession tables][experimental-professions]
+
 ## Crafting and smelting
 
 | Step | Exact input and arrangement | Output | Recipe time / XP |
@@ -36,8 +46,6 @@
 The smelting times are approximately **10 seconds at 20 ticks per second** while processing. Recipe XP is not an immediate payout; see [Furnace experience](Furnace.md#experience-and-troubleshooting). These are normal smelting recipes, not blasting recipes. [Clay-to-Terracotta recipe][base-recipe] · [Example dye recipe][red-recipe] · [Example glazing recipe][red-glaze] · [Furnace recipe type][furnace]
 
 Every dye recipe names **uncolored `minecraft:terracotta`** as its input. Already dyed Terracotta, including White Terracotta, cannot substitute. Each glazing recipe names only its matching dyed input. The bundled recipe files provide **no recoloring, dye removal, or unglazing recipe** for this family. Choose the color and finish before converting a large batch; ordinary block collection retains the current color and finish. [White dye recipe][white-recipe] · [Red dye recipe][red-recipe] · [Red glazing recipe][red-glaze] · [Exact color sources](#forms-and-colors)
-
-These are the checked crafting and smelting routes. Natural structures and trades are not inventoried here.
 
 ## Placement and facing
 
@@ -75,6 +83,8 @@ Related: [Terracotta item](../items/Terracotta.md) · [Clay](../items/Clay.md) �
 
 Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. Checked all 33 block/item registrations, recipes, and loot tables; expanded mining/tool-tier tags; and traced current placement and piston movement callbacks. All bundled recipe JSON files were scanned for this family's outputs before describing conversion limits. No in-game crafting, smelting, pattern placement, mining, piston, or Slime/Honey mechanism test was run. Data packs can change recipes, tags, and loot.
 
+Acquisition additions reviewed on **2026-10-10** at `f86206767dadde696adfed4e04c5ee97cd0d0885`: followed the normal Overworld preset, loaded Badlands surface rules and native band evaluation; checked Mason tables, offer selection, constructor amounts and the optional-table fallback; and rechecked the family recipes and matching block loot. The earlier placement, piston and collection review remains pinned above. No in-game terrain search or trading test was run.
+
 [base-block]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L3274-L3277
 [dyed-blocks]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L2907-L3030
 [glazed-blocks]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L4430-L4589
@@ -103,3 +113,12 @@ Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`.
 [red-loot]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/blocks/red_terracotta.json
 [red-glazed-loot]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/resources/data/minecraft/loot_table/blocks/red_glazed_terracotta.json
 [break-dispatch]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L278-L302
+[normal-preset]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/world_preset/normal.json#L1-L13
+[badlands-surface]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/resources/data/minecraft/worldgen/noise_settings/overworld.json#L691-L993
+[band-materials]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/level/levelgen/SurfaceSystem.java#L326-L374
+[native-bands]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/rust/world/level/levelgen/surface/evaluator.rs#L198-L211
+[mason-offers]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/VillagerTrades.java#L646-L711
+[villager-offers]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/Villager.java#L819-L842
+[offer-selection]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/AbstractVillager.java#L222-L233
+[sale-constructor]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/VillagerTrades.java#L1422-L1479
+[experimental-professions]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/minecraft/world/entity/npc/VillagerTrades.java#L831-L1128

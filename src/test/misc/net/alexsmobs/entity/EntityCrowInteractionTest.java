@@ -236,6 +236,7 @@ class EntityCrowInteractionTest {
 
         Fixture(boolean clientSide, boolean creative, boolean tame, boolean owner) {
             level = clientSide ? mock(Level.class, RETURNS_DEEP_STUBS) : mock(ServerLevel.class, RETURNS_DEEP_STUBS);
+            when(level.nativeEntityGeometry()).thenCallRealMethod();
             when(level.isClientSide()).thenReturn(clientSide);
             when(level.enabledFeatures()).thenReturn(FeatureFlags.DEFAULT_FLAGS);
             when(level.registryAccess()).thenReturn(RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY));

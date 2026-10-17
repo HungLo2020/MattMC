@@ -1220,7 +1220,7 @@ impl OpenGlLowerer {
             } else {
                 String::new()
             };
-            eprintln!(
+            crate::core::console::stderr(format_args!(
                 "MATTMC_RUST_GAL_GL_DRAW_STATE phase={} current_program={} program_label={} draw_fbo={} read_fbo={} draw_buffer0={} vertex_array={} array_buffer={} element_array_buffer={} active_texture={} depth_test={} depth_write={} blend={} cull_face={} scissor={} pipeline_bound={} index_buffer_bound={}",
                 phase,
                 current_program,
@@ -1239,7 +1239,7 @@ impl OpenGlLowerer {
                 self.gl.is_enabled(glow::SCISSOR_TEST),
                 state.pipeline.is_some(),
                 state.index_buffer.is_some(),
-            );
+            ));
         }
     }
 

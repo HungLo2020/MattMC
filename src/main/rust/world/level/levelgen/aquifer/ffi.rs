@@ -1,3 +1,4 @@
+use crate::world::level::levelgen::router::{Binding, Program};
 fn valid_shape(shape: &[i32], len: i32) -> bool {
     let row = shape[3] as i64 * shape[4] as i64;
     shape[3] > 0 && shape[4] > 0 && row <= len as i64 && len as i64 % row == 0
@@ -81,6 +82,57 @@ pub unsafe extern "C" fn mattmc_aquifer_fluid_pure(
         noise,
         unsafe { std::slice::from_raw_parts(policy, 8) },
         unsafe { std::slice::from_raw_parts(surface, size) },
+    )
+}
+
+/// `mattmc_aquifer_fluid_pure` with no requests: the sources and surface
+/// programs answer them. `grid` is the chunk's FlatCache grid [firstQuartX,
+/// firstQuartZ, size]; `memo`/`present` hold `memo_len` corner values and flags
+/// (the sources program's slots times size squared), kept by Java per chunk.
+/// Surface is written back as Java's binding writes it. Returns 0 or negative.
+/// # Safety
+/// As `mattmc_aquifer_fluid_pure`, with surface writable; handles are live
+/// programs from `mattmc_fluid_sources_create` and `mattmc_surface_program_create`.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_aquifer_fluid_native(
+    frame: *mut i32,
+    policy: *const i32,
+    surface: *mut i32,
+    sources: u64,
+    levels: u64,
+    grid: *const i32,
+    memo: *mut f64,
+    present: *mut u8,
+    memo_len: i32,
+) -> i32 {
+    if frame.is_null() || policy.is_null() || surface.is_null() || sources == 0 || levels == 0 || grid.is_null() || memo.is_null()
+        || present.is_null() || memo_len < 0
+    {
+        return -1;
+    }
+    let f = unsafe { std::slice::from_raw_parts_mut(frame, 26) };
+    let g = unsafe { std::slice::from_raw_parts(grid, 3) };
+    let sources = unsafe { &*(sources as *const Program) };
+    if !(1..=128).contains(&f[24]) || !(1..=128).contains(&f[25]) || !(1..=64).contains(&g[2])
+        || memo_len as usize != sources.point_slots() * (g[2] * g[2]) as usize || sources.root_count() != 5
+    {
+        return -1;
+    }
+    let size = (f[24] * f[25] * 2) as usize;
+    let mut binding = Binding {
+        first_x: g[0],
+        first_z: g[1],
+        size: g[2],
+        memo: unsafe { std::slice::from_raw_parts_mut(memo, memo_len as usize) },
+        present: unsafe { std::slice::from_raw_parts_mut(present, memo_len as usize) },
+    };
+    super::fluid::native_step(
+        f,
+        unsafe { std::slice::from_raw_parts(policy, 8) },
+        unsafe { std::slice::from_raw_parts_mut(surface, size) },
+        sources,
+        unsafe { &*(levels as *const Program) },
+        &mut binding,
     )
 }
 
@@ -223,4 +275,60 @@ pub unsafe extern "C" fn mattmc_aquifer_cell(
         }
     }
     0
+}
+
+/// Native `cellLocations` for built-in positional factories (`kind` 1 Xoroshiro
+/// with seedLo/seedHi, 2 Legacy with seed): fills the missing aquifer centres a
+/// cell batch reads. Grid and shape follow `mattmc_aquifer_cell`. Returns 0, or
+/// -1 for invalid arguments or a cell outside the grid.
+/// # Safety
+/// `grid` has `len` writable i64s and `shape` five readable i32s, aligned,
+/// disjoint and borrowed for this call only.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_aquifer_locations(
+    grid: *mut i64,
+    len: i32,
+    shape: *const i32,
+    kind: i32,
+    a: i64,
+    b: i64,
+    x: i32,
+    y: i32,
+    z: i32,
+    width: i32,
+    height: i32,
+) -> i32 {
+    let Some(random) = crate::world::level::levelgen::random::Positional::from_abi(kind, a, b) else {
+        return -1;
+    };
+    if grid.is_null() || shape.is_null() || !(1..=65536).contains(&len) || !(1..=16).contains(&width) || !(1..=32).contains(&height) {
+        return -1;
+    }
+    let grid = unsafe { std::slice::from_raw_parts_mut(grid, len as usize) };
+    let shape = unsafe { std::slice::from_raw_parts(shape, 5) };
+    if !valid_shape(shape, len) {
+        return -1;
+    }
+    if super::locations::fill_cell_locations(grid, shape, random, x, y, z, width, height) {
+        0
+    } else {
+        -1
+    }
+}
+
+/// Ordinary FFM admission over off-heap transport. The VM pins the canonical
+/// factory through this synchronous, callback-free borrow; pending enclosing
+/// aquifer/NOISE kernels retain their own actual Factory Arc instead.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_aquifer_locations_owned(
+    grid:*mut i64,len:i32,shape:*const i32,factory:u64,
+    x:i32,y:i32,z:i32,width:i32,height:i32,
+)->i32 {
+    if factory==0 || grid.is_null() || shape.is_null() || !(1..=65536).contains(&len)
+        || !(1..=16).contains(&width) || !(1..=32).contains(&height) { return -1; }
+    let grid=unsafe{std::slice::from_raw_parts_mut(grid,len as usize)};
+    let shape=unsafe{std::slice::from_raw_parts(shape,5)};
+    if !valid_shape(shape,len) { return -1; }
+    let factory=unsafe{crate::world::level::levelgen::owned_positional::ffi::factory(factory)};
+    if super::locations::fill_cell_locations_owned(grid,shape,factory,x,y,z,width,height){0}else{-1}
 }

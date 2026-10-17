@@ -114,6 +114,7 @@ pub(crate) fn texture_format(raw: u32) -> GalResult<TextureFormat> {
         9 => Ok(TextureFormat::Rgb16Float),
         10 => Ok(TextureFormat::R8Unorm),
         11 => Ok(TextureFormat::Rgba8Snorm),
+        12 => Ok(TextureFormat::R16Float),
         _ => Err(GalError::ffi(
             StatusCode::UnknownEnum,
             format!("unknown texture format {raw}"),
@@ -141,7 +142,8 @@ mod tests {
         assert_eq!(TextureFormat::Rgb16Float, texture_format(9).unwrap());
         assert_eq!(TextureFormat::R8Unorm, texture_format(10).unwrap());
         assert_eq!(TextureFormat::Rgba8Snorm, texture_format(11).unwrap());
-        assert!(texture_format(12).is_err());
+        assert_eq!(TextureFormat::R16Float, texture_format(12).unwrap());
+        assert!(texture_format(13).is_err());
     }
 }
 

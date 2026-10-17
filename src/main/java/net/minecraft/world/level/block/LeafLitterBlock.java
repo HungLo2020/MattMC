@@ -22,7 +22,9 @@ public class LeafLitterBlock extends VegetationBlock implements SegmentableBlock
 
 	public LeafLitterBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(this.getSegmentAmountProperty(), 1));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(this.getSegmentAmountProperty(), 1));
+		}
 		this.shapes = this.makeShapes();
 	}
 

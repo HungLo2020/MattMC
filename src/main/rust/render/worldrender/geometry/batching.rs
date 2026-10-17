@@ -31,6 +31,8 @@ pub(in crate::render::worldrender) const WORLD_BORDER_UNIFORM_BYTES: u64 =
     (WORLD_BORDER_HEADER_BYTES + WORLD_MAX_BORDER_QUADS * WORLD_BORDER_QUAD_BYTES) as u64;
 
 pub(in crate::render::worldrender) const WORLD_MATERIAL_HEADER_BYTES: usize = 144;
+pub(in crate::render::worldrender) const WORLD_SKY_MATERIAL_HEADER_BYTES: usize = 160;
+pub(in crate::render::worldrender) const WORLD_MAP_MATERIAL_HEADER_BYTES: usize = 176;
 
 // Four copied lightmap coordinate pairs retain the source UV2 semantic for
 // material families such as weather.  Keeping this in the shared explicit
@@ -38,7 +40,7 @@ pub(in crate::render::worldrender) const WORLD_MATERIAL_HEADER_BYTES: usize = 14
 // material programs which declare a lightmap contract to consume it.
 pub(in crate::render::worldrender) const WORLD_MATERIAL_QUAD_BYTES: usize = 192;
 
-pub(in crate::render::worldrender) const WORLD_MATERIAL_UNIFORM_BYTES: u64 = (WORLD_MATERIAL_HEADER_BYTES
+pub(in crate::render::worldrender) const WORLD_MATERIAL_UNIFORM_BYTES: u64 = (WORLD_MAP_MATERIAL_HEADER_BYTES
     + WORLD_MAX_MATERIAL_QUADS_PER_BATCH * WORLD_MATERIAL_QUAD_BYTES)
     as u64;
 
@@ -117,6 +119,7 @@ impl DistantHorizonsGenericBoxBatch {
 /// atlas object, texture unit, or backend handle in the semantic frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::render::worldrender) struct SourceTexturedMaterialBatch {
+    pub(in crate::render::worldrender) material_id: u32,
     pub(in crate::render::worldrender) start: usize,
     pub(in crate::render::worldrender) count: usize,
     pub(in crate::render::worldrender) texture_id: u32,
@@ -207,15 +210,107 @@ pub(in crate::render::worldrender) fn order_compatible_page_indirect_draws(draws
             mode,
             TerrainMaterialPassMode::Opaque | TerrainMaterialPassMode::Cutout
         ) {
-            draws[start..end].sort_by(|left, right| {
-                page_indirect_draw_order(left, right).then_with(|| {
-                    left.front_to_back_distance_squared
-                        .total_cmp(&right.front_to_back_distance_squared)
-                })
-            });
+            sort_page_run(&mut draws[start..end]);
         }
         start = end;
     }
+}
+
+/// The fields `page_indirect_draw_order` compares, in its order.
+type PageDrawKey = (
+    Handle,
+    Handle,
+    Handle,
+    Option<(u32, Handle)>,
+    Handle,
+    u32,
+    Option<(Handle, Handle, Handle)>,
+    Option<(u32, Handle)>,
+);
+
+fn page_draw_key(draw: &PendingMeshDraw) -> PageDrawKey {
+    let draw = &draw.draw;
+    let shadow = draw.shadow.as_ref();
+    (
+        draw.pipeline,
+        draw.pipeline_layout,
+        draw.resource_set,
+        draw.shader_resource_set.map(|binding| (binding.set_index, binding.set)),
+        draw.index_buffer,
+        draw.index_type as u32,
+        shadow.map(|shadow| (shadow.pipeline, shadow.pipeline_layout, shadow.resource_set)),
+        shadow
+            .and_then(|shadow| shadow.shader_resource_set)
+            .map(|binding| (binding.set_index, binding.set)),
+    )
+}
+
+/// Same order as a stable sort by `page_indirect_draw_order` then distance,
+/// but ranks the run's few distinct binding keys once and sorts compact
+/// `(rank, distance, index)` keys, moving each (large) draw along one
+/// permutation.
+fn sort_page_run(draws: &mut [PendingMeshDraw]) {
+    thread_local! {
+        static SCRATCH: std::cell::RefCell<PageSortScratch> = Default::default();
+    }
+    SCRATCH.with(|scratch| {
+        let scratch = &mut *scratch.borrow_mut();
+        scratch.class_of.clear();
+        scratch.classes.clear();
+        scratch.keys.clear();
+        for (index, draw) in draws.iter().enumerate() {
+            let key = page_draw_key(draw);
+            let classes = &mut scratch.classes;
+            let class = *scratch.class_of.entry(key).or_insert_with(|| {
+                classes.push(key);
+                (classes.len() - 1) as u32
+            });
+            // `total_cmp` order as unsigned bits.
+            let bits = draw.front_to_back_distance_squared.to_bits();
+            let distance = if bits & 0x8000_0000 != 0 { !bits } else { bits ^ 0x8000_0000 };
+            scratch.keys.push((u128::from(class) << 64) | (u128::from(distance) << 32) | index as u128);
+        }
+        // Rank the distinct keys by their full order, then key by rank.
+        scratch.order.clear();
+        scratch.order.extend(0..scratch.classes.len() as u32);
+        let classes = &scratch.classes;
+        scratch.order.sort_unstable_by(|left, right| classes[*left as usize].cmp(&classes[*right as usize]));
+        scratch.rank.clear();
+        scratch.rank.resize(classes.len(), 0);
+        for (rank, class) in scratch.order.iter().enumerate() {
+            scratch.rank[*class as usize] = rank as u128;
+        }
+        let rank = &scratch.rank;
+        for key in &mut scratch.keys {
+            *key = (rank[(*key >> 64) as usize] << 64) | (*key & u128::from(u64::MAX));
+        }
+        scratch.keys.sort_unstable();
+        // Position i receives the draw originally at keys[i]'s index. Apply
+        // the permutation in place by following each cycle with swaps.
+        let source = &mut scratch.source;
+        source.clear();
+        source.extend(scratch.keys.iter().map(|key| *key as u32));
+        for start in 0..source.len() {
+            let mut current = start;
+            while source[current] as usize != start {
+                let next = source[current] as usize;
+                draws.swap(current, next);
+                source[current] = current as u32;
+                current = next;
+            }
+            source[current] = current as u32;
+        }
+    });
+}
+
+#[derive(Default)]
+struct PageSortScratch {
+    class_of: std::collections::HashMap<PageDrawKey, u32, crate::render::vulkanic::gal::AccessHashBuilder>,
+    classes: Vec<PageDrawKey>,
+    order: Vec<u32>,
+    rank: Vec<u128>,
+    keys: Vec<u128>,
+    source: Vec<u32>,
 }
 
 pub(in crate::render::worldrender) fn page_indirect_draw_order(left: &PendingMeshDraw, right: &PendingMeshDraw) -> std::cmp::Ordering {
@@ -292,6 +387,8 @@ pub(in crate::render::worldrender) struct MeshBatchPlanKey {
     /// `instances` so their per-frame churn does not invalidate the plan.
     pub(in crate::render::worldrender) terrain_only: bool,
     pub(in crate::render::worldrender) instances: Vec<MeshBatchInstanceKey>,
+    /// Explicit original frame positions for a policy-selected subset.
+    pub(in crate::render::worldrender) instance_indices: Option<Vec<usize>>,
 }
 
 pub(in crate::render::worldrender) struct MeshBatchPlanCacheEntry {
@@ -335,6 +432,16 @@ pub(in crate::render::worldrender) struct SourceTerrainDrawCoverage {
 }
 
 impl SourceTerrainDrawCoverage {
+    /// The batch path's share: removes the indices the scene path drew,
+    /// which have no batches to prove them (the scene covers them by
+    /// construction).
+    pub(in crate::render::worldrender) fn without_scene(mut self, scene: SceneTerrainCoverage) -> Self {
+        self.opaque_draw_indices = self.opaque_draw_indices.saturating_sub(scene.indices[0]);
+        self.cutout_draw_indices = self.cutout_draw_indices.saturating_sub(scene.indices[1]);
+        self.translucent_draw_indices = self.translucent_draw_indices.saturating_sub(scene.indices[2]);
+        self
+    }
+
     pub(in crate::render::worldrender) fn from_batches_and_draws(batches: &[MeshBatch], draws: &[TerrainMeshDraw]) -> Self {
         let mut coverage = Self::default();
         for batch in batches {
@@ -543,7 +650,8 @@ pub(in crate::render::worldrender) fn append_private_dh_draws(draws: &[TerrainMe
 }
 
 pub(in crate::render::worldrender) fn material_uses_lightmap(key: MaterialResourceKey) -> bool {
-    is_distant_horizons_generic_stratum(key.stratum)
+    is_map_material(key.material_id)
+        || is_distant_horizons_generic_stratum(key.stratum)
         || material_uses_particle_shader(key.source_program)
 }
 
@@ -668,44 +776,47 @@ pub(in crate::render::worldrender) fn distant_horizons_generic_box_batches(
     color_format: ColorFormat,
     raster_y_direction: RasterYDirection,
 ) -> Vec<DistantHorizonsGenericBoxBatch> {
+    let box_key = |ssao: bool, translucent: bool| MaterialResourceKey {
+        raster_y_direction,
+        compact_dh_box: true,
+        stratum: if ssao {
+            WORLD_STRATUM_DH_GENERIC_SSAO
+        } else {
+            WORLD_STRATUM_DH_GENERIC
+        },
+        material_id: if translucent {
+            WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED
+        } else {
+            WORLD_MATERIAL_ID_OPAQUE_TEXTURED
+        },
+        texture_id: WORLD_MATERIAL_TEXTURE_GENERATED_WHITE,
+        source_program: WORLD_MATERIAL_SOURCE_TEXTURED,
+        material_mode: if translucent {
+            WORLD_MATERIAL_MODE_TRANSLUCENT
+        } else {
+            WORLD_MATERIAL_MODE_OPAQUE
+        },
+        depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
+        cull_policy: WORLD_CULL_BACK,
+        winding: WORLD_WINDING_CCW,
+        color_format,
+    };
+    // A box's key depends only on (ssao, translucent): track the open batch
+    // of each of the four keys instead of hashing a full key per box.
     let mut batches = Vec::<DistantHorizonsGenericBoxBatch>::new();
-    let mut key_to_batch = HashMap::<MaterialResourceKey, usize>::new();
+    let mut open: [Option<usize>; 4] = [None; 4];
     for (index, item) in frame.dh_generic_boxes.iter().enumerate() {
         let translucent = item.color_argb >> 24 != 0xff;
-        let key = MaterialResourceKey {
-            raster_y_direction,
-            compact_dh_box: true,
-            stratum: if item.ssao_enabled {
-                WORLD_STRATUM_DH_GENERIC_SSAO
-            } else {
-                WORLD_STRATUM_DH_GENERIC
-            },
-            material_id: if translucent {
-                WORLD_MATERIAL_ID_TRANSLUCENT_TEXTURED
-            } else {
-                WORLD_MATERIAL_ID_OPAQUE_TEXTURED
-            },
-            texture_id: WORLD_MATERIAL_TEXTURE_GENERATED_WHITE,
-            source_program: WORLD_MATERIAL_SOURCE_TEXTURED,
-            material_mode: if translucent {
-                WORLD_MATERIAL_MODE_TRANSLUCENT
-            } else {
-                WORLD_MATERIAL_MODE_OPAQUE
-            },
-            depth_policy: WORLD_DEPTH_POLICY_TEST_WRITE,
-            cull_policy: WORLD_CULL_BACK,
-            winding: WORLD_WINDING_CCW,
-            color_format,
-        };
-        let reusable = key_to_batch.get(&key).copied().filter(|batch_index| {
+        let class = usize::from(item.ssao_enabled) * 2 + usize::from(translucent);
+        let reusable = open[class].filter(|batch_index| {
             batches[*batch_index].indices.len() < WORLD_MAX_MATERIAL_QUADS_PER_BATCH
         });
         if let Some(batch_index) = reusable {
             batches[batch_index].indices.push(index);
         } else {
-            key_to_batch.insert(key, batches.len());
+            open[class] = Some(batches.len());
             batches.push(DistantHorizonsGenericBoxBatch {
-                key,
+                key: box_key(item.ssao_enabled, translucent),
                 indices: vec![index],
             });
         }
@@ -747,7 +858,9 @@ pub(in crate::render::worldrender) fn material_depth_and_cull(quad: &WorldMateri
     // depth writing and back-face culling. The source-family contract belongs
     // in this Rust frontend, before explicit GAL state is constructed; it is
     // not inferred from blending or a transitional Java raster-state guess.
-    if quad.source_program == WORLD_MATERIAL_SOURCE_PARTICLES {
+    if is_map_material(quad.material_id) {
+        (WORLD_DEPTH_POLICY_TEST_WRITE, WORLD_CULL_NONE)
+    } else if quad.source_program == WORLD_MATERIAL_SOURCE_PARTICLES {
         (WORLD_DEPTH_POLICY_TEST_WRITE, WORLD_CULL_BACK)
     } else {
         (quad.depth_policy, quad.cull_policy)
@@ -800,6 +913,8 @@ pub(in crate::render::worldrender) enum MeshBatchSelection {
     Static,
     CameraSorted,
     ShadowOnly,
+    /// Missing camera-facing ranges plus complete off-camera shadow candidates.
+    ShadowSupplement,
 }
 
 impl MeshBatchSelection {
@@ -817,6 +932,8 @@ impl MeshBatchSelection {
             Self::Static => !camera_sorted && !shadow_only,
             Self::CameraSorted => camera_sorted && !shadow_only,
             Self::ShadowOnly => shadow_only,
+            Self::ShadowSupplement => is_source_terrain_mesh_stratum(instance.stratum)
+                && (shadow_only || !camera_sorted),
         }
     }
 }
@@ -934,8 +1051,194 @@ pub(in crate::render::worldrender) fn mesh_batches_core(
     g_buffer: bool,
     allow_optical: bool,
     selection: MeshBatchSelection,
-    mut sorted_indices: Option<&mut Vec<u8>>,
+    sorted_indices: Option<&mut Vec<u8>>,
     terrain_only: bool,
+) -> GalResult<Vec<MeshBatch>> {
+    mesh_batches_core_indices(
+        frame,
+        frontend,
+        color_format,
+        raster_y_direction,
+        g_buffer,
+        allow_optical,
+        selection,
+        sorted_indices,
+        terrain_only,
+        None,
+    )
+}
+
+pub(in crate::render::worldrender) fn mesh_batches_filtered_indices(
+    frame: &WorldPrimitiveFrame,
+    frontend: &WorldPrimitiveFrontend,
+    color_format: ColorFormat,
+    raster_y_direction: RasterYDirection,
+    g_buffer: bool,
+    selection: MeshBatchSelection,
+    terrain_only: bool,
+    indices: &[usize],
+) -> GalResult<Vec<MeshBatch>> {
+    if indices
+        .last()
+        .is_some_and(|index| *index >= frame.mesh_instances.len())
+        || indices.windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err(GalError::invalid_argument(
+            "selected mesh indices must be in bounds and strictly increasing",
+        ));
+    }
+    // Removing the first occurrence of a shared mesh can change its batch's
+    // stable order; removing an intervening translucent draw can coalesce two
+    // previously distinct batches. Retain the established build-then-filter
+    // behavior when a selected mesh repeats. Ordinary terrain uses one
+    // instance per mesh, so its independent ranges can be grouped after
+    // policy selection.
+    if mesh_batch_selection_repeats_selected_mesh(frame, selection, terrain_only, indices) {
+        let mut batches = mesh_batches_core_indices(
+            frame,
+            frontend,
+            color_format,
+            raster_y_direction,
+            g_buffer,
+            false,
+            selection,
+            None,
+            terrain_only,
+            None,
+        )?;
+        for batch in &mut batches {
+            batch
+                .indices
+                .retain(|index| indices.binary_search(index).is_ok());
+        }
+        batches.retain(|batch| !batch.indices.is_empty());
+        return Ok(batches);
+    }
+    mesh_batches_core_indices(
+        frame,
+        frontend,
+        color_format,
+        raster_y_direction,
+        g_buffer,
+        false,
+        selection,
+        None,
+        terrain_only,
+        Some(indices),
+    )
+}
+
+/// Whether any selected instance's mesh appears more than once among the
+/// instances this selection admits. Only such meshes let culled instances
+/// affect a selected plan's batch order or translucent coalescing.
+pub(in crate::render::worldrender) fn mesh_batch_selection_repeats_selected_mesh(
+    frame: &WorldPrimitiveFrame,
+    selection: MeshBatchSelection,
+    terrain_only: bool,
+    indices: &[usize],
+) -> bool {
+    let mut seen = MeshKeySet::with_capacity_and_hasher(frame.mesh_instances.len(), Default::default());
+    let mut repeated = MeshKeySet::default();
+    for instance in frame.mesh_instances.iter().filter(|instance| {
+        selection.includes(instance)
+            && (!terrain_only || is_source_terrain_mesh_stratum(instance.stratum))
+            && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
+    }) {
+        if !seen.insert(instance.mesh_key) {
+            repeated.insert(instance.mesh_key);
+        }
+    }
+    !repeated.is_empty()
+        && indices.iter().any(|&index| {
+            frame
+                .mesh_instances
+                .get(index)
+                .is_some_and(|instance| repeated.contains(&instance.mesh_key))
+        })
+}
+
+/// Whether ordered `indices` are exactly the instances a plan with this
+/// selection admits (none culled), so selecting them changes nothing.
+pub(in crate::render::worldrender) fn mesh_batch_indices_cover_selection(
+    frame: &WorldPrimitiveFrame,
+    selection: MeshBatchSelection,
+    terrain_only: bool,
+    indices: &[usize],
+) -> bool {
+    let mut remaining = indices.iter().copied();
+    frame
+        .mesh_instances
+        .iter()
+        .enumerate()
+        .filter(|(_, instance)| {
+            selection.includes(instance)
+                && (!terrain_only || is_source_terrain_mesh_stratum(instance.stratum))
+                && instance.flags & WORLD_MESH_INSTANCE_FLAG_OUTLINE_ONLY == 0
+        })
+        .all(|(index, _)| remaining.next() == Some(index))
+        && remaining.next().is_none()
+}
+
+/// `mesh_batch_asset`'s checks for a whole-mesh instance, answered from the
+/// compact index: a resident drawable generation without optical-stencil
+/// sections. `false` means the full check must run (and may report an error).
+pub(in crate::render::worldrender) fn plain_mesh_instance_is_valid(
+    frontend: &WorldPrimitiveFrontend,
+    instance: &WorldMeshInstanceRequest,
+) -> bool {
+    instance.mesh_section_index == WORLD_MESH_SECTION_ALL
+        && frontend
+            .mesh_asset_drawable_generations
+            .get(&instance.mesh_key)
+            .is_some_and(|&(generation, optical)| generation == instance.mesh_generation && !optical)
+}
+
+/// Checks immutable asset references even when a later policy culls the instance.
+pub(in crate::render::worldrender) fn mesh_batch_asset<'a>(
+    frame: &WorldPrimitiveFrame,
+    frontend: &'a WorldPrimitiveFrontend,
+    instance: &WorldMeshInstanceRequest,
+    allow_optical: bool,
+) -> GalResult<&'a MeshAssetStore> {
+    let asset = frontend
+        .mesh_assets
+        .get(&instance.mesh_key)
+        .ok_or_else(|| {
+            GalError::invalid_argument(format!(
+                "world mesh instance references unknown mesh key {}",
+                instance.mesh_key
+            ))
+        })?;
+    if (!allow_optical || !frame.first_person.enabled) && asset.has_optical_stencil_sections() {
+        return Err(GalError::unsupported_feature(
+            "optical stencil mesh sections require the enabled Rust-owned hand target",
+        ));
+    }
+    if instance.mesh_generation != asset_generation_for_key(instance.mesh_key, asset)? {
+        return Err(GalError::invalid_argument(format!(
+            "world mesh instance generation {} does not match mesh {} generation",
+            instance.mesh_generation, instance.mesh_key
+        )));
+    }
+    if instance.mesh_section_index != WORLD_MESH_SECTION_ALL
+        && asset
+            .sections
+            .get(instance.mesh_section_index as usize)
+            .is_none()
+    {
+        return Err(GalError::invalid_argument(
+            "world mesh instance references missing section",
+        ));
+    }
+    Ok(asset)
+}
+
+fn mesh_batches_core_indices(
+    frame: &WorldPrimitiveFrame, frontend: &WorldPrimitiveFrontend,
+    color_format: ColorFormat, raster_y_direction: RasterYDirection,
+    g_buffer: bool, allow_optical: bool, selection: MeshBatchSelection,
+    mut sorted_indices: Option<&mut Vec<u8>>, terrain_only: bool,
+    instance_indices: Option<&[usize]>,
 ) -> GalResult<Vec<MeshBatch>> {
     // Preserve first-seen batch order for deterministic submission, but use a
     // hash index for membership.  The previous ordered tree made terrain
@@ -943,15 +1246,17 @@ pub(in crate::render::worldrender) fn mesh_batches_core(
     // contain thousands of section instances and many compatible ranges.
     // Ordering is represented by `batches`, so this changes lookup complexity
     // without changing semantic draw order or pipeline grouping.
-    let mut batches: Vec<MeshBatch> = Vec::with_capacity(frame.mesh_instances.len());
+    let capacity = instance_indices.map_or(frame.mesh_instances.len(), |indices| indices.len());
+    let mut batches: Vec<MeshBatch> = Vec::with_capacity(capacity);
     // Keys are Rust-built resource identities (no flooding concern); the
     // default SipHash dominated plan rebuilds with thousands of sections.
-    let mut key_to_batch = HashMap::<
-        (MeshResourceKey, Option<i32>),
-        usize,
-        crate::render::vulkanic::gal::AccessHashBuilder,
-    >::with_capacity_and_hasher(frame.mesh_instances.len(), Default::default());
+    let mut key_to_batch = MeshBatchIndex::with_capacity(capacity);
+    let mut selected = instance_indices.map(|indices| indices.iter().copied().peekable());
     for (index, instance) in frame.mesh_instances.iter().enumerate() {
+        if let Some(indices) = selected.as_mut() {
+            if indices.peek() != Some(&index) { continue; }
+            indices.next();
+        }
         if !selection.includes(instance) {
             continue;
         }
@@ -964,33 +1269,45 @@ pub(in crate::render::worldrender) fn mesh_batches_core(
             // batch where they would reveal an invisible entity body.
             continue;
         }
-        let asset = frontend
-            .mesh_assets
-            .get(&instance.mesh_key)
-            .ok_or_else(|| {
-                GalError::invalid_argument(format!(
-                    "world mesh instance references unknown mesh key {}",
-                    instance.mesh_key
-                ))
-            })?;
-        if asset.sections.iter().any(|section| {
-            matches!(
-                section.material_mode,
-                WORLD_MATERIAL_MODE_OPTICAL_STENCIL_WRITE
-                    | WORLD_MATERIAL_MODE_OPTICAL_STENCIL_TEST
-            )
-        }) && (!allow_optical || !frame.first_person.enabled)
-        {
-            return Err(GalError::unsupported_feature(
-                "optical stencil mesh sections require the enabled Rust-owned hand target",
-            ));
+        let memo_key = MeshRangeMemoKey::for_instance(
+            instance, selection, color_format, raster_y_direction, g_buffer,
+        )
+        .filter(|_| plain_mesh_instance_is_valid(frontend, instance));
+        if let Some(ranges) = memo_key.and_then(|key| {
+            frontend.mesh_range_memo.borrow_mut().get(key, frontend.mesh_texture_animation_generation)
+        }) {
+            // Resident, non-optical generation already validated by the slow path below.
+            key_to_batch.begin_instance(&batches, instance.mesh_key);
+            for range in ranges.iter().copied() {
+                key_to_batch.push(
+                    &mut batches,
+                    range.key,
+                    range.index_offset,
+                    range.index_count,
+                    index,
+                    instance.model_submission_order,
+                )?;
+            }
+            continue;
         }
-        if instance.mesh_generation != asset_generation_for_key(instance.mesh_key, asset)? {
-            return Err(GalError::invalid_argument(format!(
-                "world mesh instance generation {} does not match mesh {} generation",
-                instance.mesh_generation, instance.mesh_key
-            )));
-        }
+        let asset = mesh_batch_asset(frame, frontend, instance, allow_optical)?;
+        key_to_batch.begin_instance(&batches, instance.mesh_key);
+        // Shadow raster culling cannot restore baked faces removed here.
+        // Off-camera casters need every facing; camera casters supplement
+        // only ranges absent from their existing color/shadow batches.
+        let mut shadow_instance;
+        let instance = if matches!(selection, MeshBatchSelection::ShadowOnly | MeshBatchSelection::ShadowSupplement) {
+            let facing_mask = if selection == MeshBatchSelection::ShadowOnly
+                || instance.flags & WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY != 0
+            { 0x7f } else { !instance.terrain_visible_facing_mask & 0x7f };
+            if facing_mask == instance.terrain_visible_facing_mask {
+                instance
+            } else {
+                shadow_instance = instance.clone();
+                shadow_instance.terrain_visible_facing_mask = facing_mask;
+                &shadow_instance
+            }
+        } else { instance };
         if instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0 {
             geometry::translucent_order::append_batches(
                 instance,
@@ -1027,10 +1344,17 @@ pub(in crate::render::worldrender) fn mesh_batches_core(
                     |texture_id| frontend.world_mesh_texture_is_animated(texture_id),
                 )?
             };
+            if let Some(key) = memo_key.filter(|_| !asset.has_optical_stencil_sections()) {
+                frontend.mesh_range_memo.borrow_mut().insert(
+                    key,
+                    frontend.mesh_texture_animation_generation,
+                    Arc::clone(&ranges),
+                    frontend.mesh_assets.len(),
+                );
+            }
             for range in ranges.iter().copied() {
-                push_mesh_batch(
+                key_to_batch.push(
                     &mut batches,
-                    &mut key_to_batch,
                     range.key,
                     range.index_offset,
                     range.index_count,
@@ -1057,9 +1381,8 @@ pub(in crate::render::worldrender) fn mesh_batches_core(
                 g_buffer,
                 frontend.world_mesh_texture_is_animated(section.texture_id),
             );
-            push_mesh_batch(
+            key_to_batch.push(
                 &mut batches,
-                &mut key_to_batch,
                 key,
                 section.index_offset as u64,
                 section.index_count,
@@ -1076,35 +1399,70 @@ pub(in crate::render::worldrender) fn mesh_batches_core(
 }
 
 pub(in crate::render::worldrender) fn sort_mesh_batches(batches: &mut [MeshBatch], frame: &WorldPrimitiveFrame) {
-    batches.sort_by_key(|batch| {
-        let phase = if batch.key.standard_item_foil {
-            4
-        } else {
-            mesh_material_render_phase(batch.key.material_mode)
-        };
-        if let Some(order) = batch.model_submission_order {
-            let deferred_armor = batch
-                .indices
-                .first()
-                .and_then(|i| frame.mesh_instances[*i].item_foil)
-                .is_some_and(|foil| foil.kind.armor_projection().is_some());
-            (2u16, u8::from(deferred_armor), order, phase)
-        } else {
-            (
-                match phase {
-                    0 => 0,
-                    1 => 1,
-                    2 => 3,
-                    3 => 4,
-                    4 => 5,
-                    _ => u16::MAX,
-                },
-                0,
-                0,
-                phase,
-            )
+    // Stable like `sort_by_key`, but each wide batch moves about once:
+    // keys are computed once and sorted with their positions.
+    batches.sort_by_cached_key(|batch| mesh_batch_order_key(batch, frame));
+}
+
+/// `head` followed by `tail`, ordered exactly as `sort_mesh_batches` would
+/// order the concatenation. When both parts are already in order this is a
+/// linear stable merge (ties keep `head` first); otherwise it sorts.
+pub(in crate::render::worldrender) fn merge_sorted_mesh_batches(
+    head: &[MeshBatch],
+    tail: Vec<MeshBatch>,
+    frame: &WorldPrimitiveFrame,
+) -> Vec<MeshBatch> {
+    let head_keys: Vec<_> = head.iter().map(|batch| mesh_batch_order_key(batch, frame)).collect();
+    let tail_keys: Vec<_> = tail.iter().map(|batch| mesh_batch_order_key(batch, frame)).collect();
+    let mut combined = Vec::with_capacity(head.len() + tail.len());
+    if !head_keys.is_sorted() || !tail_keys.is_sorted() {
+        combined.extend(head.iter().cloned());
+        combined.extend(tail);
+        sort_mesh_batches(&mut combined, frame);
+        return combined;
+    }
+    let mut head_index = 0;
+    let mut tail_iter = tail.into_iter().zip(tail_keys).peekable();
+    while let Some((_, tail_key)) = tail_iter.peek() {
+        while head_index < head.len() && head_keys[head_index] <= *tail_key {
+            combined.push(head[head_index].clone());
+            head_index += 1;
         }
-    });
+        let (batch, _) = tail_iter.next().expect("peeked");
+        combined.push(batch);
+    }
+    combined.extend(head[head_index..].iter().cloned());
+    combined
+}
+
+fn mesh_batch_order_key(batch: &MeshBatch, frame: &WorldPrimitiveFrame) -> (u16, u8, i32, u8) {
+    let phase = if batch.key.standard_item_foil {
+        4
+    } else {
+        mesh_material_render_phase(batch.key.material_mode)
+    };
+    if let Some(order) = batch.model_submission_order {
+        let deferred_armor = batch
+            .indices
+            .first()
+            .and_then(|i| frame.mesh_instances[*i].item_foil)
+            .is_some_and(|foil| foil.kind.armor_projection().is_some());
+        (2u16, u8::from(deferred_armor), order, phase)
+    } else {
+        (
+            match phase {
+                0 => 0,
+                1 => 1,
+                2 => 3,
+                3 => 4,
+                4 => 5,
+                _ => u16::MAX,
+            },
+            0,
+            0,
+            phase,
+        )
+    }
 }
 
 pub(in crate::render::worldrender) fn mesh_batch_plan_key(
@@ -1121,6 +1479,7 @@ pub(in crate::render::worldrender) fn mesh_batch_plan_key(
         allow_optical,
         selection: MeshBatchSelection::All,
         terrain_only: false,
+        instance_indices: None,
         instances: frame
             .mesh_instances
             .iter()
@@ -1342,6 +1701,95 @@ pub(in crate::render::worldrender) fn index_stride(index_type: IndexType) -> u64
     match index_type {
         IndexType::U16 => 2,
         IndexType::U32 => 4,
+    }
+}
+
+/// Batch membership for `mesh_batches_core_indices`. Batch keys include the
+/// mesh identity, so different meshes can never share an opaque batch. While
+/// every visited mesh is distinct, which is the normal terrain case, a key can
+/// only repeat within the current instance; scan just its batches instead of
+/// hashing every wide key. The first repeated mesh switches to the exact map
+/// that `push_mesh_batch` maintains, built from the same eligible batches.
+pub(in crate::render::worldrender) struct MeshBatchIndex {
+    map: Option<
+        HashMap<(MeshResourceKey, Option<i32>), usize, crate::render::vulkanic::gal::AccessHashBuilder>,
+    >,
+    meshes: crate::render::worldrender::MeshKeySet<u64>,
+    /// Batches a keyed lookup would have registered, in creation order.
+    keyed: Vec<usize>,
+    instance_start: usize,
+}
+
+impl MeshBatchIndex {
+    pub(in crate::render::worldrender) fn with_capacity(capacity: usize) -> Self {
+        Self {
+            map: None,
+            meshes: crate::render::worldrender::MeshKeySet::with_capacity_and_hasher(capacity, Default::default()),
+            keyed: Vec::with_capacity(capacity),
+            instance_start: 0,
+        }
+    }
+
+    pub(in crate::render::worldrender) fn begin_instance(&mut self, batches: &[MeshBatch], mesh_key: u64) {
+        self.instance_start = batches.len();
+        if self.map.is_none() && !self.meshes.insert(mesh_key) {
+            let mut map = HashMap::with_capacity_and_hasher(self.keyed.len().max(16), Default::default());
+            for &index in &self.keyed {
+                let batch: &MeshBatch = &batches[index];
+                map.insert((batch.key, batch.model_submission_order), index);
+            }
+            self.map = Some(map);
+        }
+    }
+
+    pub(in crate::render::worldrender) fn push(
+        &mut self,
+        batches: &mut Vec<MeshBatch>,
+        key: MeshResourceKey,
+        index_offset: u64,
+        index_count: u32,
+        instance_index: usize,
+        model_submission_order: Option<i32>,
+    ) -> GalResult<()> {
+        if let Some(map) = self.map.as_mut() {
+            return push_mesh_batch(
+                batches, map, key, index_offset, index_count, instance_index, model_submission_order,
+            );
+        }
+        if material_mode_uses_alpha_blending(key.material_mode) || key.standard_item_foil {
+            // Adjacent-only coalescing never consults the keyed index.
+            let mut unused = HashMap::default();
+            return push_mesh_batch(
+                batches, &mut unused, key, index_offset, index_count, instance_index, model_submission_order,
+            );
+        }
+        let existing = self
+            .keyed
+            .iter()
+            .rev()
+            .take_while(|&&index| index >= self.instance_start)
+            .copied()
+            .find(|&index| batches[index].key == key && batches[index].model_submission_order == model_submission_order);
+        if let Some(batch_index) = existing {
+            let batch = &mut batches[batch_index];
+            if batch.index_offset != index_offset || batch.index_count != index_count {
+                return Err(GalError::invalid_argument(
+                    "world mesh batch key maps to incompatible index range",
+                ));
+            }
+            batch.indices.push(instance_index);
+            return Ok(());
+        }
+        self.keyed.push(batches.len());
+        batches.push(MeshBatch {
+            model_submission_order,
+            key,
+            index_offset,
+            index_count,
+            sorted_index_offset: None,
+            indices: smallvec![instance_index],
+        });
+        Ok(())
     }
 }
 
@@ -1643,18 +2091,32 @@ pub(in crate::render::worldrender) fn packed_material_uniforms_for_batch(
         &mut out,
         assets::material_registry::cutout_threshold(batch.key.material_id),
     );
-    // The compact material ABI reserves the fourth header component for the
-    // explicit cloud-only fog range. This preserves the existing header and
-    // makes the source-family boundary visible to the Rust shader without
-    // routing cloud work through generic terrain fog or Java state.
+    // The fourth lane carries only a family's own sky/cloud fog range.
+    // Generic materials keep zero; the typed dark-disc variant appends its
+    // fog color without shifting the ordinary material or compact-box records.
     push_f32(
         &mut out,
         if batch.key.source_program == WORLD_MATERIAL_SOURCE_CLOUDS {
             frame.shader_environment.fog_clouds_end
+        } else if batch.key.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC {
+            frame.shader_environment.fog_sky_end
         } else {
             0.0
         },
     );
+    if batch.key.material_id == WORLD_MATERIAL_ID_SKY_DARK_DISC {
+        for value in frame.shader_environment.fog_parameter_color {
+            push_f32(&mut out, value);
+        }
+    }
+    if is_map_material(batch.key.material_id) {
+        let e = &frame.shader_environment;
+        for value in e.fog_parameter_color { push_f32(&mut out, value); }
+        for value in [e.fog_environmental_start, e.fog_environmental_end,
+            e.fog_render_distance_start, e.fog_render_distance_end] {
+            push_f32(&mut out, if e.enabled { value } else { 1.0e12 });
+        }
+    }
     for index in &batch.indices {
         let quad = &frame.material_quads[*index];
         for (vertex_index, vertex) in layered_material_vertices(quad).iter().enumerate() {
@@ -1722,36 +2184,58 @@ pub(in crate::render::worldrender) fn packed_dh_generic_box_uniforms_for_batch(
     ] {
         push_f32(&mut out, value);
     }
+    // 64 bytes per box: min.xyz,0, max.xyz,0, six shaded face colors, light, 0.
+    // Boxes of one group share color and shading (clouds: thousands per
+    // frame), so the six shaded face colors are memoized on the last pair.
+    let mut memo: Option<(u32, [u32; 6], [u32; 6])> = None;
     for index in &batch.indices {
         let item = &frame.dh_generic_boxes[*index];
-        for value in item
-            .min
-            .into_iter()
-            .chain([0.0])
-            .chain(item.max)
-            .chain([0.0])
-        {
-            push_f32(&mut out, value);
+        let shading_bits = item.shading.map(f32::to_bits);
+        let faces = match memo {
+            Some((color, bits, faces)) if color == item.color_argb && bits == shading_bits => faces,
+            _ => {
+                let faces = [
+                    item.shading[0],
+                    item.shading[1],
+                    item.shading[3],
+                    item.shading[2],
+                    item.shading[5],
+                    item.shading[4],
+                ]
+                .map(|shading| {
+                    let shade = |component: u32| -> u32 {
+                        ((component as f32 * shading).round() as i32).clamp(0, 255) as u32
+                    };
+                    (item.color_argb & 0xff00_0000)
+                        | (shade((item.color_argb >> 16) & 0xff) << 16)
+                        | (shade((item.color_argb >> 8) & 0xff) << 8)
+                        | shade(item.color_argb & 0xff)
+                });
+                memo = Some((item.color_argb, shading_bits, faces));
+                faces
+            }
+        };
+        let words: [u32; 16] = [
+            item.min[0].to_bits(),
+            item.min[1].to_bits(),
+            item.min[2].to_bits(),
+            0,
+            item.max[0].to_bits(),
+            item.max[1].to_bits(),
+            item.max[2].to_bits(),
+            0,
+            faces[0],
+            faces[1],
+            faces[2],
+            faces[3],
+            faces[4],
+            faces[5],
+            item.packed_light,
+            0,
+        ];
+        for word in words {
+            out.extend_from_slice(&word.to_le_bytes());
         }
-        for shading in [
-            item.shading[0],
-            item.shading[1],
-            item.shading[3],
-            item.shading[2],
-            item.shading[5],
-            item.shading[4],
-        ] {
-            let shade = |component: u32| -> u32 {
-                ((component as f32 * shading).round() as i32).clamp(0, 255) as u32
-            };
-            let color = (item.color_argb & 0xff00_0000)
-                | (shade((item.color_argb >> 16) & 0xff) << 16)
-                | (shade((item.color_argb >> 8) & 0xff) << 8)
-                | shade(item.color_argb & 0xff);
-            push_u32(&mut out, color);
-        }
-        push_u32(&mut out, item.packed_light);
-        push_u32(&mut out, 0);
     }
     out
 }
@@ -2380,4 +2864,109 @@ pub(in crate::render::worldrender) fn terrain_composite_uniforms(
             frame.shader_environment.fog_parameter_color[3],
         ],
     })
+}
+
+/// Inputs that fully determine a static terrain instance's section ranges,
+/// given a resident drawable generation and per-texture animation classes.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(in crate::render::worldrender) struct MeshRangeMemoKey {
+    mesh_key: u64,
+    mesh_generation: u64,
+    depth_policy: u32,
+    terrain_visible_facing_mask: u8,
+    color_format: ColorFormat,
+    raster_y_direction: RasterYDirection,
+    g_buffer: bool,
+}
+
+impl MeshRangeMemoKey {
+    /// Only plain static terrain sections (no foil, decal, layering, sorted
+    /// quads or single-section selection) take the memoized path. The mask is
+    /// the one the selection draws with (see `mesh_batches_core_indices`).
+    fn for_instance(
+        instance: &WorldMeshInstanceRequest,
+        selection: MeshBatchSelection,
+        color_format: ColorFormat,
+        raster_y_direction: RasterYDirection,
+        g_buffer: bool,
+    ) -> Option<Self> {
+        if instance.stratum != WORLD_STRATUM_TERRAIN
+            || instance.mesh_section_index != WORLD_MESH_SECTION_ALL
+            || instance.flags & WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS != 0
+            || instance.item_foil.is_some()
+            || instance.decal_foil.is_some()
+            || mesh_view_layering(instance).is_some()
+            || per_section_terrain_animation_disabled()
+        {
+            return None;
+        }
+        let terrain_visible_facing_mask =
+            if matches!(selection, MeshBatchSelection::ShadowOnly | MeshBatchSelection::ShadowSupplement) {
+                if selection == MeshBatchSelection::ShadowOnly
+                    || instance.flags & WORLD_MESH_INSTANCE_FLAG_SHADOW_ONLY != 0
+                {
+                    0x7f
+                } else {
+                    !instance.terrain_visible_facing_mask & 0x7f
+                }
+            } else {
+                instance.terrain_visible_facing_mask
+            };
+        Some(Self {
+            mesh_key: instance.mesh_key,
+            mesh_generation: instance.mesh_generation,
+            depth_policy: instance.depth_policy,
+            terrain_visible_facing_mask,
+            color_format,
+            raster_y_direction,
+            g_buffer,
+        })
+    }
+}
+
+/// Section ranges of resident, non-optical static terrain generations, valid
+/// for one texture-animation generation. Batch plans miss whenever the
+/// visible set moves; this lets a miss skip the large asset stores.
+#[derive(Default)]
+pub(in crate::render::worldrender) struct MeshRangeMemo {
+    animation_generation: u64,
+    entries: HashMap<MeshRangeMemoKey, Arc<Vec<MeshSectionRange>>, MeshKeyBuildHasher>,
+}
+
+impl MeshRangeMemo {
+    fn get(&mut self, key: MeshRangeMemoKey, animation_generation: u64) -> Option<Arc<Vec<MeshSectionRange>>> {
+        if self.animation_generation != animation_generation {
+            self.entries.clear();
+            self.animation_generation = animation_generation;
+            return None;
+        }
+        self.entries.get(&key).cloned()
+    }
+
+    fn insert(
+        &mut self,
+        key: MeshRangeMemoKey,
+        animation_generation: u64,
+        ranges: Arc<Vec<MeshSectionRange>>,
+        resident_meshes: usize,
+    ) {
+        if self.animation_generation != animation_generation {
+            self.entries.clear();
+            self.animation_generation = animation_generation;
+        }
+        // Keys are per generation and facing mask; bound stale entries.
+        if self.entries.len() >= 4 * resident_meshes + 4096 {
+            self.entries.clear();
+        }
+        self.entries.insert(key, ranges);
+    }
+
+    pub(in crate::render::worldrender) fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    #[cfg(test)]
+    pub(in crate::render::worldrender) fn len(&self) -> usize {
+        self.entries.len()
+    }
 }

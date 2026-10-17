@@ -2,16 +2,20 @@
 
 ## Obtaining
 
-Barrier can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Registered in permission-gated operator contents; available through the inventory browser with Creative instant-build and permission level 2, or an authorized give command. No bundled recipe. See [the inventory browser](../mechanics/InventoryBrowser.md) for its current access rules. [Item registry][items]
 
 ## Usage
 
-Barrier is placed in the world as a block and used for building, decoration, utility, or environmental detail.
+An invisible full-collision boundary. Creative main-hand Barrier holding reveals nearby marker particles. Use [Barrier](../blocks/TechnicalBlocks.md#barrier) for the canonical placed-block instructions and their source evidence.
 
 ## Behavior
 
-When placed, it behaves as the corresponding block. Breaking the block returns drops according to the block's normal loot rules.
+No ordinary Survival mining progress or drops. Its supplied item has no Game Master placement gate; water-bucket fill/pickup requires Creative.
 
 ## Notes
 
-* This item is the item form of the `minecraft:barrier` block.
+- Registered ID: `minecraft:barrier`
+- Source-reviewed at `b823010659d7b5095ed021b1c99cf85627e2082a` on 2026-10-02; no in-game operation was performed
+- [Placed-block behavior and verification](../blocks/TechnicalBlocks.md#barrier)
+
+[items]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/world/item/Items.java

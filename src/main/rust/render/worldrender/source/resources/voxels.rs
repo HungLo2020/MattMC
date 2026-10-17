@@ -111,17 +111,9 @@ impl WorldPrimitiveFrontend {
                     frame.shader_environment.vanilla_lightmap,
                 )?;
         }
-        // Source discovery expands and lowers a complete shader-pack scope.
-        // Defer it until a copied static/DH terrain mesh exists to consume the
-        // result. World-entry frames commonly have valid environment data
-        // before Sodium has published any visible terrain, and discovering a
-        // pack in those frames is both useless and needlessly expensive.
-        if !self.candidate_colored_light_runtime {
-            let source_meshes = self.terrain_voxel_source_meshes(frame)?;
-            if source_meshes.is_empty() {
-                return Ok(false);
-            }
-        }
+        // The first world frame may contain sky and entities before terrain
+        // streams in. Its selected pack still needs discovery and resource
+        // preparation; an empty terrain list cannot select a vanilla frame.
         self.observe_shader_pack_source_candidate_for_scope(scope);
         // A discovered source candidate is not a selected production route.
         // Keep normal whole-frame execution independent of a private feature

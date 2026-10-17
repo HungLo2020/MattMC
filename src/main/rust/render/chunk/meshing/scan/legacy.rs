@@ -117,15 +117,12 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_native_se
     let profile_scan_substages = scan_substage_profile_enabled();
     let metadata_started = Instant::now();
     let cache_lookup_started = profile_start(profile_scan_substages);
-    let states_guard = native_meshing_states()
-        .lock()
+    let cache_guard = meshing_cache()
+        .read()
         .map_err(|_| ERR_INVALID_ARGUMENT)?;
-    let selectors_guard = native_model_selectors()
-        .lock()
-        .map_err(|_| ERR_INVALID_ARGUMENT)?;
-    let models_guard = static_model_cache()
-        .lock()
-        .map_err(|_| ERR_INVALID_ARGUMENT)?;
+    let states_guard = &cache_guard.states;
+    let selectors_guard = &cache_guard.selectors;
+    let models_guard = &cache_guard.models;
     builder
         .profile
         .add_stage(PROFILE_MATERIAL_PASS, metadata_started);
@@ -346,7 +343,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_native_se
                     }
                     let culling_started = profile_start(profile_static_substages);
                     let scan_culling_started = profile_start(profile_scan_substages);
-                    if native_section_culls_quad(record, state, quad_record, &states_guard) {
+                    if native_section_culls_quad(record, state, quad_record, &states_guard)? {
                         builder
                             .profile
                             .add_optional_stage(PROFILE_STATIC_CULLING, culling_started);
@@ -416,7 +413,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_native_se
         if has_fluid && (emit_all_passes || state.fluid_pass_id == pass_id) {
             let scan_fluid_started = profile_start(profile_scan_substages);
             if native_fluid_diag_enabled() {
-                eprintln!(
+                crate::core::console::stderr(format_args!(
                     "MATTMC_NATIVE_FLUID_DIAG scan-fluid pass={} pos={},{},{} local={},{},{} state={} fluid_pass={} analyzer={} store_raw={}",
                     pass_id,
                     record.absolute_x,
@@ -429,7 +426,7 @@ pub(in crate::render::chunk::meshing) unsafe fn section_builder_append_native_se
                     state.fluid_pass_id,
                     analyzer.is_some(),
                     store_raw_quads
-                );
+                ));
             }
             builder.profile.add_count(PROFILE_COUNT_FLUID_BLOCKS, 1);
             let fluid_face_count = emit_native_section_fluid_faces(

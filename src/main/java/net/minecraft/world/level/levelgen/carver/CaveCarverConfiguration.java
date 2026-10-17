@@ -22,6 +22,10 @@ public class CaveCarverConfiguration extends CarverConfiguration {
 	public final FloatProvider verticalRadiusMultiplier;
 	final FloatProvider floorLevel;
 
+	public FloatProvider floorLevel() {
+		return this.floorLevel;
+	}
+
 	public CaveCarverConfiguration(
 		float f,
 		HeightProvider heightProvider,

@@ -13,15 +13,15 @@ import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
 /** Replays saved, seed-generated structure geometry through the production cell provider. */
 public final class NativeBeardifierVerification {
     private static volatile long sink;
-    private record Cell(int x,int y,int z) {}
-    private record Fixture(String name, String group, List<Beardifier.Rigid> pieces, List<JigsawJunction> junctions,
+    record Cell(int x,int y,int z) {}
+    record Fixture(String name, String group, List<Beardifier.Rigid> pieces, List<JigsawJunction> junctions,
                            BoundingBox bounds, List<JavaBeardifier.Rigid> originalPieces, NoiseChunk chunk, List<Cell> full, List<Cell> active, double[] output) {
         DensityFunction function(boolean nativeMode) {
             return nativeMode ? Beardifier.forGeometry(pieces,junctions,bounds)
                 : new JavaBeardifier(List.copyOf(originalPieces),List.copyOf(junctions),bounds);
         }
     }
-    private static List<Fixture> fixtures() throws Exception {
+    static List<Fixture> fixtures() throws Exception {
         var stream=NativeBeardifierVerification.class.getResourceAsStream("/worldgen/beardifier/structures.json");
         if(stream==null)throw new AssertionError("Missing structure corpus");
         var result=new ArrayList<Fixture>();

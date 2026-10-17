@@ -181,7 +181,6 @@ public class RenderDataPointUtil
 	public static short getYMax(long dataPoint) { return (short) ((dataPoint >>> HEIGHT_SHIFT) & HEIGHT_MASK); }
 	/** AKA the starting/bottom/lowest Y value above {@link ILevelWrapper#getMinHeight()} */
 	public static short getYMin(long dataPoint) { return (short) ((dataPoint >>> DEPTH_SHIFT) & DEPTH_MASK); }
-	public static long setYMin(long dataPoint, int depth) { return (long) ((dataPoint & ~(DEPTH_MASK << DEPTH_SHIFT)) | (depth & DEPTH_MASK) << DEPTH_SHIFT); }
 	
 	public static short getAlpha(long dataPoint) { return (short) ((((dataPoint >>> ALPHA_SHIFT) & ALPHA_MASK) << ALPHA_DOWNSIZE_SHIFT) | 0b1111); }
 	public static short getRed(long dataPoint) { return (short) ((dataPoint >>> RED_SHIFT) & RED_MASK); }
@@ -203,9 +202,6 @@ public class RenderDataPointUtil
 		long alpha = getAlpha(dataPoint);
 		return (int) (((dataPoint >>> COLOR_SHIFT) & COLOR_MASK) | (alpha << (ALPHA_SHIFT - COLOR_SHIFT)));
 	}
-	
-	/** Return (>0) if dataA should replace dataB, (0) if equal, (<0) if dataB should replace dataA */
-	public static int compareDatapointPriority(long dataA, long dataB) { return (int) ((dataA >> COMPARE_SHIFT) - (dataB >> COMPARE_SHIFT)); }
 	
 	/** This is used to convert a dataPoint to string (useful for the print function) */
 	@SuppressWarnings("unused")
@@ -241,18 +237,6 @@ public class RenderDataPointUtil
 	// TODO this should probably be moved
 	
 	// TODO what is the purpose of these?
-	//these were needed by the old logic for mergeMultiData(),
-	//which has now been replaced by RenderDataPointReducingList.
-	//so, these are no longer necessary, but left here for the same
-	//reason the old logic is left here: in case it's ever needed again.
-	/*
-	private static final ThreadLocal<int[]> tLocalIndices = new ThreadLocal<>();
-	private static final ThreadLocal<boolean[]> tLocalIncreaseIndex = new ThreadLocal<>();
-	private static final ThreadLocal<boolean[]> tLocalIndexHandled = new ThreadLocal<>();
-	private static final ThreadLocal<short[]> tLocalHeightAndDepth = new ThreadLocal<>();
-	private static final ThreadLocal<int[]> tDataIndexCache = new ThreadLocal<>();
-	*/
-	
 	/**
 	 * This method merge column of multiple data together
 	 *
@@ -261,30 +245,7 @@ public class RenderDataPointUtil
 	 */
 	public static void mergeMultiData(IColumnDataView sourceData, ColumnArrayView output)
 	{
-		int target = output.verticalSize();
-		if (target <= 0)
-		{
-			// I expect this to never be the case,
-			// but RenderDataPointReducingList handles it sanely,
-			// so I might as well handle it sanely here too.
-			output.fill(EMPTY_DATA);
-		}
-		else if (target == 1)
-		{
-			output.set(0, RenderDataPointReducingList.reduceToOne(sourceData));
-			for (int index = 1, size = output.size(); index < size; index++)
-			{
-				output.set(index, EMPTY_DATA);
-			}
-		}
-		else
-		{
-			try (RenderDataPointReducingList list = new RenderDataPointReducingList(sourceData))
-			{
-				list.reduce(output.verticalSize());
-				list.copyTo(output);
-			}
-		}
+		net.vulkanic.world.NativeDhRenderReduction.reduce(sourceData, null, output, null);
 	}
 
 	/**
@@ -302,11 +263,7 @@ public class RenderDataPointUtil
 		{
 			throw new IllegalArgumentException("Semantic material arrays must cover their render-data views");
 		}
-		try (RenderDataPointReducingList list = new RenderDataPointReducingList(sourceData, sourceSemanticMaterials))
-		{
-			list.reduce(output.verticalSize());
-			list.copyTo(output, outputSemanticMaterials);
-		}
+		net.vulkanic.world.NativeDhRenderReduction.reduce(sourceData, sourceSemanticMaterials, output, outputSemanticMaterials);
 	}
 	
 }

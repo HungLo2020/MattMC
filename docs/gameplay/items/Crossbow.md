@@ -24,15 +24,21 @@ Use a loaded Crossbow again to fire its stored ammunition. You can switch away a
 
 ## Choosing ammunition
 
-The inventory search accepts the arrow tag: ordinary [Arrows](Arrow.md), Tipped Arrows, and Spectral Arrows. The held-ammunition search additionally accepts **Firework Rockets**. With a Crossbow in the main hand, put a rocket in the **offhand** to choose it; a rocket only sitting in the ordinary inventory is not selected by that fallback search. Held ammunition is checked before inventory arrows. [Supported predicates][crossbow] · [Arrow tag][arrows] · [Held selection][weapon] · [Inventory selection][player]
+The inventory search accepts the arrow tag: ordinary [Arrows](Arrow.md), Tipped Arrows, and Spectral Arrows. The held-ammunition search additionally accepts **[Firework Rockets](FireworkRocket.md)**. With a Crossbow in the main hand, put a rocket in the **offhand** to choose it; a rocket only sitting in the ordinary inventory is not selected by that fallback search. Held ammunition is checked before inventory arrows. [Supported predicates][crossbow] · [Arrow tag][arrows] · [Held selection][weapon] · [Inventory selection][player]
 
 Rockets and arrows use different projectile behavior. A firework's explosion damage requires explosion data; a plain rocket without explosions does not become a damaging blast merely because the Crossbow fires it. Explosive rockets can harm nearby living entities, so do not fire them point-blank near yourself, pets, or other players. This page does not claim a universal rocket damage value or radius of guaranteed harm. [Rocket creation][crossbow] · [Rocket explosion handling][rocket]
+
+See [Fireworks](../mechanics/Fireworks.md) for rocket recipes, payload choices, flight duration, collision behavior, and damage conditions.
 
 ## Multishot and Piercing
 
 **Multishot** adds two projectiles to the default one, for a three-projectile spread. The shared loading path consumes ammunition for the first projectile and creates the additional copies without another ammunition cost. Those free copies are marked intangible; do not count on recovering three ordinary arrows from one consumed arrow. [Multishot count/spread][multi] · [Shared drawing and intangible copies][weapon] · [Arrow pickup][arrow-entity]
 
 **Piercing I–IV** increases an arrow's entity-piercing level. It is an arrow behavior, not a reason to expect a Firework Rocket to pass through a line of targets. Multishot and Piercing belong to the same bundled exclusive enchantment set, so normal enchantment combination treats them as incompatible. [Piercing][piercing] · [Exclusivity tag][exclusive] · [Arrow piercing and hit handling][arrow-entity]
+
+Piercing I, II, III, and IV allow up to **2, 3, 4, and 5 distinct entity-hit attempts**, respectively. A target counts before its damage result is known, so defenses or other hit responses can leave fewer damaged targets. Once that limit has been used, another eligible entity collision removes the arrow **before damaging that additional target**. [Bundled levels][piercing-levels] · [Target count and hit handling][piercing-hits] · [Previously struck targets][piercing-targets]
+
+A successful pierced hit does not itself remove the arrow, even on its last permitted target. If the arrow then lodges in a block, it can still be recovered after the impact shake ends, provided its pickup rules allow collection and your inventory has room. Piercing does not make Creative-only or otherwise uncollectible ammunition recoverable in Survival. [Surviving entity hits][piercing-hits] · [Block impact][piercing-lodging] · [Pickup conditions][piercing-recovery]
 
 ## Wear and repair
 
@@ -53,6 +59,8 @@ Fully damaged Crossbows remain as broken stacks in MattMC. Normal use, release, 
 
 Source-reviewed on 2026-10-01 at `4285adff2e35307c277a3a5bf54ebd064aa5e64b`. No gameplay test of charge timing, loaded-item switching, rockets, Multishot, Piercing, wear, or repairs was run. Custom components and enchantments can change the reviewed defaults.
 
+Piercing target limits and arrow recovery were additionally source-reviewed on **2026-10-10** at `1b9b103398fd70d5b5152b93a1d0abc581fffc19`. No in-game piercing or recovery test was run.
+
 Related: [Bow](Bow.md) · [Arrow](Arrow.md) · [Enchanting](../enchanting/Enchanting.md) · [Items](Items.md)
 
 [item]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/java/net/minecraft/world/item/Items.java#L2373-L2377
@@ -67,3 +75,9 @@ Related: [Bow](Bow.md) · [Arrow](Arrow.md) · [Enchanting](../enchanting/Enchan
 [piercing]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/resources/data/minecraft/enchantment/piercing.json
 [exclusive]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/resources/data/minecraft/tags/enchantment/exclusive_set/crossbow.json
 [arrow-entity]: https://github.com/HungLo2020/MattMC/blob/4285adff2e35307c277a3a5bf54ebd064aa5e64b/src/main/java/net/minecraft/world/entity/projectile/AbstractArrow.java
+
+[piercing-levels]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/resources/data/minecraft/enchantment/piercing.json#L6-L25
+[piercing-hits]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/projectile/AbstractArrow.java#L389-L470
+[piercing-lodging]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/projectile/AbstractArrow.java#L487-L506
+[piercing-recovery]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/projectile/AbstractArrow.java#L598-L616
+[piercing-targets]: https://github.com/HungLo2020/MattMC/blob/1b9b103398fd70d5b5152b93a1d0abc581fffc19/src/main/java/net/minecraft/world/entity/projectile/AbstractArrow.java#L540-L552

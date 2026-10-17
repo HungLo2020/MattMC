@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteContentsExtension, net.irisshaders.iris.pbr.SpriteContentsExtension, net.irisshaders.iris.pbr.texture.SpriteContentsExtension {
+public class SpriteContents implements AutoCloseable, SpriteContentsExtension, net.irisshaders.iris.pbr.SpriteContentsExtension, net.irisshaders.iris.pbr.texture.SpriteContentsExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	final ResourceLocation name;
 	final int width;
@@ -59,44 +59,57 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 		this(resourceLocation, frameSize, nativeImage, Optional.empty(), List.of());
 	}
 
+	/**
+	 * A sprite built in Java (tests and tools): Rust validates the declared
+	 * animation, logging as vanilla did, and applies Sodium's transparent
+	 * pixel fill to the image in place.
+	 */
 	public SpriteContents(
 		ResourceLocation resourceLocation, FrameSize frameSize, NativeImage nativeImage, Optional<AnimationMetadataSection> optional, List<WithValue<?>> list
 	) {
+		this(resourceLocation, frameSize, nativeImage, prepare(resourceLocation, frameSize, nativeImage, optional),
+			optional.map(AnimationMetadataSection::interpolatedFrames).orElse(false), list);
+	}
+
+	private SpriteContents(
+		ResourceLocation resourceLocation, FrameSize frameSize, NativeImage nativeImage, NativeAtlasBuild.Prepared prepared, boolean interpolate,
+		List<WithValue<?>> list
+	) {
+		this(resourceLocation, frameSize.width(), frameSize.height(), nativeImage, prepared.frames(), prepared.frameRowSize(), interpolate,
+			prepared.transparent(), prepared.translucent(), list);
+	}
+
+	/**
+	 * A sprite from a Rust atlas build: `nativeImage` is the preprocessed
+	 * sheet, and `frames` the validated animation (null when not animated).
+	 */
+	SpriteContents(
+		ResourceLocation resourceLocation, int width, int height, NativeImage nativeImage, @Nullable List<SpriteContents.FrameInfo> frames,
+		int frameRowSize, boolean interpolate, boolean transparent, boolean translucent, List<WithValue<?>> list
+	) {
 		this.name = resourceLocation;
-		this.width = frameSize.width();
-		this.height = frameSize.height();
+		this.width = width;
+		this.height = height;
 		this.additionalMetadata = list;
-		this.animatedTexture = (SpriteContents.AnimatedTexture)optional.map(
-				animationMetadataSection -> this.createAnimatedTexture(frameSize, nativeImage.getWidth(), nativeImage.getHeight(), animationMetadataSection)
-			)
-			.orElse(null);
-		
-		// Sodium: Fill in transparent pixel colors before setting originalImage (from SpriteContentsMixin mipmaps)
-		sodium$fillInTransparentPixelColors(nativeImage);
-		
-		// Sodium: Scan sprite contents for transparency before setting originalImage (from SpriteContentsMixin scan)
-		sodium$scanSpriteContents(nativeImage);
-		
+		this.animatedTexture = frames == null ? null : new SpriteContents.AnimatedTexture(frames, frameRowSize, interpolate);
+		this.sodium$hasTransparentPixels = transparent;
+		this.sodium$hasTranslucentPixels = translucent;
 		this.originalImage = nativeImage;
 		this.byMipLevel = new NativeImage[]{this.originalImage};
 	}
 
-	public void increaseMipLevel(int i) {
-		try {
-			// Iris: From MixinSpriteContents - redirect mipmap generation to custom generator if available
-			NativeImage[] result;
-			result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
-			this.byMipLevel = result;
-		} catch (Throwable var5) {
-			CrashReport crashReport = CrashReport.forThrowable(var5, "Generating mipmaps for frame");
-			CrashReportCategory crashReportCategory = crashReport.addCategory("Frame being iterated");
-			crashReportCategory.setDetail("Sprite name", this.name);
-			crashReportCategory.setDetail("Sprite size", () -> this.width + " x " + this.height);
-			crashReportCategory.setDetail("Sprite frames", () -> this.getFrameCount() + " frames");
-			crashReportCategory.setDetail("Mipmap levels", i);
-			crashReportCategory.setDetail("Original image size", () -> this.originalImage.getWidth() + "x" + this.originalImage.getHeight());
-			throw new ReportedException(crashReport);
+	private static NativeAtlasBuild.Prepared prepare(
+		ResourceLocation resourceLocation, FrameSize frameSize, NativeImage nativeImage, Optional<AnimationMetadataSection> optional
+	) {
+		if (optional.isEmpty()) {
+			return NativeAtlasBuild.prepare(resourceLocation, nativeImage, frameSize.width(), frameSize.height(), null, false, 1, false);
 		}
+		AnimationMetadataSection animation = optional.get();
+		List<int[]> frames = animation.frames()
+			.map(list -> list.stream().map(frame -> new int[]{frame.index(), frame.time().orElse(-1)}).toList())
+			.orElse(null);
+		return NativeAtlasBuild.prepare(resourceLocation, nativeImage, frameSize.width(), frameSize.height(), frames, true,
+			animation.defaultFrameTime(), animation.interpolatedFrames());
 	}
 
 	private int getFrameCount() {
@@ -107,76 +120,20 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 		return this.getFrameCount() > 1;
 	}
 
-	@Nullable
-	private SpriteContents.AnimatedTexture createAnimatedTexture(FrameSize frameSize, int i, int j, AnimationMetadataSection animationMetadataSection) {
-		int k = i / frameSize.width();
-		int l = j / frameSize.height();
-		int m = k * l;
-		int n = animationMetadataSection.defaultFrameTime();
-		List<SpriteContents.FrameInfo> list;
-		if (animationMetadataSection.frames().isEmpty()) {
-			list = new ArrayList(m);
-
-			for (int o = 0; o < m; o++) {
-				list.add(new SpriteContents.FrameInfo(o, n));
-			}
-		} else {
-			List<AnimationFrame> list2 = (List<AnimationFrame>)animationMetadataSection.frames().get();
-			list = new ArrayList(list2.size());
-
-			for (AnimationFrame animationFrame : list2) {
-				list.add(new SpriteContents.FrameInfo(animationFrame.index(), animationFrame.timeOr(n)));
-			}
-
-			int p = 0;
-			IntSet intSet = new IntOpenHashSet();
-
-			for (Iterator<SpriteContents.FrameInfo> iterator = list.iterator(); iterator.hasNext(); p++) {
-				SpriteContents.FrameInfo frameInfo = (SpriteContents.FrameInfo)iterator.next();
-				boolean bl = true;
-				if (frameInfo.time <= 0) {
-					LOGGER.warn("Invalid frame duration on sprite {} frame {}: {}", this.name, p, frameInfo.time);
-					bl = false;
-				}
-
-				if (frameInfo.index < 0 || frameInfo.index >= m) {
-					LOGGER.warn("Invalid frame index on sprite {} frame {}: {}", this.name, p, frameInfo.index);
-					bl = false;
-				}
-
-				if (bl) {
-					intSet.add(frameInfo.index);
-				} else {
-					iterator.remove();
-				}
-			}
-
-			int[] is = IntStream.range(0, m).filter(ix -> !intSet.contains(ix)).toArray();
-			if (is.length > 0) {
-				LOGGER.warn("Unused frames in sprite {}: {}", this.name, Arrays.toString(is));
-			}
-		}
-
-		return list.size() <= 1 ? null : new SpriteContents.AnimatedTexture(List.copyOf(list), k, animationMetadataSection.interpolatedFrames());
-	}
-
 	public void upload(int i, int j, int k, int l, NativeImage[] nativeImages, GpuTexture gpuTexture) {
 		// Rust consumes the copied atlas/resource-pack pixels; Java texture
 		// uploads are unavailable on the semantic whole-frame device.
 		return;
 	}
 
-	@Override
 	public int width() {
 		return this.width;
 	}
 
-	@Override
 	public int height() {
 		return this.height;
 	}
 
-	@Override
 	public ResourceLocation name() {
 		return this.name;
 	}
@@ -488,28 +445,6 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 		}
 	}
 	
-	// Sodium: Scan sprite contents for transparency (from SpriteContentsMixin scan package)
-	private void sodium$scanSpriteContents(NativeImage nativeImage) {
-		final long ppPixel = NativeImageHelper.getPointerRGBA(nativeImage);
-		final int pixelCount = nativeImage.getHeight() * nativeImage.getWidth();
-
-		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
-			int color = org.lwjgl.system.MemoryUtil.memGetInt(ppPixel + (pixelIndex * 4L));
-			int alpha = net.sodium.api.util.ColorABGR.unpackAlpha(color);
-
-			// 25 is used as the threshold since the alpha cutoff is 0.1
-			if (alpha <= 25) { // 0.1 * 255
-				this.sodium$hasTransparentPixels = true;
-			} else if (alpha < 255) {
-				this.sodium$hasTranslucentPixels = true;
-			}
-		}
-
-		// the image contains transparency also if there are translucent pixels,
-		// since translucent pixels prevent a downgrade to the opaque render pass just as transparent pixels do
-		this.sodium$hasTransparentPixels |= this.sodium$hasTranslucentPixels;
-	}
-
 	@Override
 	public boolean sodium$hasTransparentPixels() {
 		return this.sodium$hasTransparentPixels;
@@ -520,72 +455,6 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 		return this.sodium$hasTranslucentPixels;
 	}
 
-	/**
-	 * Sodium: Fixes a common issue in image editing programs where fully transparent pixels are saved with fully black colors.
-	 * (Merged from SpriteContentsMixin mipmaps package)
-	 *
-	 * This causes issues with mipmapped texture filtering, since the black color is used to calculate the final color
-	 * even though the alpha value is zero. While ideally it would be disregarded, we do not control that. Instead,
-	 * this code tries to calculate a decent average color to assign to these fully-transparent pixels so that their
-	 * black color does not leak over into sampling.
-	 */
-	private static void sodium$fillInTransparentPixelColors(NativeImage nativeImage) {
-		final long ppPixel = NativeImageHelper.getPointerRGBA(nativeImage);
-		final int pixelCount = nativeImage.getHeight() * nativeImage.getWidth();
-
-		// Calculate an average color from all pixels that are not completely transparent.
-		// This average is weighted based on the (non-zero) alpha value of the pixel.
-		float r = 0.0f;
-		float g = 0.0f;
-		float b = 0.0f;
-
-		float totalWeight = 0.0f;
-
-		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
-			long pPixel = ppPixel + (pixelIndex * 4L);
-
-			int color = org.lwjgl.system.MemoryUtil.memGetInt(pPixel);
-			int alpha = net.sodium.api.util.ColorABGR.unpackAlpha(color);
-
-			// Ignore all fully-transparent pixels for the purposes of computing an average color.
-			if (alpha != 0) {
-				float weight = (float) alpha;
-
-				// Make sure to convert to linear space so that we don't lose brightness.
-				r += ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(color)) * weight;
-				g += ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(color)) * weight;
-				b += ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(color)) * weight;
-
-				totalWeight += weight;
-			}
-		}
-
-		// Bail if none of the pixels are semi-transparent.
-		if (totalWeight == 0.0f) {
-			return;
-		}
-
-		r /= totalWeight;
-		g /= totalWeight;
-		b /= totalWeight;
-
-		// Convert that color in linear space back to sRGB.
-		// Use an alpha value of zero - this works since we only replace pixels with an alpha value of 0.
-		int averageColor = ColorSRGB.linearToSrgb(r, g, b, 0);
-
-		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
-			long pPixel = ppPixel + (pixelIndex * 4);
-
-			int color = org.lwjgl.system.MemoryUtil.memGetInt(pPixel);
-			int alpha = net.sodium.api.util.ColorABGR.unpackAlpha(color);
-
-			// Replace the color values of pixels which are fully transparent, since they have no color data.
-			if (alpha == 0) {
-				org.lwjgl.system.MemoryUtil.memPutInt(pPixel, averageColor);
-			}
-		}
-	}
-	
 	// Iris: From MixinSpriteContents - provide access to created ticker
 	@Override
 	@Nullable

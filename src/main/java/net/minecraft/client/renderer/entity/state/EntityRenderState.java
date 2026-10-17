@@ -20,6 +20,9 @@ public class EntityRenderState {
 	 * Java render-state data and never crosses a renderer ABI boundary.
 	 */
 	public int entityId = -1;
+	/** Immutable CPU gameplay bounds; Rust chooses shadow visibility. */
+	@Nullable
+	public net.vulkanic.bridge.VulkanicGalBridge.WorldEntityCullingRecord rustEntityCulling;
 	public EntityType<?> entityType;
 	public double x;
 	public double y;

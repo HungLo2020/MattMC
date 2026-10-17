@@ -1,10 +1,10 @@
 # Flood Basalt
 
-**Flood Basalt** (`minecraft:flood_basalt`) is an orientable building block, explicitly listed in Building Blocks Creative. It is separate from ordinary Basalt and has no verified crafting or natural deposit route in this snapshot. [Registrations][blocks] [items] [creative]
+**Flood Basalt** (`minecraft:flood_basalt`) is an orientable building block, explicitly listed in Building Blocks Creative. It is separate from ordinary Basalt and has no verified crafting or natural deposit route in this snapshot. [Registrations][blocks] [items][] [creative][]
 
 ## Obtaining
 
-Its loot table names one Flood Basalt, but the placed block requires a correct tool and is absent from the standard mining tags. **An ordinary pickaxe does not pass that drop gate**, including with Silk Touch. Read the [mining limitation](../blocks/FloodBasaltAndFernThatch.md#flood-basalt-access-and-the-mining-limitation) before placing a supplied block in a Survival build. [Loot][loot-flood-basalt] · [Gate and tags][blocks] [pickaxe] [tool-material] [tool-component] [player-tool]
+Its loot table names one Flood Basalt, but the placed block requires a correct tool and is absent from the standard mining tags. **An ordinary pickaxe does not pass that drop gate**, including with Silk Touch. Read the [mining limitation](../blocks/FloodBasaltAndFernThatch.md#flood-basalt-access-and-the-mining-limitation) before placing a supplied block in a Survival build. [Loot][loot-flood-basalt] · [Gate and tags][blocks] [pickaxe][] [tool-material][] [tool-component][] [player-tool][]
 
 ## Usage
 

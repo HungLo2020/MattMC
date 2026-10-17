@@ -87,6 +87,10 @@ public class SinglePoolElement extends StructurePoolElement {
 		return structureTemplate.getSize(rotation);
 	}
 
+	public StructureTemplate nativeTemplate(StructureTemplateManager structureTemplateManager) {
+		return this.getTemplate(structureTemplateManager);
+	}
+
 	private StructureTemplate getTemplate(StructureTemplateManager structureTemplateManager) {
 		return this.template.map(structureTemplateManager::getOrCreate, Function.identity());
 	}
@@ -152,6 +156,9 @@ public class SinglePoolElement extends StructurePoolElement {
 		StructurePlaceSettings structurePlaceSettings = this.getSettings(rotation, boundingBox, liquidSettings, bl);
 		if (!structureTemplate.placeInWorld(worldGenLevel, blockPos, blockPos2, structurePlaceSettings, randomSource, 18)) {
 			return false;
+		} else if (!HANDLES_DATA_MARKERS.get(this.getClass())) {
+			// handleDataMarker does nothing and processors only read: the marker pass has no effect.
+			return true;
 		} else {
 			for (StructureTemplate.StructureBlockInfo structureBlockInfo : StructureTemplate.processBlockInfos(
 				worldGenLevel, blockPos, blockPos2, structurePlaceSettings, this.getDataMarkers(structureTemplateManager, blockPos, rotation, false)
@@ -162,6 +169,20 @@ public class SinglePoolElement extends StructurePoolElement {
 			return true;
 		}
 	}
+
+	/** Whether a class overrides {@link StructurePoolElement#handleDataMarker}. */
+	private static final ClassValue<Boolean> HANDLES_DATA_MARKERS = new ClassValue<>() {
+		@Override
+		protected Boolean computeValue(Class<?> type) {
+			try {
+				return type.getMethod("handleDataMarker", net.minecraft.world.level.LevelAccessor.class, StructureTemplate.StructureBlockInfo.class,
+					net.minecraft.core.BlockPos.class, net.minecraft.world.level.block.Rotation.class, net.minecraft.util.RandomSource.class,
+					net.minecraft.world.level.levelgen.structure.BoundingBox.class).getDeclaringClass() != StructurePoolElement.class;
+			} catch (NoSuchMethodException e) {
+				return true;
+			}
+		}
+	};
 
 	protected StructurePlaceSettings getSettings(Rotation rotation, BoundingBox boundingBox, LiquidSettings liquidSettings, boolean bl) {
 		StructurePlaceSettings structurePlaceSettings = new StructurePlaceSettings();

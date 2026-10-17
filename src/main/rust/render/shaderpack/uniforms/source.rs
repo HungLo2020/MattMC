@@ -11,6 +11,8 @@ use crate::render::shaderpack::lowering::{
     TerrainSourceUniformContract, TerrainSourceUniformField, TerrainSourceUniformType,
 };
 
+mod expressions;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TerrainSourceUniformSemantic {
     FrameCounter,
@@ -32,6 +34,10 @@ pub enum TerrainSourceUniformSemantic {
     DarknessFactor,
     MaxBlindnessDarkness,
     SunAngle,
+    SunPosition,
+    MoonPosition,
+    ShadowLightPosition,
+    UpPosition,
     /// Rust-owned celestial primitive selector. `0` is the sun and `1` is
     /// the moon; the selected source program still receives its pack-defined
     /// render-stage integer separately.
@@ -42,6 +48,8 @@ pub enum TerrainSourceUniformSemantic {
     /// Parsed shader-pack sun-path rotation used by the owned celestial
     /// transform. The value is source configuration, never Iris state.
     CelestialSunPathRotation,
+    /// Vanilla sky-clock fraction, independent of Iris's shifted sunAngle.
+    CelestialTimeOfDay,
     RainStrength,
     RainFactor,
     ThunderStrength,
@@ -76,6 +84,7 @@ pub enum TerrainSourceUniformSemantic {
     DarknessLightFactor,
     NightVision,
     EyeBrightness,
+    EyeBrightnessSmooth,
     EyeBrightnessM,
     EyeBrightnessM2,
     FogColor,
@@ -125,6 +134,9 @@ pub enum TerrainSourceUniformSemantic {
     HeldItemIdOffHand,
     HeldBlockLightMain,
     HeldBlockLightOffHand,
+    /// Linked node in this requirement catalog's immutable custom program.
+    /// The type is checked against the active property and GLSL declaration.
+    CustomExpression { index: u16, ty: TerrainSourceUniformType },
 }
 
 impl TerrainSourceUniformSemantic {
@@ -144,9 +156,14 @@ impl TerrainSourceUniformSemantic {
             "darknessFactor" => Some(Self::DarknessFactor),
             "maxBlindnessDarkness" => Some(Self::MaxBlindnessDarkness),
             "sunAngle" => Some(Self::SunAngle),
+            "sunPosition" => Some(Self::SunPosition),
+            "moonPosition" => Some(Self::MoonPosition),
+            "shadowLightPosition" => Some(Self::ShadowLightPosition),
+            "upPosition" => Some(Self::UpPosition),
             "vulkanic_source_celestial_is_moon" => Some(Self::CelestialIsMoon),
             "vulkanic_source_celestial_alpha" => Some(Self::CelestialAlpha),
             "vulkanic_source_celestial_sun_path_rotation" => Some(Self::CelestialSunPathRotation),
+            "vulkanic_source_celestial_time_of_day" => Some(Self::CelestialTimeOfDay),
             "rainStrength" => Some(Self::RainStrength),
             "rainFactor" => Some(Self::RainFactor),
             "thunderStrength" => Some(Self::ThunderStrength),
@@ -177,6 +194,7 @@ impl TerrainSourceUniformSemantic {
             "darknessLightFactor" => Some(Self::DarknessLightFactor),
             "nightVision" => Some(Self::NightVision),
             "eyeBrightness" => Some(Self::EyeBrightness),
+            "eyeBrightnessSmooth" => Some(Self::EyeBrightnessSmooth),
             "eyeBrightnessM" => Some(Self::EyeBrightnessM),
             "eyeBrightnessM2" => Some(Self::EyeBrightnessM2),
             "fogColor" => Some(Self::FogColor),
@@ -212,6 +230,7 @@ impl TerrainSourceUniformSemantic {
 
     fn expected_type(self) -> TerrainSourceUniformType {
         match self {
+            Self::CustomExpression { ty, .. } => ty,
             Self::FrameCounter
             | Self::RenderStage
             | Self::WorldTime
@@ -237,6 +256,7 @@ impl TerrainSourceUniformSemantic {
             | Self::SunAngle
             | Self::CelestialAlpha
             | Self::CelestialSunPathRotation
+            | Self::CelestialTimeOfDay
             | Self::RainStrength
             | Self::RainFactor
             | Self::ThunderStrength
@@ -284,7 +304,8 @@ impl TerrainSourceUniformSemantic {
                 TerrainSourceUniformType::Float
             }
             Self::MaterialAtlasSize => TerrainSourceUniformType::IVec2,
-            Self::EyeBrightness => TerrainSourceUniformType::IVec2,
+            Self::EyeBrightness | Self::EyeBrightnessSmooth => TerrainSourceUniformType::IVec2,
+            Self::SunPosition | Self::MoonPosition | Self::ShadowLightPosition | Self::UpPosition => TerrainSourceUniformType::Vec3,
             Self::FarPlane => TerrainSourceUniformType::Float,
             Self::DistantHorizonsRenderDistance => TerrainSourceUniformType::Int,
             Self::RelativeEyePosition => TerrainSourceUniformType::Vec3,
@@ -304,6 +325,7 @@ pub struct TerrainSourceUniformRequirement {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TerrainSourceUniformRequirements {
     fields: Vec<TerrainSourceUniformRequirement>,
+    custom_program: expressions::Program,
 }
 
 /// Bounded candidate-diagnostic summary. Names are source semantic names,
@@ -317,9 +339,17 @@ pub struct TerrainSourceUniformRequirementSummary {
 
 impl TerrainSourceUniformRequirements {
     pub fn from_contract(contract: &TerrainSourceUniformContract) -> GalResult<Self> {
+        let custom_roots = contract.fields().iter().filter(|field|
+            TerrainSourceUniformSemantic::for_name(field.name()).is_none()
+                && contract.custom_uniforms().get(field.name()).is_some_and(|definition| definition.uniform)
+        ).map(|field| (field.name(), field.ty())).collect::<Vec<_>>();
+        let custom_program = expressions::Program::compile(contract.custom_uniforms(), &custom_roots)?;
         let mut fields = Vec::with_capacity(contract.fields().len());
         for field in contract.fields() {
-            let semantic = TerrainSourceUniformSemantic::for_name(field.name());
+            let semantic = TerrainSourceUniformSemantic::for_name(field.name())
+                .or_else(|| custom_program.root(field.name()).map(|index|
+                    TerrainSourceUniformSemantic::CustomExpression { index, ty: field.ty() }
+                ));
             if let Some(semantic) = semantic {
                 if field.array_length() != 1 || field.ty() != semantic.expected_type() {
                     return Err(GalError::invalid_argument(format!(
@@ -334,7 +364,7 @@ impl TerrainSourceUniformRequirements {
                 semantic,
             });
         }
-        Ok(Self { fields })
+        Ok(Self { fields, custom_program })
     }
 
     pub fn fields(&self) -> &[TerrainSourceUniformRequirement] {
@@ -421,9 +451,14 @@ pub struct TerrainSourceUniformFrame {
     pub darkness_factor: Option<f32>,
     pub max_blindness_darkness: Option<f32>,
     pub sun_angle: Option<f32>,
+    pub sun_position: Option<[f32; 3]>,
+    pub moon_position: Option<[f32; 3]>,
+    pub shadow_light_position: Option<[f32; 3]>,
+    pub up_position: Option<[f32; 3]>,
     pub celestial_is_moon: Option<i32>,
     pub celestial_alpha: Option<f32>,
     pub celestial_sun_path_rotation: Option<f32>,
+    pub celestial_time_of_day: Option<f32>,
     pub rain_strength: Option<f32>,
     pub rain_factor: Option<f32>,
     pub thunder_strength: Option<f32>,
@@ -458,6 +493,7 @@ pub struct TerrainSourceUniformFrame {
     pub darkness_light_factor: Option<f32>,
     pub night_vision: Option<f32>,
     pub eye_brightness: Option<[i32; 2]>,
+    pub eye_brightness_smooth: Option<[i32; 2]>,
     pub eye_brightness_m: Option<f32>,
     pub eye_brightness_m2: Option<f32>,
     pub fog_color: Option<[f32; 3]>,
@@ -524,10 +560,38 @@ impl TerrainSourceUniformFrame {
     ) -> GalResult<Vec<u8>> {
         requirements.require_fully_semantic()?;
         let mut bytes = vec![0_u8; requirements.std140_size()? as usize];
+        let custom_values = requirements.custom_program.evaluate(self)?;
         for requirement in requirements.fields() {
             let semantic = requirement.semantic.expect("fully semantic requirement");
             let offset = requirement.field.offset() as usize;
             match semantic {
+                TerrainSourceUniformSemantic::SunPosition | TerrainSourceUniformSemantic::MoonPosition | TerrainSourceUniformSemantic::ShadowLightPosition | TerrainSourceUniformSemantic::UpPosition => {
+                    let value = match semantic {
+                        TerrainSourceUniformSemantic::SunPosition => self.sun_position,
+                        TerrainSourceUniformSemantic::MoonPosition => self.moon_position,
+                        TerrainSourceUniformSemantic::ShadowLightPosition => self.shadow_light_position,
+                        _ => self.up_position,
+                    };
+                    let value = self.required_vec3(value, "celestial view-space position")?;
+                    for (component, value) in value.into_iter().enumerate() { write_f32(&mut bytes, offset + component*4, value)?; }
+                }
+                TerrainSourceUniformSemantic::EyeBrightnessSmooth => {
+                    let values = self.required_smoothed_eye_brightness()?;
+                    for (component, value) in values.into_iter().enumerate() { write_i32(&mut bytes, offset + component*4, value)?; }
+                }
+                TerrainSourceUniformSemantic::CustomExpression { index, .. } => {
+                    use expressions::Value;
+                    match custom_values[index as usize].expect("evaluated custom root") {
+                        Value::Float(value) => write_f32(&mut bytes, offset, value)?,
+                        Value::Int(value) => write_i32(&mut bytes, offset, value)?,
+                        Value::Bool(value) => write_i32(&mut bytes, offset, i32::from(value))?,
+                        Value::Vector(values, count) => {
+                            for component in 0..count as usize {
+                                write_f32(&mut bytes, offset + component * 4, values[component])?;
+                            }
+                        }
+                    }
+                }
                 TerrainSourceUniformSemantic::FrameCounter => {
                     write_i32(
                         &mut bytes,
@@ -652,6 +716,10 @@ impl TerrainSourceUniformFrame {
                             "celestial sun-path rotation",
                         )?,
                     )?;
+                }
+                TerrainSourceUniformSemantic::CelestialTimeOfDay => {
+                    write_f32(&mut bytes, offset,
+                        self.required_f32(self.celestial_time_of_day, "celestial time of day")?)?;
                 }
                 TerrainSourceUniformSemantic::RainStrength => {
                     write_f32(
@@ -1132,6 +1200,14 @@ impl TerrainSourceUniformFrame {
             return Err(GalError::invalid_argument(format!(
                 "terrain source eye brightness must contain packed vanilla light values in [0, 240]"
             )));
+        }
+        Ok(value)
+    }
+
+    fn required_smoothed_eye_brightness(&self) -> GalResult<[i32; 2]> {
+        let value = self.eye_brightness_smooth.ok_or_else(|| GalError::invalid_argument("terrain source requires smoothed eye brightness"))?;
+        if value.iter().any(|component| !(0..=240).contains(component)) {
+            return Err(GalError::invalid_argument("smoothed eye brightness must contain light values in [0, 240]"));
         }
         Ok(value)
     }

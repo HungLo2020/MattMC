@@ -1,9 +1,24 @@
 //! Seed-compatible world generation. Native ABI adapters are kept separate
 //! from noise kernels, density evaluation, aquifers and resumable surface rules.
 pub(crate) mod aquifer;
+pub(crate) mod carver;
+pub(crate) mod decoration;
+pub(crate) mod biome_fill;
+pub(crate) mod blending;
 pub(crate) mod density;
 pub(crate) mod feature;
 pub(crate) mod heightmap;
 pub(crate) mod math;
+pub(crate) mod noise_fill;
+pub(crate) mod proto_chunk;
+pub(crate) mod owned_gaussian;
+pub(crate) mod owned_legacy;
+pub(crate) mod owned_worldgen;
+pub(crate) mod owned_positional;
+pub(crate) mod owned_source;
+pub(crate) mod owned_xoroshiro;
+pub(crate) mod random;
+pub(crate) mod router;
+pub(crate) mod structure;
 pub(crate) mod surface;
 pub(crate) mod synth;

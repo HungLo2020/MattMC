@@ -157,26 +157,34 @@ pub(crate) fn append_indexed_draw(
         state.index_buffer = Some(index_binding);
     }
     if let Some(indirect) = indexed_indirect {
+        let mut offset = indirect.offset;
+        let mut remaining = indirect.draw_count.max(1);
+        // Extend a contiguous preceding run, then emit the rest in chunks no
+        // larger than the backend's per-command limit.
         if let Some(CommandOp::DrawIndexedIndirect {
             buffer,
-            offset,
+            offset: previous_offset,
             draw_count,
         }) = ops.last_mut()
         {
-            let expected = offset.saturating_add(u64::from(*draw_count) * 20);
-            if *buffer == indirect.buffer
-                && expected == indirect.offset
-                && *draw_count < state.max_indirect_draw_count
-            {
-                *draw_count = draw_count.saturating_add(1);
-                return;
+            let expected = previous_offset.saturating_add(u64::from(*draw_count) * 20);
+            if *buffer == indirect.buffer && expected == offset && *draw_count < state.max_indirect_draw_count {
+                let merged = remaining.min(state.max_indirect_draw_count - *draw_count);
+                *draw_count += merged;
+                remaining -= merged;
+                offset += u64::from(merged) * 20;
             }
         }
-        ops.push(CommandOp::DrawIndexedIndirect {
-            buffer: indirect.buffer,
-            offset: indirect.offset,
-            draw_count: 1,
-        });
+        while remaining > 0 {
+            let count = remaining.min(state.max_indirect_draw_count);
+            ops.push(CommandOp::DrawIndexedIndirect {
+                buffer: indirect.buffer,
+                offset,
+                draw_count: count,
+            });
+            remaining -= count;
+            offset += u64::from(count) * 20;
+        }
     } else {
         ops.push(CommandOp::DrawIndexed {
             indices: index_count,

@@ -66,6 +66,20 @@ final class NativeClimateTree<T> {
         ends.set(index, order.size());
     }
 
+    /** The validated preorder node snapshot, for chunk-wide native searches. */
+    MemorySegment nodes() {
+        return nodes;
+    }
+
+    int nodeCount() {
+        return leaves.length;
+    }
+
+    /** The leaf at a node index; null for branches. */
+    Climate.RTree.Leaf<T> leaf(int node) {
+        return leaves[node];
+    }
+
     Climate.RTree.Leaf<T> search(Climate.TargetPoint point, Climate.RTree.Leaf<T> previous) {
         Scratch scratch = SCRATCH.get();
         scratch.put(0, point);

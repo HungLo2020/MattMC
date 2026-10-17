@@ -1,0 +1,24 @@
+package net.minecraft.world.level.levelgen.synth;
+import static org.junit.jupiter.api.Assertions.*;
+import java.util.*;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.PositionalRandomFactory;
+import org.junit.jupiter.api.Test;
+/** Original public Perlin-Simplex constructor boundaries and source state. */
+class SimplexCompositeConstructorContractTest {
+ static final class Source implements RandomSource {
+  final RandomSource actual=RandomSource.create(42);final List<String> effects=new ArrayList<>();Runnable onDouble;RuntimeException consumeFailure;
+  public RandomSource fork(){throw new AssertionError("fork");}public PositionalRandomFactory forkPositional(){throw new AssertionError("forkPositional");}public void setSeed(long seed){throw new AssertionError("setSeed");}
+  public double nextDouble(){effects.add("double");var action=onDouble;if(action!=null){onDouble=null;action.run();}return actual.nextDouble();}
+  public int nextInt(int bound){effects.add("int:"+bound);return actual.nextInt(bound);}public int nextInt(){return actual.nextInt();}public long nextLong(){return actual.nextLong();}public void consumeCount(int n){effects.add("consume:"+n);if(consumeFailure!=null)throw consumeFailure;actual.consumeCount(n);}
+  public boolean nextBoolean(){throw new AssertionError("boolean");}public float nextFloat(){throw new AssertionError("float");}public double nextGaussian(){throw new AssertionError("gaussian");}
+ }
+ @Test void negativeOctaveHolesKeepActualSkipOrderAndSourceState(){var source=new Source();var noise=new PerlinSimplexNoise(source,List.of(-3,-1,0));assertEquals(3*259+1,source.effects.size());assertEquals("consume:262",source.effects.get(2*259));var expected=RandomSource.create(42);new SimplexNoise(expected);new SimplexNoise(expected);expected.consumeCount(262);new SimplexNoise(expected);assertEquals(expected.nextLong(),source.nextLong());assertTrue(Double.isFinite(noise.getValue(1.25,-3.75,true)));}
+ @Test void positiveOctavesUseDerivedSourceAfterOriginalNegativePrefix(){var source=new Source();var noise=new PerlinSimplexNoise(source,List.of(-2,0,2));assertEquals(2*259+1,source.effects.size());assertEquals("consume:262",source.effects.get(259));var expected=RandomSource.create(42);new SimplexNoise(expected);expected.consumeCount(262);new SimplexNoise(expected);assertEquals(expected.nextLong(),source.nextLong());assertTrue(Double.isFinite(noise.getValue(1.25,-3.75,false)));}
+ @Test void genuineSkipFailurePreservesCompletedLeafPrefix(){var source=new Source();source.consumeFailure=new RuntimeException("actual Simplex skip");assertSame(source.consumeFailure,assertThrows(RuntimeException.class,()->new PerlinSimplexNoise(source,List.of(-3,-1,0))));assertEquals(2*259+1,source.effects.size());var expected=RandomSource.create(42);new SimplexNoise(expected);new SimplexNoise(expected);assertEquals(expected.nextLong(),source.nextLong());}
+ @Test void realLeafCallbackCannotChangeAlreadyCapturedOctaveSet(){var source=new Source();var octaves=new ArrayList<>(List.of(-3,-1,0));source.onDouble=()->{octaves.clear();octaves.add(7);};var noise=new PerlinSimplexNoise(source,octaves);var expected=new PerlinSimplexNoise(RandomSource.create(42),List.of(-3,-1,0));assertEquals(List.of(7),octaves);for(boolean offsets:new boolean[]{false,true})for(double x:new double[]{-127.5,-.25,0,1.25,127.5})assertEquals(Double.doubleToRawLongBits(expected.getValue(x,3.75,offsets)),Double.doubleToRawLongBits(noise.getValue(x,3.75,offsets)));}
+ @Test void originalSourceReentryCompletesIndependentInnerAndOuterNoise(){var source=new Source();var inner=new ArrayList<PerlinSimplexNoise>();source.onDouble=()->inner.add(new PerlinSimplexNoise(source,List.of(-3,-1,0)));var outer=new PerlinSimplexNoise(source,List.of(-3,-1,0));var expectedSource=RandomSource.create(42);var expectedInner=new PerlinSimplexNoise(expectedSource,List.of(-3,-1,0));var expectedOuter=new PerlinSimplexNoise(expectedSource,List.of(-3,-1,0));assertEquals(1,inner.size());assertEquals(expectedSource.nextLong(),source.nextLong());for(boolean offsets:new boolean[]{false,true})for(double x:new double[]{-127.5,-.25,0,1.25,127.5}){assertEquals(Double.doubleToRawLongBits(expectedInner.getValue(x,3.75,offsets)),Double.doubleToRawLongBits(inner.get(0).getValue(x,3.75,offsets)));assertEquals(Double.doubleToRawLongBits(expectedOuter.getValue(x,3.75,offsets)),Double.doubleToRawLongBits(outer.getValue(x,3.75,offsets)));}}
+
+ @Test void originalVmArrayLimitFailureKeepsTheCompletedInitialLeafPrefix(){var source=new Source();assertThrows(OutOfMemoryError.class,()->new PerlinSimplexNoise(source,List.of(0,Integer.MAX_VALUE-1)));assertEquals(259,source.effects.size());var expected=RandomSource.create(42);new SimplexNoise(expected);assertEquals(expected.nextLong(),source.nextLong());}
+
+}

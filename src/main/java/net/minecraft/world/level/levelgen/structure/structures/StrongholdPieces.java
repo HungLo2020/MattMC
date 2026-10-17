@@ -189,6 +189,48 @@ public class StrongholdPieces {
 		}
 	}
 
+	/**
+	 * Rebuilds the pieces Rust planned ({@code stronghold_plan.rs}), in builder order. Each piece's
+	 * words: kind, genDepth, the box, orientation (2D data value, -1 for none), field count, then the
+	 * fields (entry door ordinal first). Kinds: 10 ChestCorridor, 11 FillerCorridor, 12 FiveCrossing,
+	 * 13 LeftTurn, 14 Library, 15 PortalRoom, 16 PrisonHall, 17 RightTurn, 18 RoomCrossing,
+	 * 19 StairsDown, 20 Straight, 21 StraightStairsDown, 22 StartPiece.
+	 */
+	public static void addNativePieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, int[] words) {
+		StrongholdPieces.StrongholdPiece.SmallDoorType[] doors = StrongholdPieces.StrongholdPiece.SmallDoorType.values();
+		int at = 0;
+		while (at < words.length) {
+			int kind = words[at];
+			int depth = words[at + 1];
+			BoundingBox box = new BoundingBox(words[at + 2], words[at + 3], words[at + 4], words[at + 5], words[at + 6], words[at + 7]);
+			Direction direction = words[at + 8] == -1 ? null : Direction.from2DDataValue(words[at + 8]);
+			int count = words[at + 9];
+			int f = at + 10;
+			at = f + count;
+			if (count < 1 || at > words.length) {
+				throw new IllegalArgumentException("Bad stronghold piece words at " + (f - 10));
+			}
+			StrongholdPieces.StrongholdPiece.SmallDoorType door = doors[words[f]];
+			StructurePiece piece = switch (kind) {
+				case 10 -> new StrongholdPieces.ChestCorridor(depth, box, direction, door, words[f + 1] != 0);
+				case 11 -> new StrongholdPieces.FillerCorridor(depth, box, direction);
+				case 12 -> new StrongholdPieces.FiveCrossing(depth, box, direction, door, words[f + 1] != 0, words[f + 2] != 0, words[f + 3] != 0, words[f + 4] != 0);
+				case 13 -> new StrongholdPieces.LeftTurn(depth, box, direction, door);
+				case 14 -> new StrongholdPieces.Library(depth, box, direction, door, words[f + 1] != 0);
+				case 15 -> new StrongholdPieces.PortalRoom(depth, box, direction);
+				case 16 -> new StrongholdPieces.PrisonHall(depth, box, direction, door);
+				case 17 -> new StrongholdPieces.RightTurn(depth, box, direction, door);
+				case 18 -> new StrongholdPieces.RoomCrossing(depth, box, direction, door, words[f + 1]);
+				case 19 -> new StrongholdPieces.StairsDown(StructurePieceType.STRONGHOLD_STAIRS_DOWN, depth, box, direction, door, words[f + 1] != 0);
+				case 20 -> new StrongholdPieces.Straight(depth, box, direction, door, words[f + 1] != 0, words[f + 2] != 0);
+				case 21 -> new StrongholdPieces.StraightStairsDown(depth, box, direction, door);
+				case 22 -> new StrongholdPieces.StartPiece(depth, box, direction, door, words[f + 1] != 0);
+				default -> throw new IllegalArgumentException("Unknown stronghold piece kind " + kind);
+			};
+			builder.addPiece(piece);
+		}
+	}
+
 	static StructurePiece generateAndAddPiece(
 		StrongholdPieces.StartPiece startPiece,
 		StructurePieceAccessor structurePieceAccessor,
@@ -215,6 +257,16 @@ public class StrongholdPieces {
 	}
 
 	public static class ChestCorridor extends StrongholdPieces.StrongholdPiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(10, this.hasPlacedChest ? 1 : 0);
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
+			this.hasPlacedChest = words[10] != 0;
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 5;
 		private static final int DEPTH = 7;
@@ -224,6 +276,14 @@ public class StrongholdPieces {
 			super(StructurePieceType.STRONGHOLD_CHEST_CORRIDOR, i, boundingBox);
 			this.setOrientation(direction);
 			this.entryDoor = this.randomSmallDoor(randomSource);
+		}
+
+		/** {@link StrongholdPieces#addNativePieces}: the planned fields, no draws. */
+		ChestCorridor(int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType, boolean hasPlacedChest) {
+			super(StructurePieceType.STRONGHOLD_CHEST_CORRIDOR, i, boundingBox);
+			this.setOrientation(direction);
+			this.entryDoor = smallDoorType;
+			this.hasPlacedChest = hasPlacedChest;
 		}
 
 		public ChestCorridor(CompoundTag compoundTag) {
@@ -282,6 +342,11 @@ public class StrongholdPieces {
 	}
 
 	public static class FillerCorridor extends StrongholdPieces.StrongholdPiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(11, this.steps);
+		}
+
 		private final int steps;
 
 		public FillerCorridor(int i, BoundingBox boundingBox, Direction direction) {
@@ -356,6 +421,11 @@ public class StrongholdPieces {
 	}
 
 	public static class FiveCrossing extends StrongholdPieces.StrongholdPiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(12, this.leftLow ? 1 : 0, this.leftHigh ? 1 : 0, this.rightLow ? 1 : 0, this.rightHigh ? 1 : 0);
+		}
+
 		protected static final int WIDTH = 10;
 		protected static final int HEIGHT = 9;
 		protected static final int DEPTH = 11;
@@ -372,6 +442,17 @@ public class StrongholdPieces {
 			this.leftHigh = randomSource.nextBoolean();
 			this.rightLow = randomSource.nextBoolean();
 			this.rightHigh = randomSource.nextInt(3) > 0;
+		}
+
+		/** {@link StrongholdPieces#addNativePieces}: the planned fields, no draws. */
+		FiveCrossing(int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType, boolean leftLow, boolean leftHigh, boolean rightLow, boolean rightHigh) {
+			super(StructurePieceType.STRONGHOLD_FIVE_CROSSING, i, boundingBox);
+			this.setOrientation(direction);
+			this.entryDoor = smallDoorType;
+			this.leftLow = leftLow;
+			this.leftHigh = leftHigh;
+			this.rightLow = rightLow;
+			this.rightHigh = rightHigh;
 		}
 
 		public FiveCrossing(CompoundTag compoundTag) {
@@ -499,10 +580,22 @@ public class StrongholdPieces {
 	}
 
 	public static class LeftTurn extends StrongholdPieces.Turn {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(13);
+		}
+
 		public LeftTurn(int i, RandomSource randomSource, BoundingBox boundingBox, Direction direction) {
 			super(StructurePieceType.STRONGHOLD_LEFT_TURN, i, boundingBox);
 			this.setOrientation(direction);
 			this.entryDoor = this.randomSmallDoor(randomSource);
+		}
+
+		/** {@link StrongholdPieces#addNativePieces}: the planned fields, no draws. */
+		LeftTurn(int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType) {
+			super(StructurePieceType.STRONGHOLD_LEFT_TURN, i, boundingBox);
+			this.setOrientation(direction);
+			this.entryDoor = smallDoorType;
 		}
 
 		public LeftTurn(CompoundTag compoundTag) {
@@ -550,6 +643,11 @@ public class StrongholdPieces {
 	}
 
 	public static class Library extends StrongholdPieces.StrongholdPiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(14, this.isTall ? 1 : 0);
+		}
+
 		protected static final int WIDTH = 14;
 		protected static final int HEIGHT = 6;
 		protected static final int TALL_HEIGHT = 11;
@@ -561,6 +659,14 @@ public class StrongholdPieces {
 			this.setOrientation(direction);
 			this.entryDoor = this.randomSmallDoor(randomSource);
 			this.isTall = boundingBox.getYSpan() > 6;
+		}
+
+		/** {@link StrongholdPieces#addNativePieces}: the planned fields, no draws. */
+		Library(int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType, boolean isTall) {
+			super(StructurePieceType.STRONGHOLD_LIBRARY, i, boundingBox);
+			this.setOrientation(direction);
+			this.entryDoor = smallDoorType;
+			this.isTall = isTall;
 		}
 
 		public Library(CompoundTag compoundTag) {
@@ -730,6 +836,16 @@ public class StrongholdPieces {
 	}
 
 	public static class PortalRoom extends StrongholdPieces.StrongholdPiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(15, this.hasPlacedSpawner ? 1 : 0);
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
+			this.hasPlacedSpawner = words[10] != 0;
+		}
+
 		protected static final int WIDTH = 11;
 		protected static final int HEIGHT = 8;
 		protected static final int DEPTH = 16;
@@ -862,6 +978,11 @@ public class StrongholdPieces {
 	}
 
 	public static class PrisonHall extends StrongholdPieces.StrongholdPiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(16);
+		}
+
 		protected static final int WIDTH = 9;
 		protected static final int HEIGHT = 5;
 		protected static final int DEPTH = 11;
@@ -870,6 +991,13 @@ public class StrongholdPieces {
 			super(StructurePieceType.STRONGHOLD_PRISON_HALL, i, boundingBox);
 			this.setOrientation(direction);
 			this.entryDoor = this.randomSmallDoor(randomSource);
+		}
+
+		/** {@link StrongholdPieces#addNativePieces}: the planned fields, no draws. */
+		PrisonHall(int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType) {
+			super(StructurePieceType.STRONGHOLD_PRISON_HALL, i, boundingBox);
+			this.setOrientation(direction);
+			this.entryDoor = smallDoorType;
 		}
 
 		public PrisonHall(CompoundTag compoundTag) {
@@ -950,10 +1078,22 @@ public class StrongholdPieces {
 	}
 
 	public static class RightTurn extends StrongholdPieces.Turn {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(17);
+		}
+
 		public RightTurn(int i, RandomSource randomSource, BoundingBox boundingBox, Direction direction) {
 			super(StructurePieceType.STRONGHOLD_RIGHT_TURN, i, boundingBox);
 			this.setOrientation(direction);
 			this.entryDoor = this.randomSmallDoor(randomSource);
+		}
+
+		/** {@link StrongholdPieces#addNativePieces}: the planned fields, no draws. */
+		RightTurn(int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType) {
+			super(StructurePieceType.STRONGHOLD_RIGHT_TURN, i, boundingBox);
+			this.setOrientation(direction);
+			this.entryDoor = smallDoorType;
 		}
 
 		public RightTurn(CompoundTag compoundTag) {
@@ -1001,6 +1141,11 @@ public class StrongholdPieces {
 	}
 
 	public static class RoomCrossing extends StrongholdPieces.StrongholdPiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(18, this.type);
+		}
+
 		protected static final int WIDTH = 11;
 		protected static final int HEIGHT = 7;
 		protected static final int DEPTH = 11;
@@ -1011,6 +1156,14 @@ public class StrongholdPieces {
 			this.setOrientation(direction);
 			this.entryDoor = this.randomSmallDoor(randomSource);
 			this.type = randomSource.nextInt(5);
+		}
+
+		/** {@link StrongholdPieces#addNativePieces}: the planned fields, no draws. */
+		RoomCrossing(int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType, int type) {
+			super(StructurePieceType.STRONGHOLD_ROOM_CROSSING, i, boundingBox);
+			this.setOrientation(direction);
+			this.entryDoor = smallDoorType;
+			this.type = type;
 		}
 
 		public RoomCrossing(CompoundTag compoundTag) {
@@ -1158,6 +1311,11 @@ public class StrongholdPieces {
 	}
 
 	public static class StairsDown extends StrongholdPieces.StrongholdPiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(19, this.isSource ? 1 : 0);
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 11;
 		private static final int DEPTH = 5;
@@ -1175,6 +1333,14 @@ public class StrongholdPieces {
 			this.isSource = false;
 			this.setOrientation(direction);
 			this.entryDoor = this.randomSmallDoor(randomSource);
+		}
+
+		/** {@link StrongholdPieces#addNativePieces}: the planned fields, no draws. */
+		StairsDown(StructurePieceType structurePieceType, int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType, boolean isSource) {
+			super(structurePieceType, i, boundingBox);
+			this.isSource = isSource;
+			this.setOrientation(direction);
+			this.entryDoor = smallDoorType;
 		}
 
 		public StairsDown(StructurePieceType structurePieceType, CompoundTag compoundTag) {
@@ -1253,6 +1419,11 @@ public class StrongholdPieces {
 			super(StructurePieceType.STRONGHOLD_START, 0, i, j, getRandomHorizontalDirection(randomSource));
 		}
 
+		/** {@link StrongholdPieces#addNativePieces}: the planned start (planning-only fields stay empty). */
+		StartPiece(int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType, boolean isSource) {
+			super(StructurePieceType.STRONGHOLD_START, i, boundingBox, direction, smallDoorType, isSource);
+		}
+
 		public StartPiece(CompoundTag compoundTag) {
 			super(StructurePieceType.STRONGHOLD_START, compoundTag);
 		}
@@ -1264,6 +1435,11 @@ public class StrongholdPieces {
 	}
 
 	public static class Straight extends StrongholdPieces.StrongholdPiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(20, this.leftChild ? 1 : 0, this.rightChild ? 1 : 0);
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 5;
 		private static final int DEPTH = 7;
@@ -1276,6 +1452,15 @@ public class StrongholdPieces {
 			this.entryDoor = this.randomSmallDoor(randomSource);
 			this.leftChild = randomSource.nextInt(2) == 0;
 			this.rightChild = randomSource.nextInt(2) == 0;
+		}
+
+		/** {@link StrongholdPieces#addNativePieces}: the planned fields, no draws. */
+		Straight(int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType, boolean leftChild, boolean rightChild) {
+			super(StructurePieceType.STRONGHOLD_STRAIGHT, i, boundingBox);
+			this.setOrientation(direction);
+			this.entryDoor = smallDoorType;
+			this.leftChild = leftChild;
+			this.rightChild = rightChild;
 		}
 
 		public Straight(CompoundTag compoundTag) {
@@ -1342,6 +1527,11 @@ public class StrongholdPieces {
 	}
 
 	public static class StraightStairsDown extends StrongholdPieces.StrongholdPiece {
+		@Override
+		public long[] nativeWords() {
+			return this.nativeStrongholdWords(21);
+		}
+
 		private static final int WIDTH = 5;
 		private static final int HEIGHT = 11;
 		private static final int DEPTH = 8;
@@ -1350,6 +1540,13 @@ public class StrongholdPieces {
 			super(StructurePieceType.STRONGHOLD_STRAIGHT_STAIRS_DOWN, i, boundingBox);
 			this.setOrientation(direction);
 			this.entryDoor = this.randomSmallDoor(randomSource);
+		}
+
+		/** {@link StrongholdPieces#addNativePieces}: the planned fields, no draws. */
+		StraightStairsDown(int i, BoundingBox boundingBox, Direction direction, StrongholdPieces.StrongholdPiece.SmallDoorType smallDoorType) {
+			super(StructurePieceType.STRONGHOLD_STRAIGHT_STAIRS_DOWN, i, boundingBox);
+			this.setOrientation(direction);
+			this.entryDoor = smallDoorType;
 		}
 
 		public StraightStairsDown(CompoundTag compoundTag) {
@@ -1398,7 +1595,7 @@ public class StrongholdPieces {
 		}
 	}
 
-	abstract static class StrongholdPiece extends StructurePiece {
+	abstract static class StrongholdPiece extends StructurePiece implements net.minecraft.world.level.levelgen.structure.NativeStructurePieces.Native {
 		protected StrongholdPieces.StrongholdPiece.SmallDoorType entryDoor = StrongholdPieces.StrongholdPiece.SmallDoorType.OPENING;
 
 		protected StrongholdPiece(StructurePieceType structurePieceType, int i, BoundingBox boundingBox) {
@@ -1414,6 +1611,18 @@ public class StrongholdPieces {
 		@Override
 		protected void addAdditionalSaveData(StructurePieceSerializationContext structurePieceSerializationContext, CompoundTag compoundTag) {
 			compoundTag.store("EntryDoor", StrongholdPieces.StrongholdPiece.SmallDoorType.LEGACY_CODEC, this.entryDoor);
+		}
+
+		/** {@link net.minecraft.world.level.levelgen.structure.NativeStructurePieces}: the header, the entry door, then {@code extra} fields. */
+		protected long[] nativeStrongholdWords(int kind, long... extra) {
+			long[] words = net.minecraft.world.level.levelgen.structure.NativeStructurePieces.header(this, kind, 1 + extra.length);
+			words[9] = this.entryDoor.ordinal();
+			System.arraycopy(extra, 0, words, 10, extra.length);
+			return words;
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
 		}
 
 		protected void generateSmallDoor(

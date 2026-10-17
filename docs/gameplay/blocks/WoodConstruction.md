@@ -66,11 +66,15 @@ Silk Touch and Fortune do not change these bundled loot results. A double slab g
 
 ## Slabs
 
+Item entries: [Acacia Slab](../items/AcaciaSlab.md) · [Bamboo Mosaic Slab](../items/BambooMosaicSlab.md) · [Bamboo Slab](../items/BambooSlab.md) · [Birch Slab](../items/BirchSlab.md) · [Cherry Slab](../items/CherrySlab.md) · [Crimson Slab](../items/CrimsonSlab.md) · [Dark Oak Slab](../items/DarkOakSlab.md) · [Jungle Slab](../items/JungleSlab.md) · [Mangrove Slab](../items/MangroveSlab.md) · [Oak Slab](../items/OakSlab.md) · [Pale Oak Slab](../items/PaleOakSlab.md) · [Spruce Slab](../items/SpruceSlab.md) · [Warped Slab](../items/WarpedSlab.md)
+
 A single slab fills the lower or upper half of its block space. Clicking a top face normally places a bottom slab; clicking the underside places a top slab. On a side face, the clicked height selects the half. Place another **identical slab item** into the missing half to make a full-height double slab. Different materials, including regular Bamboo versus Bamboo Mosaic, cannot combine into one double slab. [Placement, replacement, and shapes][slab]
 
 Single slabs can be waterlogged. Combining two slabs sets the result to **double and not waterlogged**, and double slabs reject bucket waterlogging. Mine a double slab to recover its two constituent slabs. [Slab water rules][slab] · [Slab loot checks](#recipe-and-loot-matrix)
 
 ## Stairs
+
+Item entries: [Acacia Stairs](../items/AcaciaStairs.md) · [Bamboo Mosaic Stairs](../items/BambooMosaicStairs.md) · [Bamboo Stairs](../items/BambooStairs.md) · [Birch Stairs](../items/BirchStairs.md) · [Cherry Stairs](../items/CherryStairs.md) · [Crimson Stairs](../items/CrimsonStairs.md) · [Dark Oak Stairs](../items/DarkOakStairs.md) · [Jungle Stairs](../items/JungleStairs.md) · [Mangrove Stairs](../items/MangroveStairs.md) · [Oak Stairs](../items/OakStairs.md) · [Pale Oak Stairs](../items/PaleOakStairs.md) · [Spruce Stairs](../items/SpruceStairs.md) · [Warped Stairs](../items/WarpedStairs.md)
 
 Stairs face in the player's horizontal placement direction. The clicked face and height choose bottom or upside-down placement using the same half-selection rule as slabs. Neighboring stairs can form inner or outer corners when their orientations and halves fit. **Different stair materials can form corners together**; compatible halves and directions are still required, and a neighboring parallel stair can prevent a corner. [Stair placement and corner checks][stairs]
 
@@ -78,11 +82,15 @@ Stairs keep their stair item when mined, regardless of their corner shape or hal
 
 ## Fences
 
+Item entries: [Acacia Fence](../items/AcaciaFence.md) · [Bamboo Fence](../items/BambooFence.md) · [Birch Fence](../items/BirchFence.md) · [Cherry Fence](../items/CherryFence.md) · [Crimson Fence](../items/CrimsonFence.md) · [Dark Oak Fence](../items/DarkOakFence.md) · [Jungle Fence](../items/JungleFence.md) · [Mangrove Fence](../items/MangroveFence.md) · [Oak Fence](../items/OakFence.md) · [Pale Oak Fence](../items/PaleOakFence.md) · [Spruce Fence](../items/SpruceFence.md) · [Warped Fence](../items/WarpedFence.md)
+
 The 12 covered wooden fences connect horizontally to one another, including Crimson and Warped. They also connect to a neighbor's sturdy side face unless that block is a connection exception, and to a correctly oriented Fence Gate. They do not join Nether Brick Fence through the same-fence rule: that fence is outside the wooden-fence tag. Leaves, pumpkins, melons, shulker boxes, and barriers are among the explicitly excluded sturdy-face connections. [Fence connection checks][fences] · [Wooden-fence tag][block-wooden_fences] · [Fence tag][block-fences] · [Connection exceptions][connection-exceptions]
 
 Fence collision rises **1.5 blocks**, even though the visible post is one block tall. Removing a rail connection changes the shape, not the fence's existence. Fences can be waterlogged. [Fence dimensions and neighbor updates][fences] · [Collision and fluid implementation][cross]
 
 ## Fence Gates
+
+Item entries: [Acacia Fence Gate](../items/AcaciaFenceGate.md) · [Bamboo Fence Gate](../items/BambooFenceGate.md) · [Birch Fence Gate](../items/BirchFenceGate.md) · [Cherry Fence Gate](../items/CherryFenceGate.md) · [Crimson Fence Gate](../items/CrimsonFenceGate.md) · [Dark Oak Fence Gate](../items/DarkOakFenceGate.md) · [Jungle Fence Gate](../items/JungleFenceGate.md) · [Mangrove Fence Gate](../items/MangroveFenceGate.md) · [Oak Fence Gate](../items/OakFenceGate.md) · [Pale Oak Fence Gate](../items/PaleOakFenceGate.md) · [Spruce Fence Gate](../items/SpruceFenceGate.md) · [Warped Fence Gate](../items/WarpedFenceGate.md)
 
 A gate's placement direction determines the direction you walk through it. Fence rails attach across the perpendicular axis; rotating the gate can therefore fix an apparent missing connection. A gate does not require adjacent fences or continuing floor support. [Placement and connection direction][gates] · [Default survival rule][default-support]
 

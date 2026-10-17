@@ -22,13 +22,13 @@ pub(in crate::render::worldrender) fn whole_frame_phase_trace(phase: &str, frame
         return;
     }
     match started {
-        Some(started) => eprintln!(
+        Some(started) => crate::core::console::stderr(format_args!(
             "whole-frame.phase={} frame={} elapsed_nanos={}",
             phase,
             frame_id,
             crate::render::vulkanic::metrics::elapsed_nanos_u64(started)
-        ),
-        None => eprintln!("whole-frame.phase={} frame={} begin", phase, frame_id),
+        )),
+        None => crate::core::console::stderr(format_args!("whole-frame.phase={} frame={} begin", phase, frame_id)),
     }
 }
 

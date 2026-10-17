@@ -19,6 +19,38 @@ public final class DevAudioValidation {
 	private DevAudioValidation() {
 	}
 
+	/**
+	 * Runs the backend validation once, before the Rust sound engine opens its
+	 * device: on a dedicated "Sound engine" thread that owns a validation-only
+	 * device, released again afterwards so the engine starts from zero devices.
+	 */
+	public static void maybeRunIsolated(String preferredDevice, boolean hrtf) {
+		if (!ENABLED || RAN.get()) {
+			return;
+		}
+		java.util.concurrent.atomic.AtomicReference<RuntimeException> failure = new java.util.concurrent.atomic.AtomicReference<>();
+		Thread thread = new Thread(() -> {
+			Library library = new Library();
+			try {
+				library.init(preferredDevice, hrtf);
+				maybeRun(library, preferredDevice, hrtf);
+			} catch (RuntimeException runtimeException) {
+				failure.set(runtimeException);
+			} finally {
+				library.cleanup();
+			}
+		}, "Sound engine");
+		thread.start();
+		try {
+			thread.join();
+		} catch (InterruptedException interrupted) {
+			Thread.currentThread().interrupt();
+		}
+		if (failure.get() != null) {
+			throw failure.get();
+		}
+	}
+
 	public static void maybeRun(Library library, String preferredDevice, boolean hrtf) {
 		if (!ENABLED || !RAN.compareAndSet(false, true)) {
 			return;

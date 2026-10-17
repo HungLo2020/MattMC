@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.minecraft.resources.ResourceKey;
@@ -50,13 +51,23 @@ public interface RegistryAccess extends HolderLookup.Provider {
 	}
 
 	default RegistryAccess.Frozen freeze() {
-		class FrozenAccess extends RegistryAccess.ImmutableRegistryAccess implements RegistryAccess.Frozen {
-			protected FrozenAccess(final Stream<RegistryAccess.RegistryEntry<?>> stream) {
-				super(stream);
+		final class FrozenAccess extends RegistryAccess.ImmutableRegistryAccess implements RegistryAccess.Frozen {
+			private FrozenAccess(final Stream<RegistryAccess.RegistryEntry<?>> stream, AtomicBoolean controlled) {
+				super(stream, controlled);
 			}
 		}
 
-		return new FrozenAccess(this.registries().map(RegistryAccess.RegistryEntry::freeze));
+		AtomicBoolean controlled = new AtomicBoolean(true);
+		return new FrozenAccess(this.registries().map(entry -> {
+			// Record provenance while performing the original finalization, not
+			// by probing a lookup later. Unknown registry implementations still
+			// follow the original freeze path but cannot grant native admission.
+			RegistryAccess.RegistryEntry<?> frozen = entry.freeze();
+			Class<?> type = entry.value().getClass();
+			boolean standard = type == MappedRegistry.class || type == DefaultedMappedRegistry.class;
+			if (!standard || frozen.value() != entry.value()) controlled.set(false);
+			return frozen;
+		}), controlled);
 	}
 
 	public interface Frozen extends RegistryAccess {
@@ -64,20 +75,35 @@ public interface RegistryAccess extends HolderLookup.Provider {
 
 	public static class ImmutableRegistryAccess implements RegistryAccess {
 		private final Map<? extends ResourceKey<? extends Registry<?>>, ? extends Registry<?>> registries;
+		private final boolean controlledFinalizedLookups;
 
 		public ImmutableRegistryAccess(List<? extends Registry<?>> list) {
 			this.registries = (Map<? extends ResourceKey<? extends Registry<?>>, ? extends Registry<?>>)list.stream()
 				.collect(Collectors.toUnmodifiableMap(Registry::key, registry -> registry));
+			this.controlledFinalizedLookups = false;
 		}
 
 		public ImmutableRegistryAccess(Map<? extends ResourceKey<? extends Registry<?>>, ? extends Registry<?>> map) {
 			this.registries = Map.copyOf(map);
+			this.controlledFinalizedLookups = false;
 		}
 
 		public ImmutableRegistryAccess(Stream<RegistryAccess.RegistryEntry<?>> stream) {
 			this.registries = (Map<? extends ResourceKey<? extends Registry<?>>, ? extends Registry<?>>)stream.collect(
 				ImmutableMap.toImmutableMap(RegistryAccess.RegistryEntry::key, RegistryAccess.RegistryEntry::value)
 			);
+			this.controlledFinalizedLookups = false;
+		}
+
+		/** Only the final internal snapshot can call this constructor. */
+		private ImmutableRegistryAccess(Stream<RegistryAccess.RegistryEntry<?>> stream, AtomicBoolean controlled) {
+			this.registries = stream.collect(ImmutableMap.toImmutableMap(RegistryAccess.RegistryEntry::key, RegistryAccess.RegistryEntry::value));
+			this.controlledFinalizedLookups = controlled.get();
+		}
+
+		/** Provenance from successful standard finalization; performs no lookup. */
+		public final boolean hasControlledFinalizedLookups() {
+			return this.controlledFinalizedLookups;
 		}
 
 		@Override

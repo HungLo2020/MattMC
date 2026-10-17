@@ -81,9 +81,11 @@ public class CampfireBlock extends BaseEntityBlock implements SimpleWaterloggedB
 		super(properties);
 		this.spawnParticles = bl;
 		this.fireDamage = i;
-		this.registerDefaultState(
-			this.stateDefinition.any().setValue(LIT, true).setValue(SIGNAL_FIRE, false).setValue(WATERLOGGED, false).setValue(FACING, Direction.NORTH)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition.any().setValue(LIT, true).setValue(SIGNAL_FIRE, false).setValue(WATERLOGGED, false).setValue(FACING, Direction.NORTH)
+			);
+		}
 	}
 
 	@Override

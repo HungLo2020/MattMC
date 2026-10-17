@@ -4,15 +4,83 @@ Status effects temporarily change an entity's behavior, attributes, health, or o
 
 ## Reviewed effects
 
+- [Absorption](CombatEffects.md#absorption): temporary damage buffer and refill/expiry limits
+- [Bad Omen](OmenEffects.md#bad-omen): bottle levels, village conversion, and trial conversion
+- [Blindness](VisionEffects.md#blindness): restricted fog, sprinting, and ordinary critical hits
+- [Breath of the Nautilus](WaterAndFireEffects.md#breath-of-the-nautilus): mount-applied status and its current air limitation
+- [Conduit Power](WaterAndFireEffects.md#conduit-power): air protection, mining assistance, and lighting inputs
+- [Darkness](VisionEffects.md#darkness): blended fog, pulsing light, and source refresh rules
+- [Debilitating Sting](../mobs/TarantulaHawk.md#sting-and-prey): sting duration, arthropod gates, and player-motion limits
+- [Dolphin's Grace](MovementEffects.md#dolphins-grace): horizontal water-momentum retention
+- [Fire Resistance](WaterAndFireEffects.md#fire-resistance): fire-tagged damage rejection and lava-fog behavior
+- [Glowing](VisibilityEffects.md#glowing): team-colored outlines, Spectral Arrows, and native rendering limits
+- [Haste](MiningEffects.md#haste): mining-speed bonus, attack recharge, and Conduit interaction
+- [Health Boost](CombatEffects.md#health-boost): maximum ordinary health without immediate healing
+- [Hero of the Village](OmenEffects.md#hero-of-the-village): raid eligibility, first-input discounts, and villager gifts
+- [Hunger](HungerAndSaturation.md#hunger): player exhaustion, food sources, and Husk-hit conditions
+- [Infested](TriggeredEffects.md#infested): hurt-triggered Silverfish, damage gates, and spawn limits
+- [Instant Damage](InstantEffects.md#instant-damage): instant magic damage, inverted healing, and delivery limits
+- [Instant Health](InstantEffects.md#instant-health): immediate healing, inverted damage, and delivery limits
+- [Invisibility](VisibilityEffects.md#invisibility): AI detection, armor coverage, and selected body rendering
+- [Jump Boost](MovementEffects.md#jump-boost): ground-jump power and safe-fall-distance contributions
+- [Levitation](MovementEffects.md#levitation): upward air movement and the Elytra restriction
+- [Luck](LuckAndUnluck.md#luck): player luck, fishing weights, and potion/browser access
+- [Mining Fatigue](MiningEffects.md#mining-fatigue): level-specific mining penalties, attack recharge, and removal
+- [Nausea](VisibilityEffects.md#nausea): food and mob sources, overlay settings, and the current distortion limitation
+- [Night Vision](VisionEffects.md#night-vision): rendered brightness, sources, and near-expiry flicker
+- [Oozing](TriggeredEffects.md#oozing): death-triggered Slimes and the nearby-Slime count limit
+- [Orca's Might](../mobs/Orca.md#swimming-together-and-orcas-might): companion-granted attack speed and refresh rules
 - [Poison](Poison.md): periodic damage with a low-health cutoff
-- [Wither](Wither.md): periodic damage without Poison's low-health cutoff
+- [Raid Omen](OmenEffects.md#raid-omen): saved-position countdown, raid permission gates, and cancellation
 - [Regeneration](Regeneration.md): periodic healing, separate from food-based healing
+- [Resistance](CombatEffects.md#resistance): eligible damage reduction and bypasses
+- [Saturation](HungerAndSaturation.md#saturation): repeated food replenishment and stew-duration limits
+- [Slow Falling](MovementEffects.md#slow-falling): descending gravity and fall-distance handling
+- [Slowness](MovementEffects.md#slowness): reduced movement-speed attribute
+- [Speed](MovementEffects.md#speed): increased movement-speed attribute
+- [Strength](CombatEffects.md#strength): added attack-damage attribute and hit limitations
+- [Sunbird Blessing](../mobs/Sunbird.md#sunbird-blessing): nearby-player grant, fall-distance reset, and motion limits
+- [Sunbird Curse](../mobs/Sunbird.md#sunbird-curse): retaliation, Phantom scorching, and player glide interruption
+- [Tiger's Blessing](../mobs/Tiger.md#feeding-and-tigers-blessing): dropped-food chances and Tiger target protection
+- [Trial Omen](OmenEffects.md#trial-omen): duration by bottle level, player detection, and spawner cooldown limits
+- [Unluck](LuckAndUnluck.md#unluck): reduced player luck, commands, and loot-context limits
+- [Water Breathing](WaterAndFireEffects.md#water-breathing): ordinary underwater air protection and recovery
+- [Weakness](CombatEffects.md#weakness): reduced attack-damage attribute, curing, and other sources
+- [Weaving](TriggeredEffects.md#weaving): death-triggered Cobweb placement and easier web movement
+- [Wind Charged](TriggeredEffects.md#wind-charged): death-triggered wind burst, block reactions, and fall limits
+- [Wither](Wither.md): periodic damage without Poison's low-health cutoff
 
-This is a growing reference, not a complete list of all registered effects. The [brewing guide](../brewing/Brewing.md) provides verified potion chains and selected effect durations.
+The [movement effects reference](MovementEffects.md) compares acquisition, movement rules, and effect interactions.
+
+The [combat effects reference](CombatEffects.md) compares attack modifiers, damage reduction, and extra health.
+
+The [water and fire effects reference](WaterAndFireEffects.md) compares fire damage, breathing, Conduit benefits, and the Nautilus effect limitation.
+
+The [vision effects reference](VisionEffects.md) compares Night Vision, Blindness, Darkness, and their rendering and player-action limits.
+
+The [Invisibility, Glowing, and Nausea reference](VisibilityEffects.md) compares detection, selected body rendering, outlines, and the current Nausea presentation limitation.
+
+The [instant effects reference](InstantEffects.md) compares Healing and Harming, recipient inversion, and drinking, splash, cloud, and arrow delivery.
+
+The [Hunger and Saturation effect guide](HungerAndSaturation.md) separates status-effect ticks from food values and compares their sources.
+
+The [mining effects reference](MiningEffects.md) compares Haste and Mining Fatigue, their combined mining factors, and separate attack and swing timing.
+
+The [Luck and Unluck reference](LuckAndUnluck.md) separates player luck, fishing enchantments, loot-table arithmetic, and acquisition routes.
+
+The five mob-granted entries above, **Orca's Might, Debilitating Sting, Tiger's Blessing, Sunbird Blessing, and Sunbird Curse**, use distinct registered effect IDs. Their encounter routes and integration limits belong to the linked mob guides. The checked ordinary potion types and brewing recipes do not include these five; an effect registration alone is not a brewing recipe. [Distinct registrations][custom-effect-registry] · [Potion types][custom-effect-potions] · [Brewing registrations][custom-effect-brewing]
+
+The [Wind Charged, Weaving, Oozing, and Infested guide](TriggeredEffects.md) compares damage/death triggers, creation limits, brewing, and ominous-trial delivery.
+
+This directory links guides for all **45 direct effect registrations** in the reviewed source snapshot; the guides describe checked behavior, not every possible interaction or custom-data variant. [Direct effect registrations](https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/effect/MobEffects.java) The [brewing guide](../brewing/Brewing.md) provides verified potion chains and selected effect durations.
+
+The [omen and Hero of the Village guide](OmenEffects.md) compares the bottle effect chain, encounter triggers, removal timing, and villager rewards.
 
 ## Clearing effects
 
 [Milk](../items/MilkBucket.md) calls the all-effects removal path, so it can remove beneficial effects as well as harmful ones. A [Honey Bottle](../items/HoneyBottle.md) specifically removes Poison instead. Choose the remedy based on the effect rather than treating every drink as interchangeable.
+
+Milk also removes these five mob-granted effects. Clearing Tiger's Blessing ends its targeting protection, and removing a Sunbird effect while still nearby can allow another blessing at a later check. [All-effects removal][custom-effect-clear] · [Tiger target check][custom-effect-tiger] · [Sunbird grant check][custom-effect-sunbird]
 
 Item sources can have side effects: [Blobfish food](../items/Blobfish.md), for example, restores hunger but also applies Poison. Food values alone are not an effect description.
 
@@ -31,3 +99,12 @@ Source-reviewed at `9bd57e1d0057903f6a9196e592d5e2a087c9248a` on 2026-10-01. No 
 - [Effect instances and duration](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/effect/MobEffectInstance.java)
 - [Consumption effect definitions](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/component/Consumables.java)
 - [Potion effects](https://github.com/HungLo2020/MattMC/blob/9bd57e1d0057903f6a9196e592d5e2a087c9248a/src/main/java/net/minecraft/world/item/alchemy/Potions.java)
+
+The five mob-granted entries and their shared removal/brewing limits were additionally source-reviewed at `8b9173b399a629578a7bf0168e4d3ea32b10e8a6` on **2026-10-02**. No in-game effect, flight, movement, or consumption test was run.
+
+[custom-effect-registry]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/effect/MobEffects.java#L129-L148
+[custom-effect-potions]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/item/alchemy/Potions.java
+[custom-effect-brewing]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/item/alchemy/PotionBrewing.java
+[custom-effect-clear]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/minecraft/world/entity/LivingEntity.java#L943-L952
+[custom-effect-tiger]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/alexsmobs/entity/EntityTiger.java#L430-L433
+[custom-effect-sunbird]: https://github.com/HungLo2020/MattMC/blob/8b9173b399a629578a7bf0168e4d3ea32b10e8a6/src/main/java/net/alexsmobs/entity/EntitySunbird.java#L197-L207

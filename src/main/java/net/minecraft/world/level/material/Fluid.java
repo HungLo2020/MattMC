@@ -27,17 +27,19 @@ import org.jetbrains.annotations.Nullable;
 public abstract class Fluid {
 	public static final IdMapper<FluidState> FLUID_STATE_REGISTRY = new IdMapper<>();
 	protected final StateDefinition<Fluid, FluidState> stateDefinition;
+	final NativeFluidDefinitions.Definition nativeDefinition;
 	private FluidState defaultFluidState;
 	private final Holder.Reference<Fluid> builtInRegistryHolder = BuiltInRegistries.FLUID.createIntrusiveHolder(this);
 
-	protected Fluid() {
+	protected Fluid(NativeFluidDefinitions.Definition definition) {
+		this.nativeDefinition = definition;
 		StateDefinition.Builder<Fluid, FluidState> builder = new StateDefinition.Builder<>(this);
-		this.createFluidStateDefinition(builder);
-		this.stateDefinition = builder.create(Fluid::defaultFluidState, FluidState::new);
-		this.registerDefaultState(this.stateDefinition.any());
-	}
-
-	protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder) {
+		builder.add(definition.properties().toArray(net.minecraft.world.level.block.state.properties.Property<?>[]::new));
+		int[] nextState = {0};
+		this.stateDefinition = builder.create(Fluid::defaultFluidState,
+			(owner, values, codec) -> new FluidState(owner, values, codec, definition.states().get(nextState[0]++)));
+		if (nextState[0] != definition.states().size()) throw new IllegalStateException("Fluid state projection changed");
+		this.registerDefaultState(this.stateDefinition.getPossibleStates().get(definition.defaultLocalState()));
 	}
 
 	public StateDefinition<Fluid, FluidState> getStateDefinition() {
@@ -81,21 +83,29 @@ public abstract class Fluid {
 		return false;
 	}
 
-	protected boolean isEmpty() {
-		return false;
+	protected final boolean isEmpty() {
+		return this.nativeDefinition.family() == 0;
 	}
 
-	protected abstract float getExplosionResistance();
+	protected final float getExplosionResistance() {
+		return this.nativeDefinition.explosionResistance();
+	}
 
 	public abstract float getHeight(FluidState fluidState, BlockGetter blockGetter, BlockPos blockPos);
 
-	public abstract float getOwnHeight(FluidState fluidState);
+	public final float getOwnHeight(FluidState fluidState) {
+		return fluidState.getOwnHeight();
+	}
 
 	protected abstract BlockState createLegacyBlock(FluidState fluidState);
 
-	public abstract boolean isSource(FluidState fluidState);
+	public final boolean isSource(FluidState fluidState) {
+		return fluidState.isSource();
+	}
 
-	public abstract int getAmount(FluidState fluidState);
+	public final int getAmount(FluidState fluidState) {
+		return fluidState.getAmount();
+	}
 
 	public boolean isSame(Fluid fluid) {
 		return fluid == this;

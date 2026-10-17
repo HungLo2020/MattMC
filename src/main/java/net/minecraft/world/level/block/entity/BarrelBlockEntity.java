@@ -23,9 +23,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
-public class BarrelBlockEntity extends RandomizableContainerBlockEntity {
+public class BarrelBlockEntity extends RandomizableContainerBlockEntity implements NativeStockContainer {
 	private static final Component DEFAULT_NAME = Component.translatable("container.barrel");
-	private NonNullList<ItemStack> items = NonNullList.withSize(27, ItemStack.EMPTY);
+	private static final class LegacyItems {NonNullList<ItemStack> items;LegacyItems(NonNullList<ItemStack> items){this.items=items;}}
+	/** Like the stock chest: the exact class keeps its slots in a replaceable native container cell. */
+	private final net.minecraft.world.item.NativeItemState.ContainerCell nativeContainer = this.getClass()==BarrelBlockEntity.class
+		? net.minecraft.world.item.NativeItemState.ContainerCell.create(net.minecraft.world.item.NativeItemSlots.withSize(27)):null;
+	private final LegacyItems legacyItems = this.nativeContainer==null?new LegacyItems(NonNullList.withSize(27,ItemStack.EMPTY)):null;
 	private final ContainerOpenersCounter openersCounter = new ContainerOpenersCounter() {
 		@Override
 		protected void onOpen(Level level, BlockPos blockPos, BlockState blockState) {
@@ -62,16 +66,16 @@ public class BarrelBlockEntity extends RandomizableContainerBlockEntity {
 	protected void saveAdditional(ValueOutput valueOutput) {
 		super.saveAdditional(valueOutput);
 		if (!this.trySaveLootTable(valueOutput)) {
-			ContainerHelper.saveAllItems(valueOutput, this.items);
+			ContainerHelper.saveAllItems(valueOutput, this.currentItems());
 		}
 	}
 
 	@Override
 	protected void loadAdditional(ValueInput valueInput) {
 		super.loadAdditional(valueInput);
-		this.items = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
+		this.replaceItems(this.createItems(this.getContainerSize()));
 		if (!this.tryLoadLootTable(valueInput)) {
-			ContainerHelper.loadAllItems(valueInput, this.items);
+			ContainerHelper.loadAllItems(valueInput, this.currentItems());
 		}
 	}
 
@@ -82,12 +86,50 @@ public class BarrelBlockEntity extends RandomizableContainerBlockEntity {
 
 	@Override
 	protected NonNullList<ItemStack> getItems() {
-		return this.items;
+		return this.currentItems();
 	}
 
 	@Override
 	protected void setItems(NonNullList<ItemStack> nonNullList) {
-		this.items = nonNullList;
+		this.replaceItems(nonNullList);
+	}
+
+	private NonNullList<ItemStack> createItems(int size) {
+		return this.getClass() == BarrelBlockEntity.class ? net.minecraft.world.item.NativeItemSlots.withSize(size) : NonNullList.withSize(size, ItemStack.EMPTY);
+	}
+	private NonNullList<ItemStack> currentItems(){return this.nativeContainer==null?this.legacyItems.items:this.nativeContainer.facade();}
+	private void replaceItems(NonNullList<ItemStack> items){if(this.nativeContainer==null)this.legacyItems.items=items;else this.nativeContainer.replace(items);}
+
+	/** Exact-stock admission, as for the chest; pending loot keeps its original Java effects. */
+	@org.jetbrains.annotations.Nullable
+	@Override
+	public net.minecraft.world.item.NativeItemSlots nativeSlotsForTransfer() {
+		return this.getClass() == BarrelBlockEntity.class && this.lootTable == null && this.currentItems() instanceof net.minecraft.world.item.NativeItemSlots nativeSlots
+			? nativeSlots : null;
+	}
+
+	@Override
+	public final net.minecraft.world.item.NativeItemState.ContainerCell nativeContainerForSlots() {return this.nativeContainer;}
+
+	/** Exact loot-free stock barrel: emptiness read from the native rows. */
+	@Override
+	public boolean isEmpty() {
+		var rows = this.nativeSlotsForTransfer();
+		return rows != null ? rows.allEmpty() : super.isEmpty();
+	}
+
+	/** The inherited setItem chain; an exact native barrel discards the previous contents without observing them. */
+	@Override
+	public void setItem(int i, ItemStack itemStack) {
+		if (this.getClass() != BarrelBlockEntity.class) {
+			super.setItem(i, itemStack);
+			return;
+		}
+		this.unpackLootTable(null);
+		if (this.getItems() instanceof net.minecraft.world.item.NativeItemSlots nativeItems) nativeItems.replace(i, itemStack);
+		else this.getItems().set(i, itemStack);
+		itemStack.limitSize(this.getMaxStackSize(itemStack));
+		this.setChanged();
 	}
 
 	@Override

@@ -123,6 +123,8 @@ public abstract class AbstractDhTintGetter implements BlockAndTintGetter
 		int zMin = mutableBlockPos.getZ() - this.smoothingRadiusInBlocks;
 		int zMax = mutableBlockPos.getZ() + this.smoothingRadiusInBlocks + 1;
 		
+		// Render conversion blends cached tints in Rust before asking Java, so
+		// this traversal runs for cache misses (and with a resolver, to fill them).
 		int levelMinY = this.clientLevelWrapper.getMinHeight();
 		
 		for (int x = xMin; x < xMax; x++)
@@ -183,15 +185,18 @@ public abstract class AbstractDhTintGetter implements BlockAndTintGetter
 	 */
 	private int tryGetClientBiomeColor(@Nullable ColorResolver colorResolver, BiomeWrapper biomeWrapper)
 	{
-		BlockBiomeWrapperPair pair = BlockBiomeWrapperPair.get(this.blockStateWrapper, biomeWrapper);
-		
-		// use the cached color if possible
-		Integer cachedColor = COLOR_BY_BLOCK_BIOME_PAIR.get(pair); // explicit Integer return here reduces unnecessary allocations
-		if (cachedColor != null)
-		{
-			return cachedColor;
-		}
-		
+        var nativeCache = this.blockStateWrapper.nativeTintCache();
+        var nativeBiome = biomeWrapper.nativeTintIdentity();
+        BlockBiomeWrapperPair pair = null;
+        if (nativeCache != null && nativeBiome != null) {
+            long cached = nativeCache.get(nativeBiome);
+            if ((cached >>> 32) != 0) return (int)cached;
+        } else {
+            pair = BlockBiomeWrapperPair.get(this.blockStateWrapper, biomeWrapper);
+            Integer cached = COLOR_BY_BLOCK_BIOME_PAIR.get(pair);
+            if (cached != null) return cached;
+        }
+
 		if (colorResolver == null)
 		{
 			// no color resolver is present,
@@ -202,7 +207,8 @@ public abstract class AbstractDhTintGetter implements BlockAndTintGetter
 		
 		
 		int color = colorResolver.getColor(unwrapClientBiome(biomeWrapper), 0, 0);
-		COLOR_BY_BLOCK_BIOME_PAIR.put(pair, color);
+        if (nativeCache != null && nativeBiome != null) nativeCache.put(nativeBiome, color);
+        else COLOR_BY_BLOCK_BIOME_PAIR.put(pair, color);
 		return color;
 	}
 	

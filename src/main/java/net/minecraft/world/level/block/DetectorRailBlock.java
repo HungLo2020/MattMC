@@ -39,7 +39,9 @@ public class DetectorRailBlock extends BaseRailBlock {
 
 	public DetectorRailBlock(BlockBehaviour.Properties properties) {
 		super(true, properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(POWERED, false).setValue(SHAPE, RailShape.NORTH_SOUTH).setValue(WATERLOGGED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(POWERED, false).setValue(SHAPE, RailShape.NORTH_SOUTH).setValue(WATERLOGGED, false));
+		}
 	}
 
 	@Override

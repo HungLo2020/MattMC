@@ -1263,6 +1263,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("game.dev-before-tick");
 		net.minecraft.client.dev.GraphicsSubsystemBenchmark.runIfRequested(this);
 		net.minecraft.client.dev.DeterministicCameraCapture.beforeTick(this);
+		net.minecraft.client.dev.ScriptedCameraSweep.beforeFrame(this);
 		net.minecraft.client.dev.StoragePerfRunController.beforeTick(this);
 		net.minecraft.client.dev.PoiStorageValidationController.beforeTick(this);
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("game.dev-before-tick");
@@ -1468,6 +1469,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private ProfilerFiller constructProfiler(boolean bl, @Nullable SingleTickProfiler singleTickProfiler) {
+		// Session recordings time vanilla profiler sections when no real profiler is active.
+		if (net.minecraft.client.dev.GameplaySessionRecorder.ENABLED && !bl && singleTickProfiler == null
+			&& !this.metricsRecorder.isRecording() && !net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
+			return net.minecraft.client.dev.GameplaySessionRecorder.PROFILER;
+		}
 		if (!bl) {
 			this.fpsPieProfiler.disable();
 			// Don't return InactiveProfiler if custom profiling is active

@@ -93,12 +93,19 @@ public final class StructureStart {
 			BlockPos blockPos2 = new BlockPos(blockPos.getX(), boundingBox2.minY(), blockPos.getZ());
 
 			for (StructurePiece structurePiece : list) {
-				if (structurePiece.getBoundingBox().intersects(boundingBox)) {
+				if (structurePiece.getBoundingBox().intersects(boundingBox)
+					&& !NativeStructurePieces.place(structurePiece, worldGenLevel, randomSource, boundingBox, chunkPos, blockPos2)) {
+					// Template and jigsaw pieces count their own Java-written parts.
+					if (!(structurePiece instanceof TemplateStructurePiece) && !(structurePiece instanceof PoolElementStructurePiece)) {
+						net.minecraft.world.level.levelgen.NativeDecoration.javaPiece(worldGenLevel, structurePiece);
+					}
 					structurePiece.postProcess(worldGenLevel, structureManager, chunkGenerator, randomSource, boundingBox, chunkPos, blockPos2);
 				}
 			}
 
-			this.structure.afterPlace(worldGenLevel, structureManager, chunkGenerator, randomSource, boundingBox, chunkPos, this.pieceContainer);
+			if (!NativeStructurePieces.afterPlace(this.structure, worldGenLevel, randomSource, boundingBox, chunkPos, this.pieceContainer)) {
+				this.structure.afterPlace(worldGenLevel, structureManager, chunkGenerator, randomSource, boundingBox, chunkPos, this.pieceContainer);
+			}
 		}
 	}
 

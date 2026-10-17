@@ -52,7 +52,6 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.MusicManager;
 import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.client.sounds.SoundPreviewHandler;
 import net.minecraft.client.tutorial.TutorialSteps;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.StringTag;
@@ -1074,7 +1073,7 @@ public class Options {
 			SoundManager soundManager = minecraft.getSoundManager();
 			soundManager.updateSourceVolume(soundSource);
 			if (minecraft.level == null) {
-				SoundPreviewHandler.preview(soundManager, soundSource, double_.floatValue());
+				soundManager.preview(soundSource, double_.floatValue());
 			}
 		});
 	}
@@ -1668,8 +1667,14 @@ public class Options {
 	}
 
 	public CloudStatus getCloudsType() {
-		// Rust cloud semantics consume the copied gameplay setting and source
-		// pack snapshot; do not query Iris' renderer pipeline here.
+		// Iris: the selected pack's clouds= directive overrides the option.
+		// Rust resolves it from the copied pack source; no Iris pipeline here.
+		if (renderDistance.get() >= 4) {
+			CloudStatus packOverride = net.vulkanic.gui.RustGalFrameCoordinator.shaderPackVanillaCloudOverride();
+			if (packOverride != null) {
+				return packOverride;
+			}
+		}
 		return this.cloudStatus.get();
 	}
 

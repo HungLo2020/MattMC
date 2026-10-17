@@ -27,12 +27,72 @@ import org.jetbrains.annotations.Nullable;
 public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T>, PalettedContainerROExtension<T> {
 	private static final int MIN_PALETTE_BITS = 0;
 	private volatile PalettedContainer.Data<T> data;
+	@Nullable private volatile NativeLiveBlockSection nativeBlocks;
+	@Nullable private volatile NativeLiveBiomeSection<T> nativeBiomes;
+	private boolean escapedBiomeSingleton;
+	NativeLiveBiomeSection<T> nativeLiveBiomes() {
+        var biomes = this.nativeBiomes;
+        if (biomes != null && biomes.compatibilityEscaped()) { this.materializeForMutation(); return null; }
+        return biomes;
+    }
+
+	/** Test corruption and explicit compatibility writes transfer ownership first. */
+	@VisibleForTesting
+	Data<T> dataForCompatibilityMutation() { this.materializeForMutation(); return this.data; }
+
+	private T currentPaletteValue(int id) {
+		var live = this.nativeBlocks;
+		if (live != null) return (T)live.paletteValue(id);
+		var biomes = this.nativeLiveBiomes();
+		return biomes != null ? biomes.paletteValue(id) : this.data.palette.valueFor(id);
+	}
+
+	NativeLiveBlockSection nativeLiveBlocks() { return this.nativeBlocks; }
+
+	/** Whether Rust currently owns this biome container's storage (no side effects). */
+	public boolean isNativeBiomeOwned() { return this.nativeBiomes != null; }
+
+	private Data<T> readData() {
+		for (;;) {
+			var live = this.nativeBlocks;
+			if (live != null) return live.legacy(this.strategy);
+			var biomes = this.nativeLiveBiomes();
+			if (biomes != null) return biomes.legacy(this.strategy);
+			var value = this.data;
+			if (value != null) return value;
+		}
+	}
+
+	private void adoptNative() {
+		if (this.getClass() != PalettedContainer.class
+			|| (this.escapedBiomeSingleton && this.data.storage.getBits() == 0)) return;
+		var live = NativeLiveBlockSection.adopt(this.strategy, this.data);
+		if (live != null) { this.nativeBlocks = live; this.data = null; }
+		else { var biomes = NativeLiveBiomeSection.adopt(this.strategy, this.data);
+			if (biomes != null) { this.nativeBiomes = biomes; this.data = null; } }
+	}
+
+	private void materializeForMutation() {
+		var live = this.nativeBlocks;
+		if (live != null) { this.data = live.legacy(this.strategy); live.invalidate(); this.nativeBlocks = null; }
+		var biomes = this.nativeBiomes;
+		if (biomes != null) { this.escapedBiomeSingleton = biomes.bits() == 0; var data = biomes.legacyForMutation(this.strategy); this.data = data; this.nativeBiomes = null; }
+	}
+
+	private static int nativeStateId(Object value) {
+		if (value == null || value.getClass() != net.minecraft.world.level.block.state.BlockState.class) return -1;
+		var state = (net.minecraft.world.level.block.state.BlockState)value;
+		int id = net.minecraft.world.level.block.Block.getId(state);
+		return net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.byId(id) == state ? id : -1;
+	}
 	private final Strategy<T> strategy;
 	private final ThreadingDetector threadingDetector = new ThreadingDetector("PalettedContainer");
 
-	// Borrow a consistent storage/palette pair for the chunk's bulk heightmap reader.
-	// The caller observes the same ownership/exclusion rules as ordinary reads.
-	Data<T> dataForNativeScan() { return this.data; }
+	// A coherent temporary export for legacy consumers; native bulk readers use the owner.
+	// Mutating this export cannot change a native section; transfer ownership first.
+	Data<T> dataForNativeScan() { return this.readData(); }
+
+	Strategy<T> strategyForNativeSnapshot() { return this.strategy; }
 	net.minecraft.core.IdMap<T> registryForNativeScan() { return this.strategy.globalMap(); }
 
 	public void acquire() {
@@ -70,17 +130,37 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 	PalettedContainer(Strategy<T> strategy, Configuration configuration, BitStorage bitStorage, Palette<T> palette) {
 		this.strategy = strategy;
 		this.data = new PalettedContainer.Data<>(configuration, bitStorage, palette);
+		this.adoptNative();
+	}
+
+	PalettedContainer(Strategy<T> strategy, NativeLiveBlockSection owner) {
+		this.strategy = strategy;
+		this.nativeBlocks = owner;
+	}
+
+	PalettedContainer(Strategy<T> strategy, NativeLiveBiomeSection<T> owner) {
+		this.strategy = strategy;
+		this.nativeBiomes = owner;
 	}
 
 	private PalettedContainer(PalettedContainer<T> palettedContainer) {
 		this.strategy = palettedContainer.strategy;
-		this.data = palettedContainer.data.copy();
+		var live = palettedContainer.nativeBlocks;
+		if (live != null) this.nativeBlocks = live.copy();
+		else if (palettedContainer.nativeLiveBiomes() != null) this.nativeBiomes = palettedContainer.nativeLiveBiomes().copy();
+		else {
+			this.data = palettedContainer.readData().copy();
+			this.escapedBiomeSingleton = palettedContainer.escapedBiomeSingleton;
+			// A transferred single palette still aliases its original and copies.
+			if (!(NativeLiveBiomeSection.binding(this.strategy) != null && this.data.storage.getBits() == 0)) this.adoptNative();
+		}
 	}
 
 	public PalettedContainer(T object, Strategy<T> strategy) {
 		this.strategy = strategy;
 		this.data = this.createOrReuseData(null, 0);
 		this.data.palette.idFor(object, this);
+		this.adoptNative();
 	}
 
 	private PalettedContainer.Data<T> createOrReuseData(@Nullable PalettedContainer.Data<T> data, int i) {
@@ -96,9 +176,112 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		}
 	}
 
+	/** Whether this is still a fresh single-value container holding only {@code value}. */
+	boolean isUntouched(T value) {
+		var live = this.nativeBlocks;
+		if (live != null) return live.isSingle(value);
+		var biomes = this.nativeLiveBiomes();
+		if (biomes != null) return biomes.bits() == 0 && biomes.get(0) == value;
+		PalettedContainer.Data<T> data = this.readData();
+		return data.palette instanceof SingleValuePalette<T> && data.storage instanceof ZeroBitStorage && data.palette.valueFor(0) == value;
+	}
+
+	/** This container's exact state for a native stage that continues its writes:
+	 * palette kind (0 single, 1 linear, 2 hash map, 3 global), storage bits,
+	 * palette ids in id order and the raw storage (the container's own words:
+	 * copy them before it changes); null for other palettes or storage. */
+	@Nullable
+	GeneratedState exportGenerated(java.util.function.ToIntFunction<T> ids) {
+		PalettedContainer.Data<T> data = this.readData();
+		Class<?> type = data.palette.getClass();
+		int kind = type == SingleValuePalette.class ? 0 : type == LinearPalette.class ? 1 : type == HashMapPalette.class ? 2 : type == GlobalPalette.class ? 3 : -1;
+		if (kind < 0) return null;
+		int bits;
+		long[] raw;
+		if (data.storage.getClass() == ZeroBitStorage.class) {
+			bits = 0;
+			raw = new long[0];
+		} else if (data.storage.getClass() == SimpleBitStorage.class) {
+			bits = data.storage.getBits();
+			raw = data.storage.getRaw();
+		} else {
+			return null;
+		}
+		int[] palette = new int[kind == 3 ? 0 : data.palette.getSize()];
+		for (int i = 0; i < palette.length; i++) palette[i] = ids.applyAsInt(data.palette.valueFor(i));
+		return new GeneratedState(kind, bits, palette, raw);
+	}
+
+	record GeneratedState(int kind, int bits, int[] palette, long[] raw) {}
+
+	/** Global palette bits of a 64-entry container whose strategy a native biome
+	 * fill replays (zero bits, then the 1..3 bit linear palettes, then the global
+	 * palette); -1 for other containers and strategies. */
+	int generatedBiomeGlobalBits() {
+		Strategy<T> strategy = this.strategy;
+		if (this.getClass() != PalettedContainer.class || strategy.entryCount() != 64
+			|| strategy.getConfigurationForBitCount(0) != Strategy.ZERO_BITS || strategy.getConfigurationForBitCount(1) != Strategy.ONE_BIT_LINEAR
+			|| strategy.getConfigurationForBitCount(2) != Strategy.TWO_BITS_LINEAR || strategy.getConfigurationForBitCount(3) != Strategy.THREE_BITS_LINEAR
+			|| !(strategy.getConfigurationForBitCount(4) instanceof Configuration.Global global) || global.bitsInStorage() != 4) {
+			return -1;
+		}
+		return global.bitsInMemory();
+	}
+
+	IdMap<T> globalIds() {
+		return this.strategy.globalMap();
+	}
+
+	/** Storage bits of this strategy's global palette. */
+	int globalPaletteBits() {
+		return this.strategy.getConfigurationForBitCount(32).bitsInMemory();
+	}
+
+	/** Installs the palette and storage that replaying a write sequence into this
+	 * fresh container produces, as computed by the native NOISE fill. */
+	void installGenerated(int requestedBits, List<T> entries, long[] raw) {
+		Configuration configuration = this.strategy.getConfigurationForBitCount(requestedBits);
+		BitStorage bitStorage = configuration.bitsInMemory() == 0
+			? new ZeroBitStorage(this.strategy.entryCount())
+			: new SimpleBitStorage(configuration.bitsInMemory(), this.strategy.entryCount(), raw);
+		if (this.nativeBiomes != null) { this.nativeBiomes.invalidate(); this.nativeBiomes = null; }
+		this.data = new PalettedContainer.Data<>(configuration, bitStorage, configuration.createPalette(this.strategy, entries));
+		if (this.nativeBlocks != null) this.nativeBlocks.invalidate();
+		this.nativeBlocks = null;
+		this.adoptNative();
+	}
+
+	/** The value {@link #recreate()} seeds its new container with. */
+	T recreateSeed() { return this.currentPaletteValue(0); }
+
+	/** A new container in the state {@code recreate()} followed by
+	 * {@link #installGenerated} leaves, without the intermediate container. */
+	PalettedContainer<T> generated(int requestedBits, List<T> entries, long[] raw) {
+		Configuration configuration = this.strategy.getConfigurationForBitCount(requestedBits);
+		BitStorage bitStorage = configuration.bitsInMemory() == 0
+			? new ZeroBitStorage(this.strategy.entryCount())
+			: new SimpleBitStorage(configuration.bitsInMemory(), this.strategy.entryCount(), raw);
+		return new PalettedContainer<>(this.strategy, configuration, bitStorage, configuration.createPalette(this.strategy, entries));
+	}
+
+	/** Canonical stage result already constructed and owned entirely in Rust. */
+	void installNativeGenerated(NativeLiveBlockSection live) {
+		if (this.nativeBlocks != null && this.nativeBlocks != live) this.nativeBlocks.invalidate();
+		this.nativeBlocks = live;
+		this.data = null;
+	}
+
 	@Override
 	public int onResize(int i, T object) {
-		PalettedContainer.Data<T> data = this.data;
+		var live = this.nativeBlocks;
+		if (i == 0 && live != null && live.bits() == 0) {
+			return live.get(0) == object ? 0 : PaletteResize.<T>noResizeExpected().onResize(1, object);
+		}
+		var biomes = this.nativeLiveBiomes();
+		if (i == 0 && biomes != null && biomes.bits() == 0)
+			return biomes.get(0) == object ? 0 : PaletteResize.<T>noResizeExpected().onResize(1, object);
+		this.materializeForMutation();
+		PalettedContainer.Data<T> data = this.readData();
 		PalettedContainer.Data<T> data2 = this.createOrReuseData(data, i);
 		if (this.getClass() != PalettedContainer.class || !NativePaletteResize.copy(this.strategy, data, data2)) {
 			data2.copyFrom(data.palette, data.storage);
@@ -124,7 +307,32 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		return this.getAndSet(this.strategy.getIndex(i, j, k), object);
 	}
 
+	/** Exact standard containers only; a declined native policy mutates nothing. */
+	@Nullable
+	T trySetWithCounters(int x, int y, int z, T value, boolean locked, NativeSectionCounters counters) {
+		if (this.getClass() != PalettedContainer.class) return null;
+		var live = this.nativeBlocks;
+		int id = live == null ? -1 : nativeStateId(value);
+		if (id < 0) return null;
+		int index = this.strategy.getIndex(x, y, z);
+		if (index < 0 || index >= 4096) return null;
+		if (locked) this.acquire();
+		try {
+			int old = live.writeWithCounters(index, id, counters);
+			return old < 0 ? null : (T)net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.byId(old);
+		} finally { if (locked) this.release(); }
+	}
+
 	private T getAndSet(int i, T object) {
+		var live = this.nativeBlocks;
+		int id = live == null ? -1 : nativeStateId(object);
+		if (live != null && (i < 0 || i >= 4096) && live.bits() == 0 && live.get(0) == object)
+			org.apache.commons.lang3.Validate.inclusiveBetween(0L, 4095L, i);
+		if (id >= 0 && i >= 0 && i < 4096) return (T)net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.byId(live.write(i, id));
+		var biomes = this.nativeLiveBiomes();
+		int biomeId = biomes == null ? -1 : biomes.id(object);
+		if (biomeId >= 0 && i >= 0 && i < 64) return biomes.write(i, biomeId);
+		this.materializeForMutation();
 		int j = this.data.palette.idFor(object, this);
 		int k = this.data.storage.getAndSet(i, j);
 		return this.data.palette.valueFor(k);
@@ -141,6 +349,15 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 	}
 
 	private void set(int i, T object) {
+		var live = this.nativeBlocks;
+		int id = live == null ? -1 : nativeStateId(object);
+		if (live != null && (i < 0 || i >= 4096) && live.bits() == 0 && live.get(0) == object)
+			org.apache.commons.lang3.Validate.inclusiveBetween(0L, 4095L, i);
+		if (id >= 0 && i >= 0 && i < 4096) { live.write(i, id); return; }
+		var biomes = this.nativeLiveBiomes();
+		int biomeId = biomes == null ? -1 : biomes.id(object);
+		if (biomeId >= 0 && i >= 0 && i < 64) { biomes.write(i, biomeId); return; }
+		this.materializeForMutation();
 		int j = this.data.palette.idFor(object, this);
 		this.data.storage.set(i, j);
 	}
@@ -151,15 +368,29 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 	}
 
 	protected T get(int i) {
-		PalettedContainer.Data<T> data = this.data;
+		var live = this.nativeBlocks;
+		if (live != null) return (T)live.get(i);
+		var biomes = this.nativeLiveBiomes();
+		if (biomes != null) return biomes.get(i);
+		PalettedContainer.Data<T> data = this.readData();
 		return data.palette.valueFor(data.storage.get(i));
 	}
 
 	@Override
 	public void getAll(Consumer<T> consumer) {
-		Palette<T> palette = this.data.palette();
+		var sourceData = this.readData();
+		Palette<T> palette = sourceData.palette();
+		if (this.getClass() == PalettedContainer.class && sourceData.storage.getClass() == SimpleBitStorage.class) {
+			var ids = NativePaletteDistinct.scan(sourceData.storage);
+			if (ids != null) {
+				try (ids) {
+					for (int i = 0; i < ids.size; i++) consumer.accept(palette.valueFor(ids.entry(i)));
+				}
+				return;
+			}
+		}
 		IntSet intSet = new IntArraySet();
-		this.data.storage.getAll(intSet::add);
+		sourceData.storage.getAll(intSet::add);
 		intSet.forEach(i -> consumer.accept(palette.valueFor(i)));
 	}
 
@@ -168,10 +399,30 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 
 		try {
 			int i = friendlyByteBuf.readByte();
-			PalettedContainer.Data<T> data = this.createOrReuseData(this.data, i);
+			var live = this.nativeBlocks;
+			if (i == 0 && live != null && live.bits() == 0) {
+				int id = friendlyByteBuf.readVarInt();
+				net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.byIdOrThrow(id);
+				live.readSingle(id);
+				return;
+			}
+			var biomes = this.nativeLiveBiomes();
+			if (i == 0 && biomes != null && biomes.bits() == 0) {
+				int id = friendlyByteBuf.readVarInt();
+				this.strategy.globalMap().byIdOrThrow(id);
+				biomes.readSingle(id); return;
+			}
+			boolean fresh = (live != null || biomes != null) && !this.strategy.getConfigurationForBitCount(i)
+				.equals(this.strategy.getConfigurationForBitCount(live != null ? live.requestedBits() : biomes.requestedBits()));
+			if (!fresh) this.materializeForMutation();
+			PalettedContainer.Data<T> data = this.createOrReuseData(fresh ? null : this.data, i);
 			data.palette.read(friendlyByteBuf, this.strategy.globalMap());
 			friendlyByteBuf.readFixedSizeLongArray(data.storage.getRaw());
+			if (this.nativeBiomes != null) { this.nativeBiomes.invalidate(); this.nativeBiomes = null; }
 			this.data = data;
+			if (this.nativeBlocks != null) this.nativeBlocks.invalidate();
+			this.nativeBlocks = null;
+			this.adoptNative();
 		} finally {
 			this.release();
 		}
@@ -182,7 +433,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		this.acquire();
 
 		try {
-			this.data.write(friendlyByteBuf, this.strategy.globalMap());
+			this.readData().write(friendlyByteBuf, this.strategy.globalMap());
 		} finally {
 			this.release();
 		}
@@ -200,6 +451,8 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 			BitStorage bitStorage;
 			Palette<T> palette;
 			if (configuration.bitsInMemory() == 0) {
+				var loaded = NativeSavedPaletteLoading.unpack(strategy, list, NativeSavedPaletteLoading.EMPTY_WORDS);
+				if (loaded != null) return DataResult.success(loaded);
 				palette = configuration.createPalette(strategy, list);
 				bitStorage = new ZeroBitStorage(i);
 			} else {
@@ -211,6 +464,8 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 				long[] ls = ((LongStream)optional.get()).toArray();
 
 				try {
+					var owned = NativeSavedPaletteLoading.unpack(strategy, list, ls);
+					if (owned != null) return DataResult.success(owned);
 					if (!configuration.alwaysRepack() && configuration.bitsInMemory() == j) {
 						palette = configuration.createPalette(strategy, list);
 						bitStorage = new SimpleBitStorage(configuration.bitsInMemory(), i, ls);
@@ -239,12 +494,13 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 
 		PalettedContainerRO.PackedData var14;
 		try {
+			var sourceData = this.readData();
 			if (this.getClass() == PalettedContainer.class) {
-				var packed = NativePalettePacking.pack(this.data.storage, this.data.palette, this.strategy, strategy);
+				var packed = NativePalettePacking.pack(sourceData.storage, sourceData.palette, this.strategy, strategy);
 				if (packed != null) return packed;
 			}
-			BitStorage bitStorage = this.data.storage;
-			Palette<T> palette = this.data.palette;
+			BitStorage bitStorage = sourceData.storage;
+			Palette<T> palette = sourceData.palette;
 			HashMapPalette<T> hashMapPalette = new HashMapPalette<>(bitStorage.getBits());
 			int i = strategy.entryCount();
 			int[] is = reencodeContents(bitStorage, palette, hashMapPalette);
@@ -288,17 +544,22 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 
 	@Override
 	public int getSerializedSize() {
-		return this.data.getSerializedSize(this.strategy.globalMap());
+		return this.readData().getSerializedSize(this.strategy.globalMap());
 	}
 
 	@Override
 	public int bitsPerEntry() {
-		return this.data.storage().getBits();
+		var live = this.nativeBlocks;
+		var biomes = this.nativeLiveBiomes();
+		return live != null ? live.bits() : biomes != null ? biomes.bits() : this.readData().storage().getBits();
 	}
 
 	@Override
 	public boolean maybeHas(Predicate<T> predicate) {
-		return this.data.palette.maybeHas(predicate);
+		var live = this.nativeBlocks;
+		if (live != null) return live.maybeHas(state -> predicate.test((T)state));
+		var biomes = this.nativeLiveBiomes();
+		return biomes != null ? biomes.maybeHas(predicate) : this.data.palette.maybeHas(predicate);
 	}
 
 	@Override
@@ -308,29 +569,44 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 
 	@Override
 	public PalettedContainer<T> recreate() {
-		return new PalettedContainer<>(this.data.palette.valueFor(0), this.strategy);
+		return new PalettedContainer<>(this.currentPaletteValue(0), this.strategy);
 	}
 
 	@Override
 	public void count(PalettedContainer.CountConsumer<T> countConsumer) {
-		if (this.data.palette.getSize() == 1) {
-			countConsumer.accept(this.data.palette.valueFor(0), this.data.storage.getSize());
+		var live = this.nativeBlocks;
+		if (live != null) {
+			if (live.paletteSize() == 1) { countConsumer.accept((T)live.paletteValue(0), 4096); return; }
+			var counts = NativePaletteHistogram.scan(live);
+			if (counts != null) {
+				try (counts) {
+					for (int i = 0; i < counts.size; i++) {
+						long entry = counts.entry(i);
+						countConsumer.accept(this.currentPaletteValue((int)entry), (int)(entry >>> 32));
+					}
+				}
+				return;
+			}
+		}
+		var sourceData = this.readData();
+		if (sourceData.palette.getSize() == 1) {
+			countConsumer.accept(sourceData.palette.valueFor(0), sourceData.storage.getSize());
 		} else {
 			if (this.getClass() == PalettedContainer.class) {
-				var counts = NativePaletteHistogram.scan(this.data.storage);
+				var counts = NativePaletteHistogram.scan(sourceData.storage);
 				if (counts != null) {
 					try (counts) {
 						for (int i = 0; i < counts.size; i++) {
 							long entry = counts.entry(i);
-							countConsumer.accept(this.data.palette.valueFor((int)entry), (int)(entry >>> 32));
+							countConsumer.accept(this.currentPaletteValue((int)entry), (int)(entry >>> 32));
 						}
 					}
 					return;
 				}
 			}
 			Int2IntOpenHashMap int2IntOpenHashMap = new Int2IntOpenHashMap();
-			this.data.storage.getAll(i -> int2IntOpenHashMap.addTo(i, 1));
-			int2IntOpenHashMap.int2IntEntrySet().forEach(entry -> countConsumer.accept(this.data.palette.valueFor(entry.getIntKey()), entry.getIntValue()));
+			sourceData.storage.getAll(i -> int2IntOpenHashMap.addTo(i, 1));
+			int2IntOpenHashMap.int2IntEntrySet().forEach(entry -> countConsumer.accept(this.currentPaletteValue(entry.getIntKey()), entry.getIntValue()));
 		}
 	}
 
@@ -374,7 +650,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 			throw new IllegalArgumentException("Array is wrong size");
 		}
 
-		PalettedContainer.Data<T> data = java.util.Objects.requireNonNull(this.data, "PalettedContainer must have data");
+		PalettedContainer.Data<T> data = java.util.Objects.requireNonNull(this.readData(), "PalettedContainer must have data");
 
 		BitStorageExtension storage = (BitStorageExtension) data.storage();
 		storage.sodium$unpack(values, data.palette());
@@ -388,7 +664,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 			throw new IllegalArgumentException("Array is wrong size");
 		}
 
-		PalettedContainer.Data<T> data = java.util.Objects.requireNonNull(this.data, "PalettedContainer must have data");
+		PalettedContainer.Data<T> data = java.util.Objects.requireNonNull(this.readData(), "PalettedContainer must have data");
 
 		BitStorage storage = data.storage();
 		Palette<T> palette = data.palette();

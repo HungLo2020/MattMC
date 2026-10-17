@@ -26,6 +26,39 @@ public final class WorldGenTaskGroup
 		this.dataDetail = dataDetail;
 	}
 	
+	/**
+	 * {@link #consumeDataSource} for a generated chunk's native columns: trackers
+	 * that accept columns merge them directly; the producer data source is built
+	 * once, only if some tracker needs it.
+	 */
+	public void consumeNativeColumns(net.minecraft.world.level.chunk.NativeDhColumns columns)
+	{
+		FullDataSourceV2 producer = null;
+		try
+		{
+			Iterator<WorldGenTask> tasks = this.worldGenTasks.iterator();
+			while (tasks.hasNext())
+			{
+				WorldGenTask task = tasks.next();
+				Consumer<FullDataSourceV2> dataSourceConsumer = task.taskTracker.getDataSourceConsumer();
+				if (dataSourceConsumer == null)
+				{
+					tasks.remove();
+					task.future.complete(WorldGenResult.CreateFail());
+					continue;
+				}
+				var nativeConsumer = task.taskTracker.getNativeColumnsConsumer();
+				if (nativeConsumer != null && nativeConsumer.test(columns)) continue;
+				if (producer == null) producer = FullDataSourceV2.createNative(columns);
+				dataSourceConsumer.accept(producer);
+			}
+		}
+		finally
+		{
+			if (producer != null) producer.close();
+		}
+	}
+	
 	public void consumeDataSource(FullDataSourceV2 dataSource)
 	{
 		Iterator<WorldGenTask> tasks = this.worldGenTasks.iterator();

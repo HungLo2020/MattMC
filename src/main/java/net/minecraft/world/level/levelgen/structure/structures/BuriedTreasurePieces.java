@@ -18,7 +18,16 @@ import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 
 public class BuriedTreasurePieces {
-	public static class BuriedTreasurePiece extends StructurePiece {
+	/** Rebuilds {@code small_plan.rs}'s piece: kind 2, the one-block box at y 90, orientation null, no fields. */
+	public static void addNativePieces(net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder builder, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager manager, int[] words) {
+		if (words.length != 10 || words[0] != 2 || words[1] != 0 || words[8] != -1 || words[9] != 0
+			|| words[2] != words[5] || words[3] != words[6] || words[4] != words[7]) {
+			throw new IllegalArgumentException("Bad native buried treasure words");
+		}
+		builder.addPiece(new BuriedTreasurePieces.BuriedTreasurePiece(new BlockPos(words[2], words[3], words[4])));
+	}
+
+	public static class BuriedTreasurePiece extends StructurePiece implements net.minecraft.world.level.levelgen.structure.NativeStructurePieces.Native {
 		public BuriedTreasurePiece(BlockPos blockPos) {
 			super(StructurePieceType.BURIED_TREASURE_PIECE, 0, new BoundingBox(blockPos));
 		}
@@ -29,6 +38,16 @@ public class BuriedTreasurePieces {
 
 		@Override
 		protected void addAdditionalSaveData(StructurePieceSerializationContext structurePieceSerializationContext, CompoundTag compoundTag) {
+		}
+
+		@Override
+		public long[] nativeWords() {
+			return net.minecraft.world.level.levelgen.structure.NativeStructurePieces.header(this, 2, 0);
+		}
+
+		@Override
+		public void nativeUpdate(long[] words) {
+			this.boundingBox = net.minecraft.world.level.levelgen.structure.NativeStructurePieces.box(words);
 		}
 
 		@Override

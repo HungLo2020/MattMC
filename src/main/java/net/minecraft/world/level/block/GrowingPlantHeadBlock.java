@@ -24,7 +24,9 @@ public abstract class GrowingPlantHeadBlock extends GrowingPlantBlock implements
 	protected GrowingPlantHeadBlock(BlockBehaviour.Properties properties, Direction direction, VoxelShape voxelShape, boolean bl, double d) {
 		super(properties, direction, voxelShape, bl);
 		this.growPerTickProbability = d;
-		this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(AGE, 0));
+		}
 	}
 
 	@Override

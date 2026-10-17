@@ -1,6 +1,6 @@
 # Blue Jay
 
-Blue Jays can briefly follow a player who gives them seeds and sing to reveal nearby monsters with Glowing. This is a temporary feeding relationship, rather than permanent pet ownership. Dropping seeds is the clearest way to trigger both benefits without the normal breeding interaction taking priority.
+Blue Jays can briefly follow a player who gives them seeds and sing to reveal nearby monsters with [Glowing](../effects/VisibilityEffects.md#glowing). This is a temporary feeding relationship, rather than permanent pet ownership. Dropping seeds is the clearest way to trigger both benefits without the normal breeding interaction taking priority.
 
 ## At a glance
 

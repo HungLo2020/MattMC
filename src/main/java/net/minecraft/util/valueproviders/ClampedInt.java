@@ -1,26 +1,9 @@
 package net.minecraft.util.valueproviders;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DataResult;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
 public class ClampedInt extends IntProvider {
-	public static final MapCodec<ClampedInt> CODEC = RecordCodecBuilder.<ClampedInt>mapCodec(
-			instance -> instance.group(
-					IntProvider.CODEC.fieldOf("source").forGetter(clampedInt -> clampedInt.source),
-					Codec.INT.fieldOf("min_inclusive").forGetter(clampedInt -> clampedInt.minInclusive),
-					Codec.INT.fieldOf("max_inclusive").forGetter(clampedInt -> clampedInt.maxInclusive)
-				)
-				.apply(instance, ClampedInt::new)
-		)
-		.validate(
-			clampedInt -> clampedInt.maxInclusive < clampedInt.minInclusive
-				? DataResult.error(() -> "Max must be at least min, min_inclusive: " + clampedInt.minInclusive + ", max_inclusive: " + clampedInt.maxInclusive)
-				: DataResult.success(clampedInt)
-		);
 	private final IntProvider source;
 	private final int minInclusive;
 	private final int maxInclusive;
@@ -53,5 +36,17 @@ public class ClampedInt extends IntProvider {
 	@Override
 	public IntProviderType<?> getType() {
 		return IntProviderType.CLAMPED;
+	}
+
+	public IntProvider source() {
+		return this.source;
+	}
+
+	public int minInclusive() {
+		return this.minInclusive;
+	}
+
+	public int maxInclusive() {
+		return this.maxInclusive;
 	}
 }

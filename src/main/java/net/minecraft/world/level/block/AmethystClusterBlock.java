@@ -47,7 +47,9 @@ public class AmethystClusterBlock extends AmethystBlock implements SimpleWaterlo
 
 	public AmethystClusterBlock(float f, float g, BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, false).setValue(FACING, Direction.UP));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, false).setValue(FACING, Direction.UP));
+		}
 		this.shapes = Shapes.rotateAll(Block.boxZ(g, 16.0F - f, 16.0));
 		this.height = f;
 		this.width = g;

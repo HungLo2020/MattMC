@@ -23,6 +23,8 @@ public class QuadNode<T>
 	 */
 	public final byte parentTreeLeafDetailLevel;
 	public T value;
+	private final QuadTreeMutationObserver<T> observer;
+    private boolean observationAttached = true;
 	
 	
 	/**
@@ -54,8 +56,14 @@ public class QuadNode<T>
 	
 	public QuadNode(long sectionPos, byte parentTreeLeafDetailLevel)
 	{
+		this(sectionPos, parentTreeLeafDetailLevel, null);
+	}
+	public QuadNode(long sectionPos, byte parentTreeLeafDetailLevel, QuadTreeMutationObserver<T> observer)
+	{
+		this.observer = observer;
 		this.sectionPos = sectionPos;
 		this.parentTreeLeafDetailLevel = parentTreeLeafDetailLevel;
+		if (observer != null) observer.added(sectionPos);
 	}
 	
 	
@@ -129,7 +137,7 @@ public class QuadNode<T>
 		if (previousNode != null)
 		{
 			T previousValue = previousNode.value;
-			previousNode.value = newValue;
+			previousNode.replaceValue(newValue);
 			return previousValue;
 		}
 		else
@@ -177,7 +185,7 @@ public class QuadNode<T>
 			// this node is the requested position
 			if (replaceValue)
 			{
-				this.value = newValue;
+				this.replaceValue(newValue);
 			}
 			return this;
 		}
@@ -201,7 +209,7 @@ public class QuadNode<T>
 				if (replaceValue && this.nwChild == null)
 				{
 					// if no node exists for this position, but we want to insert a new value at this position, create a new node
-					this.nwChild = new QuadNode<>(nwPos, this.parentTreeLeafDetailLevel);
+					this.nwChild = new QuadNode<>(nwPos, this.parentTreeLeafDetailLevel, this.observationAttached ? this.observer : null);
 				}
 				childNode = this.nwChild;
 				
@@ -214,7 +222,7 @@ public class QuadNode<T>
 				if (replaceValue && this.swChild == null)
 				{
 					// if no node exists for this position, but we want to insert a new value at this position, create a new node
-					this.swChild = new QuadNode<>(swPos, this.parentTreeLeafDetailLevel);
+					this.swChild = new QuadNode<>(swPos, this.parentTreeLeafDetailLevel, this.observationAttached ? this.observer : null);
 				}
 				childNode = this.swChild;
 				
@@ -227,7 +235,7 @@ public class QuadNode<T>
 				if (replaceValue && this.neChild == null)
 				{
 					// if no node exists for this position, but we want to insert a new value at this position, create a new node
-					this.neChild = new QuadNode<>(nePos, this.parentTreeLeafDetailLevel);
+					this.neChild = new QuadNode<>(nePos, this.parentTreeLeafDetailLevel, this.observationAttached ? this.observer : null);
 				}
 				childNode = this.neChild;
 				
@@ -240,7 +248,7 @@ public class QuadNode<T>
 				if (replaceValue && this.seChild == null)
 				{
 					// if no node exists for this position, but we want to insert a new value at this position, create a new node
-					this.seChild = new QuadNode<>(sePos, this.parentTreeLeafDetailLevel);
+					this.seChild = new QuadNode<>(sePos, this.parentTreeLeafDetailLevel, this.observationAttached ? this.observer : null);
 				}
 				childNode = this.seChild;
 				
@@ -271,6 +279,23 @@ public class QuadNode<T>
 	// deletion //
 	//==========//
 	
+    /** Removing a branch does not make retained public node references live again. */
+    public void detachObservation() {
+        if (!this.observationAttached) return;
+        this.observationAttached = false;
+        if (this.observer != null) this.observer.removed(this.sectionPos);
+        for(int i=0;i<4;i++) {
+            QuadNode<T> child=this.getChildByIndex(i);
+            if(child!=null) child.detachObservation();
+        }
+    }
+
+    private void replaceValue(T newValue) {
+        T previous = this.value;
+        this.value = newValue;
+        if (this.observer != null && this.observationAttached && previous != newValue) this.observer.valueChanged(this.sectionPos, previous, newValue);
+    }
+
 	public void deleteAllChildren() { this.deleteAllChildren(null); }
 	/** @param removedItemConsumer is only fired for non-null nodes, however the value passed in may be null */
 	public void deleteAllChildren(Consumer<? super T> removedItemConsumer)
@@ -290,25 +315,30 @@ public class QuadNode<T>
 		{
 			removedItemConsumer.accept(this.nwChild.value);
 		}
+		if (this.nwChild != null) this.nwChild.detachObservation();
 		this.nwChild = null;
 		
 		if (this.neChild != null && removedItemConsumer != null)
 		{
 			removedItemConsumer.accept(this.neChild.value);
 		}
+		if (this.neChild != null) this.neChild.detachObservation();
 		this.neChild = null;
 		
 		if (this.seChild != null && removedItemConsumer != null)
 		{
 			removedItemConsumer.accept(this.seChild.value);
 		}
+		if (this.seChild != null) this.seChild.detachObservation();
 		this.seChild = null;
 		
 		if (this.swChild != null && removedItemConsumer != null)
 		{
 			removedItemConsumer.accept(this.swChild.value);
 		}
+		if (this.swChild != null) this.swChild.detachObservation();
 		this.swChild = null;
+		if (this.observer != null && this.observationAttached) this.observer.childrenRemoved(this.sectionPos);
 	}
 	
 	

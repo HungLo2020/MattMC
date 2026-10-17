@@ -24,178 +24,28 @@ public record BlockSetType(
 	SoundEvent buttonClickOff,
 	SoundEvent buttonClickOn
 ) {
+	private static final BlockSetType[] SETS = NativeBlockFamilies.createBlockSets();
 	private static final Map<String, BlockSetType> TYPES = new Object2ObjectArrayMap<>();
 	public static final Codec<BlockSetType> CODEC = Codec.stringResolver(BlockSetType::name, TYPES::get);
-	public static final BlockSetType IRON = register(
-		new BlockSetType(
-			"iron",
-			false,
-			false,
-			false,
-			BlockSetType.PressurePlateSensitivity.EVERYTHING,
-			SoundType.IRON,
-			SoundEvents.IRON_DOOR_CLOSE,
-			SoundEvents.IRON_DOOR_OPEN,
-			SoundEvents.IRON_TRAPDOOR_CLOSE,
-			SoundEvents.IRON_TRAPDOOR_OPEN,
-			SoundEvents.METAL_PRESSURE_PLATE_CLICK_OFF,
-			SoundEvents.METAL_PRESSURE_PLATE_CLICK_ON,
-			SoundEvents.STONE_BUTTON_CLICK_OFF,
-			SoundEvents.STONE_BUTTON_CLICK_ON
-		)
-	);
-	public static final BlockSetType COPPER = register(
-		new BlockSetType(
-			"copper",
-			true,
-			true,
-			false,
-			BlockSetType.PressurePlateSensitivity.EVERYTHING,
-			SoundType.COPPER,
-			SoundEvents.COPPER_DOOR_CLOSE,
-			SoundEvents.COPPER_DOOR_OPEN,
-			SoundEvents.COPPER_TRAPDOOR_CLOSE,
-			SoundEvents.COPPER_TRAPDOOR_OPEN,
-			SoundEvents.METAL_PRESSURE_PLATE_CLICK_OFF,
-			SoundEvents.METAL_PRESSURE_PLATE_CLICK_ON,
-			SoundEvents.STONE_BUTTON_CLICK_OFF,
-			SoundEvents.STONE_BUTTON_CLICK_ON
-		)
-	);
-	public static final BlockSetType GOLD = register(
-		new BlockSetType(
-			"gold",
-			false,
-			true,
-			false,
-			BlockSetType.PressurePlateSensitivity.EVERYTHING,
-			SoundType.METAL,
-			SoundEvents.IRON_DOOR_CLOSE,
-			SoundEvents.IRON_DOOR_OPEN,
-			SoundEvents.IRON_TRAPDOOR_CLOSE,
-			SoundEvents.IRON_TRAPDOOR_OPEN,
-			SoundEvents.METAL_PRESSURE_PLATE_CLICK_OFF,
-			SoundEvents.METAL_PRESSURE_PLATE_CLICK_ON,
-			SoundEvents.STONE_BUTTON_CLICK_OFF,
-			SoundEvents.STONE_BUTTON_CLICK_ON
-		)
-	);
-	public static final BlockSetType STONE = register(
-		new BlockSetType(
-			"stone",
-			true,
-			true,
-			false,
-			BlockSetType.PressurePlateSensitivity.MOBS,
-			SoundType.STONE,
-			SoundEvents.IRON_DOOR_CLOSE,
-			SoundEvents.IRON_DOOR_OPEN,
-			SoundEvents.IRON_TRAPDOOR_CLOSE,
-			SoundEvents.IRON_TRAPDOOR_OPEN,
-			SoundEvents.STONE_PRESSURE_PLATE_CLICK_OFF,
-			SoundEvents.STONE_PRESSURE_PLATE_CLICK_ON,
-			SoundEvents.STONE_BUTTON_CLICK_OFF,
-			SoundEvents.STONE_BUTTON_CLICK_ON
-		)
-	);
-	public static final BlockSetType POLISHED_BLACKSTONE = register(
-		new BlockSetType(
-			"polished_blackstone",
-			true,
-			true,
-			false,
-			BlockSetType.PressurePlateSensitivity.MOBS,
-			SoundType.STONE,
-			SoundEvents.IRON_DOOR_CLOSE,
-			SoundEvents.IRON_DOOR_OPEN,
-			SoundEvents.IRON_TRAPDOOR_CLOSE,
-			SoundEvents.IRON_TRAPDOOR_OPEN,
-			SoundEvents.STONE_PRESSURE_PLATE_CLICK_OFF,
-			SoundEvents.STONE_PRESSURE_PLATE_CLICK_ON,
-			SoundEvents.STONE_BUTTON_CLICK_OFF,
-			SoundEvents.STONE_BUTTON_CLICK_ON
-		)
-	);
-	public static final BlockSetType OAK = register(new BlockSetType("oak"));
-	public static final BlockSetType SPRUCE = register(new BlockSetType("spruce"));
-	public static final BlockSetType BIRCH = register(new BlockSetType("birch"));
-	public static final BlockSetType ACACIA = register(new BlockSetType("acacia"));
-	public static final BlockSetType CHERRY = register(
-		new BlockSetType(
-			"cherry",
-			true,
-			true,
-			true,
-			BlockSetType.PressurePlateSensitivity.EVERYTHING,
-			SoundType.CHERRY_WOOD,
-			SoundEvents.CHERRY_WOOD_DOOR_CLOSE,
-			SoundEvents.CHERRY_WOOD_DOOR_OPEN,
-			SoundEvents.CHERRY_WOOD_TRAPDOOR_CLOSE,
-			SoundEvents.CHERRY_WOOD_TRAPDOOR_OPEN,
-			SoundEvents.CHERRY_WOOD_PRESSURE_PLATE_CLICK_OFF,
-			SoundEvents.CHERRY_WOOD_PRESSURE_PLATE_CLICK_ON,
-			SoundEvents.CHERRY_WOOD_BUTTON_CLICK_OFF,
-			SoundEvents.CHERRY_WOOD_BUTTON_CLICK_ON
-		)
-	);
-	public static final BlockSetType JUNGLE = register(new BlockSetType("jungle"));
-	public static final BlockSetType DARK_OAK = register(new BlockSetType("dark_oak"));
-	public static final BlockSetType PALE_OAK = register(new BlockSetType("pale_oak"));
-	public static final BlockSetType CRIMSON = register(
-		new BlockSetType(
-			"crimson",
-			true,
-			true,
-			true,
-			BlockSetType.PressurePlateSensitivity.EVERYTHING,
-			SoundType.NETHER_WOOD,
-			SoundEvents.NETHER_WOOD_DOOR_CLOSE,
-			SoundEvents.NETHER_WOOD_DOOR_OPEN,
-			SoundEvents.NETHER_WOOD_TRAPDOOR_CLOSE,
-			SoundEvents.NETHER_WOOD_TRAPDOOR_OPEN,
-			SoundEvents.NETHER_WOOD_PRESSURE_PLATE_CLICK_OFF,
-			SoundEvents.NETHER_WOOD_PRESSURE_PLATE_CLICK_ON,
-			SoundEvents.NETHER_WOOD_BUTTON_CLICK_OFF,
-			SoundEvents.NETHER_WOOD_BUTTON_CLICK_ON
-		)
-	);
-	public static final BlockSetType WARPED = register(
-		new BlockSetType(
-			"warped",
-			true,
-			true,
-			true,
-			BlockSetType.PressurePlateSensitivity.EVERYTHING,
-			SoundType.NETHER_WOOD,
-			SoundEvents.NETHER_WOOD_DOOR_CLOSE,
-			SoundEvents.NETHER_WOOD_DOOR_OPEN,
-			SoundEvents.NETHER_WOOD_TRAPDOOR_CLOSE,
-			SoundEvents.NETHER_WOOD_TRAPDOOR_OPEN,
-			SoundEvents.NETHER_WOOD_PRESSURE_PLATE_CLICK_OFF,
-			SoundEvents.NETHER_WOOD_PRESSURE_PLATE_CLICK_ON,
-			SoundEvents.NETHER_WOOD_BUTTON_CLICK_OFF,
-			SoundEvents.NETHER_WOOD_BUTTON_CLICK_ON
-		)
-	);
-	public static final BlockSetType MANGROVE = register(new BlockSetType("mangrove"));
-	public static final BlockSetType BAMBOO = register(
-		new BlockSetType(
-			"bamboo",
-			true,
-			true,
-			true,
-			BlockSetType.PressurePlateSensitivity.EVERYTHING,
-			SoundType.BAMBOO_WOOD,
-			SoundEvents.BAMBOO_WOOD_DOOR_CLOSE,
-			SoundEvents.BAMBOO_WOOD_DOOR_OPEN,
-			SoundEvents.BAMBOO_WOOD_TRAPDOOR_CLOSE,
-			SoundEvents.BAMBOO_WOOD_TRAPDOOR_OPEN,
-			SoundEvents.BAMBOO_WOOD_PRESSURE_PLATE_CLICK_OFF,
-			SoundEvents.BAMBOO_WOOD_PRESSURE_PLATE_CLICK_ON,
-			SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_OFF,
-			SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_ON
-		)
-	);
+	public static final BlockSetType IRON = register(SETS[0]);
+	public static final BlockSetType COPPER = register(SETS[1]);
+	public static final BlockSetType GOLD = register(SETS[2]);
+	public static final BlockSetType STONE = register(SETS[3]);
+	public static final BlockSetType POLISHED_BLACKSTONE = register(SETS[4]);
+	public static final BlockSetType OAK = register(SETS[5]);
+	public static final BlockSetType SPRUCE = register(SETS[6]);
+	public static final BlockSetType BIRCH = register(SETS[7]);
+	public static final BlockSetType ACACIA = register(SETS[8]);
+	public static final BlockSetType CHERRY = register(SETS[9]);
+	public static final BlockSetType JUNGLE = register(SETS[10]);
+	public static final BlockSetType DARK_OAK = register(SETS[11]);
+	public static final BlockSetType PALE_OAK = register(SETS[12]);
+	public static final BlockSetType CRIMSON = register(SETS[13]);
+	public static final BlockSetType WARPED = register(SETS[14]);
+	public static final BlockSetType MANGROVE = register(SETS[15]);
+	public static final BlockSetType BAMBOO = register(SETS[16]);
+
+	public static BlockSetType nativeView(int id) { return SETS[id]; }
 
 	public BlockSetType(String string) {
 		this(

@@ -8,15 +8,15 @@
 
 Smelt **1 Netherrack → 1 Nether Brick** in a [Furnace](Furnace.md). It takes **200 game ticks**, nominally **10 seconds at 20 ticks per second**, and specifies **0.1 recipe experience**. Follow the Furnace guide for fuel and experience collection. [Smelting recipe][smelting-nether-brick] · [Active recipe type and processing][furnace] [furnace-tick]
 
-Completed adult Piglin barters can also select **2–8 Nether Brick items**. This is one possible Gold Ingot barter result, not a guaranteed return and not the full Nether Bricks block. [Barter loot][barter-loot] · [Active interaction/completion][piglin] [piglin-ai] [barter-completion]
+Completed adult Piglin barters can also select **2–8 Nether Brick items**. This is one possible Gold Ingot barter result, not a guaranteed return and not the full Nether Bricks block. [Barter loot][barter-loot] · [Active interaction/completion][piglin] [piglin-ai][] [barter-completion][]
 
 ### Collect placed masonry
 
 **Nether Fortresses** provide a checked natural structure route for ordinary Nether Bricks and their built-in fence/stair pieces. The active Nether structure set includes Fortresses; their registered generator builds the pieces using these block states. This does not establish the red, cracked or chiseled variants as ordinary Fortress materials. [Structure set and configuration][nether-structures] [fortress] · [Biome eligibility][fortress-biomes] · [Registered generator][structure-types] [fortress-structure] · [Built pieces][fortress-pieces]
 
-Use an **unbroken pickaxe**, including Wood, for all 11 placed-block forms in this guide. They require the correct tool, are pickaxe-tagged and have no higher material-tier restriction. Hand breaking does not collect them. [Registrations][blocks] · [Mining tags][pickaxe] [wood-denials] [stone-tier] [iron-tier] [diamond-tier] · [Tool/break checks][tool-material] [player-tool] [broken-tool] [break-dispatch]
+Use an **unbroken pickaxe**, including Wood, for all 11 placed-block forms in this guide. They require the correct tool, are pickaxe-tagged and have no higher material-tier restriction. Hand breaking does not collect them. [Registrations][blocks] · [Mining tags][pickaxe] [wood-denials][] [stone-tier][] [iron-tier][] [diamond-tier][] · [Tool/break checks][tool-material] [player-tool][] [broken-tool][] [break-dispatch]
 
-Full blocks, stairs, walls and fences drop **one matching block item**. A single slab gives **one slab** and a double slab gives **two**. Silk Touch is unnecessary, and Fortune does not increase these drops. A Nether Bricks block does **not** break into the four small Nether Brick crafting items. Explosion drops have separate survival/decay rules. [Full-block loot][loot-nether-bricks] [loot-red-nether-bricks] [loot-cracked-nether-bricks] [loot-chiseled-nether-bricks] · [Shape examples][loot-nether-brick-stairs] [loot-red-nether-brick-wall] [loot-nether-brick-fence] · [Slab tables][loot-nether-brick-slab] [loot-red-nether-brick-slab]
+Full blocks, stairs, walls and fences drop **one matching block item**. A single slab gives **one slab** and a double slab gives **two**. Silk Touch is unnecessary, and Fortune does not increase these drops. A Nether Bricks block does **not** break into the four small Nether Brick crafting items. Explosion drops have separate survival/decay rules. [Full-block loot][loot-nether-bricks] [loot-red-nether-bricks][] [loot-cracked-nether-bricks][] [loot-chiseled-nether-bricks] · [Shape examples][loot-nether-brick-stairs] [loot-red-nether-brick-wall][] [loot-nether-brick-fence][] · [Slab tables][loot-nether-brick-slab] [loot-red-nether-brick-slab]
 
 ## Variants
 
@@ -63,7 +63,7 @@ These cuts preserve the regular/red material family. They do not convert regular
 
 ## Placement and the fence
 
-Full blocks have no player-selected facing or axis and remain placed without support beneath. The stair, slab and wall forms follow the [shared masonry placement rules](Stone.md#placing-shaped-blocks). [Classes][blocks] · [Base behavior][properties] · [Shapes][stairs] [slabs] [walls]
+Full blocks have no player-selected facing or axis and remain placed without support beneath. The stair, slab and wall forms follow the [shared masonry placement rules](Stone.md#placing-shaped-blocks). [Classes][blocks] · [Base behavior][properties] · [Shapes][stairs] [slabs][] [walls][]
 
 **Nether Brick Fence** uses fence behavior rather than wall behavior. It connects to another Nether Brick Fence, suitable sturdy block faces and properly aligned Fence Gates. It does **not** connect directly to the registered wooden fences: the connection rule separates the wooden and non-wooden fence groups. It supports waterlogging where water can exist, and its collision rises **1.5 blocks** above its base. Using the fence can also attach eligible mobs already held on [Leads](../items/Lead.md). [Fence connections and interaction][fence] · [Collision class][fence-shape] · [Fence tags][fences-tag] [wood-fences-tag]
 

@@ -21,7 +21,7 @@ public record PackMetadataSection(Component description, InclusiveRange<PackForm
 		return RecordCodecBuilder.create(
 			instance -> instance.group(
 					ComponentSerialization.CODEC.fieldOf("description").forGetter(PackMetadataSection::description),
-					PackFormat.packCodec(packType).forGetter(PackMetadataSection::supportedFormats)
+					NativePackFormats.packCodec(packType).forGetter(PackMetadataSection::supportedFormats)
 				)
 				.apply(instance, PackMetadataSection::new)
 		);

@@ -21,16 +21,9 @@ import net.minecraft.world.phys.Vec3;
 public record ApplyMobEffect(
 	HolderSet<MobEffect> toApply, LevelBasedValue minDuration, LevelBasedValue maxDuration, LevelBasedValue minAmplifier, LevelBasedValue maxAmplifier
 ) implements EnchantmentEntityEffect {
-	public static final MapCodec<ApplyMobEffect> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				RegistryCodecs.homogeneousList(Registries.MOB_EFFECT).fieldOf("to_apply").forGetter(ApplyMobEffect::toApply),
-				LevelBasedValue.CODEC.fieldOf("min_duration").forGetter(ApplyMobEffect::minDuration),
-				LevelBasedValue.CODEC.fieldOf("max_duration").forGetter(ApplyMobEffect::maxDuration),
-				LevelBasedValue.CODEC.fieldOf("min_amplifier").forGetter(ApplyMobEffect::minAmplifier),
-				LevelBasedValue.CODEC.fieldOf("max_amplifier").forGetter(ApplyMobEffect::maxAmplifier)
-			)
-			.apply(instance, ApplyMobEffect::new)
-	);
+	/** The native codec's `apply_mob_effect` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<ApplyMobEffect> CODEC = (MapCodec<ApplyMobEffect>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:apply_mob_effect");
 
 	@Override
 	public void apply(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3) {

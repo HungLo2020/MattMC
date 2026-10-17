@@ -7,18 +7,28 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.StackedItemContents;
 import net.minecraft.world.item.ItemStack;
 
-public class TransientCraftingContainer implements CraftingContainer {
+public class TransientCraftingContainer implements CraftingContainer, net.minecraft.world.level.block.entity.NativeStockContainer {
+	/**
+	 * Exact instances keep the grid in native rows (a container cell, as stock chests
+	 * do), so menu slot links read and broadcast it natively; subclasses keep the list.
+	 * The list is never replaced, and every original notification below is unchanged.
+	 * Only sizes 1..27 (the original int product) are admitted, so other sizes keep the
+	 * original list and its exceptions (NegativeArraySizeException for a negative product).
+	 */
+	private final net.minecraft.world.item.NativeItemState.ContainerCell nativeContainer;
 	private final NonNullList<ItemStack> items;
 	private final int width;
 	private final int height;
 	private final AbstractContainerMenu menu;
 
 	public TransientCraftingContainer(AbstractContainerMenu abstractContainerMenu, int i, int j) {
-		this(abstractContainerMenu, i, j, NonNullList.withSize(i * j, ItemStack.EMPTY));
+		this(abstractContainerMenu, i, j, null);
 	}
 
 	private TransientCraftingContainer(AbstractContainerMenu abstractContainerMenu, int i, int j, NonNullList<ItemStack> nonNullList) {
-		this.items = nonNullList;
+		this.nativeContainer = nonNullList == null && this.getClass() == TransientCraftingContainer.class && i * j > 0 && i * j <= 27
+			? net.minecraft.world.item.NativeItemState.ContainerCell.create(net.minecraft.world.item.NativeItemSlots.withSize(i * j)) : null;
+		this.items = this.nativeContainer != null ? this.nativeContainer.facade() : nonNullList != null ? nonNullList : NonNullList.withSize(i * j, ItemStack.EMPTY);
 		this.menu = abstractContainerMenu;
 		this.width = i;
 		this.height = j;
@@ -93,6 +103,25 @@ public class TransientCraftingContainer implements CraftingContainer {
 	@Override
 	public List<ItemStack> getItems() {
 		return List.copyOf(this.items);
+	}
+
+	/** Exact native grids crop from their native occupancy; subclasses keep the original getItems scan. */
+	@Override
+	public net.minecraft.world.item.crafting.CraftingInput.Positioned asPositionedCraftInput() {
+		long occupied = this.nativeContainer != null && this.items instanceof net.minecraft.world.item.NativeItemSlots rows ? rows.occupiedMask() : -2;
+		return occupied < 0
+			? CraftingContainer.super.asPositionedCraftInput()
+			: net.minecraft.world.item.crafting.CraftingInput.ofOccupied(this.width, this.height, occupied, this.items);
+	}
+
+	@Override
+	public net.minecraft.world.item.NativeItemSlots nativeSlotsForTransfer() {
+		return this.nativeContainer != null && this.items instanceof net.minecraft.world.item.NativeItemSlots rows ? rows : null;
+	}
+
+	@Override
+	public net.minecraft.world.item.NativeItemState.ContainerCell nativeContainerForSlots() {
+		return this.nativeContainer;
 	}
 
 	@Override

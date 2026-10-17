@@ -1,14 +1,34 @@
 # SPR-15 HB "Sagittarius"
 
-Where there is a will, there is a gun.
+The **SPR-15 HB "Sagittarius"** is a 15-round TaCZ rifle using [5.56x45mm Bullet](556x45mmBullet.md). It offers SEMI and repeating two-round BURST fire. [Definition][definition] · [Fire modes][modes]
 
 ## Obtaining
 
-SPR-15 HB "Sagittarius" can be obtained from the Creative Menu. It is registered as `minecraft:spr15hb`.
+Craft **one SPR-15 HB "Sagittarius"** at the [TaCZ Gun Smith Table](../blocks/TaCZWorkbenches.md#gun-smith-table), under **Rifle**. Carry the materials in your inventory; one craft-control click makes the batch below. [Recipe][recipe] · [Recipe loading and output count][loader] · [Rifle index][index] · [Table groups][groups]
+
+| Materials per craft | Output |
+| --- | --- |
+| 72 Iron Ingots · 8 Gold Ingots · 2 Diamonds · 5 Blaze Rods | **1 × SPR-15 HB "Sagittarius"** |
+
+The registered item is `minecraft:spr15hb`, stacks to **1**, and also appears in Creative. The [inventory browser's Survival catalog](../mechanics/InventoryBrowser.md#mode-and-permission-limits) does not grant it to ordinary Survival players. See [workbench use](../blocks/TaCZWorkbenches.md#using-a-workbench) for shared crafting controls and Creative restrictions. [Registration][registration] · [Creative entry][creative]
+
+A freshly crafted gun starts with **15 loaded rounds**, **SEMI** selected, and **no installed attachments**. The plain recipe output has no saved ammunition override, so the active gun reads its base capacity; the Creative entry also starts at that base capacity. [Output construction][loader] · [Loaded rounds and initial mode][loaded] · [Creative stack construction][creative-stack] · [Attachment storage][refit-storage]
 
 ## Usage
 
-SPR-15 HB "Sagittarius" is a TaCZ firearm. It uses [5.56x45mm Bullet](556x45mmBullet.md) and fires with the TaCZ gun controls. Reload it with the reload key and aim down sights with the aim key.
+Use [5.56x45mm Bullet](556x45mmBullet.md), registered as `minecraft:556x45`. Other cartridges and Ammo Modifier attachments cannot supply this gun's reloads. [Gun definition][definition] · [Exact ammunition matching][ammo-supply]
+
+Hold the rifle in your **main hand**. With [default TaCZ controls](../mechanics/TaCZFirearms.md#controls), left mouse shoots, held right mouse aims, **R** reloads, **G** changes fire mode, and **Z** opens Refit. [Default keys][keys] · [Active controls][input]
+
+The fresh mode is **SEMI**; G cycles **SEMI → BURST → SEMI**. With the default mouse binding, click for a SEMI shot or hold Shoot to repeat BURST groups. SEMI uses an adjusted **300 RPM** input (700 − 400), giving a **4-game-tick server trigger cooldown**. It also adds **1** to every damage band and raises the headshot multiplier from **1.75 to 2**, while using the lower spread values below. [Modes][modes] · [Cycle][cycle] · [RPM adjustment][rpm-adjust] · [Active ballistic adjustments][spread] · [Gun data][gun-data]
+
+BURST schedules up to **two rounds**, limited by loaded ammunition, with a separate **10-game-tick trigger cooldown** (500 ms at 20 ticks per second). The configured **750 burst RPM** produces two-tick task offsets, but the current server task queue can run the rounds together instead of enforcing that spacing. This is not a verified burst rate; the **700 RPM** base row is not the burst interval. Scheduled rounds recheck that the player is alive, is still holding the same gun stack in the main hand, and has loaded ammunition. [Burst definition][burst] · [Shot scheduling][shots] · [Server task admission][task-admission] · [Task queue][task-queue] · [Trigger cooldown][cooldown]
+
+See [firing and fire modes](../mechanics/TaCZFirearms.md#firing-and-fire-modes) for shared interruption and keyboard-remapping behavior.
+
+Reloading takes **40 game ticks** (2 seconds at 20 ticks per second) before ammunition is added. This is the same server reload duration whether empty or partly loaded, including with an accepted extended magazine; the imported empty/tactical animation values do not determine that completion time. Keep holding the gun until it finishes. [Definition][definition] · [Active reload timing][reload-timing] · [Reload completion][reload]
+
+The loaded count is the whole firing supply: there is **no additional chamber round** above the selected capacity. Reloading preserves rounds already loaded. A Survival reload uses only the first matching carried stack, so a small first stack can leave the rifle partly filled; see [magazine, reserve, and reloading](../mechanics/TaCZFirearms.md#magazine-reserve-and-reloading). [Ammo and capacity][loaded] · [Reload supply][ammo-supply]
 
 ## Properties
 
@@ -27,6 +47,8 @@ SPR-15 HB "Sagittarius" is a TaCZ firearm. It uses [5.56x45mm Bullet](556x45mmBu
 | Headshot multiplier | 1.75 |
 | Knockback | 0 |
 
+These are **base definition values**; the mode-specific changes are described above and below. RPM is a timing input, not a measured sustained firing rate. Damage is the fallback value; the active shot uses the distance curve below. Bullet speed is the initial configured speed, and lifetime is finite, so the final “infinite” falloff entry does not give the projectile unlimited range. [Definition][definition] · [Shot creation][shots] · [Projectile flight][flight]
+
 ## Accuracy
 
 | Property | Value |
@@ -37,11 +59,19 @@ SPR-15 HB "Sagittarius" is a TaCZ firearm. It uses [5.56x45mm Bullet](556x45mmBu
 | Prone | 1.5 |
 | Aiming down sights | 0.08 |
 
+The table gives **BURST/base** spread inputs. The fresh SEMI mode subtracts **0.5** from non-aimed rows and **0.05** from the aimed row: **3.375 standing, 4 moving, 2 sneaking, 1 prone, and 0.03 aimed**. [Mode data][gun-data] · [Active adjustment][spread]
+
+These numbers are projectile-spread inputs: lower values produce less random spread, not a hit percentage or a camera-recoil score. The aimed row applies once the aim transition completes. “Prone” is the low-pose case, not evidence of a working Crawl key; see the [shared control limits](../mechanics/TaCZFirearms.md#controls). [Pose selection][pose] · [Aim gate][input] · [Spread application][projectile-spread]
+
+Camera recoil separately uses the bundled pitch/yaw curves, aim/zoom and low-pose scaling, and installed attachment recoil modifiers. That active camera path does not turn the spread table into a recoil measurement. [Recoil calculation][recoil] · [Shot-feedback trigger][recoil-trigger] · [Camera adjustment][camera] · [Render application][recoil-apply]
+
 ## Damage Falloff
 
 * 40 blocks: 10
 * 72 blocks: 8
 * infinite blocks: 7
+
+In **BURST**, the thresholds mean **10 below 40 blocks, 8 from 40 to below 72, and 7 at 72 or more**. The fresh SEMI mode adds **1** to each band, giving **11, 9, and 8**, respectively. Values are before headshots and target damage handling. Equality moves to the next band; this is stepwise falloff. See [reading firearm stats](../mechanics/TaCZFirearms.md#reading-firearm-stats). [Curve and mode data][gun-data] · [Active conversion][spread] · [Distance selection][distance] · [Hit handling][hit]
 
 ## Attachments
 
@@ -54,6 +84,52 @@ Supported attachment categories: Ammo Modifier, Extended Mag, Grip, Muzzle, Scop
 * Extended Mag: [Heavy Ammo Extended Mag I](HeavyAmmoExtendedMagI.md), [Heavy Ammo Extended Mag II](HeavyAmmoExtendedMagII.md), [Heavy Ammo Extended Mag III](HeavyAmmoExtendedMagIII.md)
 * Ammo Modifier: [Full Metal Jacket Ammo](FullMetalJacketAmmo.md), [Hollow-Point Ammo](HollowPointAmmo.md), [Incendiary Ammo](IncendiaryAmmo.md)
 
+This is the exact registered attachment list accepted by the gun: both the category and the attachment ID must match. Use the [Attachment Table](../blocks/TaCZWorkbenches.md#attachment-table) to make the items and [Refit](../mechanics/TaCZFirearms.md#refitting-attachments) to install them. Acceptance alone does not establish every imported attachment effect. [Accepted categories and IDs][definition] · [Acceptance check][acceptance] · [Server installation][install]
+
+Heavy Ammo Extended Mag **I / II / III** gives **20, 25, and 30 rounds**, respectively. Installation adds capacity without adding ammunition; fitting tier I to a fresh rifle leaves **15/20** until reloaded. Use up ammunition above a smaller capacity before downsizing, because [the next shot can discard excess rounds](../mechanics/TaCZFirearms.md#refitting-attachments). [Capacity and loaded count][loaded] · [Attachment storage][refit-storage]
+
 ## Notes
 
 * This item is part of the integrated TaCZ firearms system.
+* Shared guides: [TaCZ firearms](../mechanics/TaCZFirearms.md), [TaCZ Workbenches](../blocks/TaCZWorkbenches.md), and [Items](Items.md).
+
+## Sources and verification
+
+Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. Registration, the dedicated workbench recipe loader, item defaults, ammunition matching, gun input and server handlers, reload completion, active ballistic and camera-recoil consumers, and attachment acceptance were checked. Imported recipe presets, weight, movement, ADS, and per-gun attachment-profile fields are not assumed to produce gameplay effects. This is **source review**, not an in-game crafting, reload, firing-rate, accuracy, recoil, damage, or multiplayer test.
+
+[registration]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L2708-L2743
+[creative]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTabs.java#L1666-L1671
+[creative-stack]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/CreativeModeTab.java#L253-L265
+[loader]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/crafting/TaczWorkbenchRecipe.java#L108-L174
+[groups]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/inventory/TaczWorkbenchMenu.java#L125-L178
+[loaded]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L308-L340
+[refit-storage]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczRefitGun.java#L16-L82
+[input]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/tacz/TaczClientInputHandler.java#L36-L124
+[keys]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/tacz/TaczKeyMappings.java#L13-L20
+[cycle]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L333-L348
+[reload]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L184-L218
+[reload-timing]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunReloadTimings.java#L7-L31
+[ammo-supply]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L261-L297
+[shots]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L101-L181
+[rpm-adjust]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunFireModeAdjustments.java#L5-L23
+[spread]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunBallistics.java#L40-L77
+[pose]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunBallistics.java#L224-L237
+[projectile-spread]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/projectile/Projectile.java#L129-L154
+[distance]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/projectile/TaczBullet.java#L262-L272
+[hit]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/projectile/TaczBullet.java#L162-L179
+[flight]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/entity/projectile/TaczBullet.java#L101-L134
+[acceptance]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczMvpGunItem.java#L54-L67
+[install]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java#L2227-L2266
+[recoil]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunBallistics.java#L110-L144
+[camera]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/tacz/TaczCameraRecoil.java#L20-L66
+[recoil-trigger]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/tacz/TaczClientInputHandler.java#L142-L154
+[recoil-apply]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/client/renderer/GameRenderer.java#L754-L762
+[burst]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunBurstData.java#L6-L43
+[task-admission]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/server/MinecraftServer.java#L1008-L1014
+[task-queue]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/util/thread/BlockableEventLoop.java#L87-L128
+[cooldown]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/ItemCooldowns.java#L32-L60
+[definition]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunDefinitions.java#L65
+[modes]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/TaczGunFireModes.java#L58
+[recipe]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipes/gun/spr15hb.json
+[index]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/index/guns/spr15hb.json
+[gun-data]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/data/guns/spr15hb_data.json

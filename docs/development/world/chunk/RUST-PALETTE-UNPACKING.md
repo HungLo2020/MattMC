@@ -1,17 +1,31 @@
 # Rust global block-palette loading
 
-`PalettedContainer.unpack()` uses Rust to repack a saved block section's
+Current canonical saved imports install [direct Rust owners](RUST-SAVED-PALETTES.md)
+for local/global block and biome palettes. The older global-block helper below
+remains a compatibility path for inputs outside direct owner admission.
+The helper path and historical acceptance below are narrower verification;
+historical pinned-body drivers reject the new container ownership changes.
+Use the live-section guide's current Gradle checks; the older driver commands
+below describe the historical helper acceptance, not current-owner verification.
+
+
+The historical `NativePaletteUnpacking` helper uses Rust to repack a saved block section's
 palette IDs into global in-memory IDs. This applies to standard block palettes
-with 257–65,536 saved entries (9–16 bits). Small palettes already load by wrapping
-the saved words; they keep that direct path. This migration measures the global
-repacking operation, not all chunk loading or world generation.
+with 257–65,536 saved entries (9–16 bits). Small palettes prepare storage directly from
+the saved words without global repacking. The resulting canonical container
+then adopts native live storage, which allocates/copies its owner; this is not
+zero-copy loading. The historical migration measures global repacking, not all
+chunk loading or world generation.
 
 The kernel lives in
 [`palette/unpack/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/palette/unpack).
 [`NativePaletteUnpacking`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativePaletteUnpacking.java)
 resolves used objects through the Java global palette, calls the existing native
-encoder, and constructs the Java-owned result. Both FFM calls are ordinary calls;
-Rust allocates nothing and retains no pointers. Thread-local scratch uses about
+encoder, and constructs compatible result data. The container constructor then
+attempts [native live adoption](RUST-LIVE-SECTIONS.md), retaining compatibility
+storage if ineligible. Both helper FFM calls are ordinary calls; their kernels
+allocate nothing and retain no pointers. This excludes the subsequent live-owner
+allocation. Thread-local scratch uses about
 360 KiB, is protected against reentry, and holds no palette/block references.
 
 ## Constraints
@@ -32,8 +46,9 @@ Rust allocates nothing and retains no pointers. Thread-local scratch uses about
 - Native decode workspace must be zero on entry and exit, including errors.
   Buffers must be disjoint, aligned and valid for the full call. Java owns input
   and registry stability under the same rules as the original unpacker.
-- The package-visible container constructor supports Java-owned native results
-  and the literal original test caller. Keep its initialization unchanged.
+- The package-visible constructor now attempts native live adoption after
+  receiving helper results. Historical literal-reference drivers pin the earlier
+  constructor/caller boundary; they need integration updates for this owner change.
 
 ## Verification
 
@@ -70,6 +85,10 @@ compilation in measured rounds, equal checksums within/across forks, and at
 least 5% less time in every pair and at the upper 95% bootstrap ratio bound for
 every workload. Raw evidence belongs in
 `build/palette-unpacking-migration/acceptance/`.
+
+The container source audit additionally permits only the separately pinned
+[ordered-value dispatch](RUST-PALETTE-DISTINCT.md); the original reference bodies
+remain unchanged.
 
 ## Recorded verification
 

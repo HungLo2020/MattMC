@@ -115,13 +115,20 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 	}
 
 	/**
-	 * Exposes one Java-only snapshot of the resolved item model layers. Consumers
-	 * must copy the needed semantics immediately; renderer objects never cross
-	 * the native boundary.
+	 * Captures immutable resolved item-layer inputs. Canonical authored poses use
+	 * pinned Rust CPU owners; compatibility consumers may request matrix copies.
+	 * Renderer objects never cross the native boundary.
 	 */
 	public void forEachSemanticLayer(Consumer<SemanticLayer> consumer) {
 		for (int i = 0; i < this.activeLayerCount; i++) {
 			ItemStackRenderState.LayerRenderState layer = this.layers[i];
+			var nativeTransform = net.vulkanic.world.NativeItemLayerTransform.capture(layer.transform, this.displayContext.leftHand());
+			if (nativeTransform != null) {
+				consumer.accept(new SemanticLayer(layer.quads, layer.tintLayers, layer.renderType, layer.foilType,
+					layer.usesBlockLight, layer.specialRenderer != null, layer.transform == ItemTransform.NO_TRANSFORM,
+					null, null, nativeTransform.trustedNormals(), nativeTransform));
+				continue;
+			}
 			PoseStack.Pose transformPose = new PoseStack.Pose();
 			layer.transform.apply(this.displayContext.leftHand(), transformPose);
 			float[] modelTransform = new float[16];
@@ -216,9 +223,11 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 			}
 
 			// Sodium FRAPI: Process mutable mesh before resetting pose (merged from ItemRenderStateMixin)
-			MutableMeshImpl mutableMesh = ((AccessLayerRenderState) layerRenderState).fabric_getMutableMesh();
+			boolean builtInLayer = layerRenderState.getClass() == LayerRenderState.class;
+			MutableMeshImpl mutableMesh = builtInLayer
+				? layerRenderState.mutableMesh : ((AccessLayerRenderState) layerRenderState).fabric_getMutableMesh();
 
-			if (mutableMesh.size() > 0) {
+			if ((mutableMesh != null || !builtInLayer) && mutableMesh.size() > 0) {
 				if (pipe == null) {
 					pipe = new QuadToPosPipe(consumer, vector3f);
 				}
@@ -289,11 +298,22 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		boolean identityTransform,
 		float[] modelTransform,
 		float[] normalTransform,
-		boolean trustedNormals
+		boolean trustedNormals,
+		net.vulkanic.world.NativeItemLayerTransform.Capture nativeTransform
 	) {
+		public SemanticLayer(List<BakedQuad> quads, int[] tintLayers, RenderType renderType, FoilType foilType,
+			boolean usesBlockLight, boolean hasSpecialRenderer, boolean identityTransform, float[] modelTransform,
+			float[] normalTransform, boolean trustedNormals) {
+			this(quads,tintLayers,renderType,foilType,usesBlockLight,hasSpecialRenderer,identityTransform,
+				modelTransform,normalTransform,trustedNormals,null);
+		}
 		public SemanticLayer {
 			quads = List.copyOf(quads);
 			tintLayers = tintLayers.clone();
+			if (nativeTransform != null) {
+				if (modelTransform != null || normalTransform != null || trustedNormals != nativeTransform.trustedNormals())
+					throw new IllegalArgumentException("native item pose conflicts with matrix projection");
+			} else {
 			if (modelTransform.length != 16) {
 				throw new IllegalArgumentException("semantic item layer transform must contain 16 floats");
 			}
@@ -314,6 +334,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 			}
 			normalTransform = normalTransform.clone();
 			modelTransform = modelTransform.clone();
+			}
 		}
 
 		@Override
@@ -323,12 +344,12 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 
 		@Override
 		public float[] modelTransform() {
-			return this.modelTransform.clone();
+			return this.nativeTransform == null ? this.modelTransform.clone() : this.nativeTransform.modelTransform();
 		}
 
 		@Override
 		public float[] normalTransform() {
-			return this.normalTransform.clone();
+			return this.nativeTransform == null ? this.normalTransform.clone() : this.nativeTransform.normalTransform();
 		}
 	}
 
@@ -351,7 +372,8 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		private Object argumentForSpecialRendering;
 		Supplier<Vector3f[]> extents = NO_EXTENTS_SUPPLIER;
 		// Fabric Rendering API support (from ItemLayerRenderStateMixin)
-		private final MutableMeshImpl mutableMesh = new MutableMeshImpl();
+		@Nullable
+		private MutableMeshImpl mutableMesh;
 
 		public void clear() {
 			this.quads.clear();
@@ -365,7 +387,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 			this.transform = ItemTransform.NO_TRANSFORM;
 			this.extents = NO_EXTENTS_SUPPLIER;
 			// Clear mutable mesh (from ItemLayerRenderStateMixin)
-			this.mutableMesh.clear();
+			if (this.mutableMesh != null) this.mutableMesh.clear();
 		}
 
 		public List<BakedQuad> prepareQuadList() {
@@ -426,6 +448,25 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 					);
 				}
 				if (ownership.usesRustWholeFrameVulkan()) {
+                    if(this.getClass()==LayerRenderState.class&&poseStack.getClass()==PoseStack.class
+                        &&this.specialRenderer==null&&!this.hasMutableMesh()
+                        &&RustGalWorldPrimitiveRenderer.nativeItemPoseInputsSafe(this.quads,this.renderType)) {
+                        var capture=net.vulkanic.world.NativeItemLayerTransform.capture(this.transform,ItemStackRenderState.this.displayContext.leftHand());
+                        var nativePose=net.vulkanic.world.NativeItemLayerTransform.WorldPose.capture(capture,poseStack.last(),true);
+                        if(nativePose!=null) {
+                            String unavailable=RustGalWorldPrimitiveRenderer.itemEntityMeshIneligibility(
+                                ItemStackRenderState.this.displayContext,i,j,k,this.tintLayers,this.quads,this.renderType,this.foilType);
+                            if(unavailable!=null) {
+                                RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision("rust-vulkan-unavailable",false,unavailable,false,false,false);
+                                throw new IllegalStateException("Rust whole-frame item route has no semantic mesh: "+unavailable);
+                            }
+                            boolean queued=RustGalWorldPrimitiveRenderer.enqueueNativeItemEntityMesh(nativePose,
+                                ItemStackRenderState.this.displayContext,i,j,this.tintLayers,this.quads,this.renderType,this.foilType,k);
+                            RustGalWorldPrimitiveRenderer.recordItemEntityRouteDecision("rust-vulkan-whole-frame",true,null,true,queued,false);
+                            if(!queued)throw new IllegalStateException("Rust whole-frame item-entity layer was eligible but did not enqueue a copied indexed mesh request");
+                            return;
+                        }
+                    }
 					poseStack.pushPose();
 					this.transform.apply(ItemStackRenderState.this.displayContext.leftHand(), poseStack.last());
 					if ((Object)this.specialRenderer instanceof net.minecraft.client.renderer.special.TaczGlock17SpecialRenderer taczRenderer) {
@@ -486,7 +527,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 						}
 						return;
 					}
-					if (this.mutableMesh.size() > 0
+					if (this.hasMutableMesh()
 						&& submitNodeCollector instanceof net.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension access) {
 						// Fabric's MeshView is admitted through the explicit semantic
 						// collector. The collector copies QuadView records and owns the
@@ -510,7 +551,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 					String unavailableReason;
 					if (this.specialRenderer != null) {
 						unavailableReason = "special-renderer";
-					} else if (this.mutableMesh.size() > 0) {
+					} else if (this.hasMutableMesh()) {
 						unavailableReason = "fabric-mesh-collector-unavailable";
 					} else {
 						unavailableReason = RustGalWorldPrimitiveRenderer.itemEntityMeshIneligibility(
@@ -577,7 +618,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 			} else if (this.renderType != null) {
 				// Fabric Rendering API support (from ItemLayerRenderStateMixin redirect)
 				if (ItemStackRenderState.this.displayContext != ItemDisplayContext.GUI
-					&& this.mutableMesh.size() > 0
+					&& this.hasMutableMesh()
 					&& submitNodeCollector instanceof OrderedSubmitNodeCollectorExtension access) {
 					// We don't have to copy the mesh here because vanilla doesn't copy the tint array or quad list either.
 					access.fabric_submitItem(poseStack, ItemStackRenderState.this.displayContext, i, j, k, this.tintLayers, this.quads, this.renderType, this.foilType, this.mutableMesh);
@@ -594,8 +635,10 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		// Fabric Rendering API support (from ItemLayerRenderStateMixin)
 		@Override
 		public MutableMeshImpl fabric_getMutableMesh() {
+			if (this.mutableMesh == null) this.mutableMesh = new MutableMeshImpl();
 			return this.mutableMesh;
 		}
+		private boolean hasMutableMesh() { return this.mutableMesh != null && this.mutableMesh.size() > 0; }
 	}
 	
 	// Iris: ItemContextState implementation

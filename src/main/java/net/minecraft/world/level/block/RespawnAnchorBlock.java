@@ -69,7 +69,9 @@ public class RespawnAnchorBlock extends Block {
 
 	public RespawnAnchorBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(CHARGE, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(CHARGE, 0));
+		}
 	}
 
 	@Override

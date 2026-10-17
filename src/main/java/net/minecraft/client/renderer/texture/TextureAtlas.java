@@ -299,58 +299,17 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 			&& this.semanticSnapshotFrameKey == frameKey) {
 			return this.semanticRawSnapshot;
 		}
-		// Frozen samples the per-sprite CPU mip chain built by SpriteContents,
-		// then uploads each level into the matching atlas level.  A whole-atlas
-		// mip generator would blur unrelated neighbouring sprites together. Copy
-		// the same immutable CPU mip pixels for Rust-owned sampling; this neither
-		// reads nor retains a Java GPU texture.
+		// Frozen samples the per-sprite CPU mip chain, then uploads each level
+		// into the matching atlas level; a whole-atlas mip generator would blur
+		// neighbouring sprites. Rust composes the same per-level copies from
+		// the sprites' CPU images; no Java GPU texture is read or retained.
 		int mipCount = Math.max(1, this.mipLevel + 1);
+		List<TextureAtlasSprite> sprites = List.copyOf(this.texturesByName.values());
 		List<byte[]> mipPixels = new ArrayList<>(mipCount);
 		for (int mip = 0; mip < mipCount; mip++) {
-			int mipWidth = Math.max(1, this.width >> mip);
-			int mipHeight = Math.max(1, this.height >> mip);
-			byte[] pixels;
-			try {
-				pixels = new byte[Math.multiplyExact(Math.multiplyExact(mipWidth, mipHeight), 4)];
-			} catch (ArithmeticException error) {
+			byte[] pixels = NativeAtlasBuild.compose(this.width, this.height, mip, sprites);
+			if (pixels == null) {
 				return null;
-			}
-			for (TextureAtlasSprite sprite : this.texturesByName.values()) {
-				SpriteContents contents = sprite.contents();
-				if (mip >= contents.byMipLevel.length || contents.byMipLevel[mip] == null) {
-					return null;
-				}
-				var sourceImage = contents.byMipLevel[mip];
-				int spriteWidth = Math.max(1, contents.width() >> mip);
-				int spriteHeight = Math.max(1, contents.height() >> mip);
-				int sourceX = 0;
-				int sourceY = 0;
-				if (contents.animatedTexture != null) {
-					if (contents.animatedTexture.frames.isEmpty()) {
-						return null;
-					}
-					int frame = contents.semanticFrameIndex();
-					sourceX = contents.animatedTexture.getFrameX(frame) * spriteWidth;
-					sourceY = contents.animatedTexture.getFrameY(frame) * spriteHeight;
-				}
-				int targetX = sprite.getX() >> mip;
-				int targetY = sprite.getY() >> mip;
-				if (targetX < 0 || targetY < 0 || targetX + spriteWidth > mipWidth
-					|| targetY + spriteHeight > mipHeight
-					|| sourceX + spriteWidth > sourceImage.getWidth()
-					|| sourceY + spriteHeight > sourceImage.getHeight()) {
-					return null;
-				}
-				for (int y = 0; y < spriteHeight; y++) {
-					for (int x = 0; x < spriteWidth; x++) {
-						int argb = sourceImage.getPixel(sourceX + x, sourceY + y);
-						int offset = ((targetY + y) * mipWidth + targetX + x) * 4;
-						pixels[offset] = (byte)net.minecraft.util.ARGB.red(argb);
-						pixels[offset + 1] = (byte)net.minecraft.util.ARGB.green(argb);
-						pixels[offset + 2] = (byte)net.minecraft.util.ARGB.blue(argb);
-						pixels[offset + 3] = (byte)net.minecraft.util.ARGB.alpha(argb);
-					}
-				}
 			}
 			mipPixels.add(pixels);
 		}

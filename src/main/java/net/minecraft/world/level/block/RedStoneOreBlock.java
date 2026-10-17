@@ -32,7 +32,9 @@ public class RedStoneOreBlock extends Block {
 
 	public RedStoneOreBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.defaultBlockState().setValue(LIT, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.defaultBlockState().setValue(LIT, false));
+		}
 	}
 
 	@Override

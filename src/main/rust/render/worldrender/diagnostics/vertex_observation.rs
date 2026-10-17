@@ -298,7 +298,7 @@ impl Observation {
                     );
                 }
             }
-            eprintln!("terrain-vertex-observation submission={submission} count={count} truncated={truncated} records={records:?}");
+            crate::core::console::stderr(format_args!("terrain-vertex-observation submission={submission} count={count} truncated={truncated} records={records:?}"));
         }
         Ok(())
     }

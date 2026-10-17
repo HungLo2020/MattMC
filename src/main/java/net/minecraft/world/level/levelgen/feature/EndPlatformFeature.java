@@ -19,6 +19,7 @@ public class EndPlatformFeature extends Feature<NoneFeatureConfiguration> {
 	}
 
 	public static void createEndPlatform(ServerLevelAccessor serverLevelAccessor, BlockPos blockPos, boolean bl) {
+		if (net.minecraft.world.level.levelgen.NativeEndFeatures.platform(serverLevelAccessor, blockPos, bl)) return;
 		BlockPos.MutableBlockPos mutableBlockPos = blockPos.mutable();
 
 		for (int i = -2; i <= 2; i++) {

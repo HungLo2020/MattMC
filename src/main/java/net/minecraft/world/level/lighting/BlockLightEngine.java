@@ -17,6 +17,10 @@ public final class BlockLightEngine extends LightEngine<BlockLightSectionStorage
 		this(lightChunkGetter, new BlockLightSectionStorage(lightChunkGetter));
 	}
 
+    static BlockLightEngine withBindings(LightChunkGetter getter, NativeLightBindings bindings) {
+        return new BlockLightEngine(getter, new BlockLightSectionStorage(getter, bindings));
+    }
+
 	@VisibleForTesting
 	public BlockLightEngine(LightChunkGetter lightChunkGetter, BlockLightSectionStorage blockLightSectionStorage) {
 		super(lightChunkGetter, blockLightSectionStorage);
@@ -24,6 +28,7 @@ public final class BlockLightEngine extends LightEngine<BlockLightSectionStorage
 
 	@Override
 	protected void checkNode(long l) {
+        if(this.lightCoordinator!=null){this.lightCoordinator.checkNode(l);return;}
 		long m = SectionPos.blockToSection(l);
 		if (this.storage.storingLightForSection(m)) {
 			BlockState blockState = this.getState(this.mutablePos.set(l));
@@ -41,6 +46,13 @@ public final class BlockLightEngine extends LightEngine<BlockLightSectionStorage
 			}
 		}
 	}
+
+    BlockState stateForNativeNode(long pos,net.minecraft.world.level.chunk.NativeLightBlocks.NodeLease input)throws Throwable {
+        this.mutablePos.set(pos);
+        // The contextual lookup can reenter and mutate this exact position.
+        LightChunk chunk=this.getChunk(SectionPos.blockToSectionCoord(this.mutablePos.getX()),SectionPos.blockToSectionCoord(this.mutablePos.getZ()));
+        return input.acquire(chunk,this.mutablePos)?null:input.compatibility();
+    }
 
 	@Override
 	protected void propagateIncrease(long l, long m, int i) {
@@ -112,12 +124,17 @@ public final class BlockLightEngine extends LightEngine<BlockLightSectionStorage
 	@Override
 	public void propagateLightSources(ChunkPos chunkPos) {
 		this.setLightEnabled(chunkPos, true);
-		LightChunk lightChunk = this.chunkSource.getChunkForLighting(chunkPos.x, chunkPos.z);
+        this.propagateSourcesForNativeLevel(chunkPos.x,chunkPos.z);
+	}
+
+    void propagateSourcesForNativeLevel(int x,int z){
+		LightChunk lightChunk = this.chunkSource.getChunkForLighting(x, z);
 		if (lightChunk != null) {
+            if (NativeLightPropagation.seedBlockSources(lightChunk, this.lightWork)) return;
 			lightChunk.findBlockLightSources((blockPos, blockState) -> {
 				int i = blockState.getLightEmission();
 				this.enqueueIncrease(blockPos.asLong(), LightEngine.QueueEntry.increaseLightFromEmission(i, isEmptyShape(blockState)));
 			});
 		}
-	}
+    }
 }

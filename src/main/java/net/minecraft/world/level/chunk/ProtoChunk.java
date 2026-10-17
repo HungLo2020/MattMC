@@ -44,7 +44,7 @@ public class ProtoChunk extends ChunkAccess {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	@Nullable
 	private volatile LevelLightEngine lightEngine;
-	private volatile ChunkStatus status = ChunkStatus.EMPTY;
+	private final net.minecraft.server.level.NativeChunkGeneration.Status status = new net.minecraft.server.level.NativeChunkGeneration.Status();
 	private final List<CompoundTag> entities = Lists.<CompoundTag>newArrayList();
 	@Nullable
 	private CarvingMask carvingMask;
@@ -76,6 +76,13 @@ public class ProtoChunk extends ChunkAccess {
 		super(chunkPos, upgradeData, levelHeightAccessor, palettedContainerFactory, 0L, levelChunkSections, blendingData);
 		this.blockTicks = protoChunkTicks;
 		this.fluidTicks = protoChunkTicks2;
+	}
+
+	/** Section-less base for {@link ImposterProtoChunk}, which reads its wrapped chunk's sections. */
+	ProtoChunk(ChunkPos chunkPos, LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory, @Nullable BlendingData blendingData) {
+		super(chunkPos, UpgradeData.EMPTY, levelHeightAccessor, palettedContainerFactory, 0L, null, blendingData, false);
+		this.blockTicks = new ProtoChunkTicks<>();
+		this.fluidTicks = new ProtoChunkTicks<>();
 	}
 
 	@Override
@@ -117,6 +124,16 @@ public class ProtoChunk extends ChunkAccess {
 		}
 	}
 
+	/** {@link NativeDecorationRegion}'s last capture of this chunk's sections, reused while its identities hold. */
+	@Nullable
+	Object nativeDecorationCapture;
+
+	/** Native decoration replays light notifications through the chunk's own engine. */
+	@Nullable
+	public LevelLightEngine nativeLightEngine() {
+		return this.lightEngine;
+	}
+
 	@Nullable
 	@Override
 	public BlockState setBlockState(BlockPos blockPos, BlockState blockState, int i) {
@@ -136,15 +153,20 @@ public class ProtoChunk extends ChunkAccess {
 				int o = SectionPos.sectionRelative(k);
 				int p = SectionPos.sectionRelative(l);
 				BlockState blockState2 = levelChunkSection.setBlockState(n, o, p, blockState);
-				if (this.status.isOrAfter(ChunkStatus.INITIALIZE_LIGHT)) {
+				if (this.status.get().isOrAfter(ChunkStatus.INITIALIZE_LIGHT)) {
 					boolean bl2 = levelChunkSection.hasOnlyAir();
 					if (bl2 != bl) {
-						this.lightEngine.updateSectionStatus(blockPos, bl2);
+						// Inside a FEATURES transaction the light task waits for its commit.
+						BlockPos sectionPos = blockPos.immutable();
+						var engine = this.lightEngine;
+						if (!DecorationTransaction.defer(() -> engine.updateSectionStatus(sectionPos, bl2))) engine.updateSectionStatus(sectionPos, bl2);
 					}
 
 					if (LightEngine.hasDifferentLightProperties(blockState2, blockState)) {
 						this.skyLightSources.update(this, n, k, p);
-						this.lightEngine.checkBlock(blockPos);
+						BlockPos checkPos = blockPos.immutable();
+						var engine = this.lightEngine;
+						if (!DecorationTransaction.defer(() -> engine.checkBlock(checkPos))) engine.checkBlock(checkPos);
 					}
 				}
 
@@ -224,13 +246,22 @@ public class ProtoChunk extends ChunkAccess {
 		return this.entities;
 	}
 
+	/** {@link DecorationTransaction}: the tick containers themselves. */
+	net.minecraft.world.ticks.ProtoChunkTicks<Block> protoBlockTicks() {
+		return this.blockTicks;
+	}
+
+	net.minecraft.world.ticks.ProtoChunkTicks<Fluid> protoFluidTicks() {
+		return this.fluidTicks;
+	}
+
 	@Override
 	public ChunkStatus getPersistedStatus() {
-		return this.status;
+		return this.status.get();
 	}
 
 	public void setPersistedStatus(ChunkStatus chunkStatus) {
-		this.status = chunkStatus;
+		this.status.set(chunkStatus);
 		if (this.belowZeroRetrogen != null && chunkStatus.isOrAfter(this.belowZeroRetrogen.targetStatus())) {
 			this.setBelowZeroRetrogen(null);
 		}

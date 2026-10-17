@@ -159,6 +159,12 @@ def nearest_marked_root(path: Path) -> Path | None:
     current = canonical(path)
     if current.is_file():
         current = current.parent
+    while True:
+        if (current / MARKER_NAME).is_file():
+            return current
+        if current.parent == current:
+            return None
+        current = current.parent
 
 
 def clear_auto_preserve_markers(root: Path) -> list[Path]:
@@ -175,12 +181,6 @@ def clear_auto_preserve_markers(root: Path) -> list[Path]:
             marker.unlink()
             removed.append(marker)
     return removed
-    while True:
-        if (current / MARKER_NAME).is_file():
-            return current
-        if current.parent == current:
-            return None
-        current = current.parent
 
 
 def assert_inside_marked_root(root: Path, candidate: Path) -> Path:
@@ -404,6 +404,131 @@ def remove_copied_game_dirs(root: Path, scope: Path | None = None) -> list[Path]
         path = assert_inside_marked_root(root, path)
         shutil.rmtree(path)
         removed.append(path)
+    return removed
+
+
+def _flight_receipts_complete(root: Path, workspace: Path) -> bool:
+    """A parent-wide cleanup must not sweep up unfinished sibling flights."""
+    directory = workspace.parent
+    while directory.is_relative_to(root):
+        receipt = directory / "flight.json"
+        if receipt.exists() or receipt.is_symlink():
+            if receipt.is_symlink():
+                return False
+            try:
+                data = json.loads(receipt.read_text())
+            except (OSError, ValueError):
+                return False
+            if (not isinstance(data, dict)
+                    or data.get("schema") != "terrain-flight-observation-v1"
+                    or data.get("status") != "observation_complete_requires_position_review"
+                    or type(data.get("engine_exit_code")) is not int
+                    or data["engine_exit_code"] != 0):
+                return False
+        if directory == root:
+            break
+        directory = directory.parent
+    return True
+
+
+def retire_completed_fixtures(root: Path) -> dict[str, list[str]]:
+    """Called only after the invocation's comparisons finish; keep input receipts.
+
+    Capture preservation protects evidence, not regenerable workspace copies.
+    Unknown fixtures, external paths, unfinished flights and live process
+    workspaces are retained. Flight completion does not replace position review.
+    """
+    root = assert_marked_root(root)
+    removed: list[str] = []
+    retained: list[str] = []
+    candidates: list[Path] = []
+    for directory, dirs, _ in os.walk(root):
+        for name in list(dirs):
+            candidate = Path(directory) / name
+            if name == CANONICAL_FIXTURE_DIR_NAME:
+                if candidate.is_symlink():
+                    retained.append(str(candidate))
+                    dirs.remove(name)
+                    continue
+                for fixture in candidate.iterdir():
+                    manifest_path = fixture / "fixture_manifest.json"
+                    run = fixture / "run"
+                    if not run.is_dir():
+                        continue
+                    try:
+                        manifest = json.loads(manifest_path.read_text())
+                        source = canonical(Path(manifest["source_run"]))
+                        known = (manifest.get("schema") == "mattmc-cross-repo-fixture-v2"
+                                 and canonical(Path(manifest["run_root"])) == canonical(run)
+                                 and source.is_dir()
+                                 and not source.is_relative_to(canonical(run))
+                                 and not canonical(run).is_relative_to(source))
+                    except (OSError, ValueError, KeyError, TypeError):
+                        known = False
+                    if known and not fixture.is_symlink() and not run.is_symlink():
+                        candidates.append(run)
+                    else:
+                        retained.append(str(run))
+                dirs.remove(name)
+            elif name.startswith(COPIED_GAME_DIR_PREFIXES):
+                candidates.append(candidate)
+                dirs.remove(name)
+    for candidate in candidates:
+        if candidate.is_symlink():
+            retained.append(str(candidate))
+            continue
+        candidate = assert_inside_marked_root(root, candidate)
+        if not _flight_receipts_complete(root, candidate):
+            retained.append(str(candidate))
+            continue
+        # Without process visibility, leave workspace ownership unproven.
+        if not Path("/proc").is_dir() or _live_process_references(candidate, str(candidate)):
+            retained.append(str(candidate))
+            continue
+        # Native crash receipts can be emitted inside a copied game directory.
+        crash_files = [*candidate.glob("hs_err_pid*.log"), *candidate.glob("core*"),
+                       *candidate.glob("crash-reports/*")]
+        if any(path.is_file() for path in crash_files):
+            if not (root / ".keep").exists():
+                (root / ".keep").write_text("Native crash evidence; unpin after its investigation is resolved.\n")
+            retained.append(str(candidate))
+            continue
+        shutil.rmtree(candidate)
+        removed.append(str(candidate))
+    return {"removed_workspaces": removed, "retained_workspaces": retained}
+
+
+def retire_old_invocations(current: Path, schema: str, *, protected_labels: Iterable[str] = ()) -> list[str]:
+    """Keep the latest success and failure of this driver, plus explicit pins.
+
+    Only completed, marked invocations with the exact driver's schema qualify.
+    Unknown/older tools and live work remain outside automatic retirement.
+    A workspace retained by fixture cleanup also protects its parent invocation.
+    """
+    current = assert_marked_root(current)
+    groups: dict[bool, list[Path]] = {}
+    for candidate in current.parent.iterdir():
+        if (not candidate.is_dir() or candidate.is_symlink() or candidate.name in protected_labels
+                or (candidate / ".keep").exists() or not (candidate / MARKER_NAME).is_file()):
+            continue
+        try:
+            summary = json.loads((candidate / "summary.json").read_text())
+        except (OSError, ValueError):
+            continue
+        if isinstance(summary, dict) and summary.get("schema") == schema and type(summary.get("passed")) is bool:
+            groups.setdefault(summary["passed"], []).append(candidate)
+    removed: list[str] = []
+    for group in groups.values():
+        for candidate in sorted(group, key=lambda path: (path / "summary.json").stat().st_mtime, reverse=True)[1:]:
+            if candidate == current or not Path("/proc").is_dir() or _live_process_references(candidate, str(candidate)):
+                continue
+            # Recheck workspace evidence now: the source can disappear after
+            # the invocation's earlier fixture pass. Parent retirement must
+            # respect the same missing-source/unknown/live/crash decisions.
+            if retire_completed_fixtures(candidate)["retained_workspaces"]:
+                continue
+            shutil.rmtree(candidate)
+            removed.append(str(candidate))
     return removed
 
 

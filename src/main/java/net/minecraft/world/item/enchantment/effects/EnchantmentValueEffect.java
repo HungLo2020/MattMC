@@ -8,9 +8,10 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.RandomSource;
 
 public interface EnchantmentValueEffect {
-	Codec<EnchantmentValueEffect> CODEC = BuiltInRegistries.ENCHANTMENT_VALUE_EFFECT_TYPE
-		.byNameCodec()
-		.dispatch(EnchantmentValueEffect::codec, Function.identity());
+	/** Rust decodes, validates and encodes ValueEffects (`content/data/enchant.rs`); each registered type is one of its cases. */
+	net.minecraft.resources.NativeValues.ValueCodec<EnchantmentValueEffect> CODEC = net.minecraft.resources.NativeValues.codec(
+		net.minecraft.resources.NativeValues.Kind.ENCHANTMENT_VALUE_EFFECT, net.minecraft.world.item.enchantment.NativeEnchantmentEffects::valueEffect, net.minecraft.world.item.enchantment.NativeEnchantmentEffects::valueEffectOut
+	);
 
 	static MapCodec<? extends EnchantmentValueEffect> bootstrap(Registry<MapCodec<? extends EnchantmentValueEffect>> registry) {
 		Registry.register(registry, "add", AddValue.CODEC);

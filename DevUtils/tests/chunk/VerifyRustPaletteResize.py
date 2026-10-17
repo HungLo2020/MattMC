@@ -46,8 +46,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     original = subprocess.check_output(['git','show',REFERENCE+':src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java'],cwd=ROOT,text=True)
     source = ROOT/'src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java'
+    from VerifyRustPaletteDistinct import strip_distinct
     from VerifyRustPaletteUnpacking import strip_unpack
-    if original.count(ORIGINAL_COPY) != 1 or strip_unpack(source.read_text()) != original.replace(ORIGINAL_COPY, RESIZE_DISPATCH, 1):
+    if original.count(ORIGINAL_COPY) != 1 or strip_unpack(strip_distinct(source.read_text())) != original.replace(ORIGINAL_COPY, RESIZE_DISPATCH, 1):
         raise RuntimeError('Container differs beyond the exact onResize dispatch')
     oracle = (ROOT/'src/test/java/net/minecraft/world/level/chunk/JavaPaletteResize.java').read_text()
     a=original.index('\t\tpublic void copyFrom('); b=original.index('\n\t\tpublic int getSerializedSize',a)

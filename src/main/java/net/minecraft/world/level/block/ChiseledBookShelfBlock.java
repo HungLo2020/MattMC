@@ -70,7 +70,9 @@ public class ChiseledBookShelfBlock extends BaseEntityBlock implements Selectabl
 			blockState = blockState.setValue(booleanProperty, false);
 		}
 
-		this.registerDefaultState(blockState);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(blockState);
+		}
 	}
 
 	@Override

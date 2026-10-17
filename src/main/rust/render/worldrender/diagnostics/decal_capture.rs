@@ -144,7 +144,7 @@ fn observe_inner(
                 let (key, resource) = frontend
                     .mesh_resources
                     .iter()
-                    .find(|(_, value)| value.resource_set == set)
+                    .find(|(_, value)| value.resource_set == Some(set))
                     .ok_or_else(|| invalid("decal capture unowned resource set"))?;
                 if resource.pipeline != pipeline
                     || resource.pipeline_layout != layout

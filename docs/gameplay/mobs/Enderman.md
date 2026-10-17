@@ -56,8 +56,8 @@ The riding-projectile and bedrock-destination fixes passed **49 automated cases*
 Related: [Ender Pearl](../items/EnderPearl.md) · [Endermite](Endermite.md) · [End](../dimensions/End.md) · [Mobs](Mobs.md)
 
 [enderman]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/monster/EnderMan.java
-[current-enderman]: https://github.com/HungLo2020/MattMC/blob/fix/issue-767-enderman-behavior/src/main/java/net/minecraft/world/entity/monster/EnderMan.java
-[behavior-tests]: https://github.com/HungLo2020/MattMC/blob/fix/issue-767-enderman-behavior/src/test/misc/net/minecraft/world/entity/monster/EnderManBehaviorTest.java
+[current-enderman]: https://github.com/HungLo2020/MattMC/blob/52b5ac5263ffef831cd864be3e5a60dedd4212cd/src/main/java/net/minecraft/world/entity/monster/EnderMan.java
+[behavior-tests]: https://github.com/HungLo2020/MattMC/blob/52b5ac5263ffef831cd864be3e5a60dedd4212cd/src/test/misc/net/minecraft/world/entity/monster/EnderManBehaviorTest.java
 [defaults]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/ai/attributes/DefaultAttributes.java
 [registration]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/EntityType.java#L529-L537
 [player-damage]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/entity/player/Player.java#L722-L750

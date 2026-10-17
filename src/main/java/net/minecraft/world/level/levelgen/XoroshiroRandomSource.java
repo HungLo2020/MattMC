@@ -1,142 +1,61 @@
 package net.minecraft.world.level.levelgen;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.mojang.serialization.Codec;
-import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
-
+/** Native source/current-generator ownership; VM projection preserves actual escapes. */
 public class XoroshiroRandomSource implements RandomSource {
-	private static final float FLOAT_UNIT = 5.9604645E-8F;
-	private static final double DOUBLE_UNIT = 1.110223E-16F;
-	public static final Codec<XoroshiroRandomSource> CODEC = Xoroshiro128PlusPlus.CODEC
-		.xmap(xoroshiro128PlusPlus -> new XoroshiroRandomSource(xoroshiro128PlusPlus), xoroshiroRandomSource -> xoroshiroRandomSource.randomNumberGenerator);
-	private Xoroshiro128PlusPlus randomNumberGenerator;
-	private final MarsagliaPolarGaussian gaussianSource = new MarsagliaPolarGaussian(this);
-
-	public XoroshiroRandomSource(long l) {
-		this.randomNumberGenerator = new Xoroshiro128PlusPlus(RandomSupport.upgradeSeedTo128bit(l));
-	}
-
-	public XoroshiroRandomSource(RandomSupport.Seed128bit seed128bit) {
-		this.randomNumberGenerator = new Xoroshiro128PlusPlus(seed128bit);
-	}
-
-	public XoroshiroRandomSource(long l, long m) {
-		this.randomNumberGenerator = new Xoroshiro128PlusPlus(l, m);
-	}
-
-	private XoroshiroRandomSource(Xoroshiro128PlusPlus xoroshiro128PlusPlus) {
-		this.randomNumberGenerator = xoroshiro128PlusPlus;
-	}
-
-	@Override
-	public RandomSource fork() {
-		return new XoroshiroRandomSource(this.randomNumberGenerator.nextLong(), this.randomNumberGenerator.nextLong());
-	}
-
-	@Override
-	public PositionalRandomFactory forkPositional() {
-		return new XoroshiroRandomSource.XoroshiroPositionalRandomFactory(this.randomNumberGenerator.nextLong(), this.randomNumberGenerator.nextLong());
-	}
-
-	@Override
-	public void setSeed(long l) {
-		this.randomNumberGenerator = new Xoroshiro128PlusPlus(RandomSupport.upgradeSeedTo128bit(l));
-		this.gaussianSource.reset();
-	}
-
-	@Override
-	public int nextInt() {
-		return (int)this.randomNumberGenerator.nextLong();
-	}
-
-	@Override
-	public int nextInt(int i) {
-		if (i <= 0) {
-			throw new IllegalArgumentException("Bound must be positive");
-		} else {
-			long l = Integer.toUnsignedLong(this.nextInt());
-			long m = l * i;
-			long n = m & 4294967295L;
-			if (n < i) {
-				for (int j = Integer.remainderUnsigned(~i + 1, i); n < j; n = m & 4294967295L) {
-					l = Integer.toUnsignedLong(this.nextInt());
-					m = l * i;
-				}
-			}
-
-			long o = m >> 32;
-			return (int)o;
-		}
-	}
-
-	@Override
-	public long nextLong() {
-		return this.randomNumberGenerator.nextLong();
-	}
-
-	@Override
-	public boolean nextBoolean() {
-		return (this.randomNumberGenerator.nextLong() & 1L) != 0L;
-	}
-
-	@Override
-	public float nextFloat() {
-		return (float)this.nextBits(24) * 5.9604645E-8F;
-	}
-
-	@Override
-	public double nextDouble() {
-		return this.nextBits(53) * 1.110223E-16F;
-	}
-
-	@Override
-	public double nextGaussian() {
-		return this.gaussianSource.nextGaussian();
-	}
-
-	@Override
-	public void consumeCount(int i) {
-		for (int j = 0; j < i; j++) {
-			this.randomNumberGenerator.nextLong();
-		}
-	}
-
-	private long nextBits(int i) {
-		return this.randomNumberGenerator.nextLong() >>> 64 - i;
-	}
-
+ public static final Codec<XoroshiroRandomSource> CODEC=Xoroshiro128PlusPlus.CODEC.xmap(XoroshiroRandomSource::new,source->source.generator());
+ private Xoroshiro128PlusPlus randomNumberGenerator;
+ private Xoroshiro128PlusPlus attached;
+ private final NativeXoroshiroSource nativeSource;
+ private final MarsagliaPolarGaussian gaussianSource;
+ public XoroshiroRandomSource(long seed){nativeSource=new NativeXoroshiroSource(seed);gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);}
+ public XoroshiroRandomSource(RandomSupport.Seed128bit seed){nativeSource=new NativeXoroshiroSource(seed.seedLo(),seed.seedHi());gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);}
+ public XoroshiroRandomSource(long lo,long hi){nativeSource=new NativeXoroshiroSource(lo,hi);gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);}
+ XoroshiroRandomSource(NativeXoroshiroSource actual,boolean retained){nativeSource=actual;gaussianSource=MarsagliaPolarGaussian.nativeSource(this,actual);}
+ private XoroshiroRandomSource(Xoroshiro128PlusPlus root){nativeSource=root.sourceOwner();gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);randomNumberGenerator=root;attached=root;}
+ // The identities are real VM facts. Reflection/custom supplied generators keep dispatch.
+ private Xoroshiro128PlusPlus observed(){var root=randomNumberGenerator;if(root!=null&&root!=attached){Xoroshiro128PlusPlus.attach(nativeSource,root);attached=root;}return root;}
+ private Xoroshiro128PlusPlus generator(){var root=observed();if(root==null){root=Xoroshiro128PlusPlus.fromSource(nativeSource);randomNumberGenerator=root;attached=root;}return root;}
+ private long word(){var root=observed();return root==null?nativeSource.next():root.nextLong();}
+ private boolean nativeWords(){var root=observed();return getClass()==XoroshiroRandomSource.class&&(root==null||root.getClass()==Xoroshiro128PlusPlus.class);}
+ static NativeXoroshiroSource nativeGaussianProducer(RandomSource source){if(source==null||source.getClass()!=XoroshiroRandomSource.class)return null;var actual=(XoroshiroRandomSource)source;return actual.nativeWords()?actual.nativeSource:null;}
+ static NativeXoroshiroSource nativeWorldgenProducer(RandomSource source){if(source==null||source.getClass()!=XoroshiroRandomSource.class)return null;var actual=(XoroshiroRandomSource)source;if(actual.nativeSource==null)return null;return actual.nativeWords()?actual.nativeSource:null;}
+ public MarsagliaPolarGaussian nativeGaussian(){return gaussianSource;}
+ public Xoroshiro128PlusPlus nativeGenerator(){return generator();}
+ public static long nativeNoiseLeaf(RandomSource source,boolean simplex){if(source==null||source.getClass()!=XoroshiroRandomSource.class)return 0;var actual=(XoroshiroRandomSource)source;var root=actual.observed();if(root!=null&&root.getClass()!=Xoroshiro128PlusPlus.class)return 0;return actual.nativeSource.leaf(simplex);}
+ @Override public RandomSource fork(){return new XoroshiroRandomSource(word(),word());}
+ @Override public PositionalRandomFactory forkPositional(){return new XoroshiroPositionalRandomFactory(word(),word());}
+ @Override public void setSeed(long seed){boolean embedded=gaussianSource!=null&&gaussianSource.nativeUsesSourceCache(nativeSource);nativeSource.seed(seed,embedded);randomNumberGenerator=null;attached=null;if(!embedded)gaussianSource.reset();}
+ @Override public int nextInt(){return(int)word();}
+ @Override public int nextInt(int bound){if(bound<=0)throw new IllegalArgumentException("Bound must be positive");if(nativeWords()){var root=randomNumberGenerator;return root==null?nativeSource.bounded(bound):root.nativeBounded(bound);}long l=Integer.toUnsignedLong(this.nextInt()),m=l*bound,n=m&4294967295L;if(n<bound){for(int limit=Integer.remainderUnsigned(~bound+1,bound);n<limit;n=m&4294967295L){l=Integer.toUnsignedLong(this.nextInt());m=l*bound;}}return(int)(m>>32);}
+ @Override public long nextLong(){return word();}
+ @Override public boolean nextBoolean(){return(word()&1L)!=0;}
+ @Override public float nextFloat(){if(nativeWords()){var root=randomNumberGenerator;return root==null?nativeSource.nextFloat():root.nativeFloat();}return(float)nextBits(24)*5.9604645E-8F;}
+ @Override public double nextDouble(){if(nativeWords()){var root=randomNumberGenerator;return root==null?nativeSource.nextDouble():root.nativeDouble();}return nextBits(53)*1.110223E-16F;}
+ @Override public double nextGaussian(){return gaussianSource.nextGaussian();}
+ @Override public void consumeCount(int count){if(count<=0)return;if(nativeWords()){var root=randomNumberGenerator;if(root==null)nativeSource.consume(count);else root.nativeConsume(count);return;}for(int i=0;i<count;i++)word();}
+ private long nextBits(int count){return word()>>>64-count;}
 	public static class XoroshiroPositionalRandomFactory implements PositionalRandomFactory {
-		private final long seedLo;
-		private final long seedHi;
+		private final NativePositionalFactory nativeFactory;
 
 		public XoroshiroPositionalRandomFactory(long l, long m) {
-			this.seedLo = l;
-			this.seedHi = m;
+			this.nativeFactory = new NativePositionalFactory(1,l,m);
 		}
 
-		@Override
-		public RandomSource at(int i, int j, int k) {
-			long l = Mth.getSeed(i, j, k);
-			long m = l ^ this.seedLo;
-			return new XoroshiroRandomSource(m, this.seedHi);
-		}
+		long seedLo() { return this.nativeFactory.seed(0); }
 
-		@Override
-		public RandomSource fromHashOf(String string) {
-			RandomSupport.Seed128bit seed128bit = RandomSupport.seedFromHashOf(string);
-			return new XoroshiroRandomSource(seed128bit.xor(this.seedLo, this.seedHi));
-		}
+		long seedHi() { return this.nativeFactory.seed(1); }
+        final NativePositionalFactory nativeFactory() { return this.nativeFactory; }
 
-		@Override
-		public RandomSource fromSeed(long l) {
-			return new XoroshiroRandomSource(l ^ this.seedLo, l ^ this.seedHi);
-		}
+        @Override public RandomSource at(int x,int y,int z) { return this.nativeFactory.at(x,y,z); }
+        @Override public RandomSource fromHashOf(String string) { return this.nativeFactory.fromHashOf(string); }
+        @Override public RandomSource fromSeed(long seed) { return this.nativeFactory.fromSeed(seed); }
 
 		@VisibleForTesting
 		@Override
 		public void parityConfigString(StringBuilder stringBuilder) {
-			stringBuilder.append("seedLo: ").append(this.seedLo).append(", seedHi: ").append(this.seedHi);
+			stringBuilder.append("seedLo: ").append(this.nativeFactory.seed(0)).append(", seedHi: ").append(this.nativeFactory.seed(1));
 		}
 	}
 }

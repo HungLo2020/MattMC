@@ -21,7 +21,26 @@ pub(super) struct WorldLodDrawResourceKey {
     pub(in crate::render::worldrender::lod) segment_index: u32,
 }
 
+/// `layer` of a page key: with packed uniforms a draw's set binds only its
+/// vertex page and the shared uniform arena, so one set serves the page.
+const WORLD_LOD_PAGE_KEY_LAYER: u32 = u32::MAX;
+/// Frames a page set may go unused before it is released.
+const WORLD_LOD_PAGE_SET_IDLE_FRAMES: u64 = 120;
+
 impl WorldLodDrawResourceKey {
+    pub(super) fn page(vertex_page: Handle) -> Self {
+        Self {
+            column_key: vertex_page.raw(),
+            column_generation: 0,
+            layer: WORLD_LOD_PAGE_KEY_LAYER,
+            segment_index: 0,
+        }
+    }
+
+    pub(super) fn is_page(&self) -> bool {
+        self.layer == WORLD_LOD_PAGE_KEY_LAYER
+    }
+
     pub(super) fn from_draw(draw: WorldLodGpuDraw) -> Self {
         Self {
             column_key: draw.column_key,
@@ -57,10 +76,10 @@ pub(super) struct WorldLodPipelineResources {
 impl WorldLodPipelineResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
         if let Some(handle) = self.offscreen_pipeline {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         if let Some(handle) = self.offscreen_replay_pipeline {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         for handle in [
             self.pipeline,
@@ -70,7 +89,7 @@ impl WorldLodPipelineResources {
             self.fragment_shader,
             self.vertex_shader,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -85,6 +104,8 @@ pub(super) struct WorldLodDrawResources {
     /// This cache is discarded with the resource key at column-generation
     /// retirement, so it cannot cross a DH asset or world generation.
     pub(in crate::render::worldrender::lod) last_uniform_bytes: Option<[u8; 240]>,
+    /// Pass frame that last used this set (page sets are pruned when idle).
+    pub(in crate::render::worldrender::lod) last_used_frame: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -119,9 +140,9 @@ pub(super) struct WorldLodLightmapResources {
 
 impl WorldLodDrawResources {
     pub(super) fn destroy(self, gal: &mut VulkanicGal) {
-        let _ = gal.destroy(self.resource_set);
+        let _ = gal.retire(self.resource_set);
         if let Some(uniform_buffer) = self.uniform_buffer {
-            let _ = gal.destroy(uniform_buffer);
+            let _ = gal.retire(uniform_buffer);
         }
     }
 }
@@ -140,6 +161,7 @@ pub(super) struct WorldLodPassResources {
     pub(in crate::render::worldrender::lod) lightmaps: BTreeMap<WorldLodLightmapResourceKey, WorldLodLightmapResources>,
     pub(in crate::render::worldrender::lod) packed_uniforms: Option<WorldLodPackedUniforms>,
     pub(in crate::render::worldrender::lod) use_packed_uniforms: bool,
+    pub(in crate::render::worldrender::lod) frame: u64,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -176,12 +198,33 @@ impl WorldLodPassResources {
             lightmaps: BTreeMap::new(),
             packed_uniforms: None,
             use_packed_uniforms: !deferred && packed_lod_uniforms_enabled(),
+            frame: 0,
         }
     }
 
     pub(super) fn begin_frame(&mut self) {
         if let Some(packed) = self.packed_uniforms.as_mut() {
             packed.begin_frame();
+        }
+        self.frame += 1;
+    }
+
+    /// Releases page sets idle for a while (their page may have been
+    /// emptied and retired; the set keeps it alive until then).
+    pub(super) fn prune_idle_page_sets(&mut self, gal: &mut VulkanicGal) {
+        let frame = self.frame;
+        let idle = self
+            .draws
+            .iter()
+            .filter(|(key, resources)| {
+                key.is_page() && frame.saturating_sub(resources.last_used_frame) > WORLD_LOD_PAGE_SET_IDLE_FRAMES
+            })
+            .map(|(key, _)| *key)
+            .collect::<Vec<_>>();
+        for key in idle {
+            if let Some(resources) = self.draws.remove(&key) {
+                resources.destroy(gal);
+            }
         }
     }
 
@@ -216,7 +259,11 @@ impl WorldLodPassResources {
                 &format!("world-lod-{:?}", self.pass),
             )?);
         }
-        let key = WorldLodDrawResourceKey::from_draw(draw);
+        let key = if self.use_packed_uniforms {
+            WorldLodDrawResourceKey::page(draw.vertex_buffer)
+        } else {
+            WorldLodDrawResourceKey::from_draw(draw)
+        };
         if !self.draws.contains_key(&key) {
             let pipeline = self
                 .pipeline
@@ -277,7 +324,7 @@ impl WorldLodPassResources {
                 Ok(set) => set,
                 Err(error) => {
                     if let Some(own_uniform_buffer) = own_uniform_buffer {
-                        let _ = gal.destroy(own_uniform_buffer);
+                        let _ = gal.retire(own_uniform_buffer);
                     }
                     return Err(error);
                 }
@@ -288,6 +335,7 @@ impl WorldLodPassResources {
                     uniform_buffer: own_uniform_buffer,
                     resource_set,
                     last_uniform_bytes: None,
+                    last_used_frame: self.frame,
                 },
             );
         }
@@ -297,6 +345,7 @@ impl WorldLodPassResources {
                 .draws
                 .get_mut(&key)
                 .expect("world LOD material resource entry exists after creation");
+            resources.last_used_frame = self.frame;
             let uniform_changed =
                 !self.use_packed_uniforms && resources.last_uniform_bytes != Some(packed_uniform);
             if uniform_changed {
@@ -417,7 +466,7 @@ impl WorldLodPassResources {
             .collect::<Vec<_>>();
         for key in stale {
             if let Some(resources) = self.lightmaps.remove(&key) {
-                let _ = gal.destroy(resources.resource_set);
+                let _ = gal.retire(resources.resource_set);
             }
         }
     }
@@ -427,7 +476,7 @@ impl WorldLodPassResources {
     /// lifetime; this cache owns only consumers of its view.
     pub(crate) fn clear_lightmap_bindings(&mut self, gal: &mut VulkanicGal) {
         for (_, resources) in std::mem::take(&mut self.lightmaps) {
-            let _ = gal.destroy(resources.resource_set);
+            let _ = gal.retire(resources.resource_set);
         }
     }
 
@@ -444,7 +493,8 @@ impl WorldLodPassResources {
             .draws
             .keys()
             .filter(|key| {
-                assets.get(&key.column_key).is_none_or(|asset| {
+                // Page sets are not tied to a column; they are pruned when idle.
+                !key.is_page() && assets.get(&key.column_key).is_none_or(|asset| {
                     asset.column_generation != key.column_generation
                         || asset.segments.get(key.segment_index as usize).is_none()
                 })
@@ -667,7 +717,7 @@ impl WorldLodPassResources {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         self.pipeline = Some(result?);
@@ -882,6 +932,10 @@ impl WorldLodForwardOpaquePassResources {
         self.inner.begin_frame();
     }
 
+    pub(crate) fn prune_idle_page_sets(&mut self, gal: &mut VulkanicGal) {
+        self.inner.prune_idle_page_sets(gal);
+    }
+
     pub(crate) fn flush_packed_uniforms(&mut self, ops: &mut Vec<CommandOp>) {
         self.inner.flush_packed_uniforms(ops);
     }
@@ -965,6 +1019,11 @@ impl WorldLodTransparentPassResources {
     pub(crate) fn begin_frame(&mut self) {
         self.inner_side.begin_frame();
         self.inner_up.begin_frame();
+    }
+
+    pub(crate) fn prune_idle_page_sets(&mut self, gal: &mut VulkanicGal) {
+        self.inner_side.prune_idle_page_sets(gal);
+        self.inner_up.prune_idle_page_sets(gal);
     }
 
     pub(crate) fn flush_packed_uniforms(&mut self, ops: &mut Vec<CommandOp>) {
@@ -1085,6 +1144,10 @@ impl Default for WorldLodWaterPassResources {
 impl WorldLodWaterPassResources {
     pub(crate) fn begin_frame(&mut self) {
         self.inner.begin_frame();
+    }
+
+    pub(crate) fn prune_idle_page_sets(&mut self, gal: &mut VulkanicGal) {
+        self.inner.prune_idle_page_sets(gal);
     }
 
     pub(crate) fn flush_packed_uniforms(&mut self, ops: &mut Vec<CommandOp>) {

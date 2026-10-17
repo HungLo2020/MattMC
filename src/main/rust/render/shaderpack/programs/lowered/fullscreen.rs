@@ -54,8 +54,9 @@ pub struct FullscreenSourceMipmapRequirement {
 /// Fixed backend-neutral source ABI for a fullscreen pass. A Rust-owned
 /// procedural triangle supplies position, primary UV, and secondary UV from
 /// the draw vertex index, so no Java/Iris stream or backend-specific vertex
-/// declaration participates. The second coordinate retains the semantic role
-/// of legacy texture-coordinate set one. Set zero owns only semantic texture
+/// declaration participates. Composite sources use the fixed generic value
+/// for unused texture-coordinate sets; sky geometry has its separate inputs.
+/// Set zero owns only semantic texture
 /// transforms and scalar source uniforms; sampled resources remain in the
 /// separate pack set.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -332,12 +333,13 @@ pub fn prepare_lowered_fullscreen_source_program(
     )?;
     let program = LoweredFullscreenSourceProgram {
         identity: ProgramIdentity::new(format!(
-            "vulkanic:shader-pack/{}/{}-source-gen{}",
+            "vulkanic:shader-pack/{}/{}{}-source-gen{}",
             pack_name.to_ascii_lowercase(),
             stage_path
                 .trim_end_matches(".fsh")
                 .trim_end_matches(".glsl")
                 .replace('/', "-"),
+            if lowered.raster_primitive() == FullscreenSourceRasterPrimitive::ShaderPackHorizon { "-horizon" } else { "" },
             shader_pack_generation
         )),
         source_stage_path: stage_path.to_string(),

@@ -710,3 +710,5 @@ pub unsafe extern "C" fn mattmc_nbt_encode_from_tape(
     write_result(output_result, result);
     STATUS_OK
 }
+
+pub(crate) mod owned;

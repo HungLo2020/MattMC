@@ -27,6 +27,7 @@ import net.sodium.client.util.NativeBuffer;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.vulkanic.bridge.VulkanicGalBridge;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import net.minecraft.core.SectionPos;
 import org.slf4j.Logger;
 import net.logging.LogUtils;
 
@@ -110,6 +111,7 @@ public final class RustGalTerrainRenderer {
 	 */
 	private static final int MAX_SHADOW_CANDIDATE_SECTIONS = 12_288;
 	private static boolean shadowCandidateTruncationLogged;
+	/** Indexed by {@link #rowSlot}. */
 	private static final ChunkSectionLayer[] SHADOW_CANDIDATE_LAYERS = {
 		ChunkSectionLayer.SOLID, ChunkSectionLayer.CUTOUT_MIPPED, ChunkSectionLayer.TRANSLUCENT
 	};
@@ -149,6 +151,23 @@ public final class RustGalTerrainRenderer {
 		Minecraft minecraft = Minecraft.getInstance();
 		if (minecraft.level != null && minecraft.levelRenderer != null) {
 			minecraft.levelRenderer.allChanged();
+		}
+	}
+	/**
+	 * Frozen's {@code allChanged()} on a shader toggle: once Rust has accepted
+	 * a selected pack, drop all terrain and rebuild it. Sections built while
+	 * shaders were off lack the pack's block ids and retained source semantics,
+	 * and the source route cannot arm while one is visible.
+	 * {@code LevelRenderer.allChanged()} does nothing on this route.
+	 */
+	public static void requestSourceSemanticRebuild() {
+		RustGalWholeFrameTerrainSource.requestFullRebuild();
+	}
+
+	/** Retires every published terrain layer; the terrain source rebuilds them. */
+	static void removeAllSections(String reason) {
+		for (LayerKey key : List.copyOf(SECTION_ASSETS.keySet())) {
+			removeLayer(key.sectionPos(), key.layer(), reason);
 		}
 	}
 	private static volatile long registeredAtlasGeneration;
@@ -210,14 +229,50 @@ public final class RustGalTerrainRenderer {
 		int drawOrder
 	) {}
 
+	/** Growable compact static-terrain entries: identity, origin, policy and flags. */
+	private static final class CompactTerrainArrays {
+		long[] meshKeys = new long[1024];
+		long[] meshGenerations = new long[1024];
+		int[] sectionOrigins = new int[1024 * 3];
+		int[] depthPolicies = new int[1024];
+		int[] flags = new int[1024];
+		int count;
+
+		void append(long meshKey, long meshGeneration, int x, int y, int z, int depthPolicy, int entryFlags) {
+			if (count == meshKeys.length) {
+				int capacity = meshKeys.length * 2;
+				meshKeys = Arrays.copyOf(meshKeys, capacity);
+				meshGenerations = Arrays.copyOf(meshGenerations, capacity);
+				sectionOrigins = Arrays.copyOf(sectionOrigins, capacity * 3);
+				depthPolicies = Arrays.copyOf(depthPolicies, capacity);
+				flags = Arrays.copyOf(flags, capacity);
+			}
+			int index = count++;
+			meshKeys[index] = meshKey;
+			meshGenerations[index] = meshGeneration;
+			sectionOrigins[index * 3] = x;
+			sectionOrigins[index * 3 + 1] = y;
+			sectionOrigins[index * 3 + 2] = z;
+			depthPolicies[index] = depthPolicy;
+			flags[index] = entryFlags;
+		}
+	}
+
 	private static final class TerrainSetScratch {
 		final LongOpenHashSet seenPositions = new LongOpenHashSet();
+		/** Shadow candidates whose publication rows one read fetches, and those rows. */
+		long[] shadowRowSections = new long[256];
+		long[] shadowRows = new long[256 * 6];
 		final LongOpenHashSet visibleMeshKeys = new LongOpenHashSet();
 		final LongOpenHashSet visibleSubmissions = new LongOpenHashSet();
 		final LongOpenHashSet cachedOpaqueMeshKeys = new LongOpenHashSet();
 		long[] cachedOpaqueMeshKeyArray = new long[256];
 		long[] cachedOpaqueMeshGenerationArray = new long[256];
 		int cachedOpaqueMeshKeyCount;
+		/** Off-camera shadow casters of this frame. */
+		final CompactTerrainArrays shadows = new CompactTerrainArrays();
+		/** Camera-visible section layers of this frame, in draw order. */
+		final CompactTerrainArrays sections = new CompactTerrainArrays();
 		final ArrayList<RenderSection> sectionSnapshot = new ArrayList<>();
 		final ArrayList<TerrainSectionAsset> solidAssetSnapshot = new ArrayList<>();
 		final ArrayList<TerrainSectionAsset> cutoutAssetSnapshot = new ArrayList<>();
@@ -229,6 +284,8 @@ public final class RustGalTerrainRenderer {
 			visibleSubmissions.clear();
 			cachedOpaqueMeshKeys.clear();
 			cachedOpaqueMeshKeyCount = 0;
+			shadows.count = 0;
+			sections.count = 0;
 			sectionSnapshot.clear();
 			solidAssetSnapshot.clear();
 			cutoutAssetSnapshot.clear();
@@ -653,99 +710,126 @@ public final class RustGalTerrainRenderer {
 		String fault = activeFault();
 		boolean detailedDiagnostics = detailedTerrainDiagnosticsEnabled(fault);
 		boolean trackTerrainCounters = terrainCountersEnabled(fault);
-		boolean cachedOpaqueReplay = false;
-		if (!resourceReloadStaging && fault.isEmpty() && !detailedDiagnostics
-			&& !Boolean.getBoolean("mattmc.dev.disableCachedStaticTerrainReplay")) {
-			scratch.cachedOpaqueMeshKeys.clear();
-			scratch.cachedOpaqueMeshKeyCount = 0;
-			for (int index = 0; index < sectionSnapshot.size(); index++) {
-				TerrainSectionAsset solid = scratch.solidAssetSnapshot.get(index);
-				TerrainSectionAsset cutout = scratch.cutoutAssetSnapshot.get(index);
-				if (solid != null && scratch.cachedOpaqueMeshKeys.add(solid.meshKey())) {
-					appendCachedOpaqueMeshKey(scratch, solid.meshKey(), solid.meshGeneration());
-				}
-				if (cutout != null && scratch.cachedOpaqueMeshKeys.add(cutout.meshKey())) {
-					appendCachedOpaqueMeshKey(scratch, cutout.meshKey(), cutout.meshGeneration());
-				}
-			}
-			cachedOpaqueReplay = scratch.cachedOpaqueMeshKeyCount > 0
-				&& RustGalWorldPrimitiveRenderer.enqueueCachedStaticTerrainInstances(
-					scratch.cachedOpaqueMeshKeyArray, scratch.cachedOpaqueMeshGenerationArray,
-					scratch.cachedOpaqueMeshKeyCount,
-					viewportWidth, viewportHeight);
-		}
-		if (trackTerrainCounters) {
-			net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
-			"world.static-terrain.cached-opaque-replay",
-			cachedOpaqueReplay ? scratch.cachedOpaqueMeshKeyCount : 0L);
-		}
-		int translucentDrawOrder = 0;
-		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.opaque-submit");
-		if (cachedOpaqueReplay) {
-			if (trackTerrainCounters) {
-				visibleLayerProbes.addAndGet((long)sectionSnapshot.size() * 2L);
-			}
-			for (int index = 0; index < sectionSnapshot.size(); index++) {
-				RenderSection section = sectionSnapshot.get(index);
-				recordCachedOpaqueLayerSubmission(section, ChunkSectionLayer.SOLID,
-					scratch.solidAssetSnapshot.get(index), visibleSubmissions, trackTerrainCounters);
-				recordCachedOpaqueLayerSubmission(section, ChunkSectionLayer.CUTOUT_MIPPED,
-					scratch.cutoutAssetSnapshot.get(index), visibleSubmissions, trackTerrainCounters);
-			}
+		// Ordinary frames send compact section entries; Rust places each one and
+		// draws the generation it acknowledged. Diagnostic, fault-injection and
+		// resource-reload frames keep the per-record path their receipts need.
+		boolean compactTerrain = !resourceReloadStaging && fault.isEmpty() && !detailedDiagnostics
+			&& !Boolean.getBoolean("mattmc.dev.perRecordStaticTerrain");
+		if (compactTerrain) {
+			enqueueCompactTerrainSections(scratch, sectionSnapshot, camera, trackTerrainCounters);
 		} else {
-			for (int index = 0; index < sectionSnapshot.size(); index++) {
-				RenderSection section = sectionSnapshot.get(index);
-				enqueueSectionLayer(section, ChunkSectionLayer.SOLID, scratch.solidAssetSnapshot.get(index),
-					camera, viewportWidth, viewportHeight, 0,
-					visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
-				enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, scratch.cutoutAssetSnapshot.get(index),
-					camera, viewportWidth, viewportHeight, 0,
-					visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
+			boolean cachedOpaqueReplay = false;
+			if (!resourceReloadStaging && fault.isEmpty() && !detailedDiagnostics
+				&& !Boolean.getBoolean("mattmc.dev.disableCachedStaticTerrainReplay")) {
+				scratch.cachedOpaqueMeshKeys.clear();
+				scratch.cachedOpaqueMeshKeyCount = 0;
+				for (int index = 0; index < sectionSnapshot.size(); index++) {
+					TerrainSectionAsset solid = scratch.solidAssetSnapshot.get(index);
+					TerrainSectionAsset cutout = scratch.cutoutAssetSnapshot.get(index);
+					if (solid != null && scratch.cachedOpaqueMeshKeys.add(solid.meshKey())) {
+						appendCachedOpaqueMeshKey(scratch, solid.meshKey(), solid.meshGeneration());
+					}
+					if (cutout != null && scratch.cachedOpaqueMeshKeys.add(cutout.meshKey())) {
+						appendCachedOpaqueMeshKey(scratch, cutout.meshKey(), cutout.meshGeneration());
+					}
+				}
+				cachedOpaqueReplay = scratch.cachedOpaqueMeshKeyCount > 0
+					&& RustGalWorldPrimitiveRenderer.enqueueCachedStaticTerrainInstances(
+						scratch.cachedOpaqueMeshKeyArray, scratch.cachedOpaqueMeshGenerationArray,
+						scratch.cachedOpaqueMeshKeyCount,
+						viewportWidth, viewportHeight);
 			}
+			if (trackTerrainCounters) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordCounterSample(
+				"world.static-terrain.cached-opaque-replay",
+				cachedOpaqueReplay ? scratch.cachedOpaqueMeshKeyCount : 0L);
+			}
+			int translucentDrawOrder = 0;
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.opaque-submit");
+			if (cachedOpaqueReplay) {
+				if (trackTerrainCounters) {
+					visibleLayerProbes.addAndGet((long)sectionSnapshot.size() * 2L);
+				}
+				for (int index = 0; index < sectionSnapshot.size(); index++) {
+					RenderSection section = sectionSnapshot.get(index);
+					recordCachedOpaqueLayerSubmission(section, ChunkSectionLayer.SOLID,
+						scratch.solidAssetSnapshot.get(index), visibleSubmissions, trackTerrainCounters);
+					recordCachedOpaqueLayerSubmission(section, ChunkSectionLayer.CUTOUT_MIPPED,
+						scratch.cutoutAssetSnapshot.get(index), visibleSubmissions, trackTerrainCounters);
+				}
+			} else {
+				for (int index = 0; index < sectionSnapshot.size(); index++) {
+					RenderSection section = sectionSnapshot.get(index);
+					enqueueSectionLayer(section, ChunkSectionLayer.SOLID, scratch.solidAssetSnapshot.get(index),
+						camera, viewportWidth, viewportHeight, 0,
+						visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
+					enqueueSectionLayer(section, ChunkSectionLayer.CUTOUT_MIPPED, scratch.cutoutAssetSnapshot.get(index),
+						camera, viewportWidth, viewportHeight, 0,
+						visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
+				}
+			}
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.opaque-submit");
+			// Translucent sections are a single camera-sorted semantic stream. The
+			// legacy Sodium render list is unavailable on the Rust whole-frame route,
+			// so retain no list/GL state and order copied section centers explicitly.
+			// Restrict the sort to sections that actually own a published translucent
+			// asset; sorting every opaque/cutout-only section produced identical output
+			// while adding O(visible sections log visible sections) frame work.
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.translucent-sort");
+			ArrayList<RenderSection> translucentSections = scratch.translucentSectionSnapshot;
+			translucentSections.sort(Comparator.comparingDouble((RenderSection section) -> {
+				double dx = section.getOriginX() + 8.0D - camera.getPosition().x();
+				double dy = section.getOriginY() + 8.0D - camera.getPosition().y();
+				double dz = section.getOriginZ() + 8.0D - camera.getPosition().z();
+				return dx * dx + dy * dy + dz * dz;
+			}).reversed());
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.translucent-sort");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.translucent-submit");
+			for (RenderSection section : translucentSections) {
+				enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight,
+					translucentDrawOrder++, visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
+			}
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.translucent-submit");
 		}
-		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.opaque-submit");
-		// Translucent sections are a single camera-sorted semantic stream. The
-		// legacy Sodium render list is unavailable on the Rust whole-frame route,
-		// so retain no list/GL state and order copied section centers explicitly.
-		// Restrict the sort to sections that actually own a published translucent
-		// asset; sorting every opaque/cutout-only section produced identical output
-		// while adding O(visible sections log visible sections) frame work.
-		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.translucent-sort");
-		ArrayList<RenderSection> translucentSections = scratch.translucentSectionSnapshot;
-		translucentSections.sort(Comparator.comparingDouble((RenderSection section) -> {
-			double dx = section.getOriginX() + 8.0D - camera.getPosition().x();
-			double dy = section.getOriginY() + 8.0D - camera.getPosition().y();
-			double dz = section.getOriginZ() + 8.0D - camera.getPosition().z();
-			return dx * dx + dy * dy + dz * dz;
-		}).reversed());
-		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.translucent-sort");
-		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.translucent-submit");
-		for (RenderSection section : translucentSections) {
-			enqueueSectionLayer(section, ChunkSectionLayer.TRANSLUCENT, camera, viewportWidth, viewportHeight,
-				translucentDrawOrder++, visibleSubmissions, fault, detailedDiagnostics, trackTerrainCounters);
-		}
-		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.translucent-submit");
 		// This is a separate bounded semantic stream. Candidate assets stay
 		// resident, but only Rust may select them into a source shadow pass.
 		if (shadowCandidates != null) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.shadow-candidate-limit");
 			shadowCandidates = nearestShadowCandidates(shadowCandidates, camera);
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.shadow-candidate-limit");
+			net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.shadow-submit");
+			int[] depthPolicies = new int[SHADOW_CANDIDATE_LAYERS.length];
+			for (int slot = 0; slot < depthPolicies.length; slot++) {
+				depthPolicies[slot] = terrainDepthPolicy(SHADOW_CANDIDATE_LAYERS[slot]);
+			}
+			// A camera-visible section already contributed every layer asset.
+			// Candidate sections are distinct and mesh keys are unique per
+			// section layer, so no key here can repeat a visible or earlier one.
+			// One publication read covers every other candidate's row.
+			int lookups = 0;
+			for (RenderSection section : shadowCandidates) {
+				if (section == null || !section.isBuilt() || scratch.seenPositions.contains(section.getPositionAsLong())) continue;
+				if (lookups == scratch.shadowRowSections.length) {
+					scratch.shadowRowSections = Arrays.copyOf(scratch.shadowRowSections, lookups * 2);
+				}
+				scratch.shadowRowSections[lookups++] = section.getPositionAsLong();
+			}
+			if (scratch.shadowRows.length < lookups * 6) {
+				scratch.shadowRows = new long[scratch.shadowRowSections.length * 6];
+			}
+			RustTerrainPublication.rows(scratch.shadowRowSections, lookups, scratch.shadowRows);
+			int lookup = 0;
 			for (RenderSection section : shadowCandidates) {
 				if (section == null || !section.isBuilt()) continue;
-				long sectionPos = section.getPositionAsLong();
-				// A camera-visible section already contributed every layer asset
-				// from this frame's snapshot, so none can be a new shadow key.
-				boolean alreadyVisible = scratch.seenPositions.contains(sectionPos);
-				TerrainSectionAsset[] row = alreadyVisible ? null : sectionAssetRow(sectionPos);
-				for (ChunkSectionLayer layer : SHADOW_CANDIDATE_LAYERS) {
-					if (row == null) break;
-					TerrainSectionAsset asset = row[rowSlot(layer)];
-					if (asset == null || !visibleMeshKeys.add(asset.meshKey())) continue;
-					RustGalWorldPrimitiveRenderer.enqueueStaticTerrainSectionInstance(
-						asset.meshKey(), asset.meshGeneration(),
-						section.getOriginX(), section.getOriginY(), section.getOriginZ(),
-						camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z(),
-						viewportWidth, viewportHeight, terrainDepthPolicy(layer),
-						RustGalWorldPrimitiveRenderer.CULL_BACK, false, true);
+				if (!scratch.seenPositions.contains(section.getPositionAsLong())) {
+					int row = lookup++ * 6;
+					for (int slot = 0; slot < SHADOW_CANDIDATE_LAYERS.length; slot++) {
+						long meshKey = scratch.shadowRows[row + slot * 2];
+						if (meshKey == 0L) continue;
+						scratch.shadows.append(meshKey, scratch.shadowRows[row + slot * 2 + 1],
+							section.getOriginX(), section.getOriginY(), section.getOriginZ(),
+							depthPolicies[slot], 0);
+					}
 				}
 				var animatedSprites = section.getAnimatedSprites();
 				if (animatedSprites != null) {
@@ -756,9 +840,14 @@ public final class RustGalTerrainRenderer {
 					}
 				}
 			}
+			RustGalWorldPrimitiveRenderer.enqueueStaticTerrainShadowCandidates(
+				scratch.shadows.meshKeys, scratch.shadows.meshGenerations, scratch.shadows.sectionOrigins,
+				scratch.shadows.depthPolicies, scratch.shadows.count,
+				camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z());
+			net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.shadow-submit");
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.visibility-reconcile");
-		if (!resourceReloadStaging) {
+		if (!resourceReloadStaging && !compactTerrain) {
 			RustGalWorldPrimitiveRenderer.reconcileStaticTerrainVisibility(visibleMeshKeys);
 		}
 		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.visibility-reconcile");
@@ -789,6 +878,86 @@ public final class RustGalTerrainRenderer {
 				viewportWidth,
 				viewportHeight
 			);
+		}
+	}
+
+	/**
+	 * Appends the frame's visible section layers as compact entries: solid and
+	 * cutout in visibility order, then translucent back to front by section
+	 * centre. Each visible section reports its animated sprites, as the
+	 * per-record path did for every accepted layer.
+	 */
+	private static void enqueueCompactTerrainSections(TerrainSetScratch scratch, List<RenderSection> sectionSnapshot,
+			Camera camera, boolean trackTerrainCounters) {
+		net.minecraft.client.dev.GraphicsFrameBenchmark.beginPhase("world.static-terrain.compact-submit");
+		CompactTerrainArrays entries = scratch.sections;
+		LongOpenHashSet visibleSubmissions = scratch.visibleSubmissions;
+		int solidDepth = terrainDepthPolicy(ChunkSectionLayer.SOLID);
+		int cutoutDepth = terrainDepthPolicy(ChunkSectionLayer.CUTOUT_MIPPED);
+		int translucentDepth = terrainDepthPolicy(ChunkSectionLayer.TRANSLUCENT);
+		for (int index = 0; index < sectionSnapshot.size(); index++) {
+			RenderSection section = sectionSnapshot.get(index);
+			boolean submitted = appendCompactLayer(entries, visibleSubmissions, section, ChunkSectionLayer.SOLID,
+				scratch.solidAssetSnapshot.get(index), solidDepth, 0, trackTerrainCounters);
+			submitted |= appendCompactLayer(entries, visibleSubmissions, section, ChunkSectionLayer.CUTOUT_MIPPED,
+				scratch.cutoutAssetSnapshot.get(index), cutoutDepth, 0, trackTerrainCounters);
+			if (submitted) {
+				recordAnimatedSpriteUse(section);
+			}
+		}
+		ArrayList<RenderSection> translucentSections = scratch.translucentSectionSnapshot;
+		double cameraX = camera.getPosition().x();
+		double cameraY = camera.getPosition().y();
+		double cameraZ = camera.getPosition().z();
+		translucentSections.sort(Comparator.comparingDouble((RenderSection section) -> {
+			double dx = section.getOriginX() + 8.0D - cameraX;
+			double dy = section.getOriginY() + 8.0D - cameraY;
+			double dz = section.getOriginZ() + 8.0D - cameraZ;
+			return dx * dx + dy * dy + dz * dz;
+		}).reversed());
+		for (RenderSection section : translucentSections) {
+			TerrainSectionAsset asset = sectionAsset(section.getPositionAsLong(), ChunkSectionLayer.TRANSLUCENT);
+			int flags = asset != null && terrainCameraSortRequested(ChunkSectionLayer.TRANSLUCENT, asset.translucentSortType())
+				? RustGalWorldPrimitiveRenderer.WORLD_MESH_INSTANCE_FLAG_CAMERA_SORTED_QUADS : 0;
+			if (appendCompactLayer(entries, visibleSubmissions, section, ChunkSectionLayer.TRANSLUCENT, asset,
+					translucentDepth, flags, trackTerrainCounters)) {
+				recordAnimatedSpriteUse(section);
+			}
+		}
+		RustGalWorldPrimitiveRenderer.enqueueStaticTerrainSections(
+			entries.meshKeys, entries.meshGenerations, entries.sectionOrigins, entries.depthPolicies, entries.flags,
+			entries.count, cameraX, cameraY, cameraZ);
+		net.minecraft.client.dev.GraphicsFrameBenchmark.endPhase("world.static-terrain.compact-submit");
+	}
+
+	private static boolean appendCompactLayer(CompactTerrainArrays entries, LongOpenHashSet visibleSubmissions,
+			RenderSection section, ChunkSectionLayer layer, TerrainSectionAsset asset, int depthPolicy, int flags,
+			boolean trackTerrainCounters) {
+		if (trackTerrainCounters) {
+			visibleLayerProbes.incrementAndGet();
+		}
+		if (asset == null || !visibleSubmissions.add(asset.meshKey())) {
+			return false;
+		}
+		entries.append(asset.meshKey(), asset.meshGeneration(),
+			section.getOriginX(), section.getOriginY(), section.getOriginZ(), depthPolicy, flags);
+		if (trackTerrainCounters) {
+			long enqueueFrameId = rustEnqueueFrames.incrementAndGet();
+			visibleLayerSubmissions.incrementAndGet();
+			recordCurrentFrameVisibleSubmission(enqueueFrameId, section.getPositionAsLong(), layer,
+				asset.meshKey(), asset.meshGeneration());
+			recordVisibleSubmissionIdentity(section.getPositionAsLong(), layer, asset.meshGeneration());
+		}
+		return true;
+	}
+
+	static void recordAnimatedSpriteUse(RenderSection section) {
+		var animatedSprites = section.getAnimatedSprites();
+		if (animatedSprites != null) {
+			for (var sprite : animatedSprites) {
+				RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
+					sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+			}
 		}
 	}
 
@@ -905,7 +1074,7 @@ public final class RustGalTerrainRenderer {
 			double dy = section.getOriginY() + 8.0D - cy;
 			double dz = section.getOriginZ() + 8.0D - cz;
 			return dx * dx + dy * dy + dz * dz;
-		}));
+		}).thenComparingLong(RenderSection::getPositionAsLong));
 		return nearest.subList(0, MAX_SHADOW_CANDIDATE_SECTIONS);
 	}
 
@@ -985,6 +1154,7 @@ public final class RustGalTerrainRenderer {
 		for (LayerKey key : List.copyOf(SECTION_ASSETS.keySet())) {
 			removeLayer(key.sectionPos(), key.layer(), "world-unload");
 		}
+		RustTerrainPublication.clear();
 		invalidations.incrementAndGet();
 			recordEvent(0L, ChunkSectionLayer.SOLID, 0L, 0L, 0L, atlasGeneration, null, 0, 0, 0, 0.0F, 0.0F, 0.0F, "world-unload");
 	}
@@ -997,11 +1167,10 @@ public final class RustGalTerrainRenderer {
 	}
 
 	/**
-	 * Rust owns opaque/cutout geometry after its explicit asset update is
-	 * accepted. Keep the section's generation and draw metadata for the visible
-	 * semantic callsite, but discard Java's duplicate vertex/index payload. A
-	 * translucent section is deliberately excluded because its copied CPU index
-	 * stream is required for the explicit camera-relative sort producer.
+	 * Rust owns section geometry after its explicit asset update is accepted
+	 * (translucent order included: Rust re-sorts per frame). Keep the section's
+	 * generation and draw metadata for the visible semantic callsite, but
+	 * discard Java's duplicate vertex/index payload.
 	 */
 	public static void releaseUploadedStaticTerrainPayload(long meshKey, long meshGeneration) {
 		TerrainAssetIdentity identity = SECTION_ASSETS_BY_MESH_KEY.get(meshKey);
@@ -1010,8 +1179,7 @@ public final class RustGalTerrainRenderer {
 		}
 		LayerKey layerKey = identity.layerKey();
 		TerrainSectionAsset asset = identity.asset();
-		if (asset.meshGeneration() != meshGeneration || layerKey.layer() == ChunkSectionLayer.TRANSLUCENT
-			|| asset.asset() == null) {
+		if (asset.meshGeneration() != meshGeneration || asset.asset() == null) {
 			return;
 		}
 		TerrainSectionAsset released = asset.releaseCpuPayload();
@@ -1644,8 +1812,9 @@ public final class RustGalTerrainRenderer {
 	/**
 	 * Publishes the copied Minecraft block atlas as a Rust-owned world-mesh
 	 * resource even when the first visible consumer is Distant Horizons. DH
-	 * exact-atlas draws must not depend on an unrelated near-terrain section
-	 * happening to build first.
+	 * exact-atlas draws and shader material samplers must not depend on an
+	 * unrelated near-terrain section happening to build first. Publish copied
+	 * normal/specular maps with the same immutable atlas generation.
 	 */
 	public static void ensureTerrainAtlasAssetForWorldMesh() {
 		// Semantic-only tests deliberately exercise routing without a live client.
@@ -1659,6 +1828,8 @@ public final class RustGalTerrainRenderer {
 		}
 		ensureAtlasPayload();
 		byte[] payload;
+		byte[] normalPayload;
+		byte[] specularPayload;
 		List<byte[]> mipPayloads;
 		AtlasAnimationResource animation;
 		long generation;
@@ -1667,6 +1838,8 @@ public final class RustGalTerrainRenderer {
 				return;
 			}
 			payload = atlasPayload;
+			normalPayload = normalAtlasPayload;
+			specularPayload = specularAtlasPayload;
 			mipPayloads = atlasMipPayloads;
 			animation = atlasAnimationSource;
 			generation = atlasGeneration;
@@ -1682,6 +1855,18 @@ public final class RustGalTerrainRenderer {
 			RustGalWorldPrimitiveRenderer.registerTerrainAtlasAnimation(texture, animation);
 		} else {
 			RustGalWorldPrimitiveRenderer.registerWorldMeshTexture(texture, "terrain-atlas");
+		}
+		if (normalPayload != null) {
+			RustGalWorldPrimitiveRenderer.registerWorldMeshTexture(
+				new VulkanicGalBridge.WorldMeshTextureAssetRecord(
+					RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_NORMAL_ATLAS, normalPayload),
+				"terrain-normal-atlas");
+		}
+		if (specularPayload != null) {
+			RustGalWorldPrimitiveRenderer.registerWorldMeshTexture(
+				new VulkanicGalBridge.WorldMeshTextureAssetRecord(
+					RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_SPECULAR_ATLAS, specularPayload),
+				"terrain-specular-atlas");
 		}
 		var registeredTexture = RustGalWorldPrimitiveRenderer.requireRegisteredWorldMeshTexturePayload(texture);
 		synchronized (RustGalTerrainRenderer.class) {
@@ -1756,7 +1941,21 @@ public final class RustGalTerrainRenderer {
 	}
 
 	public static void recordExecutedStaticTerrainInstances(
-		List<VulkanicGalBridge.WorldMeshInstanceRecord> instances,
+		List<VulkanicGalBridge.WorldMeshInstance> instances,
+		long frameId,
+		long submissionId
+	) {
+		recordExecutedStaticTerrainInstances(instances, 0, frameId, submissionId);
+	}
+
+	/**
+	 * As above, for a frame whose camera-visible terrain also travelled as
+	 * {@code compactSections} compact entries. Outside detailed diagnostics
+	 * only the count is kept, so no per-instance identity lookup runs.
+	 */
+	public static void recordExecutedStaticTerrainInstances(
+		List<VulkanicGalBridge.WorldMeshInstance> instances,
+		int compactSections,
 		long frameId,
 		long submissionId
 	) {
@@ -1775,10 +1974,21 @@ public final class RustGalTerrainRenderer {
 			// this map.
 			TRANSLUCENT_EXECUTION_METADATA.clear();
 		}
-		long executedStaticTerrainInstances = 0L;
+		long executedStaticTerrainInstances = compactSections;
+		if (!detailedDiagnostics) {
+			for (VulkanicGalBridge.WorldMeshInstance instance : instances) {
+				if (instance.stratum() == RustGalWorldPrimitiveRenderer.STRATUM_WORLD_TERRAIN) {
+					executedStaticTerrainInstances++;
+				}
+			}
+			lastExecutedStaticTerrainFrameId.set(frameId);
+			lastExecutedStaticTerrainSubmissionId.set(submissionId);
+			lastExecutedStaticTerrainInstances.set(executedStaticTerrainInstances);
+			return;
+		}
 		List<net.sodium.client.render.StaticTerrainParityDiagnostics.RustExecutionIdentity> executionReceipt =
-			detailedDiagnostics ? new ArrayList<>(instances.size()) : List.of();
-		for (VulkanicGalBridge.WorldMeshInstanceRecord instance : instances) {
+			new ArrayList<>(instances.size());
+		for (VulkanicGalBridge.WorldMeshInstance instance : instances) {
 			TerrainAssetIdentity identity = SECTION_ASSETS_BY_MESH_KEY.get(instance.meshKey());
 			if (identity == null) {
 				continue;
@@ -1907,7 +2117,8 @@ public final class RustGalTerrainRenderer {
 					layer.name(),
 					asset.meshKey(),
 					asset.meshGeneration(),
-					asset.asset().vertices()
+					asset.asset().vertices() instanceof VulkanicGalBridge.StagedWorldMeshVertices
+						? null : asset.asset().vertices()
 				);
 				if (layer == ChunkSectionLayer.TRANSLUCENT && asset.unsupportedPrimitiveCount() > 0) {
 					unsupportedFluidRejectedSections.incrementAndGet();
@@ -1921,8 +2132,7 @@ public final class RustGalTerrainRenderer {
 				boolean stagingReload = resourceReloadStaging;
 				RustGalWorldPrimitiveRenderer.registerStaticTerrainMeshAsset(
 					asset.asset(), stagingReload ? List.of()
-						: atlasTextureUpdatePayload(waterTextureBinding(WorldRenderRoutePolicy.currentStaticTerrainRoute())),
-					layer == ChunkSectionLayer.TRANSLUCENT
+						: atlasTextureUpdatePayload(waterTextureBinding(WorldRenderRoutePolicy.currentStaticTerrainRoute()))
 				);
 				if (stagingReload) {
 					RESOURCE_RELOAD_SECTION_ASSETS.put(
@@ -1963,7 +2173,7 @@ public final class RustGalTerrainRenderer {
 					output.render.getOriginY() + 8.0D,
 					output.render.getOriginZ() + 8.0D,
 					layer == ChunkSectionLayer.TRANSLUCENT ? Math.max(0, asset.indexCount() / 6) : 0,
-						layer == ChunkSectionLayer.TRANSLUCENT ? sortedIndexHash(asset.asset().indexBytes()) : 0L,
+						layer == ChunkSectionLayer.TRANSLUCENT ? asset.translucentIndexHash() : 0L,
 						layer == ChunkSectionLayer.TRANSLUCENT ? asset.initialSortGeneration() : 0L,
 					0
 					);
@@ -2021,205 +2231,69 @@ public final class RustGalTerrainRenderer {
 		if (vertexCount > bufferVertexCapacity) {
 			throw new IllegalArgumentException("static terrain vertex segments require " + vertexCount + " vertices but buffer holds " + bufferVertexCapacity);
 		}
-		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = new ArrayList<>(vertexCount);
-		float minX = Float.POSITIVE_INFINITY;
-		float minY = Float.POSITIVE_INFINITY;
-		float minZ = Float.POSITIVE_INFINITY;
-		float maxX = Float.NEGATIVE_INFINITY;
-		float maxY = Float.NEGATIVE_INFINITY;
-		float maxZ = Float.NEGATIVE_INFINITY;
-		float minU = Float.POSITIVE_INFINITY;
-		float minV = Float.POSITIVE_INFINITY;
-		float maxU = Float.NEGATIVE_INFINITY;
-		float maxV = Float.NEGATIVE_INFINITY;
-		int separateAoVertexCount = 0;
-		float minAo = 1.0F;
-		float maxAo = 0.0F;
-		boolean aoContractValid = true;
-		boolean blockSkyLightContractValid = true;
-		for (int vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
-			int offset = vertexIndex * vertexStride;
-			int positionHi = buffer.getInt(offset + POSITION_OFFSET);
-			int positionLo = buffer.getInt(offset + POSITION_OFFSET + 4);
-			int compactColor = buffer.getInt(offset + COLOR_OFFSET);
-			int color = decodeCompactTerrainColorForRust(compactColor, separateAo, "inverted-ao".equals(fault), "doubled-face-shade".equals(fault));
-			int texture = buffer.getInt(offset + TEXTURE_OFFSET);
-			int lightMaterial = buffer.getInt(offset + LIGHT_MATERIAL_OFFSET);
-			float ao = separateAo ? ((compactColor >>> 24) & 0xff) / 255.0F : 1.0F;
-			if ("inverted-ao".equals(fault)) {
-				ao = 1.0F - ao;
-			}
-			if (separateAo) {
-				separateAoVertexCount++;
-				minAo = Math.min(minAo, ao);
-				maxAo = Math.max(maxAo, ao);
-				if (((color >>> 24) & 0xff) != ((compactColor >>> 24) & 0xff)) {
-					aoContractValid = false;
-				}
-			}
-			if ("inverted-ao".equals(fault) || "doubled-face-shade".equals(fault)) {
-				aoContractValid = false;
-			}
-			if ("swapped-block-sky-light".equals(fault)) {
-				blockSkyLightContractValid = false;
-			}
-			float x = decodePosition(positionHi, positionLo, 0);
-			float y = decodePosition(positionHi, positionLo, 1);
-			float z = decodePosition(positionHi, positionLo, 2);
-			float u = decodeTextureForCopiedAtlas(texture & 0xffff, copiedAtlasWidth);
-			float v = decodeTextureForCopiedAtlas((texture >>> 16) & 0xffff, copiedAtlasHeight);
-			minX = Math.min(minX, x);
-			minY = Math.min(minY, y);
-			minZ = Math.min(minZ, z);
-			maxX = Math.max(maxX, x);
-			maxY = Math.max(maxY, y);
-			maxZ = Math.max(maxZ, z);
-			minU = Math.min(minU, u);
-			minV = Math.min(minV, v);
-			maxU = Math.max(maxU, u);
-			maxV = Math.max(maxV, v);
-			int packedShaderBlock = shaderBlockIdOffset == 0 ? 0 : buffer.getInt(offset + shaderBlockIdOffset);
-			int shaderBlockId = shaderBlockIdOffset == 0 ? -1 : decodeIrisShaderBlockId(packedShaderBlock);
-			int shaderMaterialType = shaderBlockIdOffset == 0 ? -1 : decodeIrisShaderRenderType(packedShaderBlock);
-			int midBlockPacked = midBlockOffset == 0 ? 0 : buffer.getInt(offset + midBlockOffset);
-			vertices.add(new VulkanicGalBridge.WorldMeshVertexRecord(
-				x,
-				y,
-				z,
-				u,
-				v,
-				u,
-				v,
-				shaderBlockId,
-				shaderMaterialType,
-				decodeTerrainMaterialBits(lightMaterial, separateAo),
-				color,
-				0,
-				decodeLight(lightMaterial, "swapped-block-sky-light".equals(fault)),
-				midBlockPacked
-			));
+		// Each vertex record is built once with its final semantics: the
+		// canonical primitive identity (previously a second pass), and its
+		// segment normal and fault-adjusted color (previously a third pass).
+		int[] primitiveMetadata = mesh.getPrimitiveMetadata();
+		int metadataStride = NativeSectionMeshBuilder.PRIMITIVE_METADATA_RECORD_INTS;
+		if (vertexCount % 4 != 0) {
+			throw new IllegalArgumentException("static terrain semantic vertices are not quad-aligned");
 		}
-		applyPrimitiveSemanticFallback(
-			mesh.getPrimitiveMetadata(),
-			vertices,
-			vertexCount,
-			shaderBlockIdOffset != 0,
-			midBlockOffset != 0
-		);
-		List<Integer> indices = new ArrayList<>(Math.max(6, vertexCount / 4 * 6));
-		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
-		int cursor = 0;
-		int maxIndex = -1;
-		int positiveYNormalSections = 0;
-		int negativeYNormalSections = 0;
-		int horizontalNormalSections = 0;
-		boolean normalContractValid = true;
-		boolean topFaceShadeContractValid = true;
-		for (int i = 0; i < vertexSegments.length; i += 2) {
-			int segmentVertexCount = vertexSegments[i];
-			if (segmentVertexCount <= 0) {
-				continue;
-			}
-			if (cursor + segmentVertexCount > vertexCount) {
-				throw new IllegalArgumentException("static terrain vertex segments exceed vertex payload");
-			}
-			int firstIndex = indices.size();
-			int facing = vertexSegments[i + 1];
-			int normalPacked = normalForSegment(vertices, cursor, segmentVertexCount, facing);
-			if ("inverted-normal".equals(fault)) {
-				normalPacked = invertPackedNormal(normalPacked);
-				normalContractValid = false;
-			}
-			switch (facing) {
-				case 1 -> positiveYNormalSections++;
-				case 4 -> negativeYNormalSections++;
-				case 0, 2, 3, 5 -> horizontalNormalSections++;
-				default -> {
-				}
-			}
-			if ("wrong-top-face-shade".equals(fault) && facing == 1) {
-				topFaceShadeContractValid = false;
-			}
-			for (int vertex = cursor; vertex < cursor + segmentVertexCount; vertex++) {
-				VulkanicGalBridge.WorldMeshVertexRecord original = vertices.get(vertex);
-				int color = original.colorArgb();
-				if ("wrong-top-face-shade".equals(fault) && facing == 1) {
-					color = multiplyArgbRgb(color, 0x80);
-				}
-				vertices.set(vertex, new VulkanicGalBridge.WorldMeshVertexRecord(
-					original.x(), original.y(), original.z(), original.u(), original.v(), original.atlasU(), original.atlasV(),
-					original.shaderBlockId(), original.shaderMaterialType(), original.terrainMaterialBits(), color, normalPacked, original.light(), original.midBlockPacked()
-				));
-			}
-			for (int quadBase = cursor; quadBase + 3 < cursor + segmentVertexCount; quadBase += 4) {
-				indices.add(quadBase);
-				indices.add(quadBase + 1);
-				indices.add(quadBase + 2);
-				indices.add(quadBase + 2);
-				indices.add(quadBase + 3);
-				indices.add(quadBase);
-				maxIndex = Math.max(maxIndex, quadBase + 3);
-			}
-			if (layer != ChunkSectionLayer.TRANSLUCENT) {
-				// A segment is one facing/material run.  Emit one range after all
-				// of its quads have been appended; emitting a growing range per quad
-				// duplicates prior quads and advances later segment offsets wrongly.
-				sections.add(new VulkanicGalBridge.WorldMeshSectionRecord(
-					layer == ChunkSectionLayer.SOLID ? RustGalWorldPrimitiveRenderer.MATERIAL_ID_OPAQUE_TEXTURED : RustGalWorldPrimitiveRenderer.MATERIAL_ID_CUTOUT_TEXTURED,
-					RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS,
-					layer == ChunkSectionLayer.SOLID ? RustGalWorldPrimitiveRenderer.MATERIAL_MODE_OPAQUE : RustGalWorldPrimitiveRenderer.MATERIAL_MODE_CUTOUT,
-					// Frozen's Sodium terrain pipelines inherit RenderPipeline's
-					// default back-face culling, including the translucent pass.
-					// The copied mesh ABI preserves each baked quad's CCW winding, so
-					// carry that semantic raster contract into GAL rather than
-					// accumulating both sides of every glass/fluid face.
-					RustGalWorldPrimitiveRenderer.CULL_BACK,
-					RustGalWorldPrimitiveRenderer.WORLD_WINDING_CCW,
-					firstIndex * 2,
-					indices.size() - firstIndex,
-					facing
-				));
-			}
-			cursor += segmentVertexCount;
+		if (primitiveMetadata.length != vertexCount / 4 * metadataStride) {
+			throw new IllegalArgumentException("static terrain primitive metadata count " + primitiveMetadata.length
+				+ " does not match assembled primitive count " + vertexCount / 4);
 		}
-		if (cursor != vertexCount) {
-			throw new IllegalArgumentException("static terrain vertex segments cover " + cursor + " of " + vertexCount + " vertices");
-		}
-		byte[] indexBytes;
-		OrderedTranslucentMesh orderedTranslucentMesh = null;
+		int faultBits = ("inverted-ao".equals(fault) ? RustTerrainIntake.FAULT_INVERTED_AO : 0)
+			| ("doubled-face-shade".equals(fault) ? RustTerrainIntake.FAULT_DOUBLED_FACE_SHADE : 0)
+			| ("swapped-block-sky-light".equals(fault) ? RustTerrainIntake.FAULT_SWAPPED_BLOCK_SKY_LIGHT : 0)
+			| ("inverted-normal".equals(fault) ? RustTerrainIntake.FAULT_INVERTED_NORMAL : 0)
+			| ("wrong-top-face-shade".equals(fault) ? RustTerrainIntake.FAULT_WRONG_TOP_FACE_SHADE : 0);
+		// Rust decodes and assembles the layer (worldrender/terrain/assembly.rs):
+		// vertices, index bytes, draw ranges, translucent order, key, generation.
+		long sectionPos = output.render.getPositionAsLong();
+		RustTerrainIntake.AssembledLayer assembled = RustTerrainIntake.assemble(buffer, vertexStride, separateAo,
+			copiedAtlasWidth, copiedAtlasHeight, midBlockOffset, faultBits, vertexSegments, primitiveMetadata,
+			metadataStride, vertexCount, layer == ChunkSectionLayer.TRANSLUCENT ? sorterIndexBuffer(output.getSorter()) : null,
+			sectionPos, layer.ordinal(), atlasGeneration,
+			waterTextureBinding(WorldRenderRoutePolicy.currentStaticTerrainRoute()) == WaterTextureBinding.BLOCK_ATLAS,
+			waterSprites(), !vertexCopyRequired(fault));
+		RustTerrainIntake.DecodedVertices decoded = assembled.decoded();
+		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices = decoded.encoded();
+		float minX = decoded.minX();
+		float minY = decoded.minY();
+		float minZ = decoded.minZ();
+		float maxX = decoded.maxX();
+		float maxY = decoded.maxY();
+		float maxZ = decoded.maxZ();
+		float minU = decoded.minU();
+		float minV = decoded.minV();
+		float maxU = decoded.maxU();
+		float maxV = decoded.maxV();
+		int separateAoVertexCount = decoded.separateAoVertices();
+		float minAo = decoded.minAo();
+		float maxAo = decoded.maxAo();
+		boolean aoContractValid = decoded.aoContractValid();
+		boolean blockSkyLightContractValid = !"swapped-block-sky-light".equals(fault);
+		boolean normalContractValid = !"inverted-normal".equals(fault) || vertexSegments.length == 0;
+		boolean topFaceShadeContractValid = !("wrong-top-face-shade".equals(fault) && assembled.positiveYSections() > 0);
+		int positiveYNormalSections = assembled.positiveYSections();
+		int negativeYNormalSections = assembled.negativeYSections();
+		int horizontalNormalSections = assembled.horizontalSections();
+		int maxIndex = assembled.maxIndex();
+		byte[] indexBytes = assembled.indexBytes();
+		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = assembled.sections();
 		int[] translucentSourceSegmentQuadCounts = layer == ChunkSectionLayer.TRANSLUCENT
 			? translucentSourceSegmentQuadCounts(vertexSegments)
 			: new int[0];
+		OrderedTranslucentMesh orderedTranslucentMesh = null;
 		if (layer == ChunkSectionLayer.TRANSLUCENT) {
-			byte[] sourceSortedIndexBytes = normalizeTranslucentSortedIndexBytes(
-				copySorterIndexBytes(output.getSorter()),
-				vertexCount,
-				translucentSourceSegmentQuadCounts
-			);
-			if (sourceSortedIndexBytes.length == 0) {
-				sourceSortedIndexBytes = packU32(indices);
-			}
-			orderedTranslucentMesh = buildOrderedTranslucentMesh(
-				sourceSortedIndexBytes,
-				mesh.getPrimitiveMetadata(),
-				vertices,
-				vertexCount,
-				waterTextureBinding(WorldRenderRoutePolicy.currentStaticTerrainRoute())
-			);
-			if (orderedTranslucentMesh.retainedIndexCount() == 0) {
+			if (sections.isEmpty()) {
 				return null;
 			}
-			indexBytes = orderedTranslucentMesh.indexBytes();
-			sections.addAll(orderedTranslucentMesh.sections());
-		} else {
-			indexBytes = packU16(indices);
+			orderedTranslucentMesh = orderedTranslucentReceipt(assembled);
 		}
-		if (sections.isEmpty()) {
-			throw new IllegalArgumentException("static terrain mesh has no drawable sections");
-		}
-		long sectionPos = output.render.getPositionAsLong();
-		long meshKey = meshKey(sectionPos, layer);
-		long generation = meshGeneration(sectionPos, layer, vertices, indexBytes, sections);
+		long meshKey = assembled.meshKey();
+		long generation = assembled.meshGeneration();
 		int diagnosticVertexCount = vertexCount;
 		int diagnosticVertexStride = vertexStride;
 		int diagnosticMaxIndex = maxIndex;
@@ -2261,7 +2335,7 @@ public final class RustGalTerrainRenderer {
 				diagnosticVertexCount,
 			bufferVertexCapacity,
 			diagnosticVertexStride,
-			layer == ChunkSectionLayer.TRANSLUCENT ? indexBytes.length / Integer.BYTES : indices.size(),
+			layer == ChunkSectionLayer.TRANSLUCENT ? indexBytes.length / Integer.BYTES : assembled.assembledIndexCount(),
 			diagnosticMaxIndex,
 			diagnosticIndexType,
 			sections.size(),
@@ -2301,6 +2375,8 @@ public final class RustGalTerrainRenderer {
 			orderedTranslucentMesh == null ? "" : orderedTranslucentMesh.accountingReason(),
 			orderedTranslucentMesh == null ? 0 : orderedTranslucentMesh.unsupportedPrimitiveCount(),
 			translucentSourceSegmentQuadCounts,
+			layer == ChunkSectionLayer.TRANSLUCENT ? indexBytes.length : 0,
+			layer == ChunkSectionLayer.TRANSLUCENT ? assembled.retainedHash() : 0L,
 			new VulkanicGalBridge.WorldMeshAssetRecord(
 				meshKey,
 				generation,
@@ -2312,6 +2388,143 @@ public final class RustGalTerrainRenderer {
 			)
 		);
 	}
+
+	static void installTestingFluidSpriteAssetsForUnitTests() {
+		waterStillAsset = new FluidSpriteAsset(
+			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL,
+			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still"),
+			0.0F,
+			0.25F,
+			0.0F,
+			0.25F,
+			16,
+			16,
+			1,
+			1,
+			0,
+			0,
+			0,
+			List.of(),
+			new byte[] { 1 }, 1
+		);
+		waterFlowAsset = new FluidSpriteAsset(
+			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW,
+			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_flow"),
+			0.25F,
+			0.5F,
+			0.0F,
+			0.25F,
+			16,
+			16,
+			1,
+			1,
+			0,
+			0,
+			0,
+			List.of(),
+			new byte[] { 2 }, 1
+		);
+		waterOverlayAsset = new FluidSpriteAsset(
+			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY,
+			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_overlay"),
+			0.5F,
+			0.75F,
+			0.0F,
+			0.25F,
+			16,
+			16,
+			1,
+			1,
+			0,
+			0,
+			0,
+			List.of(),
+			new byte[] { 3 }, 1
+		);
+	}
+
+	/**
+	 * Diagnostics that read a layer's vertices in Java after assembly. Without
+	 * them the vertices stay staged in Rust and only their count reaches Java.
+	 */
+	private static boolean vertexCopyRequired(String fault) {
+		boolean vertexReaders = !fault.isEmpty() || !activeTextureProbes.isEmpty()
+			|| net.sodium.client.render.StaticTerrainParityDiagnostics.appearanceTraceActive();
+		// Captures run with detailed diagnostics; this lets them verify staging.
+		if (FORCE_VERTEX_STAGING) {
+			return vertexReaders;
+		}
+		return vertexReaders || detailedTerrainDiagnosticsEnabled(fault);
+	}
+
+	private static final boolean FORCE_VERTEX_STAGING = Boolean.getBoolean("mattmc.dev.forceTerrainVertexStaging");
+
+	/** The build sorter's u32 quad order, read in place (null when there is none). */
+	private static ByteBuffer sorterIndexBuffer(Sorter sorter) {
+		if (sorter == null) {
+			return null;
+		}
+		NativeBuffer indexBuffer = sorter.getIndexBuffer();
+		if (indexBuffer == null || indexBuffer.getLength() <= 0) {
+			return null;
+		}
+		ByteBuffer src = indexBuffer.getDirectBuffer().duplicate();
+		src.clear();
+		src.limit(indexBuffer.getLength());
+		return src;
+	}
+
+	/** Still, flow and overlay water sprites for Rust assembly; null until initialized. */
+	private static RustTerrainIntake.WaterSprite[] waterSprites() {
+		FluidSpriteAsset still = waterStillAsset;
+		FluidSpriteAsset flow = waterFlowAsset;
+		FluidSpriteAsset overlay = waterOverlayAsset;
+		if (still == null || flow == null || overlay == null) {
+			return null;
+		}
+		return new RustTerrainIntake.WaterSprite[] {
+			new RustTerrainIntake.WaterSprite(still.textureId(), still.u0(), still.u1(), still.v0(), still.v1()),
+			new RustTerrainIntake.WaterSprite(flow.textureId(), flow.u0(), flow.u1(), flow.v0(), flow.v1()),
+			new RustTerrainIntake.WaterSprite(overlay.textureId(), overlay.u0(), overlay.u1(), overlay.v0(), overlay.v1())
+		};
+	}
+
+	/** The translucent accounting receipt, as Java's ordered-mesh record. */
+	private static OrderedTranslucentMesh orderedTranslucentReceipt(RustTerrainIntake.AssembledLayer assembled) {
+		StringBuilder primitiveSample = new StringBuilder();
+		int[] samples = assembled.samples();
+		for (int offset = 0; offset + 5 < samples.length; offset += 6) {
+			appendPrimitiveSample(primitiveSample, samples[offset], samples[offset + 1],
+				samples[offset + 2] != 0 ? "retained" : "omitted", samples[offset + 3], samples[offset + 4],
+				samples[offset + 5]);
+		}
+		return new OrderedTranslucentMesh(
+			assembled.indexBytes(),
+			assembled.sections(),
+			assembled.sourcePrimitives(),
+			assembled.nonFluidPrimitives(),
+			assembled.waterPrimitives(),
+			assembled.unsupportedPrimitives(),
+			assembled.retainedPrimitives(),
+			assembled.omittedPrimitives(),
+			assembled.sourceIndices(),
+			assembled.retainedIndices(),
+			assembled.omittedIndices(),
+			assembled.sourceHash(),
+			assembled.retainedHash(),
+			assembled.omittedHash(),
+			assembled.materialSwitches(),
+			assembled.waterStill(),
+			assembled.waterFlow(),
+			assembled.waterOverlay(),
+			assembled.waterTextureSwitches(),
+			waterAnimationHash(),
+			waterAnimationSummary(),
+			translucentRangeSummary(assembled.sections()),
+			primitiveSample.toString()
+		);
+	}
+
 
 	/**
 	 * Restores terrain shader semantics from the native builder's per-quad
@@ -2450,149 +2663,7 @@ public final class RustGalTerrainRenderer {
 			? WaterTextureBinding.BLOCK_ATLAS : WaterTextureBinding.SEPARATE_SHEETS;
 	}
 
-	static OrderedTranslucentMesh buildOrderedTranslucentMesh(byte[] sourceSortedIndexBytes,
-			int[] primitiveMetadata, List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, int vertexCount) {
-		return buildOrderedTranslucentMesh(sourceSortedIndexBytes, primitiveMetadata, vertices, vertexCount,
-			WaterTextureBinding.SEPARATE_SHEETS);
-	}
 
-	static OrderedTranslucentMesh buildOrderedTranslucentMesh(byte[] sourceSortedIndexBytes,
-			int[] primitiveMetadata, List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, int vertexCount,
-			WaterTextureBinding waterBinding) {
-		java.util.Objects.requireNonNull(waterBinding);
-		if (sourceSortedIndexBytes.length == 0 || sourceSortedIndexBytes.length % (Integer.BYTES * 6) != 0) {
-			throw new IllegalArgumentException("translucent sorted index payload must contain whole u32 quads");
-		}
-		int primitiveCount = vertexCount / 4;
-		int metadataStride = NativeSectionMeshBuilder.PRIMITIVE_METADATA_RECORD_INTS;
-		if (primitiveMetadata.length != primitiveCount * metadataStride) {
-			throw new IllegalArgumentException("translucent primitive metadata count " + primitiveMetadata.length
-				+ " does not match primitive count " + primitiveCount);
-		}
-		ByteArrayOutputStream retainedIndices = new ByteArrayOutputStream(sourceSortedIndexBytes.length);
-		ByteArrayOutputStream omittedIndices = new ByteArrayOutputStream(sourceSortedIndexBytes.length);
-		List<VulkanicGalBridge.WorldMeshSectionRecord> sections = new ArrayList<>();
-		int openMaterialId = 0;
-		int openTextureId = 0;
-		int openIndexStart = 0;
-		int retainedIndexCount = 0;
-		int retainedPrimitiveCount = 0;
-		int omittedPrimitiveCount = 0;
-		int nonFluidPrimitiveCount = 0;
-		int waterPrimitiveCount = 0;
-		int unsupportedPrimitiveCount = 0;
-		int previousRetainedMaterialId = 0;
-		int previousRetainedTextureId = 0;
-		int materialSwitchCount = 0;
-		int waterStillPrimitiveCount = 0;
-		int waterFlowPrimitiveCount = 0;
-		int waterOverlayPrimitiveCount = 0;
-		int waterTextureSwitchCount = 0;
-		StringBuilder primitiveSample = new StringBuilder();
-		boolean[] seen = new boolean[primitiveCount];
-		for (int sourceOffset = 0; sourceOffset < sourceSortedIndexBytes.length; sourceOffset += Integer.BYTES * 6) {
-			int primitiveId = primitiveIdFromSortedQuad(sourceSortedIndexBytes, sourceOffset, vertexCount);
-			if (primitiveId < 0 || primitiveId >= primitiveCount) {
-				throw new IllegalArgumentException("translucent sorted payload references primitive " + primitiveId
-					+ " outside 0.." + (primitiveCount - 1));
-			}
-			if (seen[primitiveId]) {
-				throw new IllegalArgumentException("translucent sorted payload references primitive " + primitiveId + " more than once");
-			}
-			seen[primitiveId] = true;
-			int metadataOffset = primitiveId * metadataStride;
-			int primitiveKind = primitiveMetadata[metadataOffset];
-			// Flat translucent quads do not carry a fluid record.  The native
-			// metadata ABI leaves their kind at UNKNOWN (0) on the ordinary
-			// compact path; the modified-translucent path already normalizes this
-			// value.  Treating it as a non-fluid translucent quad here preserves
-			// the semantic atlas material instead of rejecting the whole section.
-			if (primitiveKind == NativeSectionMeshBuilder.PRIMITIVE_KIND_UNKNOWN) {
-				primitiveKind = NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT;
-			}
-			switch (primitiveKind) {
-				case NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT -> nonFluidPrimitiveCount++;
-				case NativeSectionMeshBuilder.PRIMITIVE_KIND_GENERIC_FLUID -> nonFluidPrimitiveCount++;
-				case NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER -> waterPrimitiveCount++;
-				case NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID -> unsupportedPrimitiveCount++;
-				default -> {
-				}
-			}
-			int materialId = translucentMaterialForPrimitiveKind(primitiveKind);
-			if (materialId == 0) {
-				closeTranslucentRange(sections, openMaterialId, openTextureId, openIndexStart, retainedIndexCount);
-				openMaterialId = 0;
-				openTextureId = 0;
-				openIndexStart = retainedIndexCount;
-				omittedIndices.write(sourceSortedIndexBytes, sourceOffset, Integer.BYTES * 6);
-				omittedPrimitiveCount++;
-				appendPrimitiveSample(primitiveSample, primitiveId, primitiveKind, "omitted", 0, 0, retainedIndexCount);
-				continue;
-			}
-			int textureId = translucentTextureForPrimitive(primitiveKind, primitiveId, vertices, waterBinding);
-			if (primitiveKind == NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER) {
-				int waterType = vertices.get(primitiveId * 4).shaderMaterialType();
-				if (waterType == 1) {
-					waterStillPrimitiveCount++;
-				} else if (waterType == 2) {
-					waterFlowPrimitiveCount++;
-				} else if (waterType == 3) {
-					waterOverlayPrimitiveCount++;
-				}
-				if (previousRetainedTextureId != 0 && previousRetainedTextureId != textureId) {
-					waterTextureSwitchCount++;
-				}
-			}
-			if (openMaterialId != materialId || openTextureId != textureId) {
-				closeTranslucentRange(sections, openMaterialId, openTextureId, openIndexStart, retainedIndexCount);
-				if (previousRetainedMaterialId != 0 && previousRetainedMaterialId != materialId) {
-					materialSwitchCount++;
-				}
-				previousRetainedMaterialId = materialId;
-				previousRetainedTextureId = textureId;
-				openMaterialId = materialId;
-				openTextureId = textureId;
-				openIndexStart = retainedIndexCount;
-			}
-			retainedIndices.write(sourceSortedIndexBytes, sourceOffset, Integer.BYTES * 6);
-			retainedIndexCount += 6;
-			retainedPrimitiveCount++;
-			appendPrimitiveSample(primitiveSample, primitiveId, primitiveKind, "retained", materialId, textureId, retainedIndexCount - 6);
-		}
-		closeTranslucentRange(sections, openMaterialId, openTextureId, openIndexStart, retainedIndexCount);
-		for (int primitiveId = 0; primitiveId < primitiveCount; primitiveId++) {
-			if (!seen[primitiveId]) {
-				throw new IllegalArgumentException("translucent sorted payload omitted primitive " + primitiveId);
-			}
-		}
-		byte[] retainedIndexBytes = retainedIndices.toByteArray();
-		byte[] omittedIndexBytes = omittedIndices.toByteArray();
-		return new OrderedTranslucentMesh(
-			retainedIndexBytes,
-			sections,
-			primitiveCount,
-			nonFluidPrimitiveCount,
-			waterPrimitiveCount,
-			unsupportedPrimitiveCount,
-			retainedPrimitiveCount,
-			omittedPrimitiveCount,
-			sourceSortedIndexBytes.length / Integer.BYTES,
-			retainedIndexCount,
-			omittedIndexBytes.length / Integer.BYTES,
-			sortedIndexHash(sourceSortedIndexBytes),
-			sortedIndexHash(retainedIndexBytes),
-			sortedIndexHash(omittedIndexBytes),
-			materialSwitchCount,
-			waterStillPrimitiveCount,
-			waterFlowPrimitiveCount,
-			waterOverlayPrimitiveCount,
-			waterTextureSwitchCount,
-			waterAnimationHash(),
-			waterAnimationSummary(),
-			translucentRangeSummary(sections),
-			primitiveSample.toString()
-		);
-	}
 
 	private static void appendPrimitiveSample(StringBuilder sample, int primitiveId, int primitiveKind, String fate,
 			int materialId, int textureId, int retainedIndexStart) {
@@ -2718,212 +2789,15 @@ public final class RustGalTerrainRenderer {
 		return summary.toString();
 	}
 
-	private static void closeTranslucentRange(List<VulkanicGalBridge.WorldMeshSectionRecord> sections,
-			int materialId, int textureId, int startIndex, int currentIndexCount) {
-		if (materialId == 0 || currentIndexCount <= startIndex) {
-			return;
-		}
-		sections.add(new VulkanicGalBridge.WorldMeshSectionRecord(
-			materialId,
-			textureId == 0 ? RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS : textureId,
-			RustGalWorldPrimitiveRenderer.MATERIAL_MODE_TRANSLUCENT,
-			// Frozen's translucent terrain inherits the terrain pipeline's
-			// back-face culling. The pass differs by blend/depth-write semantics,
-			// not by silently rasterizing both sides of one baked face.
-			RustGalWorldPrimitiveRenderer.CULL_BACK,
-			RustGalWorldPrimitiveRenderer.WORLD_WINDING_CCW,
-			startIndex * Integer.BYTES,
-			currentIndexCount - startIndex
-		));
-	}
 
-	private static int translucentMaterialForPrimitiveKind(int primitiveKind) {
-		return switch (primitiveKind) {
-			case NativeSectionMeshBuilder.PRIMITIVE_KIND_NON_FLUID_TRANSLUCENT ->
-				RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED;
-			case NativeSectionMeshBuilder.PRIMITIVE_KIND_GENERIC_FLUID ->
-				RustGalWorldPrimitiveRenderer.MATERIAL_ID_TRANSLUCENT_TEXTURED;
-			case NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER ->
-				RustGalWorldPrimitiveRenderer.MATERIAL_ID_WATER_TRANSLUCENT;
-			case NativeSectionMeshBuilder.PRIMITIVE_KIND_UNSUPPORTED_FLUID -> 0;
-			default -> throw new IllegalArgumentException("unsupported translucent primitive kind " + primitiveKind);
-		};
-	}
 
-	private static int translucentTextureForPrimitive(int primitiveKind, int primitiveId,
-			List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, WaterTextureBinding waterBinding) {
-		if (primitiveKind != NativeSectionMeshBuilder.PRIMITIVE_KIND_BUILTIN_WATER) {
-			return RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS;
-		}
-		int base = primitiveId * 4;
-		if (base < 0 || base + 3 >= vertices.size()) {
-			throw new IllegalArgumentException("water primitive " + primitiveId + " exceeds vertex payload");
-		}
-		FluidSpriteAsset asset = waterTextureForPrimitive(vertices.subList(base, base + 4));
-		for (int index = base; index < base + 4; index++) {
-			VulkanicGalBridge.WorldMeshVertexRecord original = vertices.get(index);
-			vertices.set(index, new VulkanicGalBridge.WorldMeshVertexRecord(
-				original.x(),
-				original.y(),
-				original.z(),
-				waterBinding == WaterTextureBinding.BLOCK_ATLAS ? original.u() : clamp01(asset.localU(original.u())),
-				waterBinding == WaterTextureBinding.BLOCK_ATLAS ? original.v() : clamp01(asset.localV(original.v())),
-				original.atlasU(),
-				original.atlasV(),
-				original.shaderBlockId(),
-				waterShaderMaterialType(asset.textureId()),
-				original.terrainMaterialBits(),
-				original.colorArgb(),
-				original.normalPacked(),
-				original.light(),
-				original.midBlockPacked()
-			));
-		}
-		return waterBinding == WaterTextureBinding.BLOCK_ATLAS
-			? RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_TERRAIN_BLOCK_ATLAS : asset.textureId();
-	}
 
-	private static FluidSpriteAsset waterTextureForPrimitive(List<VulkanicGalBridge.WorldMeshVertexRecord> vertices) {
-		FluidSpriteAsset still = waterStillAsset;
-		FluidSpriteAsset flow = waterFlowAsset;
-		FluidSpriteAsset overlay = waterOverlayAsset;
-		if (still == null || flow == null || overlay == null) {
-			throw new IllegalStateException("water animation texture assets have not been initialized");
-		}
-		if (allVerticesWithin(vertices, still)) {
-			return still;
-		}
-		if (allVerticesWithin(vertices, overlay)) {
-			return overlay;
-		}
-		if (allVerticesWithin(vertices, flow)) {
-			return flow;
-		}
-		throw new IllegalArgumentException("built-in water primitive UVs do not match still, flow, or overlay sprites");
-	}
 
-	private static boolean allVerticesWithin(List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, FluidSpriteAsset asset) {
-		for (VulkanicGalBridge.WorldMeshVertexRecord vertex : vertices) {
-			if (!asset.contains(vertex.u(), vertex.v())) {
-				return false;
-			}
-		}
-		return true;
-	}
 
-	private static float clamp01(float value) {
-		return Math.max(0.0F, Math.min(1.0F, value));
-	}
 
-	private static int waterShaderMaterialType(int textureId) {
-		if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL) {
-			return 1;
-		}
-		if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW) {
-			return 2;
-		}
-		if (textureId == RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY) {
-			return 3;
-		}
-		return 0;
-	}
 
-	private static int primitiveIdFromSortedQuad(byte[] bytes, int offset, int vertexCount) {
-		int i0 = readU32Index(bytes, offset);
-		int i1 = readU32Index(bytes, offset + 4);
-		int i2 = readU32Index(bytes, offset + 8);
-		int i3 = readU32Index(bytes, offset + 12);
-		int i4 = readU32Index(bytes, offset + 16);
-		int i5 = readU32Index(bytes, offset + 20);
-		if ((i0 & 3) != 0 || i1 != i0 + 1 || i2 != i0 + 2 || i3 != i0 + 2 || i4 != i0 + 3 || i5 != i0) {
-			throw new IllegalArgumentException("translucent sorted payload contains an interleaved or malformed primitive at byte " + offset);
-		}
-		if (i4 < 0 || i4 >= vertexCount) {
-			throw new IllegalArgumentException("translucent sorted payload references vertex " + i4 + " but vertex count is " + vertexCount);
-		}
-		return i0 / 4;
-	}
 
-	/**
-	 * Sodium's STATIC_NORMAL_RELATIVE sorter keeps each facing's vertex indices
-	 * local. Our copied semantic terrain stream is flattened, so the same local
-	 * quad index legitimately occurs once per facing. Translate that established
-	 * producer format without changing its within-facing sort order. Global
-	 * sorter payloads, including dynamic/topological orders, are already unique
-	 * and pass through untouched.
-	 */
-	static byte[] normalizeTranslucentSortedIndexBytes(byte[] source, int vertexCount, int[] segmentQuadCounts) {
-		if (source.length == 0) {
-			return source;
-		}
-		if (source.length % (Integer.BYTES * 6) != 0 || vertexCount < 0 || vertexCount % 4 != 0) {
-			throw new IllegalArgumentException("translucent sorted index payload has an invalid quad layout");
-		}
-		int primitiveCount = vertexCount / 4;
-		if (source.length / (Integer.BYTES * 6) != primitiveCount) {
-			throw new IllegalArgumentException("translucent sorted index payload count does not match copied terrain vertices");
-		}
-		if (sortedIndexPayloadHasUniqueGlobalPrimitives(source, vertexCount)) {
-			return source;
-		}
-		int totalSegmentPrimitives = 0;
-		for (int count : segmentQuadCounts) {
-			if (count < 0) {
-				throw new IllegalArgumentException("translucent source segment has a negative primitive count");
-			}
-			totalSegmentPrimitives = Math.addExact(totalSegmentPrimitives, count);
-		}
-		if (totalSegmentPrimitives != primitiveCount) {
-			throw new IllegalArgumentException("translucent source segments do not cover copied terrain primitives");
-		}
-		byte[] normalized = new byte[source.length];
-		int sourceOffset = 0;
-		int globalVertexBase = 0;
-		for (int segmentQuadCount : segmentQuadCounts) {
-			boolean[] seenLocal = new boolean[segmentQuadCount];
-			int segmentVertexCount = Math.multiplyExact(segmentQuadCount, 4);
-			for (int quad = 0; quad < segmentQuadCount; quad++) {
-				int localPrimitive = primitiveIdFromSortedQuad(source, sourceOffset, segmentVertexCount);
-				if (seenLocal[localPrimitive]) {
-					throw new IllegalArgumentException("translucent facing-local payload references primitive "
-						+ localPrimitive + " more than once");
-				}
-				seenLocal[localPrimitive] = true;
-				for (int index = 0; index < 6; index++) {
-					writeU32Index(normalized, sourceOffset + index * Integer.BYTES,
-						Math.addExact(globalVertexBase, readU32Index(source, sourceOffset + index * Integer.BYTES)));
-				}
-				sourceOffset += Integer.BYTES * 6;
-			}
-			globalVertexBase = Math.addExact(globalVertexBase, segmentVertexCount);
-		}
-		if (!sortedIndexPayloadHasUniqueGlobalPrimitives(normalized, vertexCount)) {
-			throw new IllegalArgumentException("normalized translucent sorted payload is not globally complete");
-		}
-		return normalized;
-	}
 
-	private static boolean sortedIndexPayloadHasUniqueGlobalPrimitives(byte[] bytes, int vertexCount) {
-		int primitiveCount = vertexCount / 4;
-		boolean[] seen = new boolean[primitiveCount];
-		try {
-			for (int offset = 0; offset < bytes.length; offset += Integer.BYTES * 6) {
-				int primitive = primitiveIdFromSortedQuad(bytes, offset, vertexCount);
-				if (seen[primitive]) {
-					return false;
-				}
-				seen[primitive] = true;
-			}
-		} catch (IllegalArgumentException ignored) {
-			return false;
-		}
-		for (boolean present : seen) {
-			if (!present) {
-				return false;
-			}
-		}
-		return true;
-	}
 
 	private static int[] translucentSourceSegmentQuadCounts(int[] vertexSegments) {
 		int[] counts = new int[vertexSegments.length / 2];
@@ -2940,19 +2814,7 @@ public final class RustGalTerrainRenderer {
 		return Arrays.copyOf(counts, count);
 	}
 
-	private static void writeU32Index(byte[] bytes, int offset, int value) {
-		bytes[offset] = (byte)(value & 0xff);
-		bytes[offset + 1] = (byte)((value >>> 8) & 0xff);
-		bytes[offset + 2] = (byte)((value >>> 16) & 0xff);
-		bytes[offset + 3] = (byte)((value >>> 24) & 0xff);
-	}
 
-	private static int readU32Index(byte[] bytes, int offset) {
-		return (bytes[offset] & 0xff)
-			| ((bytes[offset + 1] & 0xff) << 8)
-			| ((bytes[offset + 2] & 0xff) << 16)
-			| ((bytes[offset + 3] & 0xff) << 24);
-	}
 
 	private static void appendCachedOpaqueMeshKey(TerrainSetScratch scratch, long meshKey, long meshGeneration) {
 		if (scratch.cachedOpaqueMeshKeyCount == scratch.cachedOpaqueMeshKeyArray.length) {
@@ -3365,12 +3227,10 @@ public final class RustGalTerrainRenderer {
 		currentFrameVisibleFingerprint.set(fingerprint);
 	}
 
+	/** One word of the visible-layer fingerprint; Rust's selection mixes identically. */
 	private static long terrainFingerprintLong(long hash, long value) {
-		for (int shift = 0; shift < 64; shift += 8) {
-			hash ^= (value >>> shift) & 0xffL;
-			hash *= 0x100000001b3L;
-		}
-		return hash;
+		long mixed = (hash ^ value) * 0x100000001b3L;
+		return mixed ^ (mixed >>> 32);
 	}
 
 	private static boolean finiteBounds(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
@@ -3457,200 +3317,29 @@ public final class RustGalTerrainRenderer {
 		return (value & 0x7fff) / (float)TEXTURE_MAX_VALUE;
 	}
 
-	/**
-	 * Resolves Sodium's compact UV and its high-bit direction into the exact
-	 * copied-atlas coordinate consumed by Rust. Frozen's block-layer vertex
-	 * stage performs this as {@code base + direction * u_TexCoordShrink}; the
-	 * result is semantic vertex data, never a borrowed Java texture or sampler.
-	 */
-	static float decodeTextureForCopiedAtlas(int packedValue, int atlasExtent) {
-		if (atlasExtent <= 0) {
-			throw new IllegalArgumentException("copied atlas extent must be positive");
-		}
-		float base = decodeTexture(packedValue);
-		float direction = (packedValue & 0x8000) == 0 ? -1.0F : 1.0F;
-		float shrink = (1.0F / TEXTURE_MAX_VALUE)
-			- (1.0F / (atlasExtent * (float)COMPACT_TEXTURE_SUB_TEXEL_PRECISION));
-		return base + direction * shrink;
-	}
-
-
-	static int decodeLight(int lightMaterial, boolean swapBlockAndSky) {
-		int block = lightMaterial & 0xff;
-		int sky = (lightMaterial >>> 8) & 0xff;
-		if (swapBlockAndSky) {
-			int swapped = block;
-			block = sky;
-			sky = swapped;
-		}
-		// These are UV2 byte coordinates, not integer light levels. Smooth
-		// lighting may use every low bit; quantizing changes texture sampling.
-		return block | (sky << 16);
-	}
-
-	/** Sodium's compact terrain material byte: mip policy and alpha cutoff. */
-	static int decodeTerrainMaterialBits(int lightMaterial) {
-		return (lightMaterial >>> 16) & 0xff;
-	}
-
-	static int decodeTerrainMaterialBits(int lightMaterial, boolean separateAo) {
-		return decodeTerrainMaterialBits(lightMaterial) | (separateAo ? 0x100 : 0);
-	}
-
-	static int decodeCompactTerrainColorForRust(int compactAbgr, boolean separateAo) {
-		return decodeCompactTerrainColorForRust(compactAbgr, separateAo, false, false);
-	}
-
-	private static int decodeCompactTerrainColorForRust(int compactAbgr, boolean separateAo, boolean invertAo, boolean doubleShade) {
-		int alphaOrAo = (compactAbgr >>> 24) & 0xff;
-		int blue = (compactAbgr >>> 16) & 0xff;
-		int green = (compactAbgr >>> 8) & 0xff;
-		int red = compactAbgr & 0xff;
-		int alpha = alphaOrAo;
-		if (separateAo) {
-			if (invertAo) {
-				alphaOrAo = 255 - alphaOrAo;
-			}
-			if (doubleShade) {
-				red = multiplyColorByte(red, alphaOrAo);
-				green = multiplyColorByte(green, alphaOrAo);
-				blue = multiplyColorByte(blue, alphaOrAo);
-			}
-			alpha = alphaOrAo;
-		}
-		return (alpha << 24) | (red << 16) | (green << 8) | blue;
-	}
-
-	private static int multiplyColorByte(int color, int factor) {
-		return Math.max(0, Math.min(255, (color * factor + 255) >>> 8));
-	}
-
-	private static int multiplyArgbRgb(int argb, int factor) {
-		int alpha = argb & 0xff000000;
-		int red = multiplyColorByte((argb >>> 16) & 0xff, factor);
-		int green = multiplyColorByte((argb >>> 8) & 0xff, factor);
-		int blue = multiplyColorByte(argb & 0xff, factor);
-		return alpha | (red << 16) | (green << 8) | blue;
-	}
-
-	private static int invertPackedNormal(int normalPacked) {
-		float x = -unpackPackedNormalComponent(normalPacked, 0);
-		float y = -unpackPackedNormalComponent(normalPacked, 8);
-		float z = -unpackPackedNormalComponent(normalPacked, 16);
-		return packNormal(x, y, z);
-	}
 
 	private static float unpackPackedNormalComponent(int normalPacked, int shift) {
 		return (byte)((normalPacked >>> shift) & 0xff) / 127.0F;
 	}
 
-	private static int normalForSegment(List<VulkanicGalBridge.WorldMeshVertexRecord> vertices, int start, int count, int facing) {
-		return switch (facing) {
-			case 0 -> packNormal(1, 0, 0);
-			case 1 -> packNormal(0, 1, 0);
-			case 2 -> packNormal(0, 0, 1);
-			case 3 -> packNormal(-1, 0, 0);
-			case 4 -> packNormal(0, -1, 0);
-			case 5 -> packNormal(0, 0, -1);
-			default -> count >= 3 ? computedNormal(vertices.get(start), vertices.get(start + 1), vertices.get(start + 2)) : packNormal(0, 1, 0);
-		};
-	}
 
-	private static int computedNormal(
-		VulkanicGalBridge.WorldMeshVertexRecord a,
-		VulkanicGalBridge.WorldMeshVertexRecord b,
-		VulkanicGalBridge.WorldMeshVertexRecord c
-	) {
-		float ax = b.x() - a.x();
-		float ay = b.y() - a.y();
-		float az = b.z() - a.z();
-		float bx = c.x() - a.x();
-		float by = c.y() - a.y();
-		float bz = c.z() - a.z();
-		float nx = ay * bz - az * by;
-		float ny = az * bx - ax * bz;
-		float nz = ax * by - ay * bx;
-		float length = (float)Math.sqrt(nx * nx + ny * ny + nz * nz);
-		if (length <= 0.00001F) {
-			return packNormal(0, 1, 0);
-		}
-		return packNormal(nx / length, ny / length, nz / length);
-	}
 
-	private static int packNormal(float x, float y, float z) {
-		int ix = Math.max(-127, Math.min(127, Math.round(x * 127.0F))) & 0xff;
-		int iy = Math.max(-127, Math.min(127, Math.round(y * 127.0F))) & 0xff;
-		int iz = Math.max(-127, Math.min(127, Math.round(z * 127.0F))) & 0xff;
-		return ix | (iy << 8) | (iz << 16);
-	}
-
-	private static byte[] packU16(List<Integer> indices) {
-		byte[] bytes = new byte[indices.size() * 2];
-		for (int i = 0; i < indices.size(); i++) {
-			int value = indices.get(i);
-			bytes[i * 2] = (byte)(value & 0xff);
-			bytes[i * 2 + 1] = (byte)((value >>> 8) & 0xff);
-		}
-		return bytes;
-	}
-
-	private static byte[] packU32(List<Integer> indices) {
-		byte[] bytes = new byte[indices.size() * 4];
-		for (int i = 0; i < indices.size(); i++) {
-			int value = indices.get(i);
-			int offset = i * 4;
-			bytes[offset] = (byte)(value & 0xff);
-			bytes[offset + 1] = (byte)((value >>> 8) & 0xff);
-			bytes[offset + 2] = (byte)((value >>> 16) & 0xff);
-			bytes[offset + 3] = (byte)((value >>> 24) & 0xff);
-		}
-		return bytes;
-	}
-
-	private static byte[] copySorterIndexBytes(Sorter sorter) {
-		if (sorter == null) {
-			return new byte[0];
-		}
-		NativeBuffer indexBuffer = sorter.getIndexBuffer();
-		if (indexBuffer == null || indexBuffer.getLength() <= 0) {
-			return new byte[0];
-		}
-		ByteBuffer src = indexBuffer.getDirectBuffer().duplicate();
-		src.clear();
-		src.limit(indexBuffer.getLength());
-		byte[] bytes = new byte[indexBuffer.getLength()];
-		src.get(bytes);
-		return bytes;
-	}
-
-		private static RustGalWorldPrimitiveRenderer.StaticTerrainSortedIndexSnapshot sortedIndexSnapshot(long meshKey) {
-			return RustGalWorldPrimitiveRenderer.staticTerrainSortedIndexSnapshot(meshKey);
-		}
 
 		private static TranslucentSortSnapshot currentTranslucentSortSnapshot(TerrainSectionAsset asset) {
 			if (asset == null) {
 				return null;
 			}
-			RustGalWorldPrimitiveRenderer.StaticTerrainSortedIndexSnapshot sortedIndex = sortedIndexSnapshot(asset.meshKey());
-			if (sortedIndex != null) {
-				return new TranslucentSortSnapshot(
-					sortedIndex.meshGeneration(),
-					sortedIndex.indexGeneration(),
-					sortedIndex.indexType(),
-					sortedIndex.indexBytes(),
-					sortedIndex.indexHash()
-				);
-			}
-			byte[] indexBytes = asset.asset().indexBytes();
-			if (asset.initialSortGeneration() <= 0L || indexBytes.length == 0) {
+			// Rust orders translucent geometry per frame from this initial
+			// order; the payload itself may already be released from Java.
+			if (asset.initialSortGeneration() <= 0L || asset.translucentIndexBytes() == 0) {
 				return null;
 			}
 			return new TranslucentSortSnapshot(
 				asset.meshGeneration(),
 				asset.initialSortGeneration(),
 				asset.indexType(),
-				indexBytes.length,
-				sortedIndexHash(indexBytes)
+				asset.translucentIndexBytes(),
+				asset.translucentIndexHash()
 			);
 		}
 
@@ -3703,60 +3392,8 @@ public final class RustGalTerrainRenderer {
 				+ output.translucentData.getClass().getSimpleName();
 		}
 
-	private static long meshKey(long sectionPos, ChunkSectionLayer layer) {
-		long hash = fnv64("static-terrain-section-v2");
-		hash = fnv64Long(hash, sectionPos);
-		hash = fnv64Int(hash, layer.ordinal());
-		// Resource generations must coexist while a replacement atlas and all of
-		// its meshes upload off-screen. Ordinary block edits within one atlas keep
-		// the stable key and continue using per-mesh generation replacement.
-		hash = fnv64Long(hash, atlasGeneration);
-		return hash == 0L ? 1L : hash;
-	}
 
-	private static long meshGeneration(
-		long sectionPos,
-		ChunkSectionLayer layer,
-		List<VulkanicGalBridge.WorldMeshVertexRecord> vertices,
-		byte[] indexBytes,
-		List<VulkanicGalBridge.WorldMeshSectionRecord> sections
-	) {
-		long hash = fnv64("static-terrain-generation-v1");
-		hash = fnv64Long(hash, sectionPos);
-		hash = fnv64Int(hash, layer.ordinal());
-		hash = fnv64Int(hash, vertices.size());
-		for (VulkanicGalBridge.WorldMeshVertexRecord vertex : vertices) {
-			hash = fnv64Float(hash, vertex.x());
-			hash = fnv64Float(hash, vertex.y());
-			hash = fnv64Float(hash, vertex.z());
-			hash = fnv64Float(hash, vertex.u());
-			hash = fnv64Float(hash, vertex.v());
-			hash = fnv64Float(hash, vertex.atlasU());
-			hash = fnv64Float(hash, vertex.atlasV());
-			hash = fnv64Int(hash, vertex.shaderBlockId());
-			hash = fnv64Int(hash, vertex.shaderMaterialType());
-				hash = fnv64Int(hash, vertex.colorArgb());
-				hash = fnv64Int(hash, vertex.normalPacked());
-				hash = fnv64Int(hash, vertex.light());
-				// The compact Rust-owned voxel source retains this terrain semantic
-				// alongside positions and material IDs. A rebuild that changes it
-				// must therefore advance the shared mesh generation as well.
-				hash = fnv64Int(hash, vertex.midBlockPacked());
-			}
-		hash = fnv64Int(hash, sections.size());
-		for (VulkanicGalBridge.WorldMeshSectionRecord section : sections) {
-			hash = fnv64Int(hash, section.materialId());
-			hash = fnv64Int(hash, section.textureId());
-			hash = fnv64Int(hash, section.materialMode());
-			hash = fnv64Int(hash, section.cullPolicy());
-			hash = fnv64Int(hash, section.winding());
-			hash = fnv64Int(hash, section.indexOffset());
-			hash = fnv64Int(hash, section.indexCount());
-			hash = fnv64Int(hash, section.sourceFacing());
-		}
-		hash = fnv64Bytes(hash, indexBytes);
-		return hash == 0L ? 1L : hash;
-	}
+
 
 	static List<VulkanicGalBridge.WorldMeshTextureAssetRecord> atlasTextureUpdatePayload(WaterTextureBinding waterBinding) {
 		byte[] payload = atlasPayload;
@@ -3865,13 +3502,21 @@ public final class RustGalTerrainRenderer {
 				return false;
 			}
 		}
-		Map<LayerKey, TerrainSectionAsset> replacement = Map.copyOf(RESOURCE_RELOAD_SECTION_ASSETS);
+		// Every staged layer is uploaded, but its acknowledgement could not
+		// release the CPU payload while the layer was only staged (the release
+		// resolves published layers); release it with the commit.
+		Map<LayerKey, TerrainSectionAsset> replacement = new HashMap<>(RESOURCE_RELOAD_SECTION_ASSETS.size());
+		for (Map.Entry<LayerKey, TerrainSectionAsset> entry : RESOURCE_RELOAD_SECTION_ASSETS.entrySet()) {
+			TerrainSectionAsset asset = entry.getValue();
+			replacement.put(entry.getKey(), asset.asset() == null ? asset : asset.releaseCpuPayload());
+		}
 		resourceReloadCommitInProgress = true;
 		try {
 			ensureTerrainAtlasAssetForWorldMesh();
 			confirmAtlasPayloadRegistered(atlasGeneration);
 			List<TerrainSectionAsset> previous = List.copyOf(SECTION_ASSETS.values());
 			rebuildMeshKeyIdentityIndex(replacement);
+			replacePublication(replacement);
 			SECTION_ASSETS.clear();
 			SECTION_ASSETS.putAll(replacement);
 			SECTION_ASSET_ROWS.clear();
@@ -3898,12 +3543,18 @@ public final class RustGalTerrainRenderer {
 		RESOURCE_RELOAD_SECTION_ASSETS.clear();
 	}
 
+	/** Rust's publication registry owns each section's solid, cutout and
+	 * translucent row (and rejects a mesh key another section layer holds);
+	 * the camera section graph reads its rows from there. */
 	private static void publishSectionAsset(LayerKey layerKey, TerrainSectionAsset asset) {
 		TerrainAssetIdentity identity = new TerrainAssetIdentity(layerKey, asset);
-		TerrainAssetIdentity collision = SECTION_ASSETS_BY_MESH_KEY.get(asset.meshKey());
-		if (collision != null && !collision.layerKey().equals(layerKey)) {
+		int slot = rowSlot(layerKey.layer());
+		long[] collision = RustTerrainPublication.publish(layerKey.sectionPos(), slot, asset.meshKey(),
+			asset.meshGeneration(), publicationFlags(layerKey.layer(), asset));
+		if (collision != null) {
 			throw new IllegalStateException("Rust terrain mesh key maps to multiple section layers: meshKey="
-				+ asset.meshKey() + " existing=" + collision.layerKey() + " replacement=" + layerKey);
+				+ asset.meshKey() + " existing=" + new LayerKey(collision[1], ROW_LAYERS[(int)collision[2]])
+				+ " replacement=" + layerKey);
 		}
 		TerrainSectionAsset replaced = SECTION_ASSETS.put(layerKey, asset);
 		mirrorSectionAssetRow(layerKey);
@@ -3913,6 +3564,26 @@ public final class RustGalTerrainRenderer {
 			);
 		}
 		SECTION_ASSETS_BY_MESH_KEY.put(asset.meshKey(), identity);
+	}
+
+	/** Swaps Rust's publication rows for the reload's, at once. */
+	private static void replacePublication(Map<LayerKey, TerrainSectionAsset> assets) {
+		long[] layers = new long[assets.size() * 5];
+		int count = 0;
+		for (Map.Entry<LayerKey, TerrainSectionAsset> entry : assets.entrySet()) {
+			LayerKey key = entry.getKey();
+			TerrainSectionAsset asset = entry.getValue();
+			layers[count * 5] = key.sectionPos();
+			layers[count * 5 + 1] = rowSlot(key.layer());
+			layers[count * 5 + 2] = asset.meshKey();
+			layers[count * 5 + 3] = asset.meshGeneration();
+			layers[count * 5 + 4] = publicationFlags(key.layer(), asset);
+			count++;
+		}
+		// rebuildMeshKeyIdentityIndex has already rejected duplicate keys.
+		if (RustTerrainPublication.replace(layers, count) != null) {
+			throw new IllegalStateException("Rust terrain reload publication contains a duplicate mesh key");
+		}
 	}
 
 	private static void rebuildMeshKeyIdentityIndex(Map<LayerKey, TerrainSectionAsset> assets) {
@@ -3931,6 +3602,10 @@ public final class RustGalTerrainRenderer {
 
 	private static void removeLayer(long sectionPos, ChunkSectionLayer layer, String reason) {
 		LayerKey layerKey = new LayerKey(sectionPos, layer);
+		int slot = rowSlot(layer);
+		if (slot >= 0) {
+			RustTerrainPublication.remove(sectionPos, slot);
+		}
 		TerrainSectionAsset removed = SECTION_ASSETS.remove(layerKey);
 		mirrorSectionAssetRow(layerKey);
 		if (removed != null) {
@@ -4651,22 +4326,117 @@ public final class RustGalTerrainRenderer {
 		if (slot < 0) {
 			return;
 		}
-		SECTION_ASSET_ROWS.compute(layerKey.sectionPos(), (sectionPos, row) -> {
+		SECTION_ASSET_ROWS.compute(rowKey(layerKey.sectionPos()), (rowKey, row) -> {
 			TerrainSectionAsset[] next = row == null ? new TerrainSectionAsset[3] : row.clone();
 			next[slot] = SECTION_ASSETS.get(layerKey);
 			return next[0] == null && next[1] == null && next[2] == null ? null : next;
 		});
 	}
 
+	/** The row layer of each {@link #rowSlot}. */
+	private static final ChunkSectionLayer[] ROW_LAYERS = {
+		ChunkSectionLayer.SOLID, ChunkSectionLayer.CUTOUT_MIPPED, ChunkSectionLayer.TRANSLUCENT
+	};
+
+	private static int publicationFlags(ChunkSectionLayer layer, TerrainSectionAsset asset) {
+		return terrainCameraSortRequested(layer, asset.translucentSortType()) ? RustTerrainPublication.FLAG_CAMERA_SORTED : 0;
+	}
+
+	/**
+	 * Applies Rust's changed publication rows to {@code graph}; after a reset,
+	 * or with {@code republish} for a new graph, every current row.
+	 */
+	static void drainGraphMeshRows(RustSectionGraph graph, boolean republish) {
+		graph.syncPublishedMeshes(republish);
+	}
+
+	/**
+	 * Whether this frame's static terrain comes from the Rust section graph's
+	 * selection. Diagnostic, fault, reload and per-record frames, and frames
+	 * whose readiness needs per-layer identity receipts, keep the Java path.
+	 */
+	static boolean wholeFrameTerrainSelectionEligible() {
+		String fault = activeFault();
+		return !resourceReloadStaging && fault.isEmpty() && !detailedTerrainDiagnosticsEnabled(fault)
+			&& !Boolean.getBoolean("mattmc.dev.perRecordStaticTerrain")
+			&& !net.minecraft.client.dev.GraphicsFrameBenchmark.needsSubmittedWorkIdentity()
+			&& !net.minecraft.client.dev.DeterministicCameraCapture.needsSubmittedWorkIdentity()
+			&& !net.sodium.client.render.StaticTerrainParityDiagnostics.isEnabled();
+	}
+
+	/** Whether the Rust selection must compute its layer fingerprint receipt. */
+	static boolean selectionReceiptsRequested() {
+		return terrainCountersEnabled("");
+	}
+
+	/** Depth policies of the solid, cutout and translucent rows. */
+	static int[] selectionDepthPolicies() {
+		return new int[] {
+			terrainDepthPolicy(ChunkSectionLayer.SOLID),
+			terrainDepthPolicy(ChunkSectionLayer.CUTOUT_MIPPED),
+			terrainDepthPolicy(ChunkSectionLayer.TRANSLUCENT)
+		};
+	}
+
+	static final int[] SELECTION_LAYER_ORDINALS = {
+		ChunkSectionLayer.SOLID.ordinal(), ChunkSectionLayer.CUTOUT_MIPPED.ordinal(), ChunkSectionLayer.TRANSLUCENT.ordinal()
+	};
+
+	static final int MAX_SELECTION_SHADOW_CANDIDATES = MAX_SHADOW_CANDIDATE_SECTIONS;
+
+	/**
+	 * Enqueues a Rust terrain selection as the frame's static terrain: the
+	 * same compact sections and casters the Java producer built, plus its
+	 * producer receipts.
+	 */
+	static void enqueueWholeFrameTerrainSelection(RustSectionGraph.TerrainSelection selection, Camera camera) {
+		double cameraX = camera.getPosition().x();
+		double cameraY = camera.getPosition().y();
+		double cameraZ = camera.getPosition().z();
+		RustGalWorldPrimitiveRenderer.seedStaticTerrainFrameCamera(cameraX, cameraY, cameraZ);
+		if (terrainCountersEnabled("") && selection.layerSubmissions() > 0) {
+			visibleLayerProbes.addAndGet(selection.layerProbes());
+			visibleLayerSubmissions.addAndGet(selection.layerSubmissions());
+			long enqueued = rustEnqueueFrames.addAndGet(selection.layerSubmissions());
+			long frameId = currentGameplayFrameId();
+			lastVisibleSubmissionFrameId.set(frameId > 0L ? frameId : enqueued);
+			currentFrameVisibleLayerSubmissions.set(selection.layerSubmissions());
+			currentFrameVisibleFingerprint.set(selection.fingerprint());
+		}
+		RustGalWorldPrimitiveRenderer.enqueueNativeStaticTerrainSelection(
+            new VulkanicGalBridge.StaticTerrainFrameReference(selection.frameOwner(), selection.frameId(),
+                selection.sectionCount(), selection.casterCount()), cameraX, cameraY, cameraZ);
+		if (selection.layerProbes() > 0) {
+			net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.setup", 1L);
+			for (int layerPass = 0; layerPass < 3; layerPass++) {
+				net.minecraft.client.dev.GraphicsFrameBenchmark.recordPhaseSample("sodium.terrain.draw", 1L);
+			}
+		}
+	}
+
 	/** Solid, cutout, and translucent assets of one section (slots per {@link #rowSlot}); null if none. */
 	private static TerrainSectionAsset[] sectionAssetRow(long sectionPos) {
-		return SECTION_ASSET_ROWS.get(sectionPos);
+		return SECTION_ASSET_ROWS.get(rowKey(sectionPos));
+	}
+
+	/**
+	 * Key of {@link #SECTION_ASSET_ROWS} and {@link #SECTION_SHADOW_IDENTITIES}.
+	 * {@code Long.hashCode} of a packed section position keeps almost none of
+	 * its X bits in the low bits a hash table indexes, so nearby sections share
+	 * buckets; this bijective mix spreads them.
+	 */
+	private static long rowKey(long sectionPos) {
+		return it.unimi.dsi.fastutil.HashCommon.mix(sectionPos);
+	}
+
+	private static int layerAddressHash(long sectionPos, ChunkSectionLayer layer) {
+		return 31 * Long.hashCode(it.unimi.dsi.fastutil.HashCommon.mix(sectionPos)) + layer.ordinal();
 	}
 
 	private static TerrainSectionAsset sectionAsset(long sectionPos, ChunkSectionLayer layer) {
 		int slot = rowSlot(layer);
 		if (slot >= 0) {
-			TerrainSectionAsset[] row = SECTION_ASSET_ROWS.get(sectionPos);
+			TerrainSectionAsset[] row = SECTION_ASSET_ROWS.get(rowKey(sectionPos));
 			return row == null ? null : row[slot];
 		}
 		LayerLookup lookup = SECTION_ASSET_LOOKUP.get();
@@ -4689,7 +4459,7 @@ public final class RustGalTerrainRenderer {
 
 		@Override
 		public int hashCode() {
-			return 31 * Long.hashCode(sectionPos) + layer.hashCode();
+			return layerAddressHash(sectionPos, layer);
 		}
 	}
 
@@ -4721,7 +4491,7 @@ public final class RustGalTerrainRenderer {
 
 		@Override
 		public int hashCode() {
-			return 31 * Long.hashCode(sectionPos) + layer.hashCode();
+			return layerAddressHash(sectionPos, layer);
 		}
 	}
 
@@ -4775,6 +4545,8 @@ public final class RustGalTerrainRenderer {
 		String translucentPrimitiveAccountingReason,
 		int unsupportedPrimitiveCount,
 		int[] translucentSourceSegmentQuadCounts,
+		int translucentIndexBytes,
+		long translucentIndexHash,
 			VulkanicGalBridge.WorldMeshAssetRecord asset
 		) {
 		TerrainSectionAsset releaseCpuPayload() {
@@ -4789,7 +4561,8 @@ public final class RustGalTerrainRenderer {
 				separateAoVertexCount, minAo, maxAo, positiveYNormalSections,
 				negativeYNormalSections, horizontalNormalSections, sectionOriginX,
 				sectionOriginY, sectionOriginZ, translucentSortType, translucentPrimitiveAccountingReason,
-				unsupportedPrimitiveCount, translucentSourceSegmentQuadCounts, null
+				unsupportedPrimitiveCount, translucentSourceSegmentQuadCounts, translucentIndexBytes,
+				translucentIndexHash, null
 			);
 		}
 	}
@@ -5069,57 +4842,4 @@ public final class RustGalTerrainRenderer {
 		}
 	}
 
-	static void installTestingFluidSpriteAssetsForUnitTests() {
-		waterStillAsset = new FluidSpriteAsset(
-			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_STILL,
-			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still"),
-			0.0F,
-			0.25F,
-			0.0F,
-			0.25F,
-			16,
-			16,
-			1,
-			1,
-			0,
-			0,
-			0,
-			List.of(),
-			new byte[] { 1 }, 1
-		);
-		waterFlowAsset = new FluidSpriteAsset(
-			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_FLOW,
-			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_flow"),
-			0.25F,
-			0.5F,
-			0.0F,
-			0.25F,
-			16,
-			16,
-			1,
-			1,
-			0,
-			0,
-			0,
-			List.of(),
-			new byte[] { 2 }, 1
-		);
-		waterOverlayAsset = new FluidSpriteAsset(
-			RustGalWorldPrimitiveRenderer.MATERIAL_TEXTURE_WATER_OVERLAY,
-			ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_overlay"),
-			0.5F,
-			0.75F,
-			0.0F,
-			0.25F,
-			16,
-			16,
-			1,
-			1,
-			0,
-			0,
-			0,
-			List.of(),
-			new byte[] { 3 }, 1
-		);
-	}
 }

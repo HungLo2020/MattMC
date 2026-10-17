@@ -32,7 +32,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
-public class ShulkerBoxBlockEntity extends RandomizableContainerBlockEntity implements WorldlyContainer {
+public class ShulkerBoxBlockEntity extends RandomizableContainerBlockEntity implements WorldlyContainer, NativeRowsContainer {
 	public static final int COLUMNS = 9;
 	public static final int ROWS = 3;
 	public static final int CONTAINER_SIZE = 27;
@@ -42,7 +42,7 @@ public class ShulkerBoxBlockEntity extends RandomizableContainerBlockEntity impl
 	public static final float MAX_LID_ROTATION = 270.0F;
 	private static final int[] SLOTS = IntStream.range(0, 27).toArray();
 	private static final Component DEFAULT_NAME = Component.translatable("container.shulkerBox");
-	private NonNullList<ItemStack> itemStacks = NonNullList.withSize(27, ItemStack.EMPTY);
+	private NonNullList<ItemStack> itemStacks = this.newItems(27);
 	private int openCount;
 	private ShulkerBoxBlockEntity.AnimationStatus animationStatus = ShulkerBoxBlockEntity.AnimationStatus.CLOSED;
 	private float progress;
@@ -210,7 +210,7 @@ public class ShulkerBoxBlockEntity extends RandomizableContainerBlockEntity impl
 	}
 
 	public void loadFromTag(ValueInput valueInput) {
-		this.itemStacks = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
+		this.itemStacks = this.newItems(this.getContainerSize());
 		if (!this.tryLoadLootTable(valueInput)) {
 			ContainerHelper.loadAllItems(valueInput, this.itemStacks);
 		}
@@ -219,6 +219,39 @@ public class ShulkerBoxBlockEntity extends RandomizableContainerBlockEntity impl
 	@Override
 	protected NonNullList<ItemStack> getItems() {
 		return this.itemStacks;
+	}
+
+	/** The stock shulker box's slots are native rows (exact class only); subclasses keep their list. */
+	private NonNullList<ItemStack> newItems(int size) {
+		return this.getClass() == ShulkerBoxBlockEntity.class ? net.minecraft.world.item.NativeItemSlots.withSize(size) : NonNullList.withSize(size, ItemStack.EMPTY);
+	}
+
+	/** Native rows of an exact, loot-free stock shulker box (hoppers and comparators consume them natively). */
+	@Nullable
+	@Override
+	public net.minecraft.world.item.NativeItemSlots nativeSlotsForTransfer() {
+		return this.getClass() == ShulkerBoxBlockEntity.class && this.lootTable == null && this.itemStacks instanceof net.minecraft.world.item.NativeItemSlots rows ? rows : null;
+	}
+
+	/** Exact loot-free stock shulker box: emptiness read from the native rows. */
+	@Override
+	public boolean isEmpty() {
+		var rows = this.nativeSlotsForTransfer();
+		return rows != null ? rows.allEmpty() : super.isEmpty();
+	}
+
+	/** The inherited setItem chain; an exact native shulker box discards the previous contents without observing them. */
+	@Override
+	public void setItem(int i, ItemStack itemStack) {
+		if (this.getClass() != ShulkerBoxBlockEntity.class) {
+			super.setItem(i, itemStack);
+			return;
+		}
+		this.unpackLootTable(null);
+		if (this.getItems() instanceof net.minecraft.world.item.NativeItemSlots nativeItems) nativeItems.replace(i, itemStack);
+		else this.getItems().set(i, itemStack);
+		itemStack.limitSize(this.getMaxStackSize(itemStack));
+		this.setChanged();
 	}
 
 	@Override

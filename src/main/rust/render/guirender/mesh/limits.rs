@@ -19,7 +19,8 @@ pub const GUI_MESH_MAX_FRAME_PAYLOAD_BYTES: u64 = 128 * 1024 * 1024;
 /// Maximum dimension of a Rust-owned GUI item offscreen raster.
 pub const GUI_MESH_MAX_OFFSCREEN_AXIS: u32 = 4096;
 
-pub(super) const GUI_MESH_FRAME_UNIFORM_BYTES: usize = 48;
+/// Extent, two light directions and two UV-transform rows.
+pub(super) const GUI_MESH_FRAME_UNIFORM_BYTES: usize = 80;
 
 pub(crate) const GUI_MESH_COMPOSITE_UNIFORM_BYTES: usize = 80;
 

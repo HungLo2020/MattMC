@@ -143,31 +143,18 @@ public class Pack {
 		TOP,
 		BOTTOM;
 
+		/** Inserts past the fixed entries pinned to this end (index decided by Rust). */
 		public <T> int insert(List<T> list, T object, Function<T, PackSelectionConfig> function, boolean bl) {
-			Pack.Position position = bl ? this.opposite() : this;
-			if (position == BOTTOM) {
-				int i;
-				for (i = 0; i < list.size(); i++) {
-					PackSelectionConfig packSelectionConfig = (PackSelectionConfig)function.apply(list.get(i));
-					if (!packSelectionConfig.fixedPosition() || packSelectionConfig.defaultPosition() != this) {
-						break;
-					}
-				}
-
-				list.add(i, object);
-				return i;
-			} else {
-				int i;
-				for (i = list.size() - 1; i >= 0; i--) {
-					PackSelectionConfig packSelectionConfig = (PackSelectionConfig)function.apply(list.get(i));
-					if (!packSelectionConfig.fixedPosition() || packSelectionConfig.defaultPosition() != this) {
-						break;
-					}
-				}
-
-				list.add(i + 1, object);
-				return i + 1;
+			boolean[] fixed = new boolean[list.size()];
+			int[] positions = new int[list.size()];
+			for (int index = 0; index < fixed.length; index++) {
+				PackSelectionConfig packSelectionConfig = (PackSelectionConfig)function.apply(list.get(index));
+				fixed[index] = packSelectionConfig.fixedPosition();
+				positions[index] = packSelectionConfig.defaultPosition().ordinal();
 			}
+			int index = net.minecraft.server.packs.NativePacks.insertIndex(fixed, positions, this.ordinal(), bl);
+			list.add(index, object);
+			return index;
 		}
 
 		public Pack.Position opposite() {

@@ -20,6 +20,17 @@ public class DerivedLevelData implements ServerLevelData {
 		this.wrapped = serverLevelData;
 	}
 
+	/** The primary clock this view reads; writes through this data stay ignored. */
+	public NativeWeatherTime.Clock weatherTimeClock() {
+		if (this.wrapped instanceof PrimaryLevelData primaryLevelData) {
+			return primaryLevelData.weatherTimeClock();
+		} else if (this.wrapped instanceof DerivedLevelData derivedLevelData) {
+			return derivedLevelData.weatherTimeClock();
+		} else {
+			throw new IllegalStateException("Derived level data wraps unsupported " + this.wrapped.getClass().getName());
+		}
+	}
+
 	@Override
 	public LevelData.RespawnData getRespawnData() {
 		return this.wrapped.getRespawnData();

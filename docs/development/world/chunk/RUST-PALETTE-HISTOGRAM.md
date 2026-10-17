@@ -1,16 +1,32 @@
 # Rust palette histograms
 
-The multi-entry branch of `PalettedContainer.count()` uses Rust for standard
+Current canonical storage uses the [Rust live section owner](RUST-LIVE-SECTIONS.md).
+Canonical [section recounts](RUST-SECTION-COUNTERS.md) scan that owner directly
+and bypass callback records. General count consumers retain this ordered API.
+The helper path and historical acceptance below are narrower verification;
+historical pinned-body drivers reject the new container ownership changes.
+Use the live-section guide's current Gradle checks; the older driver commands
+below describe the historical helper acceptance, not current-owner verification.
+
+Canonical live containers count directly through the native owner under its
+mutex, then Java delivers the ordered records after the native call returns.
+Each callback resolves the current palette again, including after a callback
+mutates the container. The single-entry shortcut remains. The separate
+compatibility helper described below scans copied storage when applicable.
+[Current count dispatch](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java#L496-L535).
+
+The compatibility multi-entry branch of `PalettedContainer.count()` uses Rust for standard
 4096-entry `SimpleBitStorage` and `ZeroBitStorage`, with source widths 0–16.
-This accelerates section block/fluid counter reconstruction and other count
-consumers. The existing single-entry shortcut, small containers, custom storage
+This helper serves compatibility section recounts and other general count
+consumers; canonical recounts bypass these callback records. The existing
+single-entry shortcut, small containers, custom storage
 and wider formats keep their existing path.
 
 The kernel lives in
 [`palette/histogram/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk/palette/histogram).
 [`NativePaletteHistogram`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativePaletteHistogram.java)
-owns transfers and scratch lifetime. Java still resolves palette objects and
-invokes consumers; `LevelChunkSection` counter/update code is unchanged.
+owns transfers and scratch lifetime. Java still resolves palette objects and invokes general count consumers;
+unsupported section recounts retain this compatibility path.
 
 ## Constraints when changing this code
 
@@ -28,10 +44,12 @@ invokes consumers; `LevelChunkSection` counter/update code is unchanged.
   callback**. Consumers may mutate the container or throw; preserve partial
   callback traces and exception behavior. Reentrant scans use the original
   path until the outer scratch lease closes in `finally`.
-- Keep the original ownership rules: counting adds no lock. Concurrent unchecked
-  mutation is not made safe by the native boundary. Independent readers have
-  separate scratch; ordinary downcalls allow GC during native scans.
-- Rust allocates nothing and retains no pointers. The caller owns disjoint
+- Keep caller exclusion rules. Live-owner scanning takes the owner mutex; it
+  does not hold that mutex across Java callbacks or make the entire callback
+  sequence atomic. The compatibility helper adds no lock. Independent readers
+  have separate scratch; ordinary downcalls allow GC during native scans.
+- The histogram helper kernel allocates nothing and retains no pointers; this
+  does not describe live-owner allocation/lifetime. The caller owns disjoint
   input, workspace and output buffers. The dense workspace starts zero and
   every touched count is reset before returning, before any Java callback.
 - Preserve existing section counter semantics. Recounting adds both a nonair
@@ -79,6 +97,10 @@ at least 5% less time in every pair and at the upper 95% bootstrap ratio bound.
 Raw rounds, checksums, source/library hashes and parity evidence are written to
 `build/palette-histogram-migration/acceptance/`. Measurements apply to this slice;
 loading, disk I/O, full lighting and world generation are outside that timing.
+
+The container source audit additionally permits only the separately pinned
+[ordered-value dispatch](RUST-PALETTE-DISTINCT.md); the original reference bodies
+remain unchanged.
 
 ## Verified status
 

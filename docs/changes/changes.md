@@ -19,6 +19,8 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 - Offline Skin System
 - Region Editor accessible via main menu
 
+For current rendering compatibility, evidence and remaining limits, see the [Goal 5 rendering checkpoint](../development/rendering/GOAL-5-STATUS.md).
+
 ## Removals
 - Microsoft Telemetry
 - Microsoft Accounts

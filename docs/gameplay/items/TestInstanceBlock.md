@@ -2,16 +2,20 @@
 
 ## Obtaining
 
-Test Instance Block can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+Registered in operator contents for Creative instant-build plus permission level 2. No bundled recipe or mining-drop route. See [the inventory browser](../mechanics/InventoryBrowser.md) for its current access rules. [Item registry][items]
 
 ## Usage
 
-Test Instance Block is a building, utility, redstone, technical, decorative, or progression block.
+Selects a registered test and provides configuration, Run, Reset, and structure Save controls. Use [Test Blocks](../blocks/TestBlocks.md#test-instance-block) for the canonical placed-block instructions and their source evidence.
 
 ## Behavior
 
-It follows its configured block rules for placement, mining, drops, and interaction.
+Game Master gates apply. Run/Reset can replace the test area and remove non-player entities; saving a template does not register a new test definition.
 
 ## Notes
 
-* This item is the item form of the `minecraft:test_instance_block` block.
+- Registered ID: `minecraft:test_instance_block`
+- Source-reviewed at `b823010659d7b5095ed021b1c99cf85627e2082a` on 2026-10-02; no in-game operation was performed
+- [Placed-block behavior and verification](../blocks/TestBlocks.md#test-instance-block)
+
+[items]: https://github.com/HungLo2020/MattMC/blob/b823010659d7b5095ed021b1c99cf85627e2082a/src/main/java/net/minecraft/world/item/Items.java

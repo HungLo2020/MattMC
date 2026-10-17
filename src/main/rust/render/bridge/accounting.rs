@@ -235,6 +235,7 @@ pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) 
             request
                 .world_lod_instances
                 .count
+                .saturating_add(request.world_lod_frame_count)
                 .saturating_mul(size_of::<FfiWorldLodColumnInstanceRecord>() as u64),
         )
         .saturating_add(
@@ -273,6 +274,30 @@ pub(crate) fn input_bytes_for_whole_frame(request: &FfiWholeFrameSubmitRequest) 
                 .count
                 .saturating_mul(size_of::<FfiWorldDistantHorizonsGenericBoxRecord>() as u64),
         )
+        .saturating_add(
+            request
+                .world_static_terrain_shadow_casters
+                .count
+                .saturating_mul(size_of::<FfiStaticTerrainShadowCaster>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_static_terrain_sections
+                .count
+                .saturating_mul(size_of::<FfiStaticTerrainSection>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_model_rig_poses
+                .count
+                .saturating_mul(size_of::<FfiModelRigPose>() as u64),
+        )
+        .saturating_add(
+            request
+                .world_dh_generic_group_instances
+                .count
+                .saturating_mul(size_of::<FfiDhGenericGroupInstance>() as u64),
+        )
         .saturating_add(request.post_effect_id.len)
 }
 
@@ -296,6 +321,7 @@ pub(crate) fn input_bytes_for_gui_raw_image_update(request: &FfiGuiRawImageUpdat
     (size_of::<FfiGuiRawImageUpdateRequest>() as u64)
         .saturating_add(payload_headers)
         .saturating_add(payload_bytes)
+        .saturating_add(request.retained_asset_ids.count.saturating_mul(size_of::<u64>() as u64))
 }
 
 pub(crate) fn input_bytes_for_world_text_image_update(

@@ -17,8 +17,8 @@ final class NativeBeardifier {
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG,
             ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
-    private static final MemorySegment KERNEL = kernel();
-    private static MemorySegment kernel() {
+    private static final MemorySegment KERNEL = createKernel();
+    private static MemorySegment createKernel() {
         var values = Beardifier.nativeKernel();
         var data = Arena.ofAuto().allocate(values.length * 4L, 4);
         MemorySegment.copy(MemorySegment.ofArray(values), 0, data, 0, data.byteSize());
@@ -71,6 +71,28 @@ final class NativeBeardifier {
         var scratch = SCRATCH.get();
         scratch.ensure(count * 4L);
         var geometry = scratch.geometry;
+        pack(geometry);
+        try {
+            int status = (int)CELL.invokeExact(geometry, (long)count, KERNEL, scratch.output, (long)output.length, x, y, z, width, height);
+            if (status != 0) throw new IllegalStateException("Native beardifier status " + status);
+        } catch (RuntimeException | Error e) { throw e; }
+        catch (Throwable t) { throw new IllegalStateException("Native beardifier call failed", t); }
+        MemorySegment.copy(scratch.output, 0, MemorySegment.ofArray(output), 0, output.length * 8L);
+    }
+
+    /** The packed geometry fillCell passes, for the native NOISE fill to keep for a whole fill. */
+    int[] packedGeometry() {
+        int[] data = new int[8 + pieces.size() * 8 + junctions.size() * 3];
+        pack(MemorySegment.ofArray(data));
+        return data;
+    }
+
+    /** The shared kernel; a global allocation the process keeps. */
+    static MemorySegment kernel() {
+        return KERNEL;
+    }
+
+    private void pack(MemorySegment geometry) {
         geometry.setAtIndex(ValueLayout.JAVA_INT, 0, pieces.size());
         geometry.setAtIndex(ValueLayout.JAVA_INT, 1, junctions.size());
         box(geometry, 2, bounds);
@@ -86,12 +108,6 @@ final class NativeBeardifier {
             geometry.setAtIndex(ValueLayout.JAVA_INT, at++, j.getSourceGroundY());
             geometry.setAtIndex(ValueLayout.JAVA_INT, at++, j.getSourceZ());
         }
-        try {
-            int status = (int)CELL.invokeExact(geometry, (long)count, KERNEL, scratch.output, (long)output.length, x, y, z, width, height);
-            if (status != 0) throw new IllegalStateException("Native beardifier status " + status);
-        } catch (RuntimeException | Error e) { throw e; }
-        catch (Throwable t) { throw new IllegalStateException("Native beardifier call failed", t); }
-        MemorySegment.copy(scratch.output, 0, MemorySegment.ofArray(output), 0, output.length * 8L);
     }
     private static void box(MemorySegment output, int at, BoundingBox b) {
         output.setAtIndex(ValueLayout.JAVA_INT, at, b.minX());

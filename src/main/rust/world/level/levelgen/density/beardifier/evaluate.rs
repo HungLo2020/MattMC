@@ -35,7 +35,7 @@ fn beard(x: i32, y: i32, z: i32, ground_y: i32, kernel: &[f32]) -> f64 {
 fn distance(position: i32, low: i32, high: i32) -> i32 {
     0.max(low.wrapping_sub(position).max(position.wrapping_sub(high)))
 }
-pub(super) fn point(g: &Geometry<'_>, kernel: &[f32], x: i32, y: i32, z: i32) -> f64 {
+pub(crate) fn point(g: &Geometry<'_>, kernel: &[f32], x: i32, y: i32, z: i32) -> f64 {
     let b = g.bounds;
     if x < b[0] || x > b[3] || y < b[1] || y > b[4] || z < b[2] || z > b[5] {
         return 0.0;

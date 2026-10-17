@@ -29,6 +29,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
 import com.seibel.distanthorizons.core.util.math.Vec3d;
 import com.seibel.distanthorizons.core.util.math.Vec3i;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
@@ -239,7 +240,7 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 			//===============================//
 			
 			FullDataPointIdMap mapping = dataSource.mapping;
-			LongArrayList dataColumn = dataSource.getColumnAtRelPos(relativePos.x, relativePos.z);
+			LongList dataColumn = dataSource.getColumnAtRelPos(relativePos.x, relativePos.z);
 			if (dataColumn != null)
 			{
 				int dataColumnIndexCount = dataColumn.size();

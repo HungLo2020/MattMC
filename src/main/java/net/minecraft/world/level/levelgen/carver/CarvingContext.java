@@ -49,4 +49,8 @@ public class CarvingContext extends WorldGenerationContext {
 	public RandomState randomState() {
 		return this.randomState;
 	}
+
+	public SurfaceRules.RuleSource surfaceRule() {
+		return this.surfaceRule;
+	}
 }

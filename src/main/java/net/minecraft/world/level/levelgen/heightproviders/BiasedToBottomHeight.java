@@ -23,6 +23,19 @@ public class BiasedToBottomHeight extends HeightProvider {
 	private final VerticalAnchor maxInclusive;
 	private final int inner;
 
+	/** For native placement programs. */
+	public VerticalAnchor minInclusive() {
+		return this.minInclusive;
+	}
+
+	public VerticalAnchor maxInclusive() {
+		return this.maxInclusive;
+	}
+
+	public int inner() {
+		return this.inner;
+	}
+
 	private BiasedToBottomHeight(VerticalAnchor verticalAnchor, VerticalAnchor verticalAnchor2, int i) {
 		this.minInclusive = verticalAnchor;
 		this.maxInclusive = verticalAnchor2;

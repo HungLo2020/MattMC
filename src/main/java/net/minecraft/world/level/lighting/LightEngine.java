@@ -1,8 +1,8 @@
 package net.minecraft.world.level.lighting;
 
-import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Arrays;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -25,16 +25,20 @@ public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends La
 	protected static final Direction[] PROPAGATION_DIRECTIONS = Direction.values();
 	protected final LightChunkGetter chunkSource;
 	protected final S storage;
-	private final LongOpenHashSet blockNodesToCheck = new LongOpenHashSet(512, 0.5F);
-	private final LongArrayFIFOQueue decreaseQueue = new LongArrayFIFOQueue();
-	private final LongArrayFIFOQueue increaseQueue = new LongArrayFIFOQueue();
+	private final LongSet blockNodesToCheck;
+    @Nullable final NativeLightCoordinator lightCoordinator;
+	final NativeLightQueues lightWork = new NativeLightQueues();
 	private static final int CACHE_SIZE = 2;
 	private final long[] lastChunkPos = new long[2];
 	private final LightChunk[] lastChunk = new LightChunk[2];
+	@Nullable
+	private final NativeLightPropagation nativePropagation = NativeLightPropagation.create(this);
 
 	protected LightEngine(LightChunkGetter lightChunkGetter, S layerLightSectionStorage) {
 		this.chunkSource = lightChunkGetter;
 		this.storage = layerLightSectionStorage;
+        this.lightCoordinator=layerLightSectionStorage.coordinator==null?null:layerLightSectionStorage.coordinator.forEngine(this);
+        this.blockNodesToCheck=this.lightCoordinator==null?new LongOpenHashSet(512,0.5F):this.lightCoordinator.set(0);
 		this.clearChunkCache();
 	}
 
@@ -111,6 +115,13 @@ public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends La
 		Arrays.fill(this.lastChunk, null);
 	}
 
+    void clearChunkCacheForNativeCoordinator() { this.clearChunkCache(); }
+
+    int propagateForNativeCoordinator() {
+        int processed=this.nativePropagation==null?-1:this.nativePropagation.run(this.storage,this.lightWork);
+        return processed<0?this.propagateDecreases()+this.propagateIncreases():processed;
+    }
+
 	@Override
 	public void checkBlock(BlockPos blockPos) {
 		this.blockNodesToCheck.add(blockPos.asLong());
@@ -136,6 +147,7 @@ public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends La
 
 	@Override
 	public int runLightUpdates() {
+        if(this.lightCoordinator!=null)return this.lightCoordinator.runLightUpdates();
 		LongIterator longIterator = this.blockNodesToCheck.iterator();
 
 		while (longIterator.hasNext()) {
@@ -143,10 +155,13 @@ public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends La
 		}
 
 		this.blockNodesToCheck.clear();
-		this.blockNodesToCheck.trim(512);
-		int i = 0;
-		i += this.propagateDecreases();
-		i += this.propagateIncreases();
+		((LongOpenHashSet)this.blockNodesToCheck).trim(512);
+		int i = this.nativePropagation == null ? -1 : this.nativePropagation.run(this.storage, this.lightWork);
+		if (i < 0) {
+			i = 0;
+			i += this.propagateDecreases();
+			i += this.propagateIncreases();
+		}
 		this.clearChunkCache();
 		this.storage.markNewInconsistencies(this);
 		this.storage.swapSectionMap();
@@ -155,9 +170,9 @@ public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends La
 
 	private int propagateIncreases() {
 		int i;
-		for (i = 0; !this.increaseQueue.isEmpty(); i++) {
-			long l = this.increaseQueue.dequeueLong();
-			long m = this.increaseQueue.dequeueLong();
+		for (i = 0; !this.lightWork.isEmpty(1); i++) {
+			long l = this.lightWork.dequeue(1);
+			long m = this.lightWork.dequeue(1);
 			int j = this.storage.getStoredLevel(l);
 			int k = LightEngine.QueueEntry.getFromLevel(m);
 			if (LightEngine.QueueEntry.isIncreaseFromEmission(m) && j < k) {
@@ -175,9 +190,9 @@ public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends La
 
 	private int propagateDecreases() {
 		int i;
-		for (i = 0; !this.decreaseQueue.isEmpty(); i++) {
-			long l = this.decreaseQueue.dequeueLong();
-			long m = this.decreaseQueue.dequeueLong();
+		for (i = 0; !this.lightWork.isEmpty(0); i++) {
+			long l = this.lightWork.dequeue(0);
+			long m = this.lightWork.dequeue(0);
 			this.propagateDecrease(l, m);
 		}
 
@@ -185,18 +200,17 @@ public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends La
 	}
 
 	protected void enqueueDecrease(long l, long m) {
-		this.decreaseQueue.enqueue(l);
-		this.decreaseQueue.enqueue(m);
+		this.lightWork.enqueue(0, l, m);
 	}
 
 	protected void enqueueIncrease(long l, long m) {
-		this.increaseQueue.enqueue(l);
-		this.increaseQueue.enqueue(m);
+		this.lightWork.enqueue(1, l, m);
 	}
 
 	@Override
 	public boolean hasLightWork() {
-		return this.storage.hasInconsistencies() || !this.blockNodesToCheck.isEmpty() || !this.decreaseQueue.isEmpty() || !this.increaseQueue.isEmpty();
+		if(this.lightCoordinator!=null)return this.lightCoordinator.hasLightWork();
+		return this.storage.hasInconsistencies() || !this.blockNodesToCheck.isEmpty() || !this.lightWork.isEmpty(0) || !this.lightWork.isEmpty(1);
 	}
 
 	@Nullable

@@ -37,7 +37,9 @@ Keep bears away from working beehives and bee nests. Adults seek hives containin
 
 ## Verification scope
 
-The baseline source audit used commit `fffe4a073f0b8d867902b067a6dd022cda31926f`. The breeding description includes the offspring-factory correction on `fix/issue-778-grizzly-offspring`. Other behavior remains from the baseline audit. This is not a completed in-game taming, combat, spawning, or breeding test.
+The baseline source audit used commit `fffe4a073f0b8d867902b067a6dd022cda31926f`. The breeding description includes the offspring-factory correction originally recorded on [`fix/issue-778-grizzly-offspring`][offspring-history]. Other behavior remains from the baseline audit. This is not a completed in-game taming, combat, spawning, or breeding test.
+
+A scoped source check on **2026-10-10** at `f86206767dadde696adfed4e04c5ee97cd0d0885` reconfirmed the [registered breeding goal][offspring-goal-current] and [Grizzly Bear offspring factory][offspring]. It does not extend the baseline review to other behavior.
 
 [attributes]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L87-L103
 [registration]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/minecraft/world/entity/EntityType.java#L714-L720
@@ -53,6 +55,9 @@ The baseline source audit used commit `fffe4a073f0b8d867902b067a6dd022cda31926f`
 [goals]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L185-L209
 [hives]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/ai/GrizzlyBearAIBeehive.java#L85-L129
 [food]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L236-L239
-[offspring]: https://github.com/HungLo2020/MattMC/blob/fix/issue-778-grizzly-offspring/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L646-L650
+[offspring]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L646-L650
 [hide]: https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L525-L528
 [loot]: https://github.com/HungLo2020/MattMC/tree/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/resources/data/minecraft/loot_table/entities
+
+[offspring-history]: https://github.com/HungLo2020/MattMC/blob/1c146bbd82940100daa5cecba0a5400eb55011bc/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L646-L650
+[offspring-goal-current]: https://github.com/HungLo2020/MattMC/blob/f86206767dadde696adfed4e04c5ee97cd0d0885/src/main/java/net/alexsmobs/entity/EntityGrizzlyBear.java#L185-L209

@@ -36,7 +36,9 @@ public class TargetBlock extends Block {
 
 	public TargetBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(OUTPUT_POWER, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(OUTPUT_POWER, 0));
+		}
 	}
 
 	@Override

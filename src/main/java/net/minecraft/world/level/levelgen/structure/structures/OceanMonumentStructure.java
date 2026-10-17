@@ -27,6 +27,18 @@ public class OceanMonumentStructure extends Structure {
 	}
 
 	@Override
+	public int[] nativeStub() {
+		return new int[]{0, 1, 0};
+	}
+
+	@Override
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext,
+		net.minecraft.core.BlockPos stub, net.minecraft.world.level.block.Rotation rotation, long[] extra, int[] pieces) {
+		// Rust planned the building's room graph and children (structure/monument_plan.rs).
+		OceanMonumentPieces.addNativePieces(structurePiecesBuilder, pieces);
+	}
+
+	@Override
 	public Optional<Structure.GenerationStub> findGenerationPoint(Structure.GenerationContext generationContext) {
 		int i = generationContext.chunkPos().getBlockX(9);
 		int j = generationContext.chunkPos().getBlockZ(9);
@@ -58,12 +70,19 @@ public class OceanMonumentStructure extends Structure {
 		if (piecesContainer.isEmpty()) {
 			return piecesContainer;
 		} else {
-			WorldgenRandom worldgenRandom = new WorldgenRandom(new LegacyRandomSource(RandomSupport.generateUniqueSeed()));
-			worldgenRandom.setLargeFeatureSeed(l, chunkPos.x, chunkPos.z);
 			StructurePiece structurePiece = (StructurePiece)piecesContainer.pieces().get(0);
 			BoundingBox boundingBox = structurePiece.getBoundingBox();
 			int i = boundingBox.minX();
 			int j = boundingBox.minZ();
+			// Rust re-plans the building from the same seed, draw and saved origin/orientation.
+			int[] words = net.minecraft.world.level.levelgen.NativeStructureStubs.regenerateMonument(l, chunkPos, i, j, structurePiece.getOrientation(), new long[1]);
+			if (words != null) {
+				StructurePiecesBuilder nativeBuilder = new StructurePiecesBuilder();
+				OceanMonumentPieces.addNativePieces(nativeBuilder, words);
+				return nativeBuilder.build();
+			}
+			WorldgenRandom worldgenRandom = new WorldgenRandom(new LegacyRandomSource(RandomSupport.generateUniqueSeed()));
+			worldgenRandom.setLargeFeatureSeed(l, chunkPos.x, chunkPos.z);
 			Direction direction = Direction.Plane.HORIZONTAL.getRandomDirection(worldgenRandom);
 			Direction direction2 = (Direction)Objects.requireNonNullElse(structurePiece.getOrientation(), direction);
 			StructurePiece structurePiece2 = new OceanMonumentPieces.MonumentBuilding(worldgenRandom, i, j, direction2);

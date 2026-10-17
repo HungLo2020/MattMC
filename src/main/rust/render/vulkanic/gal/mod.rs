@@ -23,6 +23,7 @@ mod submission;
 mod command_validation;
 mod hazards;
 mod normalization;
+mod host_write_hoist;
 mod profiling;
 mod capture;
 mod test_hooks;
@@ -30,6 +31,7 @@ mod test_hooks;
 use self::arena::*;
 pub(crate) use self::buffers_textures::*;
 use self::submission::*;
+pub(crate) use self::submission::per_frame_validation;
 pub(crate) use self::hazards::*;
 pub(in crate::render::vulkanic) use self::normalization::*;
 use self::profiling::*;
@@ -108,6 +110,9 @@ pub struct VulkanicGal {
     render_passes: Arena<ResourceRecord<RenderPassDesc>>,
     dependencies: BTreeMap<Handle, BTreeSet<Handle>>,
     reverse_dependencies: BTreeMap<Handle, BTreeSet<Handle>>,
+    /// Resources retired while still bound (see `retire`); each is destroyed
+    /// when its last dependent goes.
+    retired_while_referenced: BTreeSet<Handle>,
     pending_destroys: BTreeMap<Handle, PendingDestroy>,
     /// Whole-frame frontends assemble command lists incrementally. Resources
     /// retired while that transaction is open must remain logically live until
@@ -120,6 +125,9 @@ pub struct VulkanicGal {
     next_submission: u64,
     latest_accepted_submission: SubmissionId,
     buffer_upload_capture: super::buffer_upload_capture::BufferUploadCapture,
+    /// Reused per-submission hazard state and in-flight marking set.
+    hazard_tracker: hazards::AccessTracker,
+    in_flight_scratch: std::collections::HashSet<Handle, AccessHashBuilder>,
     completed_submission: SubmissionId,
     metrics: Metrics,
     /// Frontend policy tagging passes/pipelines with GPU profiling scopes.
@@ -150,6 +158,7 @@ impl VulkanicGal {
             render_passes: Arena::new(HandleKind::RenderPass),
             dependencies: BTreeMap::new(),
             reverse_dependencies: BTreeMap::new(),
+            retired_while_referenced: BTreeSet::new(),
             pending_destroys: BTreeMap::new(),
             command_recording_depth: 0,
             command_recording_destroys: Vec::new(),
@@ -158,6 +167,8 @@ impl VulkanicGal {
             next_submission: 1,
             latest_accepted_submission: SubmissionId(0),
             buffer_upload_capture: Default::default(),
+            hazard_tracker: Default::default(),
+            in_flight_scratch: Default::default(),
             completed_submission: SubmissionId(0),
             metrics: Metrics::default(),
             gpu_profile_classifier: None,

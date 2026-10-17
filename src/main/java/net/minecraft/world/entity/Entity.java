@@ -216,6 +216,8 @@ public abstract class Entity
 	public float yRotO;
 	public float xRotO;
 	private AABB bb = INITIAL_AABB;
+	@Nullable private NativeEntityGeometry.Body nativeGeometry;
+	private boolean nativeStandardBounds=true;
 	private boolean onGround;
 	public boolean horizontalCollision;
 	public boolean verticalCollision;
@@ -223,8 +225,7 @@ public abstract class Entity
 	public boolean minorHorizontalCollision;
 	public boolean hurtMarked;
 	protected Vec3 stuckSpeedMultiplier = Vec3.ZERO;
-	@Nullable
-	private Entity.RemovalReason removalReason;
+	private static final Entity.RemovalReason[] REMOVAL_REASONS = Entity.RemovalReason.values();
 	public static final float DEFAULT_BB_WIDTH = 0.6F;
 	public static final float DEFAULT_BB_HEIGHT = 1.8F;
 	public float moveDist;
@@ -300,6 +301,7 @@ public abstract class Entity
 		this.position = Vec3.ZERO;
 		this.blockPosition = BlockPos.ZERO;
 		this.chunkPosition = ChunkPos.ZERO;
+		this.nativeGeometry=(level==null ? new NativeEntityGeometry() : level.nativeEntityGeometry()).create(0.0,0.0,0.0,INITIAL_AABB);
 		SynchedEntityData.Builder builder = new SynchedEntityData.Builder(this);
 		builder.define(DATA_SHARED_FLAGS_ID, (byte)0);
 		builder.define(DATA_AIR_SUPPLY_ID, this.getMaxAirSupply());
@@ -1895,7 +1897,7 @@ public abstract class Entity
 	}
 
 	public boolean saveAsPassenger(ValueOutput valueOutput) {
-		if (this.removalReason != null && !this.removalReason.shouldSave()) {
+		if (this.removalReason() != null && !this.removalReason().shouldSave()) {
 			return false;
 		} else {
 			String string = this.getEncodeId();
@@ -2852,7 +2854,7 @@ public abstract class Entity
 
 	public String toString() {
 		String string = this.level() == null ? "~NULL~" : this.level().toString();
-		return this.removalReason != null
+		return this.removalReason() != null
 			? String.format(
 				Locale.ROOT,
 				"%s['%s'/%d, l='%s', x=%.2f, y=%.2f, z=%.2f, removed=%s]",
@@ -2863,7 +2865,7 @@ public abstract class Entity
 				this.getX(),
 				this.getY(),
 				this.getZ(),
-				this.removalReason
+				this.removalReason()
 			)
 			: String.format(
 				Locale.ROOT,
@@ -3293,7 +3295,14 @@ public abstract class Entity
 	}
 
 	public final void setBoundingBox(AABB aABB) {
+		if(this.nativeGeometry!=null)this.nativeGeometry.bounds(aABB);
+		this.nativeStandardBounds=aABB!=null && aABB.getClass()==AABB.class;
 		this.bb = aABB;
+	}
+
+	/** Primary immutable-coordinate CPU component, suitable for stock culling only. */
+	@Nullable public final NativeEntityGeometry.Body nativeCullingGeometry() {
+		return this.nativeStandardBounds ? this.nativeGeometry : null;
 	}
 
 	public final float getEyeHeight(Pose pose) {
@@ -3706,15 +3715,16 @@ public abstract class Entity
 	}
 
 	public final void setPosRaw(double d, double e, double f) {
-		if (this.position.x != d || this.position.y != e || this.position.z != f) {
+		int changes=this.nativeGeometry==null ? -1 : this.nativeGeometry.move(d,e,f);
+		if (changes>=0 ? (changes & 1)!=0 : this.position.x != d || this.position.y != e || this.position.z != f) {
 			this.position = new Vec3(d, e, f);
-			int i = Mth.floor(d);
-			int j = Mth.floor(e);
-			int k = Mth.floor(f);
-			if (i != this.blockPosition.getX() || j != this.blockPosition.getY() || k != this.blockPosition.getZ()) {
+			int i = changes<0 ? Mth.floor(d) : this.nativeGeometry.blockX();
+			int j = changes<0 ? Mth.floor(e) : this.nativeGeometry.blockY();
+			int k = changes<0 ? Mth.floor(f) : this.nativeGeometry.blockZ();
+			if (changes>=0 ? (changes & 2)!=0 : i != this.blockPosition.getX() || j != this.blockPosition.getY() || k != this.blockPosition.getZ()) {
 				this.blockPosition = new BlockPos(i, j, k);
 				this.inBlockState = null;
-				if (SectionPos.blockToSectionCoord(i) != this.chunkPosition.x || SectionPos.blockToSectionCoord(k) != this.chunkPosition.z) {
+				if (changes>=0 ? (changes & 4)!=0 : SectionPos.blockToSectionCoord(i) != this.chunkPosition.x || SectionPos.blockToSectionCoord(k) != this.chunkPosition.z) {
 					this.chunkPosition = new ChunkPos(this.blockPosition);
 				}
 			}
@@ -3824,21 +3834,35 @@ public abstract class Entity
 
 	@Override
 	public final boolean isRemoved() {
-		return this.removalReason != null;
+		return this.nativeGeometry != null && this.nativeGeometry.removalReasonCode() != 0;
+	}
+
+	/** Internal reads preserve private-field semantics even when getRemovalReason is overridden. */
+	@Nullable
+	private Entity.RemovalReason removalReason() {
+		int code = this.nativeGeometry == null ? 0 : this.nativeGeometry.removalReasonCode();
+		return code == 0 ? null : REMOVAL_REASONS[code - 1];
+	}
+
+	private NativeEntityGeometry.Body lifecycleGeometry() {
+		if (this.nativeGeometry == null) {
+			// Construction-bypassing compatibility objects still acquire a Rust owner.
+			Vec3 pos = this.position == null ? Vec3.ZERO : this.position;
+			this.nativeGeometry = new NativeEntityGeometry().create(pos.x, pos.y, pos.z, this.bb == null ? INITIAL_AABB : this.bb);
+		}
+		return this.nativeGeometry;
 	}
 
 	@Nullable
 	public Entity.RemovalReason getRemovalReason() {
-		return this.removalReason;
+		return this.removalReason();
 	}
 
 	@Override
 	public final void setRemoved(Entity.RemovalReason removalReason) {
-		if (this.removalReason == null) {
-			this.removalReason = removalReason;
-		}
+		this.lifecycleGeometry().remove(removalReason == null ? 0 : removalReason.ordinal() + 1);
 
-		if (this.removalReason.shouldDestroy()) {
+		if (this.removalReason().shouldDestroy()) {
 			this.stopRiding();
 		}
 
@@ -3848,7 +3872,7 @@ public abstract class Entity
 	}
 
 	protected void unsetRemoved() {
-		this.removalReason = null;
+		if (this.nativeGeometry != null) this.nativeGeometry.revive();
 	}
 
 	@Override
@@ -3858,7 +3882,7 @@ public abstract class Entity
 
 	@Override
 	public boolean shouldBeSaved() {
-		if (this.removalReason != null && !this.removalReason.shouldSave()) {
+		if (this.removalReason() != null && !this.removalReason().shouldSave()) {
 			return false;
 		} else {
 			return this.isPassenger() ? false : !this.isVehicle() || !this.hasExactlyOnePlayerPassenger();
@@ -3884,6 +3908,7 @@ public abstract class Entity
 	}
 
 	protected void setLevel(Level level) {
+		if(this.nativeGeometry!=null)this.nativeGeometry.transfer(level==null ? new NativeEntityGeometry() : level.nativeEntityGeometry());
 		this.level = level;
 	}
 

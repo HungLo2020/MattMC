@@ -62,9 +62,11 @@ public class FireBlock extends BaseFireBlock {
 
 	public FireBlock(BlockBehaviour.Properties properties) {
 		super(properties, 1.0F);
-		this.registerDefaultState(
-			this.stateDefinition.any().setValue(AGE, 0).setValue(NORTH, false).setValue(EAST, false).setValue(SOUTH, false).setValue(WEST, false).setValue(UP, false)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition.any().setValue(AGE, 0).setValue(NORTH, false).setValue(EAST, false).setValue(SOUTH, false).setValue(WEST, false).setValue(UP, false)
+			);
+		}
 		this.shapes = this.makeShapes();
 	}
 

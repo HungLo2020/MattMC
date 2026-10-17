@@ -103,26 +103,14 @@ public final class ItemStack implements DataComponentHolder {
 		Component.translatable("item.op_warning.line3").withStyle(ChatFormatting.RED)
 	);
 	private static final Component UNBREAKABLE_TOOLTIP = Component.translatable("item.unbreakable").withStyle(ChatFormatting.BLUE);
-	public static final MapCodec<ItemStack> MAP_CODEC = MapCodec.recursive(
-		"ItemStack",
-		codec -> RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					Item.CODEC.fieldOf("id").forGetter(ItemStack::getItemHolder),
-					ExtraCodecs.intRange(1, 99).fieldOf("count").orElse(1).forGetter(ItemStack::getCount),
-					DataComponentPatch.CODEC.optionalFieldOf("components", DataComponentPatch.EMPTY).forGetter(itemStack -> itemStack.components.asPatch())
-				)
-				.apply(instance, ItemStack::new)
-		)
+	/** Rust decodes, validates and encodes stacks (`content/data/items.rs`). */
+	private static final net.minecraft.resources.NativeValues.ValueCodec<ItemStack> NATIVE_CODEC = net.minecraft.resources.NativeValues.codec(
+		net.minecraft.resources.NativeValues.Kind.ITEM_STACK, NativeItemStacks::project, NativeItemStacks::unproject
 	);
-	public static final Codec<ItemStack> CODEC = Codec.lazyInitialized(MAP_CODEC::codec);
-	public static final Codec<ItemStack> SINGLE_ITEM_CODEC = Codec.lazyInitialized(
-		() -> RecordCodecBuilder.create(
-			instance -> instance.group(
-					Item.CODEC.fieldOf("id").forGetter(ItemStack::getItemHolder),
-					DataComponentPatch.CODEC.optionalFieldOf("components", DataComponentPatch.EMPTY).forGetter(itemStack -> itemStack.components.asPatch())
-				)
-				.apply(instance, (holder, dataComponentPatch) -> new ItemStack(holder, 1, dataComponentPatch))
-		)
+	public static final MapCodec<ItemStack> MAP_CODEC = NATIVE_CODEC.mapCodec();
+	public static final Codec<ItemStack> CODEC = NATIVE_CODEC;
+	public static final Codec<ItemStack> SINGLE_ITEM_CODEC = net.minecraft.resources.NativeValues.codec(
+		net.minecraft.resources.NativeValues.Kind.SINGLE_ITEM, NativeItemStacks::projectSingle, NativeItemStacks::unprojectSingle
 	);
 	public static final Codec<ItemStack> STRICT_CODEC = CODEC.validate(ItemStack::validateStrict);
 	public static final Codec<ItemStack> STRICT_SINGLE_ITEM_CODEC = SINGLE_ITEM_CODEC.validate(ItemStack::validateStrict);
@@ -157,11 +145,7 @@ public final class ItemStack implements DataComponentHolder {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final ItemStack EMPTY = new ItemStack((Void)null);
 	private static final Component DISABLED_ITEM_TOOLTIP = Component.translatable("item.disabled").withStyle(ChatFormatting.RED);
-	private int count;
-	private int popTime;
-	@Deprecated
-	@Nullable
-	private final Item item;
+	final NativeItemState.Stack state;
 	final PatchedDataComponentMap components;
 	@Nullable
 	private Entity entityRepresentation;
@@ -266,14 +250,14 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	private ItemStack(ItemLike itemLike, int i, PatchedDataComponentMap patchedDataComponentMap) {
-		this.item = itemLike.asItem();
-		this.count = i;
+		Item item = itemLike.asItem();
 		this.components = patchedDataComponentMap;
+		this.state = NativeItemState.Stack.create(item, i, patchedDataComponentMap.nativeState());
 	}
 
 	private ItemStack(@Nullable Void void_) {
-		this.item = null;
 		this.components = new PatchedDataComponentMap(DataComponentMap.EMPTY);
+		this.state = NativeItemState.Stack.createEmpty(this.components.nativeState());
 	}
 
 	public static DataResult<Unit> validateComponents(DataComponentMap dataComponentMap) {
@@ -295,7 +279,7 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public boolean isEmpty() {
-		return this == EMPTY || this.item == Items.AIR || this.count <= 0;
+		return this == EMPTY || this.state.item() == Items.AIR || this.state.count() <= 0;
 	}
 
 	public boolean isItemEnabled(FeatureFlagSet featureFlagSet) {
@@ -320,7 +304,7 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public Item getItem() {
-		return this.isEmpty() ? Items.AIR : this.item;
+		return this.isEmpty() ? Items.AIR : this.state.item();
 	}
 
 	public Holder<Item> getItemHolder() {
@@ -608,10 +592,53 @@ public final class ItemStack implements DataComponentHolder {
 		if (this.isEmpty()) {
 			return EMPTY;
 		} else {
-			ItemStack itemStack = new ItemStack(this.getItem(), this.count, this.components.copy());
+			Item item = this.getItem();
+			if (item != null && item.nativeTransferCopyIsPure()) return this.copyOwnedStack();
+			ItemStack itemStack = new ItemStack(this.getItem(), this.state.count(), this.components.copy());
 			itemStack.setPopTime(this.getPopTime());
 			return itemStack;
 		}
+	}
+
+	/** Complete stock-chest consumer copy with one retained stack/overlay adoption. */
+	public ItemStack copyForNativeTransfer() {
+		if (this.isEmpty()) return EMPTY;
+		if (this.getItem() == null || !this.getItem().nativeTransferCopyIsPure()) return this.copy();
+		return this.copyOwnedStack();
+	}
+
+	private ItemStack copyOwnedStack() {
+		ItemStack copy = new ItemStack(this.state.copyStack());
+		copy.setPopTime(this.getPopTime());
+		return copy;
+	}
+
+	/**
+	 * {@link #copyForNativeTransferWithCount} for a copy the native operation
+	 * already prepared (count and pop time set): the same facade construction and
+	 * {@code asItem} dispatch, without a second native copy.
+	 */
+	public ItemStack adoptPreparedCopy(long handle, long address, long adopted) {
+		return new ItemStack(NativeItemState.adoptPreparedCopy(this.state, handle, address, adopted));
+	}
+
+	/** The canonical facade of natively published slot contents, with the copy constructor's same {@code asItem} dispatch. */
+	static ItemStack materializeNative(NativeItemState.Stack nativeStack) {
+		return new ItemStack(nativeStack);
+	}
+
+	private ItemStack(NativeItemState.Stack nativeStack) {
+		this.components = PatchedDataComponentMap.fromNativeStack(nativeStack);
+		// Preserve the original private copy constructor's single dispatch.
+		nativeStack.item().asItem();
+		this.state = nativeStack;
+	}
+
+	public ItemStack copyForNativeTransferWithCount(int count) {
+		if (this.isEmpty()) return EMPTY;
+		ItemStack copy = this.copyForNativeTransfer();
+		copy.setCount(count);
+		return copy;
 	}
 
 	public ItemStack copyWithCount(int i) {
@@ -667,7 +694,11 @@ public final class ItemStack implements DataComponentHolder {
 		if (!itemStack.is(itemStack2.getItem())) {
 			return false;
 		} else {
-			return itemStack.isEmpty() && itemStack2.isEmpty() ? true : Objects.equals(itemStack.components, itemStack2.components);
+			if (itemStack.isEmpty() && itemStack2.isEmpty()) return true;
+			// Both stacks hold the same item here, so neither is empty: compare natively,
+			// falling back to the original equals only for component values Rust cannot decide.
+			int same = NativeItemState.sameComponents(itemStack.state, itemStack2.state);
+			return same >= 0 ? same != 0 : Objects.equals(itemStack.components, itemStack2.components);
 		}
 	}
 
@@ -701,8 +732,8 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public void inventoryTick(Level level, Entity entity, @Nullable EquipmentSlot equipmentSlot) {
-		if (this.popTime > 0) {
-			this.popTime--;
+		if (this.state.popTime() > 0) {
+			this.state.popTime(this.state.popTime() - 1);
 		}
 
 		if (level instanceof ServerLevel serverLevel) {
@@ -1044,19 +1075,21 @@ public final class ItemStack implements DataComponentHolder {
 	}
 
 	public int getPopTime() {
-		return this.popTime;
+		return this.state.popTime();
 	}
 
 	public void setPopTime(int i) {
-		this.popTime = i;
+		this.state.popTime(i);
 	}
 
 	public int getCount() {
-		return this.isEmpty() ? 0 : this.count;
+		if (this == EMPTY || this.state.item() == Items.AIR) return 0;
+		int count = this.state.count();
+		return count <= 0 ? 0 : count;
 	}
 
 	public void setCount(int i) {
-		this.count = i;
+		this.state.count(i);
 	}
 
 	public void limitSize(int i) {

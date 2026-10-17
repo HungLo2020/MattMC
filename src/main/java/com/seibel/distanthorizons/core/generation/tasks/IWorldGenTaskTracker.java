@@ -15,6 +15,14 @@ public interface IWorldGenTaskTracker
 	@Nullable
 	Consumer<FullDataSourceV2> getDataSourceConsumer();
 	
+	/**
+	 * Optionally consumes a generated chunk's native columns directly, without a
+	 * producer {@link FullDataSourceV2}; returns false to receive that data source
+	 * through {@link #getDataSourceConsumer()} instead. Null (the default) always does.
+	 */
+	@Nullable
+	default java.util.function.Predicate<net.minecraft.world.level.chunk.NativeDhColumns> getNativeColumnsConsumer() { return null; }
+	
 	CompletableFuture<Boolean> shouldGenerateSplitChild(long pos);
 	
 }

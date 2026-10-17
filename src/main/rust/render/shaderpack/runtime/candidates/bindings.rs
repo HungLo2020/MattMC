@@ -43,11 +43,16 @@ impl ShaderPackRuntimeExecutor {
                 source_resource_bindings,
                 source_shadow_resource_bindings,
                 translucent_source_resource_bindings,
+                pre_terrain_preparation,
+                post_terrain_preparation,
                 ..
             } => source_resource_bindings
                 .iter()
                 .chain(source_shadow_resource_bindings.iter())
                 .chain(translucent_source_resource_bindings.iter())
+                .chain(pre_terrain_preparation.iter().chain(post_terrain_preparation.iter())
+                    .filter_map(|stage| stage.source_program.as_ref())
+                    .map(|program| &program.opaque_resource_bindings))
                 .collect(),
             TerrainSourceCandidateState::Unavailable
             | TerrainSourceCandidateState::Disabled { .. }
@@ -57,10 +62,16 @@ impl ShaderPackRuntimeExecutor {
             if let DistantHorizonsSourceCandidateState::Discovered {
                 source_resource_bindings,
                 depth_consumer_preparation,
+                pre_terrain_preparation,
                 ..
             } = &self.distant_horizons_source_candidate
             {
                 plans.extend(source_resource_bindings.iter());
+                plans.extend(
+                    pre_terrain_preparation.iter()
+                        .filter_map(|stage| stage.source_program.as_ref())
+                        .map(|program| &program.opaque_resource_bindings),
+                );
                 plans.extend(
                     depth_consumer_preparation
                         .iter()
@@ -87,11 +98,33 @@ impl ShaderPackRuntimeExecutor {
         noted.1.len() != before
     }
 
-    pub(crate) fn source_required_resource_roles(&self) -> BTreeSet<TerrainSourceResourceRole> {
+    pub(crate) fn source_required_resource_roles(&self) -> std::sync::Arc<BTreeSet<TerrainSourceResourceRole>> {
         self.source_required_resource_roles_for_frame(true)
     }
 
+    /// Memoized: the binding plans are immutable for their candidate epochs
+    /// and noted writer roles only grow, so equal keys mean equal sets.
     pub(crate) fn source_required_resource_roles_for_frame(
+        &self,
+        includes_distant_horizons: bool,
+    ) -> std::sync::Arc<BTreeSet<TerrainSourceResourceRole>> {
+        let noted = {
+            let noted = self.writer_required_roles.borrow();
+            if noted.0 == self.source_candidate_epoch { noted.1.len() } else { 0 }
+        };
+        let key = (self.source_candidate_epoch, self.distant_horizons_source_candidate_epoch, noted);
+        let slot = usize::from(includes_distant_horizons);
+        if let Some((cached, roles)) = &self.required_roles_memo.borrow()[slot] {
+            if *cached == key {
+                return std::sync::Arc::clone(roles);
+            }
+        }
+        let roles = std::sync::Arc::new(self.compute_source_required_resource_roles(includes_distant_horizons));
+        self.required_roles_memo.borrow_mut()[slot] = Some((key, std::sync::Arc::clone(&roles)));
+        roles
+    }
+
+    fn compute_source_required_resource_roles(
         &self,
         includes_distant_horizons: bool,
     ) -> BTreeSet<TerrainSourceResourceRole> {
@@ -122,6 +155,7 @@ impl ShaderPackRuntimeExecutor {
                     TerrainSourceResourceRole::ShadowDepthPrimary
                         | TerrainSourceResourceRole::ShadowDepthSecondary
                         | TerrainSourceResourceRole::ShadowDepthRaw
+                        | TerrainSourceResourceRole::ShadowDepthRawSecondary
                 )
             }));
         }

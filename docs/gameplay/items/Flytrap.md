@@ -1,6 +1,6 @@
 # Flytrap
 
-**Flytrap** (`minecraft:flytrap`) places a decorative plant that opens and closes. Its explicit Creative listing is in Natural Blocks; a natural starter supply or crafting recipe was not established in the checked data. [Registration][blocks] [items] [creative]
+**Flytrap** (`minecraft:flytrap`) places a decorative plant that opens and closes. Its explicit Creative listing is in Natural Blocks; a natural starter supply or crafting recipe was not established in the checked data. [Registration][blocks] [items][] [creative][]
 
 ## Obtaining
 

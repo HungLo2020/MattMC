@@ -1,0 +1,306 @@
+# Capture storage and recovery
+
+Graphics captures accumulate under `artifacts/graphics-captures/`,
+`logs/graphics-audit/`, and older `~/.cache/mattmc-*` test directories. Preserve
+unique runtime evidence and fixture inputs when reclaiming space. Treat copied
+worlds as saves, even when their parent directory is named `cache`.
+Cleanup histories below are implementation-author reports; this documentation
+review did not inspect their original files or rerun cleanup.
+
+## Unused Rust caches and validation archival: 2026-10-12
+
+Removed the generated `src/main/rust/target` and `build/rust/target-tests`
+caches after confirming no tracked files or live process references. Free space
+increased36.45GiB; the primary `build/rust/target`, production native libraries
+and pinned predecessor controls remain. Use `CARGO_TARGET_DIR=build/rust/target`
+for suite tests to share the existing profile cache rather than recreating the
+retired duplicate trees.
+
+Losslessly archived19 large `graphics_audit_artifact.json` files in completed,
+successful historical validation roots. Each decompressed archive matched its
+original SHA256 before removing the plain file; payload reduction was2.14GiB.
+Screenshots, profiles, completion receipts and prepared inputs remain. Restore a
+plain artifact with `gzip -dk FILE.json.gz` for a consumer that requires it.
+Exact manifests and verification are in `build/native-dh-render-source/`:
+`cache-retention.json`, `validation-archive-plan.json` and `validation-archive.json`.
+
+## Superseded profile videos: 2026-10-11
+
+Retired 56 `window-crop.nut` videos from seven completed October9 CPU/allocation
+flight scopes, reclaiming17.83GiB. Each scope's profiling receipts reported
+success and driver exit0; no process or open file used the target scopes.
+All447 endpoint/derived PNGs, source identities, profiles, metrics and completion
+receipts remain. Current runs and open terrain/startup investigations were excluded.
+
+The exact paths, original video sizes/SHA256 and preserved receipts are recorded
+in `build/native-saved-palettes/retired-profile-videos.json`. These obsolete
+clips were deleted, not archived; they cannot be restored from that receipt.
+Historical profile metrics and endpoint reviews remain available, while the
+retired videos no longer provide independent temporal evidence.
+
+## Lossless validation archival: 2026-10-10
+
+The [implementation author’s record](https://github.com/HungLo2020/MattMC/blob/52664da430edab005b09f64e2df29eaa79db95a1/docs/development/rendering/ARTIFACT-STORAGE.md)
+reports archiving 253 large JSON diagnostics from fourteen completed
+October9 validation scopes. Each adjacent `.gz` was decompressed and its SHA256
+verified before removing the original. Actual free space increased21.08GiB;
+workspace paths, saves, screenshots, profile captures and the open investigations
+were excluded. This is archival of exact evidence bytes, not removal of results.
+The saved exact-target plan, per-file hashes and disk/worktree/prompt checks are
+in `build/native-dh-source-owner/validation-archive-*`. Restore individual paths
+with `gzip -dk -- FILE.json.gz` when an older consumer needs plain JSON; current
+archive-aware audit readers preserve declared original paths.
+
+## Bulk retirement: 2026-10-08
+
+The [implementation author's cleanup record at `97e30922`](https://github.com/HungLo2020/MattMC/blob/97e3092269ed29854c8175a480a819fb1896c311/docs/development/rendering/ARTIFACT-STORAGE.md)
+reports free space rising from about 8.8 GiB to 304 GiB and the capture tree
+falling from 339 GiB to about 62 GiB. It records retirement of 1,081 inactive
+generated workspaces, 413 obsolete videos/raw readbacks, unused Cargo incremental
+caches, and 8,135 inactive Gradle daemon logs. The record also attributes
+42.26 GiB of recovery to replacing 2,669 large historical measurement/log/readback
+files with hash-verified `.gz` archives.
+
+The author reports preserving current verification reports and frames, source
+worlds, original shader packs, retained reference assets and unresolved crash
+evidence. The ignored receipt directory
+`artifacts/graphics-captures/goal5/disk-cleanup-20261008/` is reported to contain
+deleted paths, preserved fixture manifests, archive hashes and before/after
+checks, with protected save/settings and shader-pack hashes matching. This
+documentation review did not inspect that unbundled receipt or the source
+filesystem, reproduce the cleanup, or independently establish those figures.
+
+The author's [later cleanup record](https://github.com/HungLo2020/MattMC/blob/1b1837931a9b25fa12b655e440c6ff77cdd5887d/docs/development/rendering/ARTIFACT-STORAGE.md#bulk-retirement-2026-10-08)
+reports a follow-up reclaiming another 45.54 GiB, leaving about 348 GiB free.
+It removed 41 unused build-output/cache directories and, after stopping the idle Gradle
+daemon, its regenerable compiler analysis cache. The active checkout's main
+build and staged native library remain available; retired build trees require
+recompilation. Another 1,237 historical logs, measurement files and raw
+readbacks became hash-verified `.gz` archives, saving 13.96 GiB. Nineteen exact
+duplicate archives now share storage through hardlinks. Recent validation,
+feature comparison baselines, source fixtures and crash evidence were excluded
+from this additional compression. All 28 protected source/save/settings/pack
+hashes matched, and cleanup left the worktree status unchanged before this
+documentation update. Follow-up receipts are in `bulk-followup/` below the
+receipt directory named above.
+
+The author reports a final sweep reclaiming another 10.90 GiB: 2,065
+byte-identical historical artifact files now share storage, five inactive generated fixtures outside the
+main capture tree were retired, and unused Cargo profiles/incremental data were
+removed. The current release library and debug test outputs remain; rebuilding
+retired profiles recreates their caches. Free space measured 352.49 GiB after
+the recent builds and verification runs. Receipts in `final-dedup/` record
+duplicate hashes, original timestamps, removed paths and protected-file checks.
+Historical hardlinked artifacts are immutable: copy a file to a separate inode
+before editing it. Unique evidence and pinned investigations were reportedly
+retained. These follow-up figures, hash checks and preservation claims were not
+independently verified against the original filesystem or cleanup receipts.
+
+Retired videos/readbacks cannot be restored from this receipt; old generated
+workspaces require regeneration from their recorded inputs.
+
+After a paired verification invocation finishes, retire its generated fixture
+copies once its input sources and fixture manifests are retained. Keep recent
+acceptance evidence and representative unresolved failures; prune superseded
+captures regularly. Capture quotas exclude `.canonical-fixtures`, and
+`--artifact-preserve-current-run` protects the current capture's extracted
+evidence while ordinary cleanup still removes managed temporary game directories;
+it does not bypass the verification-driver retirement below. Neither gives a bound on
+total workspace storage. Never retire a fixture between Current and Frozen
+rows or while a client/build still uses it.
+
+## Verification-driver retention
+
+The [retirement helpers at `48a6e051`](https://github.com/HungLo2020/MattMC/blob/48a6e051ecd8bc322fb41118004edb3f13b41932/DevUtils/Common/artifact_retention.py#L410-L504)
+perform two separate destructive operations. `RunValidation.py` retires workspace
+copies while finishing its summary; `RunFeatureParity.py` does so after each
+scenario's pair and again at the end. Both prune older completed invocations
+after writing their summary. Failed comparisons are eligible too. A driver
+exception before these calls can leave copies and no final retention receipt.
+
+**Parent retirement:** [#823 is closed after focused verification](https://github.com/HungLo2020/MattMC/issues/823#issuecomment-6073221178)
+of the repair in `48a6e051`. Before deleting an eligible old invocation, the
+helper reruns fixture/workspace retirement and retains the parent if any
+workspace must remain. It rechecks the filesystem rather than trusting the old
+summary's retained-workspace list. Once an external source returns, an otherwise
+eligible old invocation can retire normally.
+
+The author reports 11 focused retention tests. Separately, the linked tracker
+review independently executed eight exact-source Python cases: successive
+successful and failed `RunValidation.finish` calls retained a missing-source
+fixture across repeated passes and retired it after source restoration;
+unknown-fixture, root-pin, comparison-baseline, live-parent, crash-evidence and
+ordinary-retirement controls also passed. Those checks used synthetic temporary
+fixtures and mocked process discovery, without clients or Java/Rust runtime
+suites. The closure covers the demonstrated two-pass defect, not live-process
+race freedom or safe cleanup of every filesystem state.
+
+**Flight workspace guard:** the [repair at `af6921cf`](https://github.com/HungLo2020/MattMC/blob/af6921cf5379cdb6010259d77d0b39b41b4fa549/DevUtils/Common/artifact_retention.py#L410-L481)
+checks enclosing flight receipts before workspace deletion, including when an
+old invocation's parent is considered for retirement. The author reports that
+an earlier parent-wide pass deleted an interrupted allocation world's copy.
+Its logs, images, raw profile and interruption receipt were retained; that is
+not recovery of the copied world. The author reports thirteen retention tests
+and 43 combined retention/flight tests after the repair.
+
+The independent review at `bffd0eef` executed only the two new synthetic cases:
+completed and unfinished sibling flights, and a completed nested flight inside
+an incomplete outer flight. Both passed with process discovery mocked inactive.
+This verifies those decisions, not actual cleanup history, live-process races,
+all malformed filesystem states or recovery of deleted data. No client,
+Java/Rust suite or original cleanup receipt was inspected in those checks.
+
+Keep required sources outside retirement-managed outputs. Source existence is
+still only a bounded eligibility check, not proof of recoverability or a backup.
+Explicit `.keep` protects parent retirement; ordinary eligible workspace
+retirement continues within a pinned invocation.
+
+For workspace retirement, only paths inside a marked invocation are candidates:
+
+- `.canonical-fixtures/<fixture>/run` requires a
+  `mattmc-cross-repo-fixture-v2` manifest with a matching resolved `run_root`
+  and an existing `source_run` directory that is neither the run itself, its
+  ancestor nor its descendant. The manifest beside `run` remains after deletion.
+- Directories named `game_dir_*` or `region_validation_game_*` qualify by name;
+  they do not require the canonical-fixture manifest.
+- When a candidate has an enclosing `flight.json` within the cleanup scope,
+  every such receipt must have schema `terrain-flight-observation-v1`, status
+  `observation_complete_requires_position_review` and integer `engine_exit_code`
+  zero. Starting, failed, malformed, unknown or symlinked flight receipts retain
+  their workspaces even during parent-wide cleanup. Completion still requires
+  separate F3/position review; a bounded client's expected exit 143 is not the
+  capture engine's exit code. A missing enclosing receipt is not detected as an
+  unfinished flight; ordinary workspace rules still apply. The guard checks
+  receipt fields, not F3 images, parity, profile acceptance or source hashes.
+  Other verification invocations keep their existing rules.
+- Unknown canonical fixtures and symlinked fixture/run candidates remain.
+  Cleanup also retains candidates when `/proc` is absent or a readable process
+  command/working directory references them. This is best-effort process
+  discovery: unreadable process records are not proof of inactivity, and open
+  files alone are not checked. Stop affected clients and builds before cleanup.
+- Files matching `hs_err_pid*.log`, `core*` or `crash-reports/*` at the candidate
+  workspace root retain that workspace and create a root `.keep` pin. This is
+  not a recursive search for every form or location of crash evidence.
+
+**Keep source saves outside retirement-managed outputs and verify them before
+running either driver.** The canonical-fixture check validates path relationships,
+plus source-directory existence, not input hashes or recoverability. The drivers check source
+existence before creating a fresh output, and the capture harness requires a
+source world. The retirement helper does not compare recorded input hashes or independently
+protect sources placed inside disposable output trees.
+Before the repair, an exact-source synthetic check for #823 used a source that existed at fixture
+creation and was then relocated. With process discovery mocked inactive, the
+workspace survived its pass but was deleted with its old parent; the explicit
+root `.keep` control survived. This demonstrates the two-pass gap, not actual
+user-data loss or a live-driver run. A manifest by itself is not a backup.
+
+Workspace retirement ignores capture preservation and root `.keep` pins;
+those pins protect the **full invocation** in the next operation. Among sibling
+invocations with the exact driver schema (`mattmc-validation-v2` or
+`mattmc-feature-parity-v2`), a generated-root marker and a Boolean `passed`,
+full-invocation retirement keeps the newest successful and failed summary by
+`summary.json` modification time. It also keeps the current invocation, root
+`.keep` pins, symlinked invocations and detected live work.
+`RunFeatureParity.py --compare <label>` protects that label during this call;
+add a root `.keep` if it must survive later runs that do not name it. A `.preserve`
+marker alone does not pin an invocation against this operation. Older/unknown,
+missing or unreadable summaries are excluded and need deliberate review.
+Remove obsolete `.keep` pins only after their investigation or published
+acceptance purpose is resolved.
+
+`summary.json` records the final workspace pass in `workspace_retention` and
+deleted old runs in `retired_invocations`; the feature driver's earlier
+per-scenario workspace passes are not accumulated in that final receipt.
+Retirement deletes files, without an archive or undo path. Keep the input sources
+and pin evidence needed to reproduce a comparison. The earlier documentation
+review independently ran four temporary-fixture tests with mocked process
+checks. The [repair commit's author](https://github.com/HungLo2020/MattMC/commit/a0f5abeb27f122ace8a44265b0ed82320a39c0a7)
+reports nine retention tests, including a real child-process lifetime check,
+within 37 passing harness regressions. Those reported checks do not cover the
+later demonstrated #823 parent-retirement gap. The newer author tests and
+independent synthetic acceptance cases above exercise the repaired sequence;
+their bounded scope does not establish safe cleanup of every live filesystem
+state.
+
+The capture runner also retires its isolated game directories after shutdown.
+The [`a0f5abeb` repair](https://github.com/HungLo2020/MattMC/blob/a0f5abeb27f122ace8a44265b0ed82320a39c0a7/DevUtils/Common/artifact_retention.py#L158-L167)
+restores the parent ownership-marker search; the former early return silently
+skipped this cleanup. Live process references, symlinks,
+missing `/proc` process visibility and crash-containing copies remain. Canonical
+fixture retirement also requires that its recorded source directory still
+exists. Check these paths with:
+
+```sh
+python3 -m unittest discover -s DevUtils/tests/rendering -p test_verification_artifacts.py
+```
+
+
+## Lossless historical archives
+
+The 2026-10-04 cleanup replaced large historical capture JSON, raw data and logs,
+inactive Gradle daemon logs, and historical DH database backup files with
+adjacent `.gz` archives. It preserved live world databases, region files,
+screenshots, recordings, JFR/RenderDoc captures, and native crash evidence.
+Current Goal 5 capture data was excluded from capture-data compression; historical
+DH backup files inside those fixtures were eligible.
+
+An archive contains the exact original bytes. Before removing each original,
+the cleanup decompressed its archive and verified the original SHA-256. The
+ignored receipt directory `artifacts/graphics-captures/goal5/disk-cleanup-20261004/`
+contains the file inventory, original hashes, retained asset reference, and
+before/after storage and worktree checks.
+
+Exact duplicate compressed DH backups share storage through hardlinks, after
+verification of original hashes and the retained archive's decompressed bytes. Their paths and
+contents remain available independently. Treat these archives as immutable;
+restore a separate uncompressed file before changing a recovered database.
+
+Tools that expect an original `.json`, `.raw`, or `.log` path need that file
+restored first. For example:
+
+```sh
+gzip -dk -- path/to/graphics_audit_artifact.json.gz
+```
+
+`-k` retains the archive; `gzip` refuses to overwrite an existing destination
+unless explicitly forced. Restore individual inputs as needed instead of
+expanding the entire archive collection. Use `gzip -dc -- FILE.gz` to inspect
+text without restoring it. Restore an archived DH backup before using the
+existing world recovery procedure; do not replace a live database during a run.
+
+## Reclaiming reproducible data
+
+- Remove archived test `assets/` directories only after verifying every file
+  against a retained reference inventory. Preserve distinct asset sets. A replay
+  that requires a retired asset directory must copy the retained reference back
+  to that path first; the cleanup receipt records both paths.
+- Duplicate Cargo target trees and incremental compilation caches are
+  reproducible. Their removal requires recompilation for subsequent builds.
+  Keep the staged native library and the build target used by an ongoing A/B
+  comparison so native identity remains verifiable.
+- Preserve active daemon logs and their registries, dependency downloads,
+  source changes, fixture manifests, and unique crash evidence. Avoid broad
+  `git clean` commands and indiscriminate deletion of directories named `run`,
+  `saves`, or `cache`.
+
+Perform cleanup while no test client or affected build is running. Never edit
+the Frozen repository as part of capture cleanup. Record actual filesystem
+free-space changes separately from logical file sizes, which can differ because
+of hardlinks, directory overhead, or concurrent disk activity.
+
+The saved-palette batch also archived the two completed JFR event JSON files
+losslessly and removed two completed generated profiling worlds, saving255.5MiB.
+`build/native-saved-palettes/chunk-loader/completed-profile-archive.json` records
+hashes and restoration; original `.jfr`, analyses and source corpus remain. The
+completed correctness driver retired nine disposable runtime workspaces while
+retaining captures and result receipts.
+
+Nine large JSON artifacts from the terminal October10 heightmap validation were
+replaced with lossless, SHA-verified gzip archives, saving1.013GiB.
+`build/native-owned-tape/completed-validation-archive.json` records original
+hashes and sizes. Failure receipts, logs, images and source worlds remain; restore an individual JSON with `gzip -dk`.
+The completed retained-tape validation retired nine disposable workspaces and
+the superseded saved-palette capture invocation through harness retention.
+Its compact saved-palette verification receipts remain under
+`build/native-saved-palettes/`; current captures and retention paths are recorded
+in the retained-tape validation summary.

@@ -33,7 +33,9 @@ public class RedstoneWallTorchBlock extends RedstoneTorchBlock {
 
 	public RedstoneWallTorchBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(LIT, true));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(LIT, true));
+		}
 	}
 
 	@Override

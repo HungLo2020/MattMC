@@ -5,6 +5,7 @@ import com.mojang.serialization.MapCodec;
 import java.util.function.Function;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.NativeValues;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -12,12 +13,12 @@ import net.minecraft.network.codec.StreamCodec;
 
 public class ParticleTypes {
 	public static final SimpleParticleType ANGRY_VILLAGER = register("angry_villager", false);
-	public static final ParticleType<BlockParticleOption> BLOCK = register("block", false, BlockParticleOption::codec, BlockParticleOption::streamCodec);
+	public static final ParticleType<BlockParticleOption> BLOCK = register("block", false, BlockParticleOption::streamCodec);
 	public static final ParticleType<BlockParticleOption> BLOCK_MARKER = register(
-		"block_marker", true, BlockParticleOption::codec, BlockParticleOption::streamCodec
+		"block_marker", true, BlockParticleOption::streamCodec
 	);
 	public static final ParticleType<TaczBulletHoleParticleOptions> BULLET_HOLE = register(
-		"bullet_hole", false, particleType -> TaczBulletHoleParticleOptions.CODEC, particleType -> TaczBulletHoleParticleOptions.STREAM_CODEC
+		"bullet_hole", false, particleType -> TaczBulletHoleParticleOptions.STREAM_CODEC
 	);
 	public static final SimpleParticleType BUBBLE = register("bubble", false);
 	public static final SimpleParticleType CLOUD = register("cloud", false);
@@ -25,7 +26,7 @@ public class ParticleTypes {
 	public static final SimpleParticleType CRIT = register("crit", false);
 	public static final SimpleParticleType DAMAGE_INDICATOR = register("damage_indicator", true);
 	public static final ParticleType<PowerParticleOption> DRAGON_BREATH = register(
-		"dragon_breath", false, PowerParticleOption::codec, PowerParticleOption::streamCodec
+		"dragon_breath", false, PowerParticleOption::streamCodec
 	);
 	public static final SimpleParticleType DRIPPING_LAVA = register("dripping_lava", false);
 	public static final SimpleParticleType FALLING_LAVA = register("falling_lava", false);
@@ -33,18 +34,18 @@ public class ParticleTypes {
 	public static final SimpleParticleType DRIPPING_WATER = register("dripping_water", false);
 	public static final SimpleParticleType FALLING_WATER = register("falling_water", false);
 	public static final ParticleType<DustParticleOptions> DUST = register(
-		"dust", false, particleType -> DustParticleOptions.CODEC, particleType -> DustParticleOptions.STREAM_CODEC
+		"dust", false, particleType -> DustParticleOptions.STREAM_CODEC
 	);
 	public static final ParticleType<DustColorTransitionOptions> DUST_COLOR_TRANSITION = register(
-		"dust_color_transition", false, particleType -> DustColorTransitionOptions.CODEC, particleType -> DustColorTransitionOptions.STREAM_CODEC
+		"dust_color_transition", false, particleType -> DustColorTransitionOptions.STREAM_CODEC
 	);
-	public static final ParticleType<SpellParticleOption> EFFECT = register("effect", false, SpellParticleOption::codec, SpellParticleOption::streamCodec);
+	public static final ParticleType<SpellParticleOption> EFFECT = register("effect", false, SpellParticleOption::streamCodec);
 	public static final SimpleParticleType ELDER_GUARDIAN = register("elder_guardian", true);
 	public static final SimpleParticleType ENCHANTED_HIT = register("enchanted_hit", false);
 	public static final SimpleParticleType ENCHANT = register("enchant", false);
 	public static final SimpleParticleType END_ROD = register("end_rod", false);
 	public static final ParticleType<ColorParticleOption> ENTITY_EFFECT = register(
-		"entity_effect", false, ColorParticleOption::codec, ColorParticleOption::streamCodec
+		"entity_effect", false, ColorParticleOption::streamCodec
 	);
 	public static final SimpleParticleType EXPLOSION_EMITTER = register("explosion_emitter", true);
 	public static final SimpleParticleType EXPLOSION = register("explosion", true);
@@ -54,7 +55,7 @@ public class ParticleTypes {
 	public static final SimpleParticleType GUST_EMITTER_SMALL = register("gust_emitter_small", true);
 	public static final SimpleParticleType SONIC_BOOM = register("sonic_boom", true);
 	public static final ParticleType<BlockParticleOption> FALLING_DUST = register(
-		"falling_dust", false, BlockParticleOption::codec, BlockParticleOption::streamCodec
+		"falling_dust", false, BlockParticleOption::streamCodec
 	);
 	public static final SimpleParticleType FIREWORK = register("firework", false);
 	public static final SimpleParticleType FISHING = register("fishing", false);
@@ -63,28 +64,28 @@ public class ParticleTypes {
 	public static final SimpleParticleType CHERRY_LEAVES = register("cherry_leaves", false);
 	public static final SimpleParticleType PALE_OAK_LEAVES = register("pale_oak_leaves", false);
 	public static final ParticleType<ColorParticleOption> TINTED_LEAVES = register(
-		"tinted_leaves", false, ColorParticleOption::codec, ColorParticleOption::streamCodec
+		"tinted_leaves", false, ColorParticleOption::streamCodec
 	);
 	public static final SimpleParticleType SCULK_SOUL = register("sculk_soul", false);
 	public static final ParticleType<SculkChargeParticleOptions> SCULK_CHARGE = register(
-		"sculk_charge", true, particleType -> SculkChargeParticleOptions.CODEC, particleType -> SculkChargeParticleOptions.STREAM_CODEC
+		"sculk_charge", true, particleType -> SculkChargeParticleOptions.STREAM_CODEC
 	);
 	public static final SimpleParticleType SCULK_CHARGE_POP = register("sculk_charge_pop", true);
 	public static final SimpleParticleType SOUL_FIRE_FLAME = register("soul_fire_flame", false);
 	public static final SimpleParticleType SOUL = register("soul", false);
-	public static final ParticleType<ColorParticleOption> FLASH = register("flash", false, ColorParticleOption::codec, ColorParticleOption::streamCodec);
+	public static final ParticleType<ColorParticleOption> FLASH = register("flash", false, ColorParticleOption::streamCodec);
 	public static final SimpleParticleType HAPPY_VILLAGER = register("happy_villager", false);
 	public static final SimpleParticleType COMPOSTER = register("composter", false);
 	public static final SimpleParticleType HEART = register("heart", false);
 	public static final ParticleType<SpellParticleOption> INSTANT_EFFECT = register(
-		"instant_effect", false, SpellParticleOption::codec, SpellParticleOption::streamCodec
+		"instant_effect", false, SpellParticleOption::streamCodec
 	);
-	public static final ParticleType<ItemParticleOption> ITEM = register("item", false, ItemParticleOption::codec, ItemParticleOption::streamCodec);
+	public static final ParticleType<ItemParticleOption> ITEM = register("item", false, ItemParticleOption::streamCodec);
 	public static final ParticleType<VibrationParticleOption> VIBRATION = register(
-		"vibration", true, particleType -> VibrationParticleOption.CODEC, particleType -> VibrationParticleOption.STREAM_CODEC
+		"vibration", true, particleType -> VibrationParticleOption.STREAM_CODEC
 	);
 	public static final ParticleType<TrailParticleOption> TRAIL = register(
-		"trail", false, particleType -> TrailParticleOption.CODEC, particleType -> TrailParticleOption.STREAM_CODEC
+		"trail", false, particleType -> TrailParticleOption.STREAM_CODEC
 	);
 	public static final SimpleParticleType ITEM_SLIME = register("item_slime", false);
 	public static final SimpleParticleType ITEM_COBWEB = register("item_cobweb", false);
@@ -140,7 +141,7 @@ public class ParticleTypes {
 	public static final SimpleParticleType ELECTRIC_SPARK = register("electric_spark", true);
 	public static final SimpleParticleType SCRAPE = register("scrape", true);
 	public static final ParticleType<ShriekParticleOption> SHRIEK = register(
-		"shriek", false, particleType -> ShriekParticleOption.CODEC, particleType -> ShriekParticleOption.STREAM_CODEC
+		"shriek", false, particleType -> ShriekParticleOption.STREAM_CODEC
 	);
 	public static final SimpleParticleType EGG_CRACK = register("egg_crack", false);
 	public static final SimpleParticleType DUST_PLUME = register("dust_plume", false);
@@ -148,13 +149,13 @@ public class ParticleTypes {
 	public static final SimpleParticleType TRIAL_SPAWNER_DETECTED_PLAYER_OMINOUS = register("trial_spawner_detection_ominous", true);
 	public static final SimpleParticleType VAULT_CONNECTION = register("vault_connection", true);
 	public static final ParticleType<BlockParticleOption> DUST_PILLAR = register(
-		"dust_pillar", false, BlockParticleOption::codec, BlockParticleOption::streamCodec
+		"dust_pillar", false, BlockParticleOption::streamCodec
 	);
 	public static final SimpleParticleType OMINOUS_SPAWNING = register("ominous_spawning", true);
 	public static final SimpleParticleType RAID_OMEN = register("raid_omen", false);
 	public static final SimpleParticleType TRIAL_OMEN = register("trial_omen", false);
 	public static final ParticleType<BlockParticleOption> BLOCK_CRUMBLE = register(
-		"block_crumble", false, BlockParticleOption::codec, BlockParticleOption::streamCodec
+		"block_crumble", false, BlockParticleOption::streamCodec
 	);
 	public static final SimpleParticleType FIREFLY = register("firefly", false);
 	// Alex's Caves primordial particles
@@ -163,11 +164,22 @@ public class ParticleTypes {
 	// Alex's Mobs particles
 	public static final SimpleParticleType SUNBIRD_FEATHER = register("sunbird_feather", false);
 	
-	public static final Codec<ParticleOptions> CODEC = BuiltInRegistries.PARTICLE_TYPE
-		.byNameCodec()
-		.dispatch("type", ParticleOptions::getType, ParticleType::codec);
+	/** Rust decodes, validates and encodes particle options (`content/data/values.rs`). */
+	public static final NativeValues.ValueCodec<ParticleOptions> CODEC = NativeValues.codec(
+		NativeValues.Kind.PARTICLE, NativeParticles::project, NativeParticles::unproject
+	);
 	public static final StreamCodec<RegistryFriendlyByteBuf, ParticleOptions> STREAM_CODEC = ByteBufCodecs.registry(Registries.PARTICLE_TYPE)
 		.dispatch(ParticleOptions::getType, ParticleType::streamCodec);
+
+	/** Options from Rust's decoded value, for definitions that embed them. */
+	public static ParticleOptions project(Object value, net.minecraft.resources.NativeData.Context context) {
+		return NativeParticles.project(value, context);
+	}
+
+	/** Options' decoded value, for definitions that embed them. */
+	public static Object unproject(ParticleOptions options, net.minecraft.resources.NativeData.Builder builder) {
+		return NativeParticles.unproject(options, builder);
+	}
 
 	private static SimpleParticleType register(String string, boolean bl) {
 		return Registry.register(BuiltInRegistries.PARTICLE_TYPE, string, new SimpleParticleType(bl));
@@ -176,13 +188,14 @@ public class ParticleTypes {
 	private static <T extends ParticleOptions> ParticleType<T> register(
 		String string,
 		boolean bl,
-		Function<ParticleType<T>, MapCodec<T>> function,
 		Function<ParticleType<T>, StreamCodec<? super RegistryFriendlyByteBuf, T>> function2
 	) {
 		return Registry.register(BuiltInRegistries.PARTICLE_TYPE, string, new ParticleType<T>(bl) {
 			@Override
+			@SuppressWarnings("unchecked")
 			public MapCodec<T> codec() {
-				return (MapCodec<T>)function.apply(this);
+				// The native codec's case: the type's fields without `type`.
+				return (MapCodec<T>)(MapCodec<?>)CODEC.dispatchCase("minecraft:" + string);
 			}
 
 			@Override

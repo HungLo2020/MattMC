@@ -11,7 +11,6 @@ import net.minecraft.client.renderer.item.properties.conditional.ConditionalItem
 import net.minecraft.client.renderer.item.properties.numeric.RangeSelectItemModelProperties;
 import net.minecraft.client.renderer.item.properties.select.SelectItemModelProperties;
 import net.minecraft.client.renderer.special.SpecialModelRenderers;
-import net.minecraft.client.renderer.texture.atlas.SpriteSources;
 
 @Environment(EnvType.CLIENT)
 public class ClientBootstrap {
@@ -26,7 +25,6 @@ public class ClientBootstrap {
 			SelectItemModelProperties.bootstrap();
 			ConditionalItemModelProperties.bootstrap();
 			RangeSelectItemModelProperties.bootstrap();
-			SpriteSources.bootstrap();
 			DialogScreens.bootstrap();
 			InputControlHandlers.bootstrap();
 			DialogBodyHandlers.bootstrap();

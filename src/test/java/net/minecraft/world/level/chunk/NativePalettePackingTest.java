@@ -127,7 +127,8 @@ class NativePalettePackingTest {
     @Test
     void malformedIdsKeepExceptionsAndReleaseTheLock() {
         var source = PalettePackingFixtures.states(2, 0, "cycle");
-        var raw = source.dataForNativeScan().storage().getRaw();
+        // Deliberate Java corruption needs an explicit compatibility owner.
+        var raw = source.dataForCompatibilityMutation().storage().getRaw();
         raw[0] |= 15;
         var strategy = PalettePackingFixtures.owner(source);
         var a =

@@ -21,7 +21,7 @@ serde_json = "1"
 shaderc = { version = "0.10.1", features = ["build-from-source"] }
 smallvec = "1.15.2"
 tracy-client = { version = "0.18.4", default-features = false, features = ["enable", "manual-lifetime", "only-localhost"], optional = true }
-xxhash-rust = { version = "0.8", features = ["xxh32"] }
+xxhash-rust = { version = "0.8", features = ["xxh32", "xxh3"] }
 
 [dev-dependencies]
 raw-window-handle = "0.6.2"
@@ -44,6 +44,24 @@ panic = "unwind"
 incremental = true
 codegen-units = 256
 rpath = false
+
+# Optimize third-party crates in dev/test builds; this crate stays at opt-level 0
+# so its incremental rebuilds are unchanged. shaderc's C++ (glslang) otherwise
+# builds as a CMake Debug build, which dominates shader-pack and GPU test time.
+[profile.dev.package."*"]
+opt-level = 3
+
+# Whole-suite test runs (`cargo test --profile suite`, testRustNative and the
+# validation driver). Dev semantics, including debug assertions and overflow
+# checks, but opt-level 1: the suite runs ~40% faster while a full crate
+# compile takes ~2x longer, so single-test edit loops keep the dev profile.
+# Builds into target/suite, leaving the dev cache untouched.
+[profile.suite]
+inherits = "dev"
+opt-level = 1
+
+[profile.suite.package."*"]
+opt-level = 3
 
 [profile.release]
 opt-level = 3

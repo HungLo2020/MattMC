@@ -10,27 +10,83 @@ pub(super) fn intersect_world_boxes(a: [[i32; 3]; 2], b: [[i32; 3]; 2]) -> Optio
 }
 
 /// Merges intersecting half-open boxes into their bounding boxes until the
-/// set is pairwise disjoint (touching boxes stay separate).
-pub(super) fn disjoint_world_boxes(mut boxes: Vec<[[i32; 3]; 2]>) -> Vec<[[i32; 3]; 2]> {
-    let mut merged = true;
-    while merged {
-        merged = false;
-        'outer: for i in 0..boxes.len() {
-            for j in i + 1..boxes.len() {
-                if intersect_world_boxes(boxes[i], boxes[j]).is_some() {
-                    let other = boxes.swap_remove(j);
-                    let current = boxes[i];
-                    boxes[i] = [
-                        [0, 1, 2].map(|axis| current[0][axis].min(other[0][axis])),
-                        [0, 1, 2].map(|axis| current[1][axis].max(other[1][axis])),
-                    ];
-                    merged = true;
-                    break 'outer;
+/// set is pairwise disjoint (touching boxes stay separate). Each incoming box
+/// absorbs every accepted box it overlaps until none remain; restarting the
+/// whole scan after each merge made bursts of changed sections cubic.
+pub(super) fn disjoint_world_boxes(boxes: Vec<[[i32; 3]; 2]>) -> Vec<[[i32; 3]; 2]> {
+    let mut disjoint: Vec<[[i32; 3]; 2]> = Vec::with_capacity(boxes.len());
+    for mut current in boxes {
+        while let Some(index) = disjoint
+            .iter()
+            .position(|accepted| intersect_world_boxes(*accepted, current).is_some())
+        {
+            let other = disjoint.swap_remove(index);
+            current = [
+                [0, 1, 2].map(|axis| current[0][axis].min(other[0][axis])),
+                [0, 1, 2].map(|axis| current[1][axis].max(other[1][axis])),
+            ];
+        }
+        disjoint.push(current);
+    }
+    disjoint
+}
+
+#[cfg(test)]
+mod disjoint_tests {
+    use super::*;
+
+    fn restarting_reference(mut boxes: Vec<[[i32; 3]; 2]>) -> Vec<[[i32; 3]; 2]> {
+        let mut merged = true;
+        while merged {
+            merged = false;
+            'outer: for i in 0..boxes.len() {
+                for j in i + 1..boxes.len() {
+                    if intersect_world_boxes(boxes[i], boxes[j]).is_some() {
+                        let other = boxes.swap_remove(j);
+                        let current = boxes[i];
+                        boxes[i] = [
+                            [0, 1, 2].map(|axis| current[0][axis].min(other[0][axis])),
+                            [0, 1, 2].map(|axis| current[1][axis].max(other[1][axis])),
+                        ];
+                        merged = true;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        boxes
+    }
+
+    #[test]
+    fn worklist_merge_matches_restarting_reference_and_is_disjoint() {
+        let mut state = 0x9e37_79b9_u32;
+        let mut next = |bound: u32| {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            (state % bound) as i32
+        };
+        for case in 0..400 {
+            let count = 1 + (case % 60) as u32;
+            let boxes = (0..count)
+                .map(|_| {
+                    let min = [next(64) - 32, next(64) - 32, next(64) - 32];
+                    let size = [1 + next(18), 1 + next(18), 1 + next(18)];
+                    [min, [0, 1, 2].map(|axis| min[axis] + size[axis])]
+                })
+                .collect::<Vec<_>>();
+            let mut expected = restarting_reference(boxes.clone());
+            let mut actual = disjoint_world_boxes(boxes);
+            expected.sort();
+            actual.sort();
+            assert_eq!(expected, actual, "case {case}");
+            for i in 0..actual.len() {
+                for j in i + 1..actual.len() {
+                    assert!(intersect_world_boxes(actual[i], actual[j]).is_none());
                 }
             }
         }
     }
-    boxes
 }
 
 /// Half-open boxes covering `a` minus `b` (at most six, disjoint).

@@ -1,4 +1,4 @@
-pub(super) fn clear(maps: &mut [u64], bits: usize) {
+pub(in crate::world::level::lighting) fn clear(maps: &mut [u64], bits: usize) {
     let per_word = 64 / bits;
     let full_words = 256 / per_word;
     // Each complete word can also have padding above its packed fields.
@@ -17,14 +17,14 @@ pub(super) fn clear(maps: &mut [u64], bits: usize) {
     }
 }
 
-fn set_height(maps: &mut [u64], column: usize, bits: usize, value: u64) {
+pub(in crate::world::level::lighting) fn set_height(maps: &mut [u64], column: usize, bits: usize, value: u64) {
     let per_word = 64 / bits;
     let shift = column % per_word * bits;
     let field = ((1u64 << bits) - 1) << shift;
     maps[column / per_word] = (maps[column / per_word] & !field) | ((value << shift) & field);
 }
 
-pub(super) fn section(
+pub(in crate::world::level::lighting) fn section(
     words: &[u64],
     flags: &[u32],
     edges: &[u8],
@@ -34,6 +34,27 @@ pub(super) fn section(
     maps: &mut [u64],
 ) -> Result<i32, ()> {
     let bits = header[0];
+    section_states(bits == -1, |index| {
+        let id = if bits == 0 { 0 } else {
+            let per_word = 64 / bits as usize;
+            ((words[index / per_word] >> ((index % per_word) * bits as usize))
+                & ((1u64 << bits) - 1)) as usize
+        };
+        flags.get(id).copied().ok_or(())
+    }, edges, header, pending, above, maps)
+}
+
+/// The same physical scan over synchronous primary-owner semantic reads.
+/// The caller holds any section guard only for this callback-free operation.
+pub(in crate::world::level::lighting) fn section_states(
+    all_air: bool,
+    mut descriptor: impl FnMut(usize) -> Result<u32, ()>,
+    edges: &[u8],
+    header: &[i32],
+    pending: &mut [u8],
+    above: &mut [u32],
+    maps: &mut [u64],
+) -> Result<i32, ()> {
     let height_bits = header[1] as usize;
     let base = header[3];
     let min_source = header[4];
@@ -45,24 +66,16 @@ pub(super) fn section(
         if pending[column] == 0 {
             continue;
         }
-        if bits == -1 {
+        if all_air {
             above[column] = 0;
         } else {
-            let per_word = if bits == 0 { 1 } else { 64 / bits as usize };
-            let mask = if bits == 0 { 0 } else { (1u64 << bits) - 1 };
             let mut upper = above[column] as usize;
             if upper >= faces {
                 return Err(());
             }
             for y in (0..16).rev() {
                 let index = column + y * 256;
-                let id = if bits == 0 {
-                    0
-                } else {
-                    ((words[index / per_word] >> ((index % per_word) * bits as usize)) & mask)
-                        as usize
-                };
-                let state = *flags.get(id).ok_or(())?;
+                let state = descriptor(index)?;
                 let up = ((state >> 1) & 32767) as usize;
                 let down = (state >> 16) as usize;
                 if up >= faces || down >= faces {

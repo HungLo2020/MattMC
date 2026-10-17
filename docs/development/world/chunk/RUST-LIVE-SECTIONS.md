@@ -1,0 +1,176 @@
+# Rust live block sections
+
+Ordinary canonical block containers now keep their authoritative palette and
+packed words in Rust. Rust admits state IDs, grows palettes in first-use order,
+updates packed words and owns their lifetimes. Java's container keeps scoped CPU
+views for block reads; it retains no Java palette/word mirror and performs no
+native call per read. Changing Java writes currently make one fused downcall;
+unchanged positions need no native mutation.
+
+The implementation is in
+[`chunk/live/`](https://github.com/HungLo2020/MattMC/tree/642943247003d7d8d756a65180f0872b088c13f0/src/main/rust/world/level/chunk/live).
+[`NativeLiveBlockSection`](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/java/net/minecraft/world/level/chunk/NativeLiveBlockSection.java)
+is its transitional CPU bridge. This covers fresh containers, valid saved/network
+imports, generated-section installation and independent nonzero-width copies.
+Zero-width copies retain the shared single-value behavior described below.
+Section [block/fluid counters](RUST-SECTION-COUNTERS.md) now also have native
+owners and fuse with canonical writes. Admitted [live biome palettes and sky
+sampling](../biome/RUST-LIVE-BIOMES.md) have separate Rust owners. Java retains
+chunk orchestration, scheduling and compatibility paths.
+
+[Direct saved-palette loading](RUST-SAVED-PALETTES.md) now creates the primary
+owner without first constructing Java palettes or bit storage. NBT/codec object
+resolution and saved-word stream materialization remain transitional Java work.
+
+At [source `5de23173`](https://github.com/HungLo2020/MattMC/blob/5de23173ae5b61fb17887589d4dff69a6b17fc77/src/main/rust/world/level/chunk/inputs.rs),
+[shared chunk inputs](RUST-DH-CHUNK-INPUTS.md) retain reference-counted primary
+block and counter owners, including owners produced by stage adoption. Consumers
+retain the mutable owner across palette growth; generation views keep independent
+leases. Java validates section/container identities before reusing a binding.
+These bindings are not frozen snapshots and add no copied block/word mirror.
+DH height, emitter, lighting, column and [change-hash](RUST-DH-CHANGE-HASH.md)
+consumers use them, as do [client-residency empty scans](../chunk-loading/RUST-CLIENT-RESIDENCY.md).
+CPU verification and runtime limits remain scoped to the linked guides.
+
+## Consumers and remaining work
+
+[Random tick selection](RUST-RANDOM-TICKS.md) reads primary atomic storage through
+strong generation leases. A saturating owner epoch changes on storage replacement;
+old leases decline and are rebound, while ordinary writes and zero-width aliases
+remain visible without rebuilding block arrays. The tick view holds no owner lock
+across behavior callbacks. Existing mutation exclusion still applies.
+
+Rebuild captures decode directly from the live owner in Rust. Under the owner
+lock, [`Generation::unpack`](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/rust/world/level/chunk/live/mod.rs)
+reads each packed word once and snapshots the local palette once; global storage
+uses IDs directly. Zero-width capture still reads its shared single value once.
+This changes capture preparation, not immutable snapshot ownership or the live
+CPU-view contract. Light propagation now [captures directly into its native pass snapshot](../lighting/RUST-LIGHT-SECTION-INPUTS.md)
+under the owner lock, without an intermediate packed callback payload. Heightmap
+scans still export a coherent native word/ID pair into reusable native scratch.
+The [skylight-source owner](../lighting/RUST-SKYLIGHT-SOURCES.md) consumes sections
+directly: its bridge pins the existing CPU owner
+for one synchronous native scan, with no exported word/palette buffer on that
+route. The existing section APIs and physical occlusion kernel remain shared;
+compatibility sections retain packed export. See that guide for current proof
+and remaining cost limits.
+
+Rust also counts live storage into the existing ordered callback records.
+Canonical [generation-stage handoffs](../levelgen/RUST-STAGE-HANDOFF.md) now
+copy inputs and adopt results entirely within Rust. Generic enumeration and
+codec/network serialization still materialize temporary compatibility data. It is never retained
+beside the authoritative owner. Moving those consumers and bulk write producers
+onto the owner is remaining work: native allocation alone does not prove a speed
+improvement. A native executable and complete Java removal remain unfinished.
+
+## Compatibility and lifetime rules
+
+- Admission checks the exact standard block strategy, canonical registry,
+  built-in storage/palette classes and canonical ordinary block states. Alias
+  palettes, malformed data and unsupported widths decline native adoption.
+  Storage class checks precede its size/word reads, but `Configuration` is an
+  interface and its identity is not guarded before `bitsInStorage()` is called.
+  Do not infer a guarantee that all custom callbacks are untouched. Preserve
+  these actual admission boundaries without normalizing imported palettes.
+  [Admission source](https://github.com/HungLo2020/MattMC/blob/642943247003d7d8d756a65180f0872b088c13f0/src/main/java/net/minecraft/world/level/chunk/NativeLiveBlockSection.java#L62-L89)
+- Palette-ID lookup during writes uses a multiplicative hash of the state ID
+  (`StateIds`); nothing iterates the map, so it cannot affect palette order.
+- Preserve packed padding, palette order, unused entries and requested global
+  configuration bits. A resize uses fresh zero padding and first occurrence in
+  storage order. Hash palettes append the overflow entry before growing.
+- Keep caller exclusion and threading rules. A per-owner native mutex serializes
+  mutation and bulk exports; it never calls Java. A generation's atomic words
+  and palette entries support CPU readers while writes are admitted. Publishing
+  a palette entry precedes publishing its packed index.
+- A `View` holds its section's owner segment, and the owner pins its current
+  generation, so a view needs no registration of its own. When growth replaces
+  a generation, the next view call returns the replaced generations as one
+  lease, registered with the [native reclaimer](NATIVE-RECLAIMER.md) against the
+  previous view, which readers may still hold. Growth publishes a new view; old readers stay valid. No global
+  section registry/cache or extra GPU handles are introduced. Reclamation follows
+  GC; retained generations consume memory until their readers disappear.
+- Preserve the original single-palette alias: zero-width copies share their
+  palette, and a successful zero-width network read replaces it for all copies.
+  Growth detaches only the growing owner. Different-width reads that fail must
+  leave the old shared generation attached. Capture that single value once when
+  making an immutable rebuild snapshot.
+- An unsupported write or explicit compatibility mutation materializes the
+  original Java representation once and transfers ownership back. Invalid writes
+  preserve the original palette-admission-before-index-error behavior. Counting
+  callbacks continue to resolve the current palette after a callback mutates it.
+
+## Local consumer invalidation (in progress)
+
+Authoritative generations now also own saturating mutation revisions for
+[bounded height-field reuse](RUST-DH-HEIGHTMAPS.md#local-bounded-field-reuse-in-progress).
+Every packed write, palette append and shared single-value replacement changes
+that revision; growth supplies a different weak generation identity. Read stamps
+sample under the mutation lock and include the actual shared zero-width value.
+Weak stamps keep allocation identity unique without retaining section contents.
+A saturated revision disables reuse, preserving correctness instead of wrapping.
+
+This is native world-state policy, with no new Java mirror or GPU handle.
+Consumers retain their existing exclusion rules; revisions do not establish a
+whole-world transaction. Focused alias/growth/in-place/invalid-write/saturation
+controls pass in the227-test Rust world suite. Releaseb1611469 also passes the
+full Java task:1,737 ordinary tests (two skipped) and134 parity tests, including
+seven live-storage Java controls. Six observed full-task workers map the exact
+image and all source/native/Frozen/prompt guards match. These CPU checks do not
+accept runtime or performance; assess the additional write bookkeeping in
+realistic workloads. Historical results below do not accept this source.
+
+## Verification
+
+The pinned shared-owner source was inspected for this documentation update;
+no native, Java or game tests were rerun. The release-specific reports below
+remain historical evidence for their own source and workload.
+
+Use JDK25 and a consistently configured release library for Java/runtime checks:
+
+```sh
+CARGO_TARGET_DIR=build/rust/target-tests cargo test --manifest-path src/main/rust/Cargo.toml -- --test-threads=4
+CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=line-tables-only ./gradlew -PmattmcRustProfile=release test -x testRustNative --tests 'net.minecraft.world.level.chunk.*'
+python3 DevUtils/RunWiki.py check
+python3 DevUtils/tests/rendering/RunValidation.py --label <new-label> --all-java-tests --perf
+```
+
+Focused tests compare original Java writes, configurations, words, palette order,
+old returned objects and serialization across growth boundaries, every registered
+state and 324 recorded sections. They cover malformed imports, aliases, padding,
+custom callbacks, copies, retained views, GC readers and rebuild/light exports.
+Real gameplay, lifecycle and Frozen comparisons are still required; source tests
+and fixture timing alone do not establish performance acceptance.
+
+The [`fc1d529d` packed-capture fixture](https://github.com/HungLo2020/MattMC/blob/fc1d529db2cc6ec80a4ad7a86b15007c17d0e097/src/main/rust/world/level/chunk/live/tests.rs)
+compares all 4,096 outputs with per-index reads after 6,000 deterministic writes
+in each of nine requested cardinality scenarios (1, 2, 5, 16, 17, 40, 100, 300,
+2,000). Despite its name, it does not assert every selected width or inspect
+intermediate growth; these final cases do not cover zero-width or 8-bit storage.
+This review inspected the fixture rather than executing Rust. The
+[author's later diagnostic report](../../rendering/GOAL-5-STATUS.md#october-10-capture-minimap-and-dh-cost-report)
+does not replace a runtime acceptance run at the new source.
+
+The author reports that the preceding live-owner checkpoint, release `526af413`, passes 2,415 Rust tests (3 ignored), 113 focused Java
+tests and the full Java suite (1,746 passed, 2 skipped). All seven lifecycle cases
+and both reviewed vanilla/Iris+DH coast pairs pass; VUIDs are zero. All 16
+ABAB runs contain exactly 6,000 frames and have clean runtime/cleanup receipts.
+Source, library and untouched Frozen identity checks pass.
+
+Whole-renderer performance acceptance **fails**: vanilla averages 5.1% below
+Frozen and vanilla+DH 24.3% below, with worse p99 times. Both shader modes beat
+Frozen on average FPS and p99. These results do not establish an isolated
+storage speedup or identify the cause of the DH gap. Historical receipt:
+`validation/native-live-block-sections-alias-final-20261009/summary.json`.
+The [section-counter comparison](RUST-SECTION-COUNTERS.md#verification)
+is a later checkpoint that includes live storage and generation handoff. This
+documentation review did not rerun the suites or inspect the
+unbundled runtime receipts.
+
+Earlier diagnostic profiles used release `4a8f5d18`, before final alias hardening:
+`goal5/live-block-sections-flight-profile-20261009/` and
+`goal5/live-sections-dh-benchmark-profile-20261009/`. Their source, timing,
+camera-position and cleanup receipts pass. Short CPU windows, observer overhead
+and some inconsistent inline stack labels limit attribution. Allocation samples
+and native-worker costs guide further migration; they do not prove throughput
+acceptance. Settled images and bounded profiles cannot certify unseen flicker,
+broad gameplay coverage or long-running memory behavior.

@@ -108,3 +108,10 @@ time and final source/library hashes. Finite tests do not enumerate every
 possible grid; the proof also relies on the stated stable-input/type contract.
 These numbers describe this migration after warmup, not later optimization,
 small compatibility calls, startup or whole-game performance.
+
+The shape source audit also permits the separately pinned
+[closest-point dispatch](RUST-VOXEL-CLOSEST-POINT.md). Original join and
+coordinate behavior remains unchanged.
+
+[Ray-intersection verification](RUST-VOXEL-RAYCAST.md) also permits only its
+exact public dispatch when auditing shared shape sources.

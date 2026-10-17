@@ -3,8 +3,6 @@ package com.seibel.distanthorizons.core.generation;
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGeneratorReturnType;
-import com.seibel.distanthorizons.api.objects.data.DhApiChunk;
-import com.seibel.distanthorizons.api.objects.data.IDhApiFullDataSource;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.generation.tasks.IWorldGenTaskTracker;
@@ -24,9 +22,7 @@ import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
 import com.seibel.distanthorizons.core.util.ExceptionUtil;
 import com.seibel.distanthorizons.core.util.LodUtil.AssertFailureException;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
-import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
 import com.seibel.distanthorizons.core.util.objects.RollingAverage;
-import com.seibel.distanthorizons.core.util.objects.UncheckedInterruptedException;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
@@ -40,6 +36,8 @@ import java.awt.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDebugRenderable
@@ -154,13 +152,20 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		CompletableFuture<WorldGenResult> future = new CompletableFuture<>();
 		synchronized (this.waitingTaskAdmissionLock)
 		{
+			if (this.generatorClosingFuture != null)
+			{
+				return CompletableFuture.completedFuture(WorldGenResult.CreateFail());
+			}
 			// Replacing the same section is not another unit of pending work.
 			if (!this.waitingTasks.containsKey(pos) && this.waitingTasks.size() >= MAX_WAITING_WORLD_GEN_TASKS)
 			{
 				this.rejectedWaitingTaskAdmissions++;
 				return CompletableFuture.completedFuture(WorldGenResult.CreateFail());
 			}
-			this.waitingTasks.put(pos, new WorldGenTask(pos, requiredDataDetail, tracker, future));
+			WorldGenTask task = new WorldGenTask(pos, requiredDataDetail, tracker, future);
+			WorldGenTask previous = this.waitingTasks.put(pos, task);
+			future.whenComplete((result, failure) -> this.waitingTasks.remove(pos, task));
+			if (previous != null) previous.future.cancel(false);
 		}
 		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] Task added to waiting queue. Total waiting tasks: " + this.waitingTasks.size());
 		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] ========== submitRetrievalTask() COMPLETE ==========");
@@ -172,9 +177,13 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	{
 		synchronized (this.waitingTaskAdmissionLock)
 		{
-			this.waitingTasks.forEachKey(100, (genPos) ->
+			this.waitingTasks.forEachKey(Long.MAX_VALUE, (genPos) ->
 			{
-				if (removeIf.accept(genPos)) this.waitingTasks.remove(genPos);
+				if (removeIf.accept(genPos))
+				{
+					WorldGenTask removed = this.waitingTasks.remove(genPos);
+					if (removed != null) removed.future.cancel(false);
+				}
 			});
 		}
 	}
@@ -203,7 +212,8 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	}
 	private synchronized void tryQueueNewWorldGenRequestsAsync()
 	{
-		if (!DhApiWorldProxy.INSTANCE.worldLoaded()
+		if (this.generatorClosingFuture != null
+			|| !DhApiWorldProxy.INSTANCE.worldLoaded()
 			|| DhApiWorldProxy.INSTANCE.getReadOnly())
 		{
 			return;
@@ -218,29 +228,36 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		
 		
 		// queue world generation tasks on its own thread since this process is very slow and would lag the server thread
-		this.queueingThread.execute(() ->
+		try
 		{
-			try
+			this.queueingThread.execute(() ->
 			{
-				this.generator.preGeneratorTaskStart();
-			
-				// queue generation tasks until the generator is full, or there are no more tasks to generate
-				boolean taskStarted = true;
-				while (!this.isGeneratorBusy()
-						&& taskStarted)
+				try
 				{
-					taskStarted = this.tryStartNextWorldGenTask(this.generationTargetPos);
+					this.generator.preGeneratorTaskStart();
+
+					// queue generation tasks until the generator is full, or there are no more tasks to generate
+					boolean taskStarted = true;
+					while (!this.isGeneratorBusy()
+							&& taskStarted)
+					{
+						taskStarted = this.tryStartNextWorldGenTask(this.generationTargetPos);
+					}
 				}
-			}
-			catch (Exception e)
-			{
-				LOGGER.error("queueing exception: " + e.getMessage(), e);
-			}
-			finally
-			{
-				this.generationQueueRunning = false;
-			}
-		});
+				catch (Exception e)
+				{
+					LOGGER.error("queueing exception: " + e.getMessage(), e);
+				}
+				finally
+				{
+					this.generationQueueRunning = false;
+				}
+			});
+		}
+		catch (RejectedExecutionException ignored)
+		{
+			this.generationQueueRunning = false;
+		}
 	}
 	private boolean isGeneratorBusy()
 	{
@@ -261,7 +278,7 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	 */
 	private boolean tryStartNextWorldGenTask(DhBlockPos2D targetPos)
 	{
-		if (this.waitingTasks.isEmpty())
+		if (this.generatorClosingFuture != null || this.waitingTasks.isEmpty())
 		{
 			return false;
 		}
@@ -279,6 +296,11 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		}
 		
 		WorldGenTask closestTask = closestTaskPair.task;
+		if (closestTask.future.isDone())
+		{
+			this.waitingTasks.remove(closestTask.pos, closestTask);
+			return true;
+		}
 		
 		// do we need to modify this task to generate it?
 		if (this.canGenerateDetailLevel(DhSectionPos.getDetailLevel(closestTask.pos)))
@@ -307,7 +329,9 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 				// 		   the newly selected task, we cannot use it,
 				//         as some chunks may have already been written into.
 				
-				//LOGGER.warn("A task already exists for this position, todo: "+DhSectionPos.toString(closestTask.pos));
+				// The running group may already have emitted chunks, so this request cannot
+				// join it safely. Terminate the request instead of dropping its future.
+				closestTask.future.complete(WorldGenResult.CreateFail());
 			}
 			
 			// a task has been started
@@ -344,11 +368,17 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 				{
 					CompletableFuture<WorldGenResult> newFuture = new CompletableFuture<>();
 					childFutures.add(newFuture);
-					this.waitingTasks.put(childPos, new WorldGenTask(
-						childPos, DhSectionPos.getDetailLevel(childPos), closestTask.taskTracker, newFuture
-					));
+					WorldGenTask childTask = new WorldGenTask(
+						childPos, DhSectionPos.getDetailLevel(childPos), closestTask.taskTracker, newFuture);
+					WorldGenTask previous = this.waitingTasks.put(childPos, childTask);
+					newFuture.whenComplete((result, failure) -> this.waitingTasks.remove(childPos, childTask));
+					if (previous != null) previous.future.cancel(false);
 				}
-				closestTask.future.complete(WorldGenResult.CreateSplit(childFutures));
+				if (!closestTask.future.complete(WorldGenResult.CreateSplit(childFutures)))
+				{
+					// The parent was cancelled during expansion; these results have no recipient.
+					childFutures.forEach(future -> future.cancel(false));
+				}
 			}
 			
 			// return true so we attempt to generate again
@@ -364,38 +394,39 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		int generationRequestChunkWidthCount = BitShiftUtil.powerOfTwo(DhSectionPos.getDetailLevel(taskPos) - taskDetailLevel - 4); // minus 4 is equal to dividing by 16 to convert to chunk scale
 		
 		long generationStartMsTime = System.currentTimeMillis();
-		CompletableFuture<Void> generationFuture = this.startGenerationEvent(taskPos, taskDetailLevel, generationRequestChunkWidthCount, newTaskGroup.group::consumeDataSource);
-		generationFuture.thenRun(() -> 
-		{
-			long totalGenTimeInMs = System.currentTimeMillis() - generationStartMsTime;
-			int chunkCount = generationRequestChunkWidthCount * generationRequestChunkWidthCount;
-			double timePerChunk = (double)totalGenTimeInMs / (double)chunkCount;
-			this.rollingAverageChunkGenTimeInMs.add(timePerChunk);
-		});
-		
+		// Own the request before calling the generator. Submission can complete inline,
+		// throw, or overlap queue closure before returning its actual worker future.
+		GenerationFuture generationFuture = new GenerationFuture();
 		newTaskGroup.genFuture = generationFuture;
-		LodUtil.assertTrue(newTaskGroup.genFuture != null);
-		
-		newTaskGroup.genFuture.whenComplete((voidObj, exception) ->
+		synchronized (this.waitingTaskAdmissionLock)
 		{
+			if (this.generatorClosingFuture != null)
+			{
+				newTaskGroup.group.worldGenTasks.forEach(task -> task.future.complete(WorldGenResult.CreateFail()));
+				return;
+			}
+			this.inProgressGenTasksByLodPos.put(taskPos, newTaskGroup);
+		}
+		generationFuture.whenComplete((voidObj, exception) ->
+		{
+			this.inProgressGenTasksByLodPos.remove(taskPos, newTaskGroup);
 			try
 			{
 				if (exception != null)
 				{
-					// don't log the shutdown exceptions
 					if (!ExceptionUtil.isInterruptOrReject(exception))
 					{
 						LOGGER.error("Error generating data for pos: " + DhSectionPos.toString(taskPos), exception);
 					}
-					
 					newTaskGroup.group.worldGenTasks.forEach(worldGenTask -> worldGenTask.future.complete(WorldGenResult.CreateFail()));
 				}
 				else
 				{
+					long totalGenTimeInMs = System.currentTimeMillis() - generationStartMsTime;
+					int chunkCount = generationRequestChunkWidthCount * generationRequestChunkWidthCount;
+					this.rollingAverageChunkGenTimeInMs.add((double) totalGenTimeInMs / (double) chunkCount);
 					newTaskGroup.group.worldGenTasks.forEach(worldGenTask -> worldGenTask.future.complete(WorldGenResult.CreateSuccess(taskPos)));
 				}
-				boolean worked = this.inProgressGenTasksByLodPos.remove(taskPos, newTaskGroup);
-				LodUtil.assertTrue(worked, "Unable to find in progress generator task with position ["+DhSectionPos.toString(taskPos)+"]");
 			}
 			catch (Exception e)
 			{
@@ -406,14 +437,27 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 				this.tryQueueNewWorldGenRequestsAsync();
 			}
 		});
-		
-		this.inProgressGenTasksByLodPos.put(taskPos, newTaskGroup);
+		if (generationFuture.isDone()) return;
+		try
+		{
+			CompletableFuture<Void> workerFuture = Objects.requireNonNull(this.startGenerationEvent(
+				taskPos, taskDetailLevel, generationRequestChunkWidthCount,
+				newTaskGroup.group::consumeDataSource, newTaskGroup.group::consumeNativeColumns));
+			generationFuture.attach(workerFuture);
+		}
+		catch (Throwable failure)
+		{
+			generationFuture.completeExceptionally(failure);
+			// Release all request ownership before allowing a fatal generator error to escape.
+			if (failure instanceof Error error) throw error;
+		}
 	}
 	private CompletableFuture<Void> startGenerationEvent(
 		long requestPos, 
 		byte targetDataDetail,
 		int generationRequestChunkWidthCount,
-		Consumer<FullDataSourceV2> dataSourceConsumer
+		Consumer<FullDataSourceV2> dataSourceConsumer,
+		@org.jetbrains.annotations.Nullable Consumer<net.minecraft.world.level.chunk.NativeDhColumns> nativeColumnsConsumer
 		)
 	{
 		DhChunkPos chunkPosMin = new DhChunkPos(DhSectionPos.getSectionBBoxPos(requestPos).getCornerBlockPos());
@@ -447,10 +491,19 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 								DhLightingEngine.INSTANCE.bakeChunkBlockLighting(chunkWrapper, nearbyChunkList, maxSkyLight);
 							}
 							
-							try (FullDataSourceV2 dataSource = LodDataBuilder.createFromChunk(this.level.getLevelWrapper(), chunkWrapper))
+							// Native columns merge straight into the recipients; no producer data source.
+							var nativeColumns = LodDataBuilder.nativeColumnsFromChunk(this.level.getLevelWrapper(), chunkWrapper);
+							// A chunk that cannot be converted (logged once) contributes no LOD data.
+							if (nativeColumns != null && nativeColumnsConsumer != null)
 							{
-								LodUtil.assertTrue(dataSource != null);
-								dataSourceConsumer.accept(dataSource);
+								nativeColumnsConsumer.accept(nativeColumns);
+							}
+							else if (nativeColumns != null)
+							{
+								try (FullDataSourceV2 dataSource = FullDataSourceV2.createNative(nativeColumns))
+								{
+									dataSourceConsumer.accept(dataSource);
+								}
 							}
 						}
 						catch (ClassCastException e)
@@ -466,84 +519,11 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 					}
 				);
 			}
-			case API_CHUNKS: 
-			{
-				return this.generator.generateApiChunks(
-					chunkPosMin.getX(), chunkPosMin.getZ(),
-					generationRequestChunkWidthCount,
-					targetDataDetail,
-					generatorMode,
-					ThreadPoolUtil.getWorldGenExecutor(),
-					(DhApiChunk dataPoints) ->
-					{
-						try(FullDataSourceV2 dataSource = LodDataBuilder.createFromApiChunkData(dataPoints, this.generator.runApiValidation()))
-						{
-							dataSourceConsumer.accept(dataSource);
-						}
-						catch (DataCorruptedException | IllegalArgumentException e)
-						{
-							LOGGER.error("World generator returned a corrupt chunk. Error: [" + e.getMessage() + "]. World generator disabled.", e);
-							Config.Common.WorldGenerator.enableDistantGeneration.set(false);
-						}
-						catch (ClassCastException e)
-						{
-							LOGGER.error("World generator return type incorrect. Error: [" + e.getMessage() + "]. World generator disabled.", e);
-							Config.Common.WorldGenerator.enableDistantGeneration.set(false);
-						}
-					}
-				);
-			}
-			case API_DATA_SOURCES:
-			{
-				// done to reduce GC overhead
-				FullDataSourceV2 pooledDataSource = FullDataSourceV2.createEmpty(requestPos);
-				// set here so the API user doesn't have to pass in this value anywhere themselves
-				pooledDataSource.setRunApiChunkValidation(this.generator.runApiValidation());
-				
-				// only apply to children if we aren't at the bottom of the tree
-				
-				pooledDataSource.applyToChildren = DhSectionPos.getDetailLevel(pooledDataSource.getPos()) > DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL;
-				pooledDataSource.applyToParent = DhSectionPos.getDetailLevel(pooledDataSource.getPos()) < DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL + 12;
-				
-				
-				return this.generator.generateLod(
-						chunkPosMin.getX(), chunkPosMin.getZ(),
-						DhSectionPos.getX(requestPos), DhSectionPos.getZ(requestPos),
-						(byte) (DhSectionPos.getDetailLevel(requestPos) - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL),
-						pooledDataSource,
-						generatorMode,
-						ThreadPoolUtil.getWorldGenExecutor(),
-						(IDhApiFullDataSource apiDataSource) ->
-						{
-							try
-							{
-								FullDataSourceV2 fullDataSource = (FullDataSourceV2) apiDataSource;
-								try
-								{
-									dataSourceConsumer.accept(fullDataSource);
-								}
-								finally
-								{
-									fullDataSource.close();
-								}
-							}
-							catch (IllegalArgumentException e)
-							{
-								LOGGER.error("World generator returned a corrupt data source. Error: [" + e.getMessage() + "]. World generator disabled.", e);
-								Config.Common.WorldGenerator.enableDistantGeneration.set(false);
-							}
-							catch (ClassCastException e)
-							{
-								LOGGER.error("World generator return type incorrect. Error: [" + e.getMessage() + "]. World generator disabled.", e);
-								Config.Common.WorldGenerator.enableDistantGeneration.set(false);
-							}
-						}
-				);
-			}
 			default: 
 			{
+				// Only the built-in generator (vanilla chunks) exists; there are no API generators.
 				Config.Common.WorldGenerator.enableDistantGeneration.set(false);
-				throw new AssertFailureException("Unknown return type: " + returnType);
+				throw new AssertFailureException("Unsupported world generator return type: " + returnType);
 			}
 		}
 	}
@@ -598,47 +578,37 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	
 	@Override public CompletableFuture<Void> startClosingAsync(boolean cancelCurrentGeneration, boolean alsoInterruptRunning)
 	{
+		ArrayList<InProgressWorldGenTaskGroup> runningTasks;
+		CompletableFuture<Void> closingFuture;
+		synchronized (this.waitingTaskAdmissionLock)
+		{
+			if (this.generatorClosingFuture != null) return this.generatorClosingFuture;
+			// Publish closure before cancelling anything: completion callbacks cannot restart it.
+			closingFuture = new CompletableFuture<>();
+			this.generatorClosingFuture = closingFuture;
+			this.waitingTasks.values().forEach(task -> task.future.cancel(false));
+			this.waitingTasks.clear();
+			runningTasks = new ArrayList<>(this.inProgressGenTasksByLodPos.values());
+		}
 		LOGGER.info("Closing world gen queue");
 		this.queueingThread.shutdownNow();
-		
-		
-		// stop and remove any in progress tasks
-		ArrayList<CompletableFuture<Void>> inProgressTasksCancelingFutures = new ArrayList<>(this.inProgressGenTasksByLodPos.size());
-		this.inProgressGenTasksByLodPos.values().forEach(runningTaskGroup ->
+		ArrayList<CompletableFuture<Void>> completions = new ArrayList<>(runningTasks.size());
+		for (InProgressWorldGenTaskGroup runningTask : runningTasks)
 		{
-			CompletableFuture<Void> genFuture = runningTaskGroup.genFuture; // Do this to prevent it getting swapped out
-			if (genFuture == null)
+			CompletableFuture<Void> generationFuture = runningTask.genFuture;
+			if (cancelCurrentGeneration) generationFuture.cancel(alsoInterruptRunning);
+			completions.add(generationFuture.handle((ignored, exception) ->
 			{
-				// genFuture's shouldn't be null, but sometimes they are...
-				LOGGER.info("Null gen future: "+runningTaskGroup.group.pos);
-				return;
-			}
-			
-			
-			if (cancelCurrentGeneration)
-			{
-				genFuture.cancel(alsoInterruptRunning);
-			}
-			
-			inProgressTasksCancelingFutures.add(genFuture.handle((voidObj, exception) ->
-			{
-				if (exception instanceof CompletionException)
+				if (exception != null && !ExceptionUtil.isInterruptOrReject(exception))
 				{
-					exception = exception.getCause();
+					LOGGER.error("Error when terminating data generation for pos: ["+DhSectionPos.toString(runningTask.group.pos)+"].", exception);
 				}
-				
-				if (!UncheckedInterruptedException.isInterrupt(exception) 
-					&& !(exception instanceof CancellationException))
-				{
-					LOGGER.error("Error when terminating data generation for pos: ["+DhSectionPos.toString(runningTaskGroup.group.pos)+"], error: ["+exception.getMessage()+"].", exception);
-				}
-				
 				return null;
 			}));
-		});
-		this.generatorClosingFuture = CompletableFuture.allOf(inProgressTasksCancelingFutures.toArray(new CompletableFuture[0]));
-		
-		return this.generatorClosingFuture;
+		}
+		CompletableFuture.allOf(completions.toArray(new CompletableFuture[0]))
+			.whenComplete((ignored, failure) -> closingFuture.complete(null));
+		return closingFuture;
 	}
 	
 	@Override
@@ -735,6 +705,47 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	// helper classes //
 	//================//
 	
+	/** Retains cancellation policy while the generator is still returning its worker future. */
+	private static final class GenerationFuture extends CompletableFuture<Void>
+	{
+		private final AtomicReference<CompletableFuture<Void>> worker = new AtomicReference<>();
+		private final AtomicReference<Boolean> interruptRequested = new AtomicReference<>();
+		private final AtomicBoolean cancellationForwarded = new AtomicBoolean();
+
+		@Override public boolean cancel(boolean mayInterruptIfRunning)
+		{
+			if (this.isDone()) return this.isCancelled();
+			this.interruptRequested.compareAndSet(null, mayInterruptIfRunning);
+			boolean cancelled = super.cancel(mayInterruptIfRunning);
+			if (cancelled) this.forwardCancellation();
+			return cancelled;
+		}
+
+		void attach(CompletableFuture<Void> workerFuture)
+		{
+			this.worker.set(workerFuture);
+			workerFuture.whenComplete((ignored, failure) ->
+			{
+				// A worker's cancellation needs no second cancellation sent back to it.
+				if (workerFuture.isCancelled()) super.cancel(false);
+				else if (failure != null) this.completeExceptionally(failure);
+				else this.complete(null);
+			});
+			this.forwardCancellation();
+		}
+
+		private void forwardCancellation()
+		{
+			CompletableFuture<Void> workerFuture = this.worker.get();
+			Boolean interrupt = this.interruptRequested.get();
+			if (workerFuture != null && interrupt != null && this.isCancelled()
+				&& this.cancellationForwarded.compareAndSet(false, true))
+			{
+				workerFuture.cancel(interrupt);
+			}
+		}
+	}
+
 	private static class TaskDistancePair
 	{
 		public final WorldGenTask task;

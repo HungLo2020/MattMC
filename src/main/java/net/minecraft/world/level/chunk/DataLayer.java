@@ -13,6 +13,8 @@ public class DataLayer {
 	@Nullable
 	protected byte[] data;
 	private int defaultValue;
+	@Nullable
+	private NativeLightLayer nativeLayer;
 
 	public DataLayer() {
 		this(0);
@@ -20,6 +22,7 @@ public class DataLayer {
 
 	public DataLayer(int i) {
 		this.defaultValue = i;
+		if (getClass() == DataLayer.class) this.nativeLayer = NativeLightLayer.create(i);
 	}
 
 	public DataLayer(byte[] bs) {
@@ -28,6 +31,87 @@ public class DataLayer {
 		if (bs.length != 2048) {
 			throw (IllegalArgumentException)Util.pauseInIde(new IllegalArgumentException("DataLayer should be 2048 bytes not: " + bs.length));
 		}
+	}
+
+    /** Independent import; callers retaining a mutable array use the public constructor. */
+    public static DataLayer copyOf(byte[] bytes) {
+        // Keep the original malformed-array constructor and exception path.
+        if (bytes == null || bytes.length != SIZE) return new DataLayer((byte[])bytes.clone());
+        return new DataLayer(NativeLightLayer.importBytes(bytes));
+    }
+
+    private DataLayer(NativeLightLayer owner) {
+        this.nativeLayer = owner;
+        this.defaultValue = owner.rawDefault();
+    }
+
+    /** Package-internal saved decode handoff; consumes independent native leases. */
+    static DataLayer adoptDecoded(java.lang.foreign.MemorySegment owner, java.lang.foreign.MemorySegment view) {
+        var layer = NativeLightLayer.adoptOwned(owner, view);
+        return new DataLayer(layer);
+    }
+
+    /** Refreshes this facade after native materialization; no array escape. */
+    void refreshNativeLightView() {
+        if(!this.hasNativeLight())throw new IllegalStateException("Native light generation escaped during a coordinator write");
+        this.nativeLayer.refreshView();
+    }
+
+    @Nullable
+    NativeLightLayer nativeLightLayer() { return this.hasNativeLight() ? this.nativeLayer : null; }
+
+    private boolean hasNativeLight() { return this.nativeLayer != null && this.nativeLayer.valid(); }
+
+    /** Caller-retained CPU owner for the Rust light map; never retain this raw address in Java. */
+    public java.lang.foreign.MemorySegment nativeLightOwnerForMap() {
+        return getClass() == DataLayer.class && this.hasNativeLight()
+            ? this.nativeLayer.ownerForNativeCall() : java.lang.foreign.MemorySegment.NULL;
+    }
+
+    /** A read-only CPU generation lease; the returned segment owns its lifetime. */
+    @Nullable
+    public java.lang.foreign.MemorySegment nativeLightView() {
+        return getClass() == DataLayer.class && this.hasNativeLight()
+            ? this.nativeLayer.view().metadata() : null;
+    }
+
+    @Nullable
+    public DataLayer repeatNativeFirstLightLayer() {
+        return !this.hasNativeLight() ? null : new DataLayer(this.nativeLayer.repeatFirst());
+    }
+
+    /** Installs a native propagation result without exposing a mutable array. */
+    public boolean installNativeLightResult(long engine, int index) {
+        if (!this.hasNativeLight()) return false;
+        this.nativeLayer.installResult(engine, index);
+        return true;
+    }
+
+    /** Retains lazy allocation until the original sky loop actually writes. */
+    public boolean seedNativeSkyLight(int[] columns, int bottom, int minX, int minZ, long[] entries, int[] output) {
+        if (!this.hasNativeLight()) return false;
+        if (!this.nativeLayer.allocated() && (this.nativeLayer.rawDefault() < 0 || this.nativeLayer.rawDefault() > 15)) return false;
+        this.nativeLayer.seedSky(columns, bottom, minX, minZ, entries, output);
+        return true;
+    }
+
+    /** Seeds the canonical native work owner without exporting entry pairs. */
+    public boolean seedNativeSkyLightQueued(java.lang.foreign.MemorySegment columns, int bottom, int minX, int minZ,
+            net.minecraft.world.level.lighting.NativeLightQueues queues, java.lang.foreign.MemorySegment output) {
+        if (!this.hasNativeLight()) return false;
+        if (!this.nativeLayer.allocated() && (this.nativeLayer.rawDefault() < 0 || this.nativeLayer.rawDefault() > 15)) return false;
+        this.nativeLayer.seedSkyQueued(columns, bottom, minX, minZ, queues, output);
+        return true;
+    }
+
+	// Compatibility array projection. Native consumers use the leased CPU view.
+	@Nullable
+	public byte[] dataForNativeLight() {
+        return this.hasNativeLight() && this.nativeLayer.allocated() ? this.getData() : this.data;
+	}
+
+	public int defaultValueForNativeLight() {
+        return !this.hasNativeLight() ? this.defaultValue : this.nativeLayer.rawDefault();
 	}
 
 	public int get(int i, int j, int k) {
@@ -43,6 +127,12 @@ public class DataLayer {
 	}
 
 	private int get(int i) {
+        if (this.hasNativeLight()) {
+            if (!this.nativeLayer.allocated()) return this.nativeLayer.rawDefault();
+            if (i >= 0 && i < 4096) return this.nativeLayer.view().get(i);
+            // Preserve the original array exception, without a native unchecked read.
+            this.getData();
+        }
 		if (this.data == null) {
 			return this.defaultValue;
 		} else {
@@ -53,6 +143,10 @@ public class DataLayer {
 	}
 
 	private void set(int i, int j) {
+        if (this.hasNativeLight() && i >= 0 && i < 4096) {
+            this.nativeLayer.set(i, j);
+            return;
+        }
 		byte[] bs = this.getData();
 		int k = getByteIndex(i);
 		int l = getNibbleIndex(i);
@@ -70,6 +164,8 @@ public class DataLayer {
 	}
 
 	public void fill(int i) {
+        if (this.nativeLayer != null) this.nativeLayer.fill(i);
+        else if (getClass() == DataLayer.class) this.nativeLayer = NativeLightLayer.create(i);
 		this.defaultValue = i;
 		this.data = null;
 	}
@@ -85,6 +181,12 @@ public class DataLayer {
 	}
 
 	public byte[] getData() {
+        if (this.hasNativeLight()) {
+            this.data = this.nativeLayer.exportBytes();
+            this.defaultValue = this.nativeLayer.rawDefault();
+            this.nativeLayer.invalidate();
+            return this.data;
+        }
 		if (this.data == null) {
 			this.data = new byte[2048];
 			if (this.defaultValue != 0) {
@@ -96,6 +198,10 @@ public class DataLayer {
 	}
 
 	public DataLayer copy() {
+        if (getClass() == DataLayer.class) {
+            if (this.hasNativeLight()) return new DataLayer(this.nativeLayer.copy());
+            if (this.data != null && this.data.length == 2048) return new DataLayer(NativeLightLayer.importBytes(this.data));
+        }
 		return this.data == null ? new DataLayer(this.defaultValue) : new DataLayer((byte[])this.data.clone());
 	}
 
@@ -131,14 +237,14 @@ public class DataLayer {
 	}
 
 	public boolean isDefinitelyHomogenous() {
-		return this.data == null;
+		return !this.hasNativeLight() ? this.data == null : !this.nativeLayer.allocated();
 	}
 
 	public boolean isDefinitelyFilledWith(int i) {
-		return this.data == null && this.defaultValue == i;
+		return this.isDefinitelyHomogenous() && this.defaultValueForNativeLight() == i;
 	}
 
 	public boolean isEmpty() {
-		return this.data == null && this.defaultValue == 0;
+		return this.isDefinitelyFilledWith(0);
 	}
 }

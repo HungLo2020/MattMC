@@ -118,7 +118,7 @@ fn observe_inner(
                 let Some((key, resource)) = frontend
                     .mesh_resources
                     .iter()
-                    .find(|(_, r)| r.resource_set == set)
+                    .find(|(_, r)| r.resource_set == Some(set))
                 else {
                     continue;
                 };

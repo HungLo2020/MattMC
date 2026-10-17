@@ -4,6 +4,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import net.minecraft.world.level.block.state.properties.NativeBlockFamilies;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -57,18 +58,25 @@ public class DoorBlock extends Block {
 		return CODEC;
 	}
 
+	/** Registered content takes its family configuration from Rust. */
+	public DoorBlock(BlockBehaviour.Properties properties) {
+		this(NativeBlockFamilies.set(properties, NativeBlockFamilies.Kind.DOOR), properties);
+	}
+
 	public DoorBlock(BlockSetType blockSetType, BlockBehaviour.Properties properties) {
 		super(properties.sound(blockSetType.soundType()));
 		this.type = blockSetType;
-		this.registerDefaultState(
-			this.stateDefinition
-				.any()
-				.setValue(FACING, Direction.NORTH)
-				.setValue(OPEN, false)
-				.setValue(HINGE, DoorHingeSide.LEFT)
-				.setValue(POWERED, false)
-				.setValue(HALF, DoubleBlockHalf.LOWER)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition
+					.any()
+					.setValue(FACING, Direction.NORTH)
+					.setValue(OPEN, false)
+					.setValue(HINGE, DoorHingeSide.LEFT)
+					.setValue(POWERED, false)
+					.setValue(HALF, DoubleBlockHalf.LOWER)
+			);
+		}
 	}
 
 	public BlockSetType type() {

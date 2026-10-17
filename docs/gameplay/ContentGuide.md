@@ -2,23 +2,39 @@
 
 MattMC combines vanilla-derived Minecraft content with integrated additions. Use the pages below to find current recipes, interactions, and limitations. A familiar name from a mod does not guarantee that all of its original systems are available in MattMC.
 
-Browse all registered blocks in the [alphabetical Blocks directory](blocks/Blocks.md), or by [material and purpose](blocks/catalog/index.md). These inventories expose missing articles explicitly; they do not imply that detailed block coverage is finished.
+Browse the 1,235 IDs in the corrected [source-backed alphabetical Blocks directory](blocks/Blocks.md), or by [material and purpose](blocks/catalog/index.md). Every listed ID currently has a related guide, but family routes do not imply that every variant detail is finished. Use this page for curated topics and the directories for exhaustive name lookup.
 
-## Vanilla-derived gameplay
+## Shared gameplay guides {#vanilla-derived-gameplay}
 
 ### Getting started and survival
 
+- [Ticks and chunk activity](mechanics/TicksAndChunkActivity.md), [Light](mechanics/Light.md) and [Loot and drops](mechanics/LootAndDrops.md): active farms, lighting requirements and missing-reward diagnosis
+
+- [World types](mechanics/WorldTypes.md): generation presets, Superflat and Single Biome customization, Skyblock and Debug limits
+- [Locator Bar](mechanics/LocatorBar.md): built-in tracked-entity directions, display priorities and hiding conditions
+
+- [Game rules](mechanics/GameRules.md): choose, inspect and change shared world settings
+
+- [Dedicated servers](mechanics/DedicatedServers.md): current launch routes, save locations, permissions and normal shutdown
+- [World data packs](mechanics/WorldDataPacks.md): creation selection, loaded-world commands and reload limits
+
+- [Chat and closed captions](mechanics/ChatAndCaptions.md) and [Advancements and statistics](mechanics/AdvancementsAndStatistics.md): readable information, progress and recorded counters
+
+- [Create and preserve a local world](mechanics/LocalWorlds.md), [join or host multiplayer](mechanics/MultiplayerAndLAN.md), and [adjust graphics or packs](mechanics/GraphicsAndPacks.md): current menu workflows and their save, permission and compatibility limits
+
+- [Time, weather, and sleep](mechanics/TimeWeatherAndSleep.md): shared clocks, local precipitation, independent cycle rules, multiplayer rest and timer limits
+
 - [Snow and Powder Snow](blocks/Snow.md) and [Ice families](blocks/Ice.md): collecting, layering, melting, freezing, weather and slippery floors
 
-- [Tree logs and roots](blocks/TreeLogsAndRoots.md) and [Leaves/Propagules](blocks/TreeLeaves.md): exact timber variants, stripping, leaf drops/decay and mangrove materials
+- [Tree logs and roots](blocks/TreeLogsAndRoots.md) and [Leaves/Propagules](blocks/TreeLeaves.md): exact timber variants, stripping, leaf drops/decay and mangrove materials; [leaf variant entries](blocks/TreeLeaves.md#leaf-families-and-drops) connect collection, Fortune and persistent placement; [Nether timber forms](blocks/TreeLogsAndRoots.md#logs-wood-stems-and-hyphae) distinguish stem/hyphae conversions, stripping and fuel limits
 - [Water and Lava](blocks/WaterAndLava.md) and [Bubble Columns](blocks/BubbleColumns.md): fluid sources/flow, bucket rules, reusable pools and vertical transport
 
 - [Soil, Sand, and Gravel](blocks/SoilSandAndGravel.md): collection, Grass/Mycelium spread, tool conversions, falling terrain, Flint, and suspicious-block care
 
 - [Game modes](gamemodes/Gamemodes.md): all four modes and permission-aware switching
 - [Oak](blocks/Oak.md), [Logs](items/OakLog.md), [Planks](items/OakPlanks.md), [Saplings](items/OakSapling.md), and [Sticks](items/Stick.md): the renewable beginner wood loop
-- [Stone](blocks/Stone.md) and [Deepslate](blocks/Deepslate.md): ordinary/mossy/brick construction, exact crafting/stonecutting choices, shaped placement, infestation, and reinforced-block limits
-- [Crafting Table](blocks/CraftingTable.md), [Furnace](blocks/Furnace.md), and [Chest](blocks/Chest.md): essential workstations and storage
+- [Stone](blocks/Stone.md) and [Deepslate](blocks/Deepslate.md): ordinary/mossy/brick construction, exact crafting/stonecutting choices, shaped placement, infestation, and reinforced-block limits; [Deepslate item variants](blocks/Deepslate.md#building-variants) give exact recipe inputs and collection outcomes
+- [Crafting Table](blocks/CraftingTable.md), [Furnace](blocks/Furnace.md), and [Chest](blocks/Chest.md): essential workstations, storage, and the Blast Furnace/Smoker recipe and fuel comparison
 - [Crafting](crafting/Crafting.md) and [Smelting](smelting/Smelting.md): current recipes, device types, and troubleshooting
 - [Beds](blocks/Bed.md) and [Torches](blocks/Torch.md): sleeping safety and basic lighting
 - [Coal](items/Coal.md) and [Charcoal](items/Charcoal.md): fuel, torch ingredients, and recipe distinctions
@@ -26,9 +42,33 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Hunger and healing](mechanics/Hunger.md): food, saturation, sprinting, and regeneration
 - [Commands](commands/Commands.md): permission-aware examples, targeting, and shared time/weather scope
 
+- [Campfires](blocks/Campfires.md): four-slot cooking, damage, extinguishing and smoke
+
 ### Farming, food, and animal care
 
+- [Farmer crop tending](mobs/Villager.md#farmer-crop-tending): work access, harvest and planting choices, mixed supplies and Bone Meal
+
+- [Terrapin bucket transport](items/BucketOfTerrapin.md) and [Anaconda](items/AnacondaSpawnEgg.md), [Anteater](items/AnteaterSpawnEgg.md), [Atlatitan](items/AtlatitanSpawnEgg.md) and [Axolotl](items/AxolotlSpawnEgg.md) spawn eggs: preserved traits, release risks, adult/baby workflows and access limits
+
+- [Villager breeding and population](mobs/Villager.md#breeding-and-population): feeding both parents, reachable spare homes, birth, growth and troubleshooting
+
+- [Bison](mobs/Bison.md) and [Moose](mobs/Moose.md): browser/egg access, source-verified breeding, dispenser Fur harvesting, Antler shedding, and missing natural/recipe resource routes
+
+- [Alligator Snapping Turtle](mobs/AlligatorSnappingTurtle.md), [Catfish](mobs/Catfish.md), and [Lobster](mobs/Lobster.md): breathing/enclosure care, collecting items, bucket risks and separate food supplies
+
+- [Food reference](items/FoodReference.md): exact hunger/saturation values, consumption differences, and the distinction between handheld food, drinks, and placed food
+
+- [Mooshroom](mobs/Mooshroom.md), [Goat](mobs/Goat.md), and [Polar Bear](mobs/PolarBear.md): stew/milk routes, horn collection, breeding differences and cub safety
+
+- [Allay](mobs/Allay.md): finding helpers, sample filters, item delivery, music and Amethyst duplication
+
+- [Vines and Glow Berries](blocks/Vines.md), [Glow Lichen](blocks/GlowLichen.md), [Moss](blocks/MossAndPaleMoss.md), and [ceiling plants](blocks/HangingRootsAndSporeBlossom.md): support, water, growth, harvesting, light and verified starter routes
+
+- [Small and tall flowers](blocks/Flowers.md): exact dye/stew variants, soils, Bone Meal routes, Bee choices and Wither Rose limits
+
 - [Saplings and Azaleas](blocks/SaplingsAndAzaleas.md) and [Crimson/Warped Fungi](blocks/NetherFungi.md): planting patterns, Bone Meal, growth space and recovery
+- [Acacia Sapling](items/AcaciaSapling.md), [Azalea](items/Azalea.md), [Pewen Sapling](items/PewenSapling.md) and [Ancient Sapling](items/AncientSapling.md): starting supplies, active growth and custom-tree access limits
+- Sapling item routes: [Birch](items/BirchSapling.md), [Cherry](items/CherrySapling.md), [Dark Oak](items/DarkOakSapling.md), [Jungle](items/JungleSapling.md), [Pale Oak](items/PaleOakSapling.md), [Spruce](items/SpruceSapling.md) and [Flowering Azalea](items/FloweringAzalea.md), with acquisition, planting and growth differences
 
 - [Rabbit](mobs/Rabbit.md) and [Fox](mobs/Fox.md): breeding/coats/trust, crop and berry interactions, carried items, and Rabbit food/material drops
 - [Cat](mobs/Cat.md) and [Ocelot](mobs/Ocelot.md): ownership versus trust, spawning, food/breeding, controls, gifts, predators, and persistence
@@ -36,6 +76,9 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Llama](mobs/Llama.md), [Trader Llama](mobs/TraderLlama.md), and [Camel](mobs/Camel.md): cargo/caravans, merchant retention, two-player travel, feeding, breeding, and dash controls
 - [Cactus](blocks/Cactus.md) and [Bamboo](blocks/Bamboo.md): planting/growth, harvesting, Green Dye, fuel, and [Scaffolding](blocks/Scaffolding.md) construction
 - [Horse](mobs/Horse.md), [Donkey](mobs/Donkey.md), and [Mule](mobs/Mule.md): taming, feeding, riding/equipment, cargo, breeding, inheritance, and recovery
+- Horse armor: [Copper](items/CopperHorseArmor.md), [Iron](items/IronHorseArmor.md), [Golden](items/GoldenHorseArmor.md), [Diamond](items/DiamondHorseArmor.md) and [Netherite](items/NetheriteHorseArmor.md) acquisition, equipment limits and upgrade/recovery routes
+- [Strider](mobs/Strider.md) and [Happy Ghast](mobs/HappyGhast.md): Lava travel, ghastling growth, flight controls, [steering tools](items/WarpedFungusonaStick.md), and [Harness colors and recovery](items/Harnesses.md)
+- [Turtle](mobs/Turtle.md), [Terrapin](mobs/Terrapin.md), [Turtle Scute](items/TurtleScute.md), and [Turtle Shell](items/TurtleShell.md): nesting homes, growth rewards, diving and current lifecycle/effect limits
 - [Frog](mobs/Frog.md), [Frogspawn](blocks/Frogspawn.md), and [Tadpole](mobs/Tadpole.md): shoreline breeding, hatching/growth, bucket transport, maturation variants, and Froglights
 - [Wheat farming](blocks/Wheat.md) and [Farmland](blocks/Farmland.md): hydration, growth, and MattMC's area-harvest controls
 - [Root crops](blocks/RootCrops.md): Carrot, Potato, and Beetroot growth, custom harvesting, food, and cooking
@@ -50,20 +93,46 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Wolf](mobs/Wolf.md) and [Wolf Armor](items/WolfArmor.md): real spawn/food routes, owner care, scute repairs, and fully damaged armor behavior
 - [Axolotl](mobs/Axolotl.md), [Dolphin](mobs/Dolphin.md), and [Bucket of Axolotl](items/BucketOfAxolotl.md): aquatic care, breeding, player assistance, structure guidance, and bucket-state preservation
 
+- [Nylium and Nether vegetation](blocks/NetherGroundAndVegetation.md): renewable ground, roots, sprouts and fungus-cap blocks
+- [Composter](blocks/Composter.md) and [Stonecutter](blocks/Stonecutter.md): accepted inputs, output transactions, automation limits and village jobs
+- [Mushrooms](blocks/Mushrooms.md): light and support, spreading, huge growth, cap/stem recovery and building faces
+- [Dripleaves](blocks/Dripleaves.md) and [Lily Pads](blocks/LilyPad.md): water, support, growth, recovery and tilting platforms
+- [Shrubs and Dry Grass](blocks/ShrubsAndDryGrass.md): exact item identities, harvesting, Bone Meal, light and starter sources
+- [Cocoa](blocks/Cocoa.md) and [Sweet Berry Bush](blocks/SweetBerryBush.md): support, growth, harvesting and food/dye uses
+- [Grass and Ferns](blocks/GrassAndFerns.md), [flowerbeds/Leaf Litter](blocks/FlowerbedsAndLeafLitter.md) and [Eyeblossoms](blocks/Eyeblossoms.md): exact collection, propagation, coverage and day/night behavior
+- [Torchflower](blocks/Torchflower.md) and [Pitcher Plant](blocks/PitcherPlant.md): actual Sniffer acquisition, crop-to-flower lifecycles and separate harvest rules
+- [Placed animal eggs](blocks/AnimalEggs.md): species-specific hatching, collection, trampling and current acquisition gaps
+
 ### Materials, equipment, and enchanting
 
-- [Amethyst](blocks/Amethyst.md): protect budding blocks, grow and harvest crystals, use Shards and distinguish decoration from renewable growth
+- Core ingredients: [Gold Ingot](items/GoldIngot.md), [Gold Nugget](items/GoldNugget.md), [Iron Nugget](items/IronNugget.md) and [Leather](items/Leather.md), with exact conversions, recycling and useful next recipes
+- [Golden Carrot](items/GoldenCarrot.md) and [Glistering Melon Slice](items/GlisteringMelonSlice.md): separate food/brewing roles, crafting budgets, Farmer offers and animal interactions
+
+- Custom resource limits: [Amber Curiosity](items/AmberCuriosity.md), [Heavy Bone](items/HeavyBone.md), [Tough Hide](items/ToughHide.md) and [Ominous Catalyst](items/OminousCatalyst.md), with actual registrations, access and connected-use distinctions
+- [Emu Feather](items/EmuFeather.md), [Lost Tentacle](items/LostTentacle.md) and [Maraca](items/Maraca.md): verified resource limits, disconnected capture behavior and conditional Cockroach equip/recovery
+
+- [Dyes](items/Dyes.md): exact color recipes, ingredient choices, Sheep and collars, sign text, Banner patterns, equipment blends and storage colors
+
+- [Amethyst](blocks/Amethyst.md): protect budding blocks, grow and harvest crystals, use Shards and distinguish decoration from renewable growth; [bud item routes](blocks/Amethyst.md#six-registered-block-forms) cover Silk Touch collection and growth-stage placement
 
 - [Ores and Ancient Debris](blocks/OreResources.md): all nineteen ore/debris blocks, exact tool gates, drops/Fortune/XP, processing and checked generation examples
+- [Finding ores](mechanics/FindingOres.md): height distributions, biome bonuses, Nether and Primordial differences, and large Copper/Iron veins
 
 - [Axes and Hoes](mechanics/AxesAndHoes.md): all seven materials, combat attributes, stripping/copper restoration, tilling, and MattMC crop-area harvesting
 - [Pickaxes and Shovels](mechanics/PickaxesAndShovels.md): all seven materials with exact recipes, mining/drop rules, path/campfire use, upkeep, and recycling
 - [Mining tools](mechanics/Mining.md): material stats and correct-drop rules, including Copper
 - [Armor](mechanics/Armor.md): current material values including Copper, toughness, repairs, and Chestplate progression
+- Custom headwear: [Moose Headgear](items/MooseHeadgear.md) and [Sombrero](items/Sombrero.md), with actual access, equipment routes, final properties and current limitations
 - [Durability and repair](mechanics/Durability.md): retained broken gear, guarded actions, and differences in repair data preservation
 - [Anvil](blocks/Anvil.md) and [anvil mechanics](mechanics/AnvilMechanics.md): repairs, enchantment combining, names, wear, and the 40-level payment cap
 - [Grindstone](blocks/Grindstone.md): free repair, enchantment removal, curse retention, and experience refunds
 - [Enchanting](enchanting/Enchanting.md): bookshelf setup, costs versus requirements, eligibility, and reroll behavior
+- [Feather Falling](enchanting/FeatherFalling.md): Boots, eligible fall damage, combined protection and acquisition
+- [Protection enchantments](enchanting/ProtectionEnchantments.md): four armor choices, matching damage types, combined reduction, secondary attributes and broken gear
+- [Aqua Affinity, Respiration and Thorns](enchanting/UnderwaterAndThornsEnchantments.md): underwater mining, air conservation, retaliation and broken-equipment distinctions
+- [Equipment curses](enchanting/EquipmentCurses.md): Binding removal restrictions, Vanishing on death, eligible items and curse-preserving repairs
+- [Looting, Fire Aspect and Knockback](enchanting/MeleeUtilityEnchantments.md): mob rewards, cooked-loot conditions, direct-hit fire, push strength and broken-weapon differences
+- [Efficiency, Fortune and Silk Touch](enchanting/MiningEnchantments.md): supported tools, mining-speed bonuses, loot contexts and collection limits
 - [Bookshelf](items/Bookshelf.md), [Book](items/Book.md), [Enchanted Book](items/EnchantedBook.md), and [Lapis Lazuli](items/LapisLazuli.md): supporting materials
 - [Smithing](smithing/Smithing.md): equipment upgrades, trims, and component preservation
 - [Netherite Scrap](items/NetheriteScrap.md), [Ingot](items/NetheriteIngot.md), and [Upgrade Template](items/SmithingTemplateNetheriteUpgrade.md): material progression and template duplication
@@ -71,7 +140,31 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Nether Wart](blocks/NetherWart.md), [Blaze Powder](items/BlazePowder.md), and [Glass Bottle](items/GlassBottle.md): brewing inputs and acquisition
 - [Status effects](effects/Effects.md): Poison, Wither, Regeneration, and choosing Milk versus Honey
 
+- [Resource Storage Blocks](blocks/ResourceStorageBlocks.md): ten exact compression families, mining tiers, fuel and device uses
+- [Heads and Skulls](blocks/HeadsAndSkulls.md): seven collectibles/fourteen placed forms, real acquisition and retained data
+- [Bamboo blocks](blocks/BambooBlocks.md), [Bone Block](blocks/BoneBlock.md), [Netherrack](blocks/Netherrack.md) and [Petrified Oak Slab](blocks/PetrifiedOakSlab.md): material conversions, harvesting and current acquisition limits
+- [Resin](blocks/Resin.md) and [Creaking Heart](blocks/CreakingHeart.md): renewable material production, masonry and exact operating conditions
+
 ### Combat and mob resources
+
+- [Natural spawning and despawning](mechanics/NaturalSpawning.md): shared population caps, player/terrain eligibility, persistence and diagnosing missing encounters
+
+- [Bat](mobs/Bat.md), [Phantom](mobs/Phantom.md), [Silverfish](mobs/Silverfish.md), and [Endermite](mobs/Endermite.md): ambient cave behavior, insomnia settings, infestation, Pearl-spawn conditions and persistence
+
+- [Witch](mobs/Witch.md), [Bogged](mobs/Bogged.md), [Stray](mobs/Stray.md), and [Breeze](mobs/Breeze.md): potion choices, special-arrow effects, shearing, Trial Spawner routes and wind hazards
+
+- [Ghast](mobs/Ghast.md), [Hoglin](mobs/Hoglin.md), [Zoglin](mobs/Zoglin.md), and [Zombified Piglin](mobs/ZombifiedPiglin.md): Nether encounter routes, fireball rewards, food/breeding, zombification and group anger
+
+- [Cave Centipede](mobs/CaveCentipede.md), [Centipede Legs](items/CentipedeLeg.md), and [Leggings](items/CentipedeLeggings.md): head loot, food risk, crafting and armor-tag limits
+- [Tarantula Hawk](mobs/TarantulaHawk.md) and its [Elytra](items/TarantulaHawkElytra.md): sting/prey behavior and the current feeding, wing-production and flight integration gaps
+
+- [Swords](mechanics/Swords.md), [Spears](mechanics/Spears.md), [Mace](items/Mace.md), [Trident](items/Trident.md), and [Wind Charge](items/WindCharge.md): material choice, attack-specific rules, acquisition, movement and upkeep
+
+- [Husk](mobs/Husk.md), [Drowned](mobs/Drowned.md), and [Zombie Villager](mobs/ZombieVillager.md): water conversions, underwater equipment and [curing](mobs/ZombieVillager.md#curing-step-by-step)
+- [Nautilus](mobs/Nautilus.md) and [Zombie Nautilus](mobs/ZombieNautilus.md): egg access, ownership, dispenser armor, rider hazards and incomplete natural-spawn/breathing integration
+
+- [Combat](mechanics/Combat.md), [Health](mechanics/Health.md), [Death and respawn](mechanics/DeathAndRespawn.md), and [Experience](mechanics/Experience.md): attack timing, defenses, recovery and progression
+- [Warden](mobs/Warden.md): detection, anger, melee versus sonic defense, escape limits and burrowing
 
 - [Iron Golem](mobs/IronGolem.md) and [Snow Golem](mobs/SnowGolem.md): construction, conditional village/outpost routes, defense, repair, environmental care, and drops
 - [Monster Spawner](blocks/MonsterSpawner.md): preserving found cages, activation and attempt rules, nearby limits, and spawn-egg configuration
@@ -89,9 +182,24 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Rotten Flesh](items/RottenFlesh.md), [String](items/String.md), [Spider Eye](items/SpiderEye.md), and [Fermented Spider Eye](items/FermentedSpiderEye.md): mob resources, food risks, recipes, brewing, and trades
 - [Wither](mobs/Wither.md) and [Nether Star](items/NetherStar.md): summoning, charge and combat hazards, drop lifetime, and Beacon crafting
 
+- [Spawn eggs](items/SpawnEggs.md): ordinary browser access, two unlisted boss exceptions, placement/spawner controls and conditional offspring interactions
+
 ### Building, redstone, and travel
 
-- [Coral](blocks/Coral.md): all living/dead blocks, plants and fans, exact Silk Touch/tool rules, water/support and renewable sources
+- [Trowel](items/Trowel.md) and [Armor Stand](items/ArmorStand.md): predictable palette selection, ordinary display/equipment controls and recovery limits
+
+- [Banners](blocks/Banners.md) and [Loom](blocks/Loom.md): colors, pattern layers/templates, duplication, washing, map markers and Shield decoration; [color item entries](blocks/Banners.md#colors-and-crafted-banners) identify exact Wool recipes and standing/wall aliases
+- [Bookshelves](blocks/Bookshelves.md) and [Lectern](blocks/Lectern.md): enchanting versus storage, book slots, reading, persistence and redstone outputs
+- [Paper](items/Paper.md), [Book and Quill](items/BookAndQuill.md) and [Written Book](items/WrittenBook.md): acquisition, editing and saving, signing, reading and copy generations
+
+- [Barrel](blocks/Barrel.md) and [Ender Chest](blocks/EnderChest.md): shared versus personal storage, persistence, access, automation and recovery
+- [Cauldrons](blocks/Cauldrons.md): bucket/bottle exchanges, washing, precipitation, dripstone, contact effects and comparator levels
+- [Obsidian](blocks/Obsidian.md) and [Respawn Anchors](blocks/RespawnAnchor.md): acquisition, exact tool tiers, charges, valid respawns and dimension restrictions
+
+- [Signs and Hanging Signs](blocks/Signs.md): all material forms, placement, two-sided writing, dye/glow/wax and Pewen integration gaps
+- [Candles](blocks/Candles.md) and [Cake](blocks/Cake.md): colors, stacked light, water/ignition, slices, candle recovery and comparator output
+
+- [Coral](blocks/Coral.md): all living/dead blocks, plants and fans, exact Silk Touch/tool rules, water/support and renewable sources; [variant item entries](blocks/Coral.md#five-species-and-their-registered-forms) explain collection outcomes and placed-form aliases
 
 - [Beacon](blocks/Beacon.md) and [Conduit](blocks/Conduit.md): complete base/frame layouts, activation, effect ranges, payment and target limits
 - [Soul Sand, Soul Soil and Magma Blocks](blocks/SoulSandSoilAndMagma.md): movement, harvesting, crop support, columns and hot-floor safety
@@ -99,13 +207,15 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Quartz](blocks/Quartz.md) and [End Stone/Purpur](blocks/EndStoneAndPurpur.md): exact finishes, mixed crafting inputs, stonecutting, pillars and Dragon interactions
 
 - [Copper lighting](blocks/CopperLighting.md), [Copper Chests](blocks/CopperChests.md), [Lightning Rods](blocks/LightningRods.md), [Golem Statues](blocks/CopperGolemStatues.md), and [Raw Copper storage](blocks/RawCopperStorage.md): device controls, sorting, variant changes and collection
+- [Lightning Rod items](items/LightningRod.md): exact crafting output, all eight weathered/waxed forms and tool-qualified recovery, linked to the placed-block guide
 
 - [Sandstone](blocks/Sandstone.md), [Blackstone/Basalt](blocks/BlackstoneAndBasalt.md), and [Nether Bricks](blocks/NetherBricks.md): exact finishes, shape recipes, material yields, collection and Nether acquisition examples
 
+- [Copper Bars, Chains and Lanterns](blocks/CopperBarsChainsAndLanterns.md): 24 oxidation/wax forms, recipes, tool gates, support, waterlogging and light; [inventory variants](items/CopperFixtures.md)
 - [Copper construction](blocks/CopperConstruction.md): all structural oxidation/wax variants, efficient stonecutting, aging, scraping, lightning cleaning, doors and waterlogging
 - [Decorative stone](blocks/DecorativeStone.md) and [Tuff](blocks/Tuff.md): Granite/Diorite/Andesite/Calcite, exact polished/brick/chiseled variants and construction recipes
 
-- [Wood construction](blocks/WoodConstruction.md): twelve materials, Bamboo Mosaic, exact shape recipes, placement/connections, waterlogging, power, and fire/fuel differences
+- [Wood construction](blocks/WoodConstruction.md): twelve materials, Bamboo Mosaic, exact shape recipes, placement/connections, waterlogging, power, and fire/fuel differences; [plank item routes](blocks/WoodConstruction.md#planks-and-materials) give the exact family inputs and reusable building materials
 
 - [Crafter](blocks/Crafter.md): redstone crafting, slot controls, ingredient distribution, output overflow, and comparator signals
 
@@ -118,17 +228,55 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Concrete and Concrete Powder](blocks/Concrete.md): all 16 colors with exact recipes, water conversion, falling, and mining rules
 - [Pistons](blocks/Pistons.md) and [Dispenser/Dropper](blocks/DispenserAndDropper.md): movement limits, power response, item actions, and controlled transfer
 - [Shulker Boxes](blocks/ShulkerBox.md): portable storage in all 17 variants, recoloring/washing, contents preservation, and automation limits
+- [Bundles](items/Bundle.md): mixed-stack inventory storage, click/scroll controls, capacity, nesting limits, and exact color recipes
 - [Glass and Glass Panes](blocks/GlassAndPanes.md): every stained color plus ordinary and tinted glass, with recipes, collection, connections, light, and beacon choices
 - [Repeater](blocks/RedstoneRepeater.md), [Comparator](blocks/RedstoneComparator.md), and [Observer](blocks/Observer.md): directional signals, timing, locking, container readings, and block updates
+- [Item Frame](items/ItemFrame.md) and [Glow Item Frame](items/GlowItemFrame.md): acquisition, display placement, rotation, MattMC visibility controls, recovery and Comparator readings
+- [Painting](items/Painting.md): recipe and trade acquisition, largest-fitting picture selection, preset limits, support and recovery
 
 - [Wool and Carpet](blocks/WoolAndCarpet.md): complete 16-color families with exact dye/craft/drop rules and quiet-building distinctions
 
 - [Redstone basics](redstone/Redstone.md): lever/button inputs, wire connections, and troubleshooting
 - [Hopper](blocks/Hopper.md): item transfer, redstone locking, and sided Furnace automation
 - [Transport](mechanics/Transport.md): boats, chest storage, minecart controls, track construction, and stopping safely
+- Utility minecarts: [Chest](items/MinecartWithChest.md), [Hopper](items/MinecartWithHopper.md), [Furnace](items/MinecartWithFurnace.md), [TNT](items/MinecartWithTNT.md) and [Command Block](items/MinecartWithCommandBlock.md) acquisition, placement, recovery and distinct controls
+
+- [Glowstone, Sea Lanterns, Shroomlights and Froglights](blocks/LuminousBlocks.md) and [Lanterns](blocks/Lanterns.md): acquisition, light, recovery tools and placement
+- [Wooden Shelves](blocks/Shelves.md): full-stack storage, powered hotbar exchange, rear comparator output and moving contents; the [variant item guides](blocks/Shelves.md#variants-and-crafting) give exact recipes and ordinary empty-item collection limits
+- [Target](blocks/Target.md) and [Daylight Detector](blocks/DaylightDetector.md): projectile pulses, skylight signals and source-derived circuits
+- [Bell](blocks/Bell.md) and [Jukebox](blocks/Jukebox.md): ringing, Raider outlines, disc playback and redstone
+- Expedition music discs: [5](items/MusicDisc5.md) and [fragments](items/DiscFragment.md), [Otherside](items/MusicDiscOtherside.md), [Pigstep](items/MusicDiscPigstep.md) and [Relic](items/MusicDiscRelic.md), with distinct chest/archaeology routes, crafting and configured song data
+- Special music discs: [Creator](items/MusicDiscCreator.md), [Creator Music Box](items/MusicDiscCreatorMusicBox.md), [Precipice](items/MusicDiscPrecipice.md), [Lava Chicken](items/MusicDiscLavaChicken.md) and [Tears](items/MusicDiscTears.md), with exact reward pools and mob-drop conditions
+- Classic music discs: [13](items/MusicDisc13.md), [Cat](items/MusicDiscCat.md), [Blocks](items/MusicDiscBlocks.md), [Chirp](items/MusicDiscChirp.md), [Far](items/MusicDiscFar.md) and [Mall](items/MusicDiscMall.md), with eligible Creeper loot, exact chest-roll scope and song/Comparator values
+- More classic discs: [11](items/MusicDisc11.md), [Mellohi](items/MusicDiscMellohi.md), [Stal](items/MusicDiscStal.md), [Strad](items/MusicDiscStrad.md), [Wait](items/MusicDiscWait.md) and [Ward](items/MusicDiscWard.md), with their actual Creeper route and distinct song/Comparator values
+- [Prismarine construction](blocks/Prismarine.md): ten full-block and shaped variants, exact recipes and Conduit-frame distinctions
+- [Mud, Packed Mud and Mud Bricks](blocks/MudAndMudBricks.md): soil conversion, renewable materials and six building forms
+- [Dripstone](blocks/Dripstone.md): spike placement, natural growth, falling hazards and distinct cauldron/Mud setups
+- [Note Block](blocks/NoteBlock.md): tuning, all instrument types, head sounds and timed redstone examples
+- [TNT](blocks/TNT.md) and [Trapped Chest](blocks/TrappedChest.md): priming/fuse rules, counted opening signals and storage automation
+- [Iron fixtures](blocks/IronFixtures.md) and [Ladders](blocks/Ladder.md): distinct collection, support, power, water and climbing rules
+- [Slime and Honey Blocks](blocks/SlimeAndHoneyBlocks.md): crafting remainders, landing/slide behavior and piston groups
+- [Soul Torches](blocks/Torch.md#soul-torch), [End Rods](blocks/EndRod.md) and [Jack o'Lanterns](blocks/JackOLantern.md): support, water, lighting and specific mob/construction interactions
 
 ### Exploration, archaeology, and trade
 
+- Expedition ingredients: [Dragon's Breath](items/DragonsBreath.md), [Heart of the Sea](items/HeartOfTheSea.md), [Echo Shards](items/EchoShard.md), [Breeze Rods](items/BreezeRod.md) and [Bottle o' Enchanting](items/BottleOEnchanting.md), with actual acquisition, quantities and next uses
+
+- [Desert Pyramid](structures/DesertPyramid.md), [Jungle Temple](structures/JungleTemple.md) and [Swamp Hut](structures/SwampHut.md): traps, chest and archaeology rewards, and Witch/Cat encounters
+
+- [Woodland Mansion](structures/WoodlandMansion.md), [Evoker](mobs/Evoker.md), [Vindicator](mobs/Vindicator.md), and [Vex](mobs/Vex.md): forest expeditions, room rewards, spell/axe encounters and summon limits
+
+- [Illusioner](mobs/Illusioner.md): deliberate spawning, bow attacks, Invisibility/Blindness, persistence and equipment drops
+
+- [Pillager Outpost](structures/PillagerOutpost.md), [Pillager](mobs/Pillager.md), [Ravager](mobs/Ravager.md), and [Raids](mechanics/Raid.md): tower expeditions, captain bottles, omen preparation, waves and victory
+
+- [All biome families](biomes/Biomes.md#alphabetical-biome-directory): exact alphabetical IDs and reviewed land, cave, shore, Nether, End and special-world choices
+- [Nether biomes](biomes/NetherBiomes.md) and [End biomes](biomes/EndBiomes.md): choose natural exploration routes by materials, structures and feature limits
+
+- [Bastion Remnant](structures/BastionRemnant.md), [Piglin](mobs/Piglin.md), and [Piglin Brute](mobs/PiglinBrute.md): Nether residents, chest rewards, gold rules and bartering
+- [Ocean Monument](structures/OceanMonument.md), [Guardian](mobs/Guardian.md), and [Elder Guardian](mobs/ElderGuardian.md): deep-ocean search, beam/spike combat, fatigue and rewards
+
+- [Cod](mobs/Cod.md), [Salmon](mobs/Salmon.md), [Tropical Fish](mobs/TropicalFish.md), [Pufferfish](mobs/Pufferfish.md), [Squid](mobs/Squid.md), and [Glow Squid](mobs/GlowSquid.md): aquatic care, bucket variants, sting precautions and ink resources
 - [Ocean biomes](biomes/Oceans.md): nine ordinary/deep/temperature variants, resource and aquatic lists, structure eligibility, and integrated-content distinctions
 - [End City](structures/EndCity.md), [Shulker](mobs/Shulker.md), [Elytra](items/Elytra.md), and [Shulker Shell](items/ShulkerShell.md): outer-island rewards, Levitation, gliding, repairs, and boxes
 
@@ -142,7 +290,32 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Brush](items/Brush.md): suspicious-block excavation, dispenser use, and broken-item interaction limits
 - [Trading](trading/Trading.md), [Villagers](mobs/Villager.md), and [Emeralds](items/Emerald.md): professions, stock, prices, and optional trade-rebalance rules
 
+- [Cartography Table](blocks/CartographyTable.md) and [Fletching Table](blocks/FletchingTable.md): implemented map operations, job sites and workstation limits
+- [Trial Spawner](blocks/TrialSpawner.md) and [Vault](blocks/Vault.md): finite encounters, key rewards, ominous configurations and per-player openings
+- [Trial Chambers](structures/TrialChambers.md): finding a chamber, preparation, room hazards, supply containers and distinct normal/ominous reward routes
+- [Ancient City](structures/AncientCity.md): Deep Dark search, sculk precautions, lower-center circuitry and distinct city/ice-box chest rewards
+- [Trail Ruins](structures/TrailRuins.md): biome search, buried-site identification, careful excavation and common versus rare archaeology rewards
+- [Mineshaft](structures/Mineshaft.md): normal/Badlands search, branching-route preparation, cave-spider corridors, chest-cart loot and safe material recovery
+- [Igloo](structures/Igloo.md): snowy-biome search, optional basement inspection, finite cure supplies and resident protection
+- [Ruined Portal](structures/RuinedPortal.md): variant search, hazards, chest/salvage choices, valid frame repair and separate Primordial conversion
+- [Monster Room](structures/MonsterRoom.md): Overworld and Primordial feature generation, cave approach, optional chest loot and cage preservation
+- [Village](structures/Village.md): five settlement styles, actual map/search routes, resident protection, zombie layouts and optional supplies/chests
+- [Desert wells](biomes/DesertsBadlandsAndSavannas.md#desert), [Arms Up Pottery Sherd](items/ArmsUpPotterySherd.md) and [Brewer Pottery Sherd](items/BrewerPotterySherd.md): underwater excavation, assigned loot and pot-pattern recovery
+- Desert Pyramid sherds: [Archer](items/ArcherPotterySherd.md), [Miner](items/MinerPotterySherd.md), [Prize](items/PrizePotterySherd.md) and [Skull](items/SkullPotterySherd.md), with cellar excavation, assigned loot and mapped pot-face recovery
+- Ocean Ruin sherds: warm [Angler](items/AnglerPotterySherd.md), [Shelter](items/ShelterPotterySherd.md), [Snort](items/SnortPotterySherd.md) and cold [Blade](items/BladePotterySherd.md), [Explorer](items/ExplorerPotterySherd.md), [Mourner](items/MournerPotterySherd.md), [Plenty](items/PlentyPotterySherd.md), with assigned loot and underwater excavation
+- Trail Ruins sherds: [Burn](items/BurnPotterySherd.md), [Danger](items/DangerPotterySherd.md), [Friend](items/FriendPotterySherd.md), [Heart](items/HeartPotterySherd.md), [Heartbreak](items/HeartbreakPotterySherd.md), [Howl](items/HowlPotterySherd.md) and [Sheaf](items/SheafPotterySherd.md), with rare-table archaeology and mapped pot-face use
+- [Decorated Pot](blocks/DecoratedPot.md): face ingredients, storage, water and intact versus shattered recovery
+- [Sponge](blocks/Sponge.md) and [Lodestone](blocks/Lodestone.md): water removal/drying and persistent Compass markers
+- [Sculk and Catalysts](blocks/Sculk.md), [Sensors/calibration](blocks/SculkSensors.md) and [Shriekers](blocks/SculkShrieker.md): collection, XP-driven growth, vibration circuits and actual warning/summoning gates
+
 ## Alex's Mobs additions
+
+- [Anteater](mobs/Anteater.md): honey breeding, baby riding, live-ant predation, Dirt/Sugar actions and current feeding/rendering limits
+
+- [Rain Frog](mobs/RainFrog.md): browser eggs, sand burrowing, Shovel persistence, baby offspring, and current food/weather/rendering limits
+- [Comb Jelly](mobs/CombJelly.md), [Frilled Shark](mobs/FrilledShark.md), and [Bucket of Frilled Shark](items/BucketOfFrilledShark.md): actual acquisition, water care, prey and pressure behavior, with separate capture/release limits
+
+- **Airborne encounters:** [Spectre](mobs/Spectre.md), [Cosmaw](mobs/Cosmaw.md), and [Cosmic Cod](mobs/CosmicCod.md): Soul Heart attraction, hunting, bucket handling and current feeding/transport limits
 
 - [Hummingbird](mobs/Hummingbird.md): active flight/variants and egg offspring, with missing food/pollination/feeder integrations clearly separated
 - [Cachalot Whale](mobs/CachalotWhale.md) and [Giant Squid](mobs/GiantSquid.md): breathing/care, whale rescue rewards and building hazards, combat, and current capture/multipart limits
@@ -167,6 +340,7 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Raccoon](mobs/Raccoon.md) and [Capuchin Monkey](mobs/CapuchinMonkey.md): food behavior, owner controls, retaliation, and missing bundled taming routes
 - [Elephant](mobs/Elephant.md) and [Kangaroo](mobs/Kangaroo.md): owner controls, riding versus pouch use, food routes, and storage caveats
 - [Caiman](mobs/Caiman.md), [Platypus](mobs/Platypus.md), and [Bucket of Platypus](items/BucketOfPlatypus.md): egg ownership, care, food, digging, and bucket-state limits
+- [Mantis Shrimp](mobs/MantisShrimp.md), [Mudskipper](mobs/Mudskipper.md), and [Bucket of Mudskipper](items/BucketOfMudskipper.md): diet, owner controls, water care, active behavior and transfer limits
 - [All mobs](mobs/Mobs.md): the existing mob directory, including other integrated animals
 
 ## Alex's Caves additions
@@ -200,6 +374,33 @@ Browse all registered blocks in the [alphabetical Blocks directory](blocks/Block
 - [Vallumraptor](mobs/Vallumraptor.md) and [Grottoceratops](mobs/Grottoceratops.md): theft, flower grazing, owner differences, and species-egg limits
 
 - [Atlatitan](mobs/Atlatitan.md) and [Serene Salad](items/SereneSalad.md): the active temporary mounting route and remaining breeding/control limits
+
+## MattMC tools
+
+- [Region Editor](mechanics/RegionEditor.md): saved Overworld terrain selection, direct writes, clipboard and undo limits
+
+- [Minimap and waypoints](mechanics/MinimapAndWaypoints.md): VoxelMap controls, named places, local map data and current limits
+- [WorldEdit basics](commands/WorldEdit.md) and the [World Edit Wand](items/WorldEditWand.md): permitted selection, editing, clipboard and block-state history controls
+- [Building Wand](items/BuildingWand.md) and [Trowel](items/Trowel.md): separate placement tools with their own material, target and current-behavior limits
+
+- [Inventory item browser](mechanics/InventoryBrowser.md): catalog browsing, Creative insertion, protocol admission and operator-category limits
+- [Elevator](blocks/Elevator.md) and [Redstone Randomizer](blocks/RedstoneRandomizer.md): actual controls, search/output behavior, collection and limits
+
+## TaCZ firearms and workbenches
+
+- [TaCZ firearms](mechanics/TaCZFirearms.md): gun controls, magazine and reserve ammunition, partial reloads, refitting and current limits
+- [TaCZ Workbenches](blocks/TaCZWorkbenches.md): firearm, ammunition and attachment menus, exact table recipes and inventory transactions
+- Core rifles: [AKM](items/AKM.md), [M4A1](items/M4A1Carbine.md), [SCAR-L](items/SCARLAssaultRifle.md), [AUG](items/AUG.md) and [HK-416A5](items/HK416A5.md), with exact crafting, fresh-stack defaults, ammunition/reload behavior and active-stat limits
+- [G36K](items/G36K.md), [M16A1](items/M16A1ServiceRifle.md), [M16A4](items/M16A4ServiceRifle.md), [QBZ-191](items/QBZ191AssaultRifle.md) and [QBZ-95](items/QBZ95Longbow.md): Rifle-table recipes, supported modes, large-magazine reload limits and active effects
+- [MK14 EBR](items/MK14EBR.md), [SCAR-H](items/SCARHBattleRifle.md), [SKS](items/SksTacticalRifle.md), [SPR-15 HB](items/SPR15HBSagittarius.md) and [Type 81-1](items/Type811ServiceRifle.md): crafting, active fire-mode differences, reloads and accepted attachments
+- [Shotgun](items/ShotgunAmmoExtendedMagI.md) and [Sniper](items/SniperAmmoExtendedMagI.md) extended-magazine tiers: exact recipes, gun-specific capacities, exclusions and reload/refit behavior
+- Ammo Modifier attachments: [FMJ](items/FullMetalJacketAmmo.md), [Hollow-Point](items/HollowPointAmmo.md), [High Explosive](items/HighExplosiveAmmo.md), [Incendiary](items/IncendiaryAmmo.md) and [Shotgun Slug](items/ShotgunSlug.md), with recipes, exact fitting lists and current effect limits
+- [LPVO](items/LPVO16xScope.md), [Vudu](items/Vudu16xScope.md), [Mark 5 HD](items/Mark5HD525xScope.md) and [Scout](items/Scout410xScope.md) optics: recipes, fitting lists, active zoom values and bundled rendering limits
+- [FN FAL](items/FNFALBattleRifle.md), [HK G3](items/HKG3Battlerifle.md), [Gewehr 43](items/Gewehr43.md), [M1 Carbine](items/M1Carbine.md) and [StG44](items/Sturmgewehr44.md): exact Rifle-table recipes, mode effects, reload paths and attainable magazine limits
+- Silencers and suppressors: [Knight QD](items/KnightQDSilencer.md), [Mirage](items/MirageSilencer.md), [Phantom S1](items/PhantomS1Silencer.md), [Ptilopsis](items/PO2PtilopsisSilencer.md), [12 Gauge](items/12GaugeSilencer.md), [Ursus](items/UrsusMilitaryStandardSilencer.md), [Vulture](items/Vulture50CalSuppressor.md) and [Wraith](items/WraithSilencer.md), with recipes, exact fit and current sound/flash/recoil limits
+- Muzzle brakes and compensators: [Cthulhu K7](items/CthulhuK7Brake.md), [Cyclone D2](items/CycloneD2Brake.md), [Pioneer A3](items/PioneerA3Brake.md), [T-Rex Heavy](items/TRexHeavyBrake.md) and [Tempest Trident](items/TempestTridentCompensator.md), with crafting, compatible guns and camera-recoil tradeoffs
+- Compact sights: [ACRO P-1](items/AimpointACROP1Sight.md), [DeltaPoint](items/DeltaPointSight.md), [FastFire](items/FastFireSight.md), and their [ACRO Rised](items/AimpointACROP1SightRised.md), [DeltaPoint Rised](items/DeltaPointSightRised.md) and [FastFire Rised](items/FastFireSightRised.md) variants, with exact recipes, fitting lists and configured zoom
+- Extended magazines: Light [I](items/LightAmmoExtendedMagI.md), [II](items/LightAmmoExtendedMagII.md), [III](items/LightAmmoExtendedMagIII.md) and Heavy [I](items/HeavyAmmoExtendedMagI.md), [II](items/HeavyAmmoExtendedMagII.md), [III](items/HeavyAmmoExtendedMagIII.md), with exact recipes, gun-specific capacities and current exceptions
 
 ## Browse by topic
 

@@ -90,7 +90,14 @@ public abstract class TemplateStructurePiece extends StructurePiece {
 	) {
 		this.placeSettings.setBoundingBox(boundingBox);
 		this.boundingBox = this.template.getBoundingBox(this.placeSettings, this.templatePosition);
+		this.nativeTail = false;
 		if (this.template.placeInWorld(worldGenLevel, this.templatePosition, blockPos, this.placeSettings, randomSource, 2)) {
+			long[] words = this.nativeTailWords();
+			if (words != null && NativeStructurePieces.templateTail(this, worldGenLevel, randomSource, boundingBox, words)) {
+				this.nativeTail = true;
+				return;
+			}
+			net.minecraft.world.level.levelgen.NativeDecoration.javaWork(worldGenLevel, "tail " + this.getClass().getSimpleName());
 			for (StructureTemplate.StructureBlockInfo structureBlockInfo : this.template.filterBlocks(this.templatePosition, this.placeSettings, Blocks.STRUCTURE_BLOCK)) {
 				if (structureBlockInfo.nbt() != null) {
 					StructureMode structureMode = (StructureMode)structureBlockInfo.nbt().read("mode", StructureMode.LEGACY_CODEC).orElseThrow();
@@ -115,6 +122,24 @@ public abstract class TemplateStructurePiece extends StructurePiece {
 				}
 			}
 		}
+	}
+
+	/** Whether the last {@code postProcess} ran its tail (and any subclass decoration it names) natively. */
+	protected boolean nativeTail;
+
+	/**
+	 * {@link NativeStructurePieces#templateTail}'s words: {@code [family, ocean ruin is large,
+	 * ruined portal, vertical placement, cold, overgrown, vines, box (6)]}; null keeps Java's loops.
+	 */
+	protected long @org.jetbrains.annotations.Nullable [] nativeTailWords() {
+		return null;
+	}
+
+	/** The common tail words for a data-marker family. */
+	protected long[] nativeTailWords(int family) {
+		long[] words = new long[13];
+		words[0] = family;
+		return words;
 	}
 
 	protected abstract void handleDataMarker(

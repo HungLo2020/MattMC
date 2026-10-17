@@ -42,6 +42,10 @@ public class Beardifier implements DensityFunctions.BeardifierOrMarker {
     // Native evaluation consumes these exact float bits, avoiding libm differences.
     static float[] nativeKernel() { return BEARD_KERNEL; }
 
+    /** The native cell evaluator of a structure-owned, exact Beardifier, or null. */
+    @Nullable
+    NativeBeardifier nativeCells() { return this.getClass() == Beardifier.class && this.affectedBox != null ? this.nativeCells : null; }
+
     static Beardifier forGeometry(List<Rigid> pieces, List<JigsawJunction> junctions, BoundingBox bounds) {
         return new Beardifier(List.copyOf(pieces), List.copyOf(junctions), bounds, true);
     }

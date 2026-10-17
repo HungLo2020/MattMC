@@ -174,17 +174,7 @@ pub struct WorldLodColumnMaterialProvenance {
     pub face_materials: Vec<WorldLodFaceMaterial>,
 }
 
-/// Compact visible-column reference for the eventual combined world frame.
-/// Layer and ordering are explicit because transparent LOD streams cannot be
-/// merged into opaque terrain submission accidentally.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct WorldLodColumnInstanceRequest {
-    pub column_key: u64,
-    pub column_generation: u64,
-    pub layer: u32,
-    pub segment_index: u32,
-    pub order: u32,
-}
+pub use crate::render::scene::lod::{WorldLodColumnInstance as WorldLodColumnInstanceRequest, WorldLodInstances};
 
 /// Resolved, backend-neutral Distant Horizons terrain-program inputs for one
 /// frame. Java supplies scalar gameplay/configuration semantics only; Rust
@@ -309,6 +299,7 @@ pub struct WorldMeshTextureAssetPayload {
 
 #[derive(Clone, Debug)]
 pub struct WorldMeshInstanceRequest {
+    pub entity_culling: Option<super::entity_culling::WorldEntityCullingInputs>,
     /// Authored model collection order, independent of material and arrival order.
     pub model_submission_order: Option<i32>,
     /// Original-resource standard foil semantics, never a Java texture matrix.
@@ -421,6 +412,9 @@ pub struct WorldShaderEnvironmentFrame {
     /// configuration semantic used by selected pack sources when their shared
     /// `DISTANT_HORIZONS` branch is active; it is not a DH renderer object.
     pub distant_horizons_render_distance: i32,
+    /// Copied user maximum shadow distance in chunks. This is configuration
+    /// data only; all source selection and culler construction stay in Rust.
+    pub configured_shadow_distance_chunks: i32,
     pub relative_eye_position: [f32; 3],
     pub sky_color: [f32; 3],
     pub darkness_light_factor: f32,
@@ -616,9 +610,49 @@ pub struct WorldPrimitiveFrame {
     /// Visible DH LOD references are transport-only until a complete Rust LOD
     /// material/pass contract is admitted. Keeping them in the combined frame
     /// preserves the real producer ordering without borrowing legacy GL state.
-    pub lod_instances: Vec<WorldLodColumnInstanceRequest>,
+    pub lod_instances: WorldLodInstances,
     pub lod_render_frame: WorldLodRenderFrame,
+    /// Off-camera terrain shadow casters. The frontend expands them into
+    /// `mesh_instances` before validation; see `frame::shadow_casters`.
+    pub static_terrain_shadow_casters: StaticTerrainShadowCasters,
+    pub static_terrain_sections: StaticTerrainSections,
 }
+
+impl WorldPrimitiveFrame {
+    /// The frame's scalar state and static terrain with every per-frame
+    /// geometry list empty, for a derived pass (the first-person hand) that
+    /// supplies its own instances. Lists by field so a new field must choose.
+    pub(crate) fn clone_without_geometry(&self) -> Self {
+        Self {
+            engine_globals: self.engine_globals.clone(),
+            frame_id: self.frame_id,
+            correlation_id: self.correlation_id,
+            viewport_width: self.viewport_width,
+            viewport_height: self.viewport_height,
+            view_matrix: self.view_matrix,
+            projection_matrix: self.projection_matrix,
+            voxel_volume: self.voxel_volume.clone(),
+            shader_environment: self.shader_environment.clone(),
+            feature_coverage: self.feature_coverage.clone(),
+            first_person: self.first_person.clone(),
+            first_person_mesh_instances: Vec::new(),
+            background: self.background.clone(),
+            segments: Vec::new(),
+            crack_quads: Vec::new(),
+            border_quads: Vec::new(),
+            material_quads: Vec::new(),
+            dh_generic_boxes: Vec::new(),
+            mesh_instances: Vec::new(),
+            text_quads: Vec::new(),
+            lod_instances: WorldLodInstances::default(),
+            lod_render_frame: self.lod_render_frame.clone(),
+            static_terrain_shadow_casters: self.static_terrain_shadow_casters.clone(),
+            static_terrain_sections: self.static_terrain_sections.clone(),
+        }
+    }
+}
+
+pub use crate::render::scene::terrain::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct WorldDistantHorizonsGenericBoxRequest {
@@ -715,6 +749,7 @@ impl WorldPrimitiveFrame {
             sun_angle: environment
                 .enabled
                 .then_some(source_sun_angle(environment.time_of_day)),
+            celestial_time_of_day: Some(self.background.sky.time_of_day),
             rain_strength: environment.enabled.then_some(environment.rain_strength),
             thunder_strength: environment.enabled.then_some(environment.thunder_strength),
             sky_darken: environment.enabled.then_some(environment.sky_darken),
@@ -803,6 +838,13 @@ pub(in crate::render::worldrender) fn source_sky_initializer_requested(frame: &W
             frame.background.sky_type,
             WORLD_BACKGROUND_SKY_OVERWORLD | WORLD_BACKGROUND_SKY_NETHER | WORLD_BACKGROUND_SKY_END
         )
+}
+
+/// Iris draws its horizon during clear, even when fog/blindness hides the
+/// later vanilla disc. Standard End/Nether dimensions have no such horizon;
+/// custom skylit dimensions require their own semantic admission.
+pub(in crate::render::worldrender) fn source_horizon_initializer_requested(frame: &WorldPrimitiveFrame) -> bool {
+    frame.background.enabled && frame.background.sky_type == WORLD_BACKGROUND_SKY_OVERWORLD
 }
 
 /// The selected source uses Iris's documented solar-angle convention. This

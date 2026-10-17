@@ -43,7 +43,7 @@ import net.vulkanic.VulkanicAPI;
  * A singleton that contains everything
  * related to rendering in Minecraft.
  */
-public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
+public class MinecraftRenderWrapper implements IMinecraftRenderWrapper, IMinecraftRenderWrapper.NativeShadeFacts
 {
 	public static final MinecraftRenderWrapper INSTANCE = new MinecraftRenderWrapper();
 	
@@ -229,6 +229,16 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 		wrapper.setLightmapId(tetxureId);
 	}
 	
+	/** Same inputs as {@link #getShade}: the shading mode and the current level's shading facts. */
+	@Override
+	public int getNativeShadeFacts() {
+		int mode = Config.Client.Advanced.Graphics.Quality.lodShading.get().ordinal();
+		var level = MC == null ? null : MC.level;
+		return mode | (level != null ? 4 : 0)
+			| (level != null && level.effects().constantAmbientLight() ? 8 : 0)
+			| (net.vulkanic.world.RustGalTerrainRenderer.copiedShaderPackDisableDirectionalShading() ? 16 : 0);
+	}
+
 	@Override
 	public float getShade(EDhDirection lodDirection)
 	{

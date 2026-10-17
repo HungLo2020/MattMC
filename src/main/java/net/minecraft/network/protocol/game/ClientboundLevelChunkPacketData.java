@@ -69,7 +69,7 @@ public class ClientboundLevelChunkPacketData {
 	private static int calculateChunkSize(LevelChunk levelChunk) {
 		int i = 0;
 
-		for (LevelChunkSection levelChunkSection : levelChunk.getSections()) {
+		for (LevelChunkSection levelChunkSection : levelChunk.getSectionsForRead()) {
 			i += levelChunkSection.getSerializedSize();
 		}
 
@@ -83,7 +83,7 @@ public class ClientboundLevelChunkPacketData {
 	}
 
 	public static void extractChunkData(FriendlyByteBuf friendlyByteBuf, LevelChunk levelChunk) {
-		for (LevelChunkSection levelChunkSection : levelChunk.getSections()) {
+		for (LevelChunkSection levelChunkSection : levelChunk.getSectionsForRead()) {
 			levelChunkSection.write(friendlyByteBuf);
 		}
 

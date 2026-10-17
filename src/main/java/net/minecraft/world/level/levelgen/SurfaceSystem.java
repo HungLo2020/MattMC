@@ -100,6 +100,24 @@ public class SurfaceSystem {
 		};
 		SurfaceRules.Context context = new SurfaceRules.Context(this, randomState, chunkAccess, noiseChunk, biomeManager::getBiome, registry, worldGenerationContext);
 		NativeSurface surfaceRule = new NativeSurface(ruleSource, context, registry, biomeManager);
+		// Batched rules run over Rust-owned sections and heightmaps, installed once.
+		NativeSurfaceChunk owned = NativeSurfaceChunk.create(chunkAccess, surfaceRule, biomeManager, registry, this.defaultBlock);
+		if (owned != null) {
+			try {
+				// Rust runs the whole column loop when every input is native; the
+				// choice is made before the first write.
+				long pass = owned.createPass(this, surfaceRule, registry, bl, chunkAccess);
+				if (pass != 0) {
+					surfaceRule.pass(owned, pass);
+				} else {
+					this.buildOwnedSurface(owned, biomeManager, bl, chunkAccess, context, surfaceRule, mutableBlockPos);
+				}
+				owned.install();
+			} finally {
+				owned.close();
+			}
+			return;
+		}
 		BlockPos.MutableBlockPos mutableBlockPos2 = new BlockPos.MutableBlockPos();
 
 		for (int k = 0; k < 16; k++) {
@@ -161,6 +179,41 @@ public class SurfaceSystem {
 					}
 
 				}
+				if (holder.is(Biomes.FROZEN_OCEAN) || holder.is(Biomes.DEEP_FROZEN_OCEAN)) {
+					this.frozenOceanExtension(context.getMinSurfaceLevel(), holder.value(), blockColumn, mutableBlockPos2, m, n, o);
+				}
+			}
+		}
+	}
+
+	/** buildSurface's column loop over {@link NativeSurfaceChunk}: the same
+	 * heights, extensions and rule evaluation, reading and writing Rust storage. */
+	private void buildOwnedSurface(
+		NativeSurfaceChunk owned,
+		BiomeManager biomeManager,
+		boolean bl,
+		ChunkAccess chunkAccess,
+		SurfaceRules.Context context,
+		NativeSurface surfaceRule,
+		BlockPos.MutableBlockPos mutableBlockPos
+	) {
+		ChunkPos chunkPos = chunkAccess.getPos();
+		BlockColumn blockColumn = owned.column(mutableBlockPos);
+		BlockPos.MutableBlockPos mutableBlockPos2 = new BlockPos.MutableBlockPos();
+
+		for (int k = 0; k < 16; k++) {
+			for (int l = 0; l < 16; l++) {
+				int m = chunkPos.getMinBlockX() + k;
+				int n = chunkPos.getMinBlockZ() + l;
+				int o = owned.height(k, l) + 1;
+				mutableBlockPos.setX(m).setZ(n);
+				Holder<Biome> holder = biomeManager.getBiome(mutableBlockPos2.set(m, bl ? 0 : o, n));
+				if (holder.is(Biomes.ERODED_BADLANDS)) {
+					this.erodedBadlandsExtension(blockColumn, m, n, o, chunkAccess);
+				}
+
+				context.updateXZ(m, n);
+				surfaceRule.column(owned, m, n, owned.height(k, l) + 1);
 				if (holder.is(Biomes.FROZEN_OCEAN) || holder.is(Biomes.DEEP_FROZEN_OCEAN)) {
 					this.frozenOceanExtension(context.getMinSurfaceLevel(), holder.value(), blockColumn, mutableBlockPos2, m, n, o);
 				}
@@ -326,6 +379,42 @@ public class SurfaceSystem {
 	protected BlockState getBand(int i, int j, int k) {
 		int l = this.bandOffset(i, k);
 		return this.clayBands[(j + l + this.clayBands.length) % this.clayBands.length];
+	}
+
+	/** The band offset and secondary surface noises, for native surface stages. */
+	NormalNoise clayBandsOffsetNoise() {
+		return this.clayBandsOffsetNoise;
+	}
+
+	NormalNoise surfaceSecondaryNoise() {
+		return this.surfaceSecondaryNoise;
+	}
+
+	/** The carvers' native top material bindings for this system (NativeTopMaterial). */
+	volatile Object nativeTopMaterials;
+
+	/** getSurfaceDepth's noise and positional random, for the native carver top material. */
+	NormalNoise surfaceNoise() {
+		return this.surfaceNoise;
+	}
+
+	PositionalRandomFactory noiseRandom() {
+		return this.noiseRandom;
+	}
+
+	/** The stage's default block, for the native surface pass. */
+	BlockState defaultBlock() {
+		return this.defaultBlock;
+	}
+
+	/** The eroded badlands extension's surface, pillar and pillar roof noises, for the native surface pass. */
+	NormalNoise[] badlandsNoises() {
+		return new NormalNoise[]{this.badlandsSurfaceNoise, this.badlandsPillarNoise, this.badlandsPillarRoofNoise};
+	}
+
+	/** The frozen ocean extension's surface, pillar and pillar roof noises, for the native surface pass. */
+	NormalNoise[] icebergNoises() {
+		return new NormalNoise[]{this.icebergSurfaceNoise, this.icebergPillarNoise, this.icebergPillarRoofNoise};
 	}
 
 	int bandOffset(int x, int z) {

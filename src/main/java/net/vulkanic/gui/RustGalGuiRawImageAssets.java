@@ -32,7 +32,8 @@ import org.lwjgl.system.MemoryUtil;
  */
 public final class RustGalGuiRawImageAssets {
 	/** Frozen uploads ordinary GUI PNGs as RGBA8, retaining stored channels. */
-	private static final int RAW_RGBA8 = 2;
+	public static final int RAW_RGBA8 = 2;
+	public static final int RAW_MAP_COLOR8 = 3;
 	private static final int MAX_ENCODED_BYTES = 32 * 1024 * 1024;
 	private static final int MAX_DECODED_PIXELS = 16 * 1024 * 1024;
 	private static final int MAX_SEMANTIC_IDENTITIES = 4096;
@@ -41,6 +42,9 @@ public final class RustGalGuiRawImageAssets {
 	private static final int MAX_STAGED_CUBEMAP_ASSETS = 4096;
 	private static final Object LOCK = new Object();
 	private static final Map<ResourceLocation, Asset> CACHE = new HashMap<>();
+	// Candidates the resource manager lacked; dynamic sources such as map/<id>
+	// resolve every frame. Cleared with CACHE on resource reload.
+	private static final Set<ResourceLocation> MISSING_RESOURCES = new HashSet<>();
 	private static final Map<ResourceLocation, Asset> EARLY_VANILLA_CACHE = new HashMap<>();
 	private static final Map<ResourceLocation, AtlasAsset> ATLAS_CACHE = new HashMap<>();
 	private static final Map<ResourceLocation, Asset> CUBEMAP_CACHE = new HashMap<>();
@@ -63,8 +67,13 @@ public final class RustGalGuiRawImageAssets {
 	 * remains an inert metadata object and is never read by Rust.
 	 */
 	public static void registerDynamicTexture(ResourceLocation identity, DynamicTexture texture) {
+		registerDynamicTexture(identity, texture, true);
+	}
+
+	/** A clean producer reuses its immutable snapshot, including after native cache invalidation. */
+	public static void registerDynamicTexture(ResourceLocation identity, DynamicTexture texture, boolean pixelsChanged) {
 		registerDynamicTextureBinding(identity, texture);
-		stageDynamicTexture(texture);
+		stageDynamicTexture(texture, pixelsChanged);
 	}
 
 	/** Binds a dynamic source without publishing pixels; callers stage after admission. */
@@ -81,7 +90,10 @@ public final class RustGalGuiRawImageAssets {
 				);
 			}
 			DynamicTexture previous = DYNAMIC_TEXTURES.put(identity, texture);
-			if (previous != null && previous != texture) DYNAMIC_TEXTURE_IDS.remove(previous);
+			if (previous != texture) {
+				DYNAMIC_ASSETS.remove(identity);
+				if (previous != null) DYNAMIC_TEXTURE_IDS.remove(previous);
+			}
 			DYNAMIC_TEXTURE_IDS.put(texture, identity);
 		}
 	}
@@ -104,7 +116,11 @@ public final class RustGalGuiRawImageAssets {
 	 * not admitted to rendering.
 	 */
 	public static boolean stageDynamicTexture(DynamicTexture texture) {
-		Asset asset = prepareDynamicTexture(texture);
+		return stageDynamicTexture(texture, true);
+	}
+
+	private static boolean stageDynamicTexture(DynamicTexture texture, boolean pixelsChanged) {
+		Asset asset = prepareDynamicTexture(texture, pixelsChanged);
 		if (asset == null) return false;
 		stage(asset);
 		return true;
@@ -113,9 +129,18 @@ public final class RustGalGuiRawImageAssets {
 	/** Copies a registered DynamicTexture into the semantic cache without staging pixels. */
 	@Nullable
 	public static Asset prepareDynamicTexture(DynamicTexture texture) {
+		return prepareDynamicTexture(texture, true);
+	}
+
+	@Nullable
+	static Asset prepareDynamicTexture(DynamicTexture texture, boolean pixelsChanged) {
 		ResourceLocation identity;
 		synchronized (LOCK) {
 			identity = DYNAMIC_TEXTURE_IDS.get(texture);
+			if (!pixelsChanged && identity != null) {
+				Asset cached = DYNAMIC_ASSETS.get(identity);
+				if (cached != null) return cached;
+			}
 		}
 		if (identity == null) return null;
 		NativeImage image = texture.getPixels();
@@ -144,6 +169,7 @@ public final class RustGalGuiRawImageAssets {
 		RustGalGuiRenderer.invalidateTextAtlasMetadata();
 		synchronized (LOCK) {
 			CACHE.clear();
+			MISSING_RESOURCES.clear();
 			// The early cache exists only for the pre-reload loading overlay. It
 			// must not survive a resource-pack reload or it can shadow the newly
 			// selected pack's image for the same semantic identity.
@@ -172,15 +198,27 @@ public final class RustGalGuiRawImageAssets {
 			Asset atlas = resolveAtlas(source);
 			if (atlas != null) return atlas;
 		}
+		// Explicit CPU images (notably map/<id>) own their exact semantic
+		// identity. They are not inferred textures/<identity>.png resources.
+		// Resource reload clears this cache; stitched atlases still resolve above.
+		synchronized (LOCK) {
+			Asset copied = CACHE.get(source);
+			if (copied != null) return copied;
+		}
 		for (ResourceLocation candidate : candidates(source)) {
 			synchronized (LOCK) {
 				Asset cached = CACHE.get(candidate);
 				if (cached != null) {
 					return cached;
 				}
+				if (MISSING_RESOURCES.contains(candidate)) continue;
 			}
 			Optional<Resource> resource = Minecraft.getInstance().getResourceManager().getResource(candidate);
 			if (resource.isEmpty()) {
+				synchronized (LOCK) {
+					if (MISSING_RESOURCES.size() >= MAX_CACHED_ASSET_ENTRIES) MISSING_RESOURCES.clear();
+					MISSING_RESOURCES.add(candidate);
+				}
 				continue;
 			}
 			Asset decoded = decode(candidate, resource.get(), MAX_DECODED_PIXELS);
@@ -264,11 +302,11 @@ public final class RustGalGuiRawImageAssets {
 		Asset asset = resolve(source);
 		if (asset == null) return null;
 		long revision = 0xcbf29ce484222325L;
-		for (byte value : asset.pixels()) {
+		for (byte value : asset.pixels) {
 			revision ^= value & 0xffL;
 			revision *= 0x100000001b3L;
 		}
-		return new SemanticRawImageSnapshot(asset.identity(), asset.width(), asset.height(), 1L, revision, asset.pixels());
+		return new SemanticRawImageSnapshot(asset.identity(), asset.width(), asset.height(), 1L, revision, asset.pixels(), asset.format());
 	}
 
 	/** Loads and caches an early vanilla-pack image without publishing it to Rust. */
@@ -329,8 +367,8 @@ public final class RustGalGuiRawImageAssets {
 			|| (long) width * height > MAX_DECODED_PIXELS
 			|| pixels.length != Math.multiplyExact(Math.multiplyExact(width, height), 4)) return false;
 		Asset asset = linearClamp
-			? new Asset(assetId(source.toString()), source.toString(), width, height, pixels, 2, 2)
-			: new Asset(assetId(source.toString()), source.toString(), width, height, pixels);
+			? new Asset(assetId(source.toString()), source.toString(), width, height, pixels.clone(), 2, 2)
+			: new Asset(assetId(source.toString()), source.toString(), width, height, pixels.clone());
 		synchronized (LOCK) {
 			if (!cachePutLocked(CACHE, source, asset)) return false;
 		}
@@ -338,7 +376,36 @@ public final class RustGalGuiRawImageAssets {
 		return true;
 	}
 
-	/** Retires an image staged by {@link #stageCpuRgba8}; Rust drops it on the next generation. */
+	/** Checks CPU image availability after reload/invalidation, without consulting GPU state. */
+	public static boolean hasCpuMapColor8(ResourceLocation source) {
+		synchronized (LOCK) {
+			Asset asset = CACHE.get(source);
+			return asset != null && asset.format() == RAW_MAP_COLOR8;
+		}
+	}
+
+	/** Stages indexed map colors; Rust expands them after bounded image admission. */
+	public static boolean stageCpuMapColor8(ResourceLocation source, byte[] colors) {
+		if (source == null || colors == null || colors.length != 128 * 128) return false;
+		Asset asset = new Asset(assetId(source.toString()), source.toString(), 128, 128, colors.clone(), 0, 0, RAW_MAP_COLOR8);
+		Asset previous;
+		synchronized (LOCK) {
+			previous = CACHE.get(source);
+			if (!cachePutLocked(CACHE, source, asset)) return false;
+		}
+		try { stage(asset); }
+		catch (RuntimeException error) {
+			synchronized (LOCK) {
+				if (CACHE.get(source) == asset) {
+					if (previous == null) CACHE.remove(source); else CACHE.put(source, previous);
+				}
+			}
+			throw error;
+		}
+		return true;
+	}
+
+	/** Retires a staged CPU image; Rust drops it on the next generation. */
 	public static void releaseCpuRgba8(ResourceLocation source) {
 		if (source == null) return;
 		Asset removed;
@@ -488,7 +555,14 @@ public final class RustGalGuiRawImageAssets {
 			// Dynamic textures and animated sprites create immutable snapshots.
 			// Some producers refresh those snapshots without changing a pixel; do
 			// not turn that into a new whole-cache native upload every frame.
-			if (STAGED_ASSETS.get(asset.assetId()) == asset || samePayload(staged, asset)) return;
+			if (staged == asset) return;
+			if (samePayload(staged, asset)) {
+				// Remember the equal snapshot so its later stages (the minimap
+				// mask restages the map image every frame) take the identity
+				// fast path instead of comparing every pixel again.
+				STAGED_ASSETS.put(asset.assetId(), asset);
+				return;
+			}
 			if (Boolean.getBoolean("mattmc.dev.graphicsAuditSliceMetrics")) {
 				RustGalFrameCoordinator.auditMessage("Rust GUI raw image changed identity=" + asset.identity
 					+ " asset_id=" + asset.assetId + " extent=" + asset.width + "x" + asset.height
@@ -499,7 +573,8 @@ public final class RustGalGuiRawImageAssets {
 		// staged until its bounded pending-image transaction has succeeded, so a
 		// rejected update can be retried instead of being hidden by this fast path.
 		RustGalFrameCoordinator.stageGuiRawImage(new VulkanicGalBridge.GuiRawImageAssetRecord(
-			asset.assetId(), RAW_RGBA8, asset.width(), asset.height(), asset.pixels(), asset.samplingFilter(), asset.samplingAddress()
+			// The bridge record copies; pass the immutable backing array, not another clone.
+			asset.assetId(), asset.format(), asset.width(), asset.height(), asset.pixels, asset.samplingFilter(), asset.samplingAddress()
 		));
 		synchronized (LOCK) {
 			if (STAGED_ASSETS.size() >= MAX_SEMANTIC_IDENTITIES) {
@@ -514,6 +589,7 @@ public final class RustGalGuiRawImageAssets {
 	static boolean samePayload(Asset first, Asset second) {
 		return first != null && second != null
 			&& first.assetId == second.assetId
+			&& first.format == second.format
 			&& first.width == second.width
 			&& first.height == second.height
 			&& first.samplingFilter == second.samplingFilter
@@ -558,7 +634,7 @@ public final class RustGalGuiRawImageAssets {
 		}
 		Asset asset = new Asset(
 			assetId("atlas:" + snapshot.atlasLocation()),
-			"atlas:" + snapshot.atlasLocation(), snapshot.width(), snapshot.height(), snapshot.pixels()
+			"atlas:" + snapshot.atlasLocation(), snapshot.width(), snapshot.height(), snapshot.pixels().clone()
 		);
 		synchronized (LOCK) {
 			if (!cachePutLocked(ATLAS_CACHE, snapshot.atlasLocation(), new AtlasAsset(snapshot.generation(), asset))) return null;
@@ -698,12 +774,21 @@ public final class RustGalGuiRawImageAssets {
 		}
 	}
 
-	record Asset(long assetId, String identity, int width, int height, byte[] pixels, int samplingFilter, int samplingAddress) {
+	record Asset(long assetId, String identity, int width, int height, byte[] pixels, int samplingFilter, int samplingAddress, int format) {
+		Asset(long assetId, String identity, int width, int height, byte[] pixels, int samplingFilter, int samplingAddress) {
+			this(assetId, identity, width, height, pixels, samplingFilter, samplingAddress, RAW_RGBA8);
+		}
 		Asset(long assetId, String identity, int width, int height, byte[] pixels) {
 			this(assetId, identity, width, height, pixels, 0, 0);
 		}
+		/**
+		 * Adopts {@code pixels} without copying: every caller passes a freshly
+		 * read array it never touches again, and the entry points that receive
+		 * caller-owned arrays copy them first. Hot dynamic textures (VoxelMap)
+		 * otherwise copied each update three times.
+		 */
 		Asset {
-			pixels = pixels.clone();
+			java.util.Objects.requireNonNull(pixels, "pixels");
 		}
 
 		/** Internal residency accounting without cloning the immutable payload. */
@@ -717,7 +802,10 @@ public final class RustGalGuiRawImageAssets {
 		}
 	}
 
-	public record SemanticRawImageSnapshot(String identity, int width, int height, long generation, long revision, byte[] pixels) {
+	public record SemanticRawImageSnapshot(String identity, int width, int height, long generation, long revision, byte[] pixels, int format) {
+		public SemanticRawImageSnapshot(String identity, int width, int height, long generation, long revision, byte[] pixels) {
+			this(identity, width, height, generation, revision, pixels, RAW_RGBA8);
+		}
 		public SemanticRawImageSnapshot {
 			pixels = pixels.clone();
 		}

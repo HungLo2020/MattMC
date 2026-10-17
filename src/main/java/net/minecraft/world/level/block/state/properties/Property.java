@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 public abstract class Property<T extends Comparable<T>> {
 	private final Class<T> clazz;
 	private final String name;
+	private final int nativeDefinitionId;
 	@Nullable
 	private Integer hashCode;
 	private final Codec<T> codec = Codec.STRING
@@ -25,9 +26,17 @@ public abstract class Property<T extends Comparable<T>> {
 	private final Codec<Property.Value<T>> valueCodec = this.codec.xmap(this::value, Property.Value::value);
 
 	protected Property(String string, Class<T> class_) {
+		this(string, class_, -1);
+	}
+
+	protected Property(String string, Class<T> class_, int nativeDefinitionId) {
 		this.clazz = class_;
 		this.name = string;
+		this.nativeDefinitionId = nativeDefinitionId;
 	}
+
+	/** Native declaration identity, or -1 for a property not yet migrated. */
+	public final int nativeDefinitionId() { return this.nativeDefinitionId; }
 
 	public Property.Value<T> value(T comparable) {
 		return new Property.Value<>(this, comparable);

@@ -15,6 +15,9 @@ pub(super) struct VulkanContext {
     pub(super) physical_device: vk::PhysicalDevice,
     pub(super) device: ash::Device,
     pub(super) debug_utils: Option<ash::ext::debug_utils::Device>,
+    /// Per-frame command labels cost a format, an allocation and a driver
+    /// call each; emit them only for debugging tools and validation runs.
+    pub(super) command_labels: bool,
     pub(super) queue_family_index: u32,
     pub(super) queue: vk::Queue,
     pub(super) memory_properties: vk::PhysicalDeviceMemoryProperties,
@@ -206,6 +209,11 @@ impl VulkanContext {
             supported_features.features.fragment_stores_and_atomics == vk::TRUE;
         let multi_draw_indirect_supported =
             supported_features.features.multi_draw_indirect == vk::TRUE;
+        // Multi-draw records address per-draw data with `firstInstance`
+        // (terrain instance streams, DH draw records); Vulkan requires this
+        // feature for a non-zero first instance in indirect commands.
+        let draw_indirect_first_instance_supported =
+            supported_features.features.draw_indirect_first_instance == vk::TRUE;
         let pipeline_statistics_supported =
             supported_features.features.pipeline_statistics_query == vk::TRUE;
         let provoking_vertex_last =
@@ -213,6 +221,7 @@ impl VulkanContext {
         let core_features = vk::PhysicalDeviceFeatures::default()
             .independent_blend(independent_blend_supported)
             .multi_draw_indirect(multi_draw_indirect_supported)
+            .draw_indirect_first_instance(draw_indirect_first_instance_supported)
             .pipeline_statistics_query(pipeline_statistics_supported)
             .vertex_pipeline_stores_and_atomics(vertex_storage_writes)
             .fragment_stores_and_atomics(fragment_storage_writes);
@@ -282,6 +291,7 @@ impl VulkanContext {
             instance,
             physical_device,
             device,
+            command_labels: debug_utils.is_some() && command_labels_requested(),
             debug_utils,
             queue_family_index,
             queue,
@@ -410,7 +420,7 @@ impl VulkanContext {
     }
 
     pub(super) unsafe fn begin_label(&self, command_buffer: vk::CommandBuffer, name: &str) {
-        let Some(debug_utils) = &self.debug_utils else {
+        let Some(debug_utils) = self.debug_utils.as_ref().filter(|_| self.command_labels) else {
             return;
         };
         let Ok(name) = CString::new(name) else {
@@ -423,10 +433,21 @@ impl VulkanContext {
     }
 
     pub(super) unsafe fn end_label(&self, command_buffer: vk::CommandBuffer) {
-        if let Some(debug_utils) = &self.debug_utils {
+        if let Some(debug_utils) = self.debug_utils.as_ref().filter(|_| self.command_labels) {
             unsafe { debug_utils.cmd_end_debug_utils_label(command_buffer) };
         }
     }
+}
+
+/// Command labels are for RenderDoc/Nsight captures and validation runs:
+/// `MATTMC_VULKAN_DEBUG_LABELS=1`, RenderDoc capture (ours or RenderDoc's
+/// own launcher variable) or GAL validation enables them.
+fn command_labels_requested() -> bool {
+    let set = |name: &str| std::env::var_os(name).is_some_and(|value| !value.is_empty() && value != "0");
+    set("MATTMC_VULKAN_DEBUG_LABELS")
+        || set("MATTMC_RENDERDOC_CAPTURE")
+        || set("ENABLE_VULKAN_RENDERDOC_CAPTURE")
+        || crate::render::vulkanic::gal::per_frame_validation()
 }
 
 fn queue_timestamp_valid_bits(
@@ -499,8 +520,14 @@ fn select_graphics_device(
     surface: Option<vk::SurfaceKHR>,
 ) -> GalResult<(vk::PhysicalDevice, u32)> {
     let mut best = None;
+    // One line per windowed device selection, so a recording or log shows
+    // which GPU rendered and why (e.g. a discrete GPU that cannot present).
+    let mut candidates = Vec::new();
     for physical_device in physical_devices {
         let properties = unsafe { instance.get_physical_device_properties(*physical_device) };
+        let name = unsafe { CStr::from_ptr(properties.device_name.as_ptr()) }
+            .to_string_lossy()
+            .into_owned();
         let queue_families =
             unsafe { instance.get_physical_device_queue_family_properties(*physical_device) };
         let Some((queue_family_index, _)) =
@@ -522,6 +549,7 @@ fn select_graphics_device(
                 }
             })
         else {
+            candidates.push((*physical_device, name, properties.device_type, false, -1));
             continue;
         };
         let score = match properties.device_type {
@@ -530,12 +558,33 @@ fn select_graphics_device(
             vk::PhysicalDeviceType::CPU => 1,
             _ => 0,
         };
+        candidates.push((*physical_device, name, properties.device_type, true, score));
         if best
             .map(|(_, _, best_score)| score > best_score)
             .unwrap_or(true)
         {
             best = Some((*physical_device, queue_family_index as u32, score));
         }
+    }
+    if surface.is_some() {
+        let selected = best.map(|(device, _, _)| device);
+        let listed: Vec<String> = candidates
+            .iter()
+            .map(|(device, name, kind, usable, score)| {
+                let kind = match *kind {
+                    vk::PhysicalDeviceType::DISCRETE_GPU => "discrete",
+                    vk::PhysicalDeviceType::INTEGRATED_GPU => "integrated",
+                    vk::PhysicalDeviceType::VIRTUAL_GPU => "virtual",
+                    vk::PhysicalDeviceType::CPU => "cpu",
+                    _ => "other",
+                };
+                format!(
+                    "[{name} type={kind} graphics_present={usable} score={score}{}]",
+                    if Some(*device) == selected { " SELECTED" } else { "" }
+                )
+            })
+            .collect();
+        eprintln!("MattMC Vulkan device selection: {}", listed.join(" "));
     }
     best.map(|(device, queue, _)| (device, queue))
         .ok_or_else(|| {

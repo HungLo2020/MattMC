@@ -107,8 +107,47 @@ public record SerializableChunkData(
 	public static final String BLOCK_LIGHT_TAG = "BlockLight";
 	public static final String SKY_LIGHT_TAG = "SkyLight";
 
+	/** Parses a loaded chunk: a current-version tape has its sections decoded
+	 * by Rust ({@link net.minecraft.world.level.chunk.NativeChunkSections#decode})
+	 * and the rest read as a tag; anything else is upgraded and parsed as before. */
+	@Nullable
+	public static SerializableChunkData parseLoaded(LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory,
+		IOWorker.Loaded loaded, java.util.function.UnaryOperator<CompoundTag> upgrade) {
+		try (loaded) {
+			if (loaded.tape() != null || loaded.nativeTape() != null) {
+				try (var decoded = loaded.nativeTape() != null
+                    ? net.minecraft.world.level.chunk.NativeChunkSections.decode(loaded.nativeTape(), palettedContainerFactory,
+                        levelHeightAccessor.getMinSectionY(), levelHeightAccessor.getMaxSectionY())
+                    : net.minecraft.world.level.chunk.NativeChunkSections.decode(loaded.tape(), palettedContainerFactory,
+                        levelHeightAccessor.getMinSectionY(), levelHeightAccessor.getMaxSectionY())) {
+					if (decoded != null) {
+						CompoundTag root = net.minecraft.nbt.NativeNbtRegionAccess.readTape(decoded.root());
+						// upgradeChunkTag leaves a current-version tag untouched.
+						if (ChunkStorage.getVersion(root) == net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version()) {
+							List<SerializableChunkData.SectionData> sections = decoded.sections();
+							if (sections != null) {
+								net.minecraft.world.level.chunk.NativeChunkSections.LOADED.incrementAndGet();
+								return parse(levelHeightAccessor, palettedContainerFactory, root, sections);
+							}
+						}
+					}
+				}
+			}
+			return parse(levelHeightAccessor, palettedContainerFactory, upgrade.apply(loaded.fullTag()));
+		} catch (java.io.IOException exception) {
+			throw new java.io.UncheckedIOException(exception);
+		}
+	}
+
 	@Nullable
 	public static SerializableChunkData parse(LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory, CompoundTag compoundTag) {
+		return parse(levelHeightAccessor, palettedContainerFactory, compoundTag, null);
+	}
+
+	/** With {@code decodedSections}, those are the sections and the tag's own list is not read. */
+	@Nullable
+	private static SerializableChunkData parse(LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory, CompoundTag compoundTag,
+		@Nullable List<SerializableChunkData.SectionData> decodedSections) {
 		if (compoundTag.getString("Status").isEmpty()) {
 			return null;
 		} else {
@@ -153,8 +192,8 @@ public record SerializableChunkData(
 			List<CompoundTag> list3 = compoundTag.getList("entities").stream().flatMap(ListTag::compoundStream).toList();
 			List<CompoundTag> list4 = compoundTag.getList("block_entities").stream().flatMap(ListTag::compoundStream).toList();
 			CompoundTag compoundTag2 = compoundTag.getCompoundOrEmpty("structures");
-			ListTag listTag3 = compoundTag.getListOrEmpty("sections");
-			List<SerializableChunkData.SectionData> list5 = new ArrayList(listTag3.size());
+			ListTag listTag3 = decodedSections != null ? new ListTag() : compoundTag.getListOrEmpty("sections");
+			List<SerializableChunkData.SectionData> list5 = decodedSections != null ? decodedSections : new ArrayList(listTag3.size());
 			Codec<PalettedContainerRO<Holder<Biome>>> codec = palettedContainerFactory.biomeContainerCodec();
 			Codec<PalettedContainer<BlockState>> codec2 = palettedContainerFactory.blockStatesContainerCodec();
 
@@ -344,14 +383,14 @@ public record SerializableChunkData(
 		} else {
 			ChunkPos chunkPos = chunkAccess.getPos();
 			List<SerializableChunkData.SectionData> list = new ArrayList();
-			LevelChunkSection[] levelChunkSections = chunkAccess.getSections();
+			LevelChunkSection[] levelChunkSections = chunkAccess.getSectionsForRead();
 			LevelLightEngine levelLightEngine = serverLevel.getChunkSource().getLightEngine();
 
 			for (int i = levelLightEngine.getMinLightSection(); i < levelLightEngine.getMaxLightSection(); i++) {
 				int j = chunkAccess.getSectionIndexFromSectionY(i);
 				boolean bl = j >= 0 && j < levelChunkSections.length;
-				DataLayer dataLayer = levelLightEngine.getLayerListener(LightLayer.BLOCK).getDataLayerData(SectionPos.of(chunkPos, i));
-				DataLayer dataLayer2 = levelLightEngine.getLayerListener(LightLayer.SKY).getDataLayerData(SectionPos.of(chunkPos, i));
+				DataLayer dataLayer = levelLightEngine.dataLayerForSave(LightLayer.BLOCK, SectionPos.of(chunkPos, i));
+				DataLayer dataLayer2 = levelLightEngine.dataLayerForSave(LightLayer.SKY, SectionPos.of(chunkPos, i));
 				DataLayer dataLayer3 = dataLayer != null && !dataLayer.isEmpty() ? dataLayer.copy() : null;
 				DataLayer dataLayer4 = dataLayer2 != null && !dataLayer2.isEmpty() ? dataLayer2.copy() : null;
 				if (bl || dataLayer3 != null || dataLayer4 != null) {
@@ -419,7 +458,45 @@ public record SerializableChunkData(
 		}
 	}
 
+	/** A saved chunk's tape for its region file, with the tag built only if a
+	 * pending read asks for it. A {@code failure} is the tape writer's: the
+	 * region write reports it, where the original wrote the tape. */
+	public record Encoded(@Nullable byte[] tape, java.util.function.Supplier<CompoundTag> tag, @Nullable Exception failure) {
+		public Encoded(byte[] tape, java.util.function.Supplier<CompoundTag> tag) {
+			this(tape, tag, null);
+		}
+	}
+
+	/** {@code NativeNbtRegionAccess.writeTape(write())}, with the sections list
+	 * encoded by Rust ({@link net.minecraft.world.level.chunk.NativeChunkSections})
+	 * and spliced into the tape. Only {@code write()}'s own failures are thrown,
+	 * as when the original built the tag here; a Rust failure keeps Java's
+	 * encoding, and a tape writer failure is carried to the region write. */
+	public Encoded encode() {
+		byte[] sections;
+		try {
+			sections = net.minecraft.world.level.chunk.NativeChunkSections.encode(this.sectionData, this.containerFactory);
+		} catch (RuntimeException exception) {
+			sections = null;
+		}
+		ListTag placeholder = sections == null ? null : new ListTag();
+		CompoundTag root = this.write(placeholder);
+		try {
+			byte[] tape = placeholder == null
+				? net.minecraft.nbt.NativeNbtRegionAccess.writeTape(root)
+				: net.minecraft.nbt.NativeNbtRegionAccess.writeTape(root, placeholder, sections);
+			return new Encoded(tape, this::write, null);
+		} catch (java.io.IOException | RuntimeException exception) {
+			return new Encoded(null, this::write, exception);
+		}
+	}
+
 	public CompoundTag write() {
+		return this.write(null);
+	}
+
+	/** With a placeholder, the sections list is that (empty) tag instead. */
+	private CompoundTag write(@Nullable ListTag sectionsPlaceholder) {
 		CompoundTag compoundTag = NbtUtils.addCurrentDataVersion(new CompoundTag());
 		compoundTag.putInt("xPos", this.chunkPos.x);
 		compoundTag.putInt("yPos", this.minSectionY);
@@ -433,11 +510,11 @@ public record SerializableChunkData(
 			compoundTag.put("UpgradeData", this.upgradeData.write());
 		}
 
-		ListTag listTag = new ListTag();
+		ListTag listTag = sectionsPlaceholder != null ? sectionsPlaceholder : new ListTag();
 		Codec<PalettedContainer<BlockState>> codec = this.containerFactory.blockStatesContainerCodec();
 		Codec<PalettedContainerRO<Holder<Biome>>> codec2 = this.containerFactory.biomeContainerCodec();
 
-		for (SerializableChunkData.SectionData sectionData : this.sectionData) {
+		for (SerializableChunkData.SectionData sectionData : sectionsPlaceholder != null ? List.<SerializableChunkData.SectionData>of() : this.sectionData) {
 			CompoundTag compoundTag2 = new CompoundTag();
 			LevelChunkSection levelChunkSection = sectionData.chunkSection;
 			if (levelChunkSection != null) {

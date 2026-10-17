@@ -1,7 +1,6 @@
 package net.minecraft.world.level.entity;
 
 import net.logging.LogUtils;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
@@ -15,12 +14,13 @@ public class TransientEntitySectionManager<T extends EntityAccess> {
 	final LevelCallback<T> callbacks;
 	final EntityLookup<T> entityStorage;
 	final EntitySectionStorage<T> sectionStorage;
-	private final LongSet tickingChunks = new LongOpenHashSet();
+	private final NativeEntityResidency residency = new NativeEntityResidency();
+	private final LongSet tickingChunks = this.residency.ticking();
 	private final LevelEntityGetter<T> entityGetter;
 
 	public TransientEntitySectionManager(Class<T> class_, LevelCallback<T> levelCallback) {
 		this.entityStorage = new EntityLookup<>();
-		this.sectionStorage = new EntitySectionStorage<>(class_, l -> this.tickingChunks.contains(l) ? Visibility.TICKING : Visibility.TRACKED);
+		this.sectionStorage = new EntitySectionStorage<>(class_, this.residency::clientVisibility);
 		this.callbacks = levelCallback;
 		this.entityGetter = new LevelEntityGetterAdapter<>(this.entityStorage, this.sectionStorage);
 	}

@@ -302,6 +302,11 @@ public final class RustGalGuiRenderer {
 		List<RustGalGuiRawImageAssets.Asset> rawAssets = new ArrayList<>();
 		Set<Long> stagedAtlasIds = new HashSet<>();
 		List<VulkanicGalBridge.GuiAffineQuadRecord> requests = new ArrayList<>(quads.size());
+		// Invalid layers still fail at the original post-extraction admission
+		// point. Ordinary requests carry their final layer from construction.
+		int preparedLayerOrder = dynamicLayerOrder != null && dynamicLayerOrder >= 0
+			&& dynamicLayerOrder <= Integer.MAX_VALUE - WHOLE_FRAME_DYNAMIC_LAYER_BASE
+			? WHOLE_FRAME_DYNAMIC_LAYER_BASE + dynamicLayerOrder : GuiRenderStratum.GUI_TEXT.order();
 		try {
 			for (TextGlyphQuad quad : quads) {
 				if (!finiteTextQuad(quad) || !isParallelogram(quad)) {
@@ -325,7 +330,7 @@ public final class RustGalGuiRenderer {
 					rawAssets.add(raw);
 					assetId = raw.assetId();
 				}
-				requests.add(transformTextQuad(quad, textState.pose, assetId, guiWidth, guiHeight, textState.scissor));
+				requests.add(transformTextQuad(quad, textState.pose, assetId, guiWidth, guiHeight, textState.scissor, preparedLayerOrder));
 			}
 		} catch (RuntimeException error) {
 			LOGGER.debug("Rust GUI text semantic extraction declined", error);
@@ -336,13 +341,9 @@ public final class RustGalGuiRenderer {
 		List<RustGalGuiElementRenderState> elements = new ArrayList<>(requests.isEmpty() ? 0 : 1);
 		if (!requests.isEmpty()) {
 			int requestLayerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_TEXT.order() : dynamicLayerOrder(dynamicLayerOrder);
-			List<VulkanicGalBridge.GuiAffineQuadRecord> orderedRequests = new ArrayList<>(requests.size());
-			for (VulkanicGalBridge.GuiAffineQuadRecord request : requests) {
-				orderedRequests.add(request.withStratum(requestLayerOrder));
-			}
 			long startedNanos = System.nanoTime();
 			var token = RustGalFrameCoordinator.enqueueGuiAffineQuadRequests(
-				orderedRequests,
+				requests,
 				dynamicLayerOrder == null ? GuiRenderStratum.GUI_TEXT.id() : dynamicLayerId(dynamicLayerOrder),
 				requestLayerOrder,
 				startedNanos);
@@ -357,7 +358,7 @@ public final class RustGalGuiRenderer {
 			}
 			double minX = Double.POSITIVE_INFINITY, minY = Double.POSITIVE_INFINITY;
 			double maxX = Double.NEGATIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY;
-			for (VulkanicGalBridge.GuiAffineQuadRecord request : orderedRequests) {
+			for (VulkanicGalBridge.GuiAffineQuadRecord request : requests) {
 				minX = Math.min(minX, Math.min(request.x0(), Math.min(request.x1(), request.x3())));
 				minY = Math.min(minY, Math.min(request.y0(), Math.min(request.y1(), request.y3())));
 				maxX = Math.max(maxX, Math.max(request.x0(), Math.max(request.x1(), request.x3())));
@@ -416,6 +417,8 @@ public final class RustGalGuiRenderer {
 		List<RustGalGuiRawImageAssets.Asset> directGlyphRawAssets = new ArrayList<>();
 		Set<Long> stagedAtlasIds = new HashSet<>();
 		List<VulkanicGalBridge.GuiAffineQuadRecord> requests = new ArrayList<>(quads.size());
+		int preparedLayerOrder = dynamicLayerOrder <= Integer.MAX_VALUE - WHOLE_FRAME_DYNAMIC_LAYER_BASE
+			? WHOLE_FRAME_DYNAMIC_LAYER_BASE + dynamicLayerOrder : GuiRenderStratum.GUI_TEXT.order();
 		try {
 			for (TextGlyphQuad quad : quads) {
 				if (!finiteTextQuad(quad) || !isParallelogram(quad)) {
@@ -437,7 +440,7 @@ public final class RustGalGuiRenderer {
 					directGlyphRawAssets.add(raw);
 					assetId = raw.assetId();
 				}
-				requests.add(transformTextQuad(quad, glyph.pose(), assetId, guiWidth, guiHeight, glyph.scissorArea()));
+				requests.add(transformTextQuad(quad, glyph.pose(), assetId, guiWidth, guiHeight, glyph.scissorArea(), preparedLayerOrder));
 			}
 		} catch (RuntimeException error) {
 			LOGGER.debug("Rust GUI direct glyph semantic extraction declined", error);
@@ -445,16 +448,14 @@ public final class RustGalGuiRenderer {
 			return null;
 		}
 		int requestLayerOrder = dynamicLayerOrder(dynamicLayerOrder);
-		List<VulkanicGalBridge.GuiAffineQuadRecord> orderedRequests = new ArrayList<>(requests.size());
-		for (VulkanicGalBridge.GuiAffineQuadRecord request : requests) orderedRequests.add(request.withStratum(requestLayerOrder));
 		long startedNanos = System.nanoTime();
 		var token = RustGalFrameCoordinator.enqueueGuiAffineQuadRequests(
-			orderedRequests, dynamicLayerId(dynamicLayerOrder), requestLayerOrder, startedNanos);
+			requests, dynamicLayerId(dynamicLayerOrder), requestLayerOrder, startedNanos);
 		for (TextAtlasRequest atlasRequest : atlasRequests) stageTextAtlas(atlasRequest.assetId(), atlasRequest.atlas());
 		for (RustGalGuiRawImageAssets.Asset raw : directGlyphRawAssets) RustGalGuiRawImageAssets.stage(raw);
 		double minX = Double.POSITIVE_INFINITY, minY = Double.POSITIVE_INFINITY;
 		double maxX = Double.NEGATIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY;
-		for (VulkanicGalBridge.GuiAffineQuadRecord request : orderedRequests) {
+		for (VulkanicGalBridge.GuiAffineQuadRecord request : requests) {
 			minX = Math.min(minX, Math.min(request.x0(), Math.min(request.x1(), request.x3())));
 			minY = Math.min(minY, Math.min(request.y0(), Math.min(request.y1(), request.y3())));
 			maxX = Math.max(maxX, Math.max(request.x0(), Math.max(request.x1(), request.x3())));
@@ -508,23 +509,25 @@ public final class RustGalGuiRenderer {
 		// intact so Rust performs the same viewport clipping, but clamp the copied
 		// batch metadata to the actual frame.  Reject only a rectangle with no
 		// visible intersection; treating that as unsupported would make a selected
-		// Vulkan frame lose otherwise valid GUI work.
+		// Vulkan frame lose otherwise valid GUI work. An invisible rectangle (for
+		// example the world map's off-screen world border) draws nothing, as in
+		// vanilla: return no elements rather than an unsupported marker.
 		if (left >= right || top >= bottom || right <= 0 || bottom <= 0
-			|| left >= guiWidth || top >= guiHeight) return null;
+			|| left >= guiWidth || top >= guiHeight) return List.of();
 		int clippedLeft = Math.max(0, left);
 		int clippedTop = Math.max(0, top);
 		int clippedRight = Math.min(guiWidth, right);
 		int clippedBottom = Math.min(guiHeight, bottom);
-		if (clippedLeft >= clippedRight || clippedTop >= clippedBottom) return null;
+		if (clippedLeft >= clippedRight || clippedTop >= clippedBottom) return List.of();
 		ScreenRectangle scissor = rectangle.scissorArea();
 		int scissorLeft = 0, scissorTop = 0, scissorRight = guiWidth, scissorBottom = guiHeight;
 		if (scissor != null) {
-			if (scissor.width() < 0 || scissor.height() < 0) return null;
+			if (scissor.width() < 0 || scissor.height() < 0) return List.of();
 			scissorLeft = Math.max(0, scissor.left());
 			scissorTop = Math.max(0, scissor.top());
 			scissorRight = (int)Math.min((long)guiWidth, (long)scissor.left() + scissor.width());
 			scissorBottom = (int)Math.min((long)guiHeight, (long)scissor.top() + scissor.height());
-			if (scissorLeft >= scissorRight || scissorTop >= scissorBottom) return null;
+			if (scissorLeft >= scissorRight || scissorTop >= scissorBottom) return List.of();
 		}
 		List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = List.of(
 			new VulkanicGalBridge.GuiMeshVertexRecord(new float[] {x0, y0, 0}, new float[] {0, 0}, new float[] {0, 0}, rectangle.color00(), 0x007F0000),
@@ -2107,6 +2110,12 @@ public final class RustGalGuiRenderer {
 	static VulkanicGalBridge.GuiAffineQuadRecord transformTextQuad(
 		TextGlyphQuad quad, Matrix3x2f pose, long assetId, int guiWidth, int guiHeight, @Nullable ScreenRectangle scissor
 	) {
+		return transformTextQuad(quad, pose, assetId, guiWidth, guiHeight, scissor, GuiRenderStratum.GUI_TEXT.order());
+	}
+
+	static VulkanicGalBridge.GuiAffineQuadRecord transformTextQuad(
+		TextGlyphQuad quad, Matrix3x2f pose, long assetId, int guiWidth, int guiHeight, @Nullable ScreenRectangle scissor, int stratum
+	) {
 		float x0 = pose.m00() * quad.x0() + pose.m10() * quad.y0() + pose.m20();
 		float y0 = pose.m01() * quad.x0() + pose.m11() * quad.y0() + pose.m21();
 		// TextGlyphQuad follows Minecraft's vertex order: TL, BL, BR, TR. The
@@ -2115,11 +2124,12 @@ public final class RustGalGuiRenderer {
 		float y1 = pose.m01() * quad.x3() + pose.m11() * quad.y3() + pose.m21();
 		float x3 = pose.m00() * quad.x1() + pose.m10() * quad.y1() + pose.m20();
 		float y3 = pose.m01() * quad.x1() + pose.m11() * quad.y1() + pose.m21();
-		VulkanicGalBridge.GuiAffineQuadRecord request = new VulkanicGalBridge.GuiAffineQuadRecord(
-			GuiRenderStratum.GUI_TEXT.order(), assetId, x0, y0, x1, y1, x3, y3, quad.z(),
-			quad.u0(), quad.v0(), quad.u1(), quad.v1(), quad.colorArgb(), guiWidth, guiHeight
+		return new VulkanicGalBridge.GuiAffineQuadRecord(
+			stratum, assetId, x0, y0, x1, y1, x3, y3, quad.z(),
+			quad.u0(), quad.v0(), quad.u1(), quad.v1(), quad.colorArgb(), guiWidth, guiHeight,
+			0L, scissor == null ? 0 : 1, scissor == null ? 0 : scissor.left(), scissor == null ? 0 : scissor.top(),
+			scissor == null ? 0 : scissor.width(), scissor == null ? 0 : scissor.height()
 		);
-		return scissor == null ? request : request.withClip(scissor.left(), scissor.top(), scissor.width(), scissor.height());
 	}
 
 	private static boolean isParallelogram(TextGlyphQuad quad) {
@@ -2746,13 +2756,13 @@ public final class RustGalGuiRenderer {
 		int height
 	) {
 		long started = System.nanoTime();
-		GraphicsFrameBenchmark.beginPhase("rust-gal." + sprite.phaseName + ".java-producer");
+		GraphicsFrameBenchmark.beginDetailedPhase(sprite.producerPhase);
         boolean fullscreenPostEffect = sprite == GuiSprite.POST_EFFECT_INVERT
             || sprite == GuiSprite.POST_EFFECT_CREEPER
             || sprite == GuiSprite.POST_EFFECT_SPIDER;
         if (width <= 0 || height <= 0 || (!fullscreenPostEffect && (width > sprite.width || height > sprite.height))
             || (fullscreenPostEffect && (width > 16384 || height > 16384))) {
-			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
+			GraphicsFrameBenchmark.endDetailedPhase(sprite.producerPhase);
 			throw new IllegalArgumentException("GUI sprite destination extent is outside " + sprite.name() + ": " + width + "x" + height);
 		}
 		try {
@@ -2788,7 +2798,7 @@ public final class RustGalGuiRenderer {
 				)
 			);
 		} finally {
-			GraphicsFrameBenchmark.endPhase("rust-gal." + sprite.phaseName + ".java-producer");
+			GraphicsFrameBenchmark.endDetailedPhase(sprite.producerPhase);
 		}
 	}
 
@@ -3824,6 +3834,8 @@ public final class RustGalGuiRenderer {
 
 		final GuiRenderStratum stratum;
 		final String phaseName;
+		/** Benchmark phase name, built once (it is entered for every sprite every frame). */
+		final String producerPhase;
 		final String cacheKind;
 		final String semanticSuffix;
 		final String textureResource;
@@ -3834,6 +3846,7 @@ public final class RustGalGuiRenderer {
 		GuiSprite(GuiRenderStratum stratum, String phaseName, String cacheKind, String textureResource, int width, int height, boolean invertBlend) {
 			this.stratum = stratum;
 			this.phaseName = phaseName;
+			this.producerPhase = "rust-gal." + phaseName + ".java-producer";
 			this.cacheKind = cacheKind;
 			this.semanticSuffix = semanticSuffix(cacheKind);
 			this.textureResource = textureResource;

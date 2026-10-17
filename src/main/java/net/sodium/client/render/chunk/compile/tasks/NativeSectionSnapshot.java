@@ -1,5 +1,8 @@
 package net.sodium.client.render.chunk.compile.tasks;
 
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
+import java.lang.foreign.MemorySegment;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import net.sodium.client.render.chunk.compile.ChunkBuildBuffers;
 import net.sodium.client.render.chunk.compile.pipeline.NativeStaticBlockModelRegistry;
 import net.sodium.client.render.chunk.compile.pipeline.BlockOcclusionCache;
@@ -11,6 +14,7 @@ import net.sodium.client.render.chunk.vertex.format.NativeChunkMeshEncoder;
 import net.sodium.client.services.PlatformBlockAccess;
 import net.sodium.client.world.LevelSlice;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
@@ -49,6 +53,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private static final int HEADER_FLUID_BLOCK_IDS_ADDRESS_OFFSET = 104;
     private static final int HEADER_FLAGS_ADDRESS_OFFSET = 112;
     private static final int HEADER_TINT_LATTICES_ADDRESS_OFFSET = 120;
+    private static final int HEADER_COLOR_FIELDS_ID_OFFSET = 128;
     // Resource-pack models may legitimately extend beyond the unit block
     // (for example Stay True's leaf planes reach -7..25 model units). Java's
     // BlendedColorProvider floors vertex - 0.5 and therefore needs samples
@@ -59,6 +64,11 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private static final int TINT_LATTICE_DIMENSION = TINT_LATTICE_MAX_OFFSET - TINT_LATTICE_MIN_OFFSET + 1;
     private static final int TINT_LATTICE_SAMPLE_COUNT = TINT_LATTICE_DIMENSION * TINT_LATTICE_DIMENSION * TINT_LATTICE_DIMENSION;
     private static final int SEMANTIC_CULL_MASK_SHIFT = 8;
+    private static final int TINT_PROVIDER = 0;
+    private static final int TINT_GRASS = 1;
+    private static final int TINT_FOLIAGE = 2;
+    private static final int TINT_DRY_FOLIAGE = 3;
+    private static final int TINT_REDSTONE = 4;
 
     private final ChunkBuildBuffers buffers;
     private final int sectionIndex;
@@ -66,7 +76,9 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private final int minY;
     private final int minZ;
     private final int modelReloadGeneration;
-    private final BlockOcclusionCache modelOcclusionCache = new BlockOcclusionCache();
+    private final LevelSlice colorSlice;
+    private BlockOcclusionCache modelOcclusionCache;
+    private boolean nativeCulling;
     private final long totalBytes;
     private long address;
     private long activeIndicesAddress;
@@ -83,9 +95,12 @@ final class NativeSectionSnapshot implements AutoCloseable {
     private long flagsAddress;
     private long tintLatticesAddress;
     private int activeRecordCount;
+    private long colorKindsAddress;
+    private NativeSectionColors colorFields;
 
     NativeSectionSnapshot(ChunkBuildBuffers buffers, int sectionIndex, int minX, int minY, int minZ,
             LevelSlice slice) {
+        this.colorSlice = slice;
         this.buffers = buffers;
         this.sectionIndex = sectionIndex;
         this.minX = minX;
@@ -119,8 +134,10 @@ final class NativeSectionSnapshot implements AutoCloseable {
         offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
         this.flagsAddress = offset;
         offset += (long) SECTION_BLOCK_COUNT * Integer.BYTES;
-        this.tintLatticesAddress = offset;
-        offset += (long) SECTION_BLOCK_COUNT * TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES;
+        this.colorKindsAddress = offset;
+        offset += SECTION_BLOCK_COUNT;
+        // Literal providers retain their original calls. Their staging rows are
+        // allocated only if one is encountered; built-in biome fields are Rust-owned.
         this.totalBytes = align(offset, Long.BYTES);
 
         this.address = MemoryUtil.nmemCalloc(1L, this.totalBytes);
@@ -128,8 +145,13 @@ final class NativeSectionSnapshot implements AutoCloseable {
             throw new OutOfMemoryError("Could not allocate native section snapshot");
         }
         this.rebaseAddresses();
-        this.writeHeader();
-        this.populatePaddedGrids(slice);
+        try {
+            this.writeHeader();
+            this.populatePaddedGrids(slice);
+        } catch (Throwable failure) {
+            this.close();
+            throw failure;
+        }
     }
 
     void appendBlock(int localBlockIndex, LevelSlice slice, BlockState blockState, BlockPos blockPos,
@@ -155,8 +177,16 @@ final class NativeSectionSnapshot implements AutoCloseable {
         MemoryUtil.memPutInt(this.seedLosAddress + (long) localBlockIndex * Integer.BYTES, (int) seed);
         MemoryUtil.memPutInt(this.seedHisAddress + (long) localBlockIndex * Integer.BYTES, (int) (seed >>> 32));
         MemoryUtil.memPutInt(this.tintsAddress + (long) localBlockIndex * Integer.BYTES, tint);
-        this.writeTintLattice(localBlockIndex, slice, blockState, blockPos);
-        this.recordTintSource(localBlockIndex, blockState, blockPos, tint);
+        int colorKind = colorSourceKind(blockState, Minecraft.getInstance().getBlockColors());
+        MemoryUtil.memPutByte(this.colorKindsAddress + localBlockIndex, (byte) colorKind);
+        if (colorKind == 4) {
+            if (this.tintLatticesAddress == 0L) {
+                this.tintLatticesAddress = MemoryUtil.nmemCalloc(SECTION_BLOCK_COUNT, TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES);
+                if (this.tintLatticesAddress == 0L) throw new OutOfMemoryError("Could not allocate literal color samples");
+            }
+            this.writeTintLattice(localBlockIndex, slice, blockState, blockPos);
+        }
+        this.recordTintSource(localBlockIndex, slice, blockState, blockPos, tint, colorKind);
         MemoryUtil.memPutInt(this.fluidTintsAddress + (long) localBlockIndex * Integer.BYTES, fluidTint);
         MemoryUtil.memPutFloat(this.fluidFlowXAddress + (long) localBlockIndex * Float.BYTES, (float) flow.x);
         MemoryUtil.memPutFloat(this.fluidFlowZAddress + (long) localBlockIndex * Float.BYTES, (float) flow.z);
@@ -170,7 +200,13 @@ final class NativeSectionSnapshot implements AutoCloseable {
         flags |= NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_FLAG_TINT_LATTICE;
         if (blockState.getRenderShape() == RenderShape.MODEL
                 && NativeStaticBlockModelRegistry.hasNativeModel(blockState)) {
-            flags |= this.modelCullMask(slice, blockState, blockPos) << SEMANTIC_CULL_MASK_SHIFT;
+            int id = MemoryUtil.memGetInt(this.paddedStateIdsAddress
+                + (long)paddedIndex(localX + 1, localY + 1, localZ + 1) * Integer.BYTES);
+            if (this.nativeCulling && NativeTerrainCulling.admitsState(id, blockState)) {
+                flags |= NativeChunkMeshEncoder.NATIVE_SECTION_BLOCK_FLAG_NATIVE_CULL;
+            } else {
+                flags |= this.modelCullMask(slice, blockState, blockPos) << SEMANTIC_CULL_MASK_SHIFT;
+            }
         }
         MemoryUtil.memPutInt(this.flagsAddress + (long) localBlockIndex * Integer.BYTES, flags);
     }
@@ -181,6 +217,22 @@ final class NativeSectionSnapshot implements AutoCloseable {
         if (this.modelReloadGeneration != NativeStaticBlockModelRegistry.reloadGeneration()) {
             throw new IllegalStateException("Native section snapshot was built against stale native model metadata");
         }
+        if (this.colorFields != null) throw new IllegalStateException("Native section snapshot was already flushed");
+        this.colorFields = NativeSectionColors.capture(this.minX, this.minY, this.minZ,
+                this.activeIndicesAddress, this.activeRecordCount, this.colorKindsAddress, this.tintLatticesAddress,
+                this.colorSlice);
+        // A reload can finish during color extraction. Revalidate immediately
+        // before native model/state admission, retaining the original guard too.
+        if (this.modelReloadGeneration != NativeStaticBlockModelRegistry.reloadGeneration()) {
+            throw new IllegalStateException("Native section snapshot was built against stale native model metadata");
+        }
+        // Rust copied literal rows into the sealed owner; no Java tensor is
+        // needed during the native scan, including custom-provider sections.
+        if (this.tintLatticesAddress != 0L) {
+            MemoryUtil.nmemFree(this.tintLatticesAddress);
+            this.tintLatticesAddress = 0L;
+        }
+        MemoryUtil.memPutLong(this.address + HEADER_COLOR_FIELDS_ID_OFFSET, this.colorFields.identity());
         MemoryUtil.memPutInt(this.address + HEADER_ACTIVE_COUNT_OFFSET, this.activeRecordCount);
         int[] nativeQuads = this.buffers.appendCompactNativeSectionSnapshotAllPasses(this.address,
                 this.sectionIndex, collector);
@@ -211,7 +263,7 @@ final class NativeSectionSnapshot implements AutoCloseable {
         this.fluidFlowZAddress += this.address;
         this.fluidBlockIdsAddress += this.address;
         this.flagsAddress += this.address;
-        this.tintLatticesAddress += this.address;
+        this.colorKindsAddress += this.address;
     }
 
     private void writeHeader() {
@@ -243,18 +295,48 @@ final class NativeSectionSnapshot implements AutoCloseable {
      */
     private void writeTintLattice(int localBlockIndex, LevelSlice slice, BlockState state, BlockPos pos) {
         long base = this.tintLatticesAddress + (long) localBlockIndex * TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES;
+        writeTintLattice(base, slice, state, pos);
+    }
+
+    static void writeTintLattice(long base, net.minecraft.world.level.BlockAndTintGetter slice,
+            BlockState state, BlockPos pos) {
+        int kind = tintKind(state.getBlock());
+        BlockColors colors = kind == TINT_PROVIDER && !NativeMeshingDiagnostics.forceWhiteTint()
+                ? Minecraft.getInstance().getBlockColors() : null;
+        writeTintLattice(base, slice, state, pos, kind, colors);
+    }
+
+    static void writeTintLattice(long base, net.minecraft.world.level.BlockAndTintGetter slice,
+            BlockState state, BlockPos pos, BlockColors colors) {
+        writeTintLattice(base, slice, state, pos, tintKind(state.getBlock()), colors);
+    }
+
+    private static void writeTintLattice(long base, net.minecraft.world.level.BlockAndTintGetter slice,
+            BlockState state, BlockPos pos, int kind, BlockColors colors) {
+        // Absence of a provider proves every sample is -1. A provider returning
+        // -1 at the block origin does not: custom colors may vary at neighbors.
+        // The built-in biome paths keep their existing independent semantics.
+        if (NativeMeshingDiagnostics.forceWhiteTint()
+                || (kind == TINT_PROVIDER && !colors.hasColorProvider(state.getBlock()))) {
+            MemoryUtil.memSet(base, 0xFF, (long) TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES);
+            return;
+        }
+        // Color providers consume the coordinate synchronously. Keep every
+        // authored sample, including extended resource-pack model vertices,
+        // without allocating an immutable position for each of the 64 queries.
+        BlockPos.MutableBlockPos samplePos = new BlockPos.MutableBlockPos();
         int sample = 0;
         for (int y = TINT_LATTICE_MIN_OFFSET; y <= TINT_LATTICE_MAX_OFFSET; y++) {
             for (int z = TINT_LATTICE_MIN_OFFSET; z <= TINT_LATTICE_MAX_OFFSET; z++) {
                 for (int x = TINT_LATTICE_MIN_OFFSET; x <= TINT_LATTICE_MAX_OFFSET; x++) {
                     MemoryUtil.memPutInt(base + (long) sample++ * Integer.BYTES,
-                            blockTint(slice, state, pos.offset(x, y, z)));
+                            blockTint(slice, state, samplePos.set(pos.getX() + x, pos.getY() + y, pos.getZ() + z), kind, colors));
                 }
             }
         }
     }
 
-    private void recordTintSource(int localBlockIndex, BlockState state, BlockPos pos, int tint) {
+    private void recordTintSource(int localBlockIndex, LevelSlice slice, BlockState state, BlockPos pos, int tint, int kind) {
         if (tint == -1) {
             return;
         }
@@ -264,16 +346,45 @@ final class NativeSectionSnapshot implements AutoCloseable {
         if (!StaticTerrainParityDiagnostics.tracesNativeTintSource(sectionKey)) {
             return;
         }
-        long base = this.tintLatticesAddress + (long) localBlockIndex * TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES;
-        int[] lattice = new int[TINT_LATTICE_SAMPLE_COUNT];
-        for (int sample = 0; sample < lattice.length; sample++) {
-            lattice[sample] = MemoryUtil.memGetInt(base + (long) sample * Integer.BYTES);
+        long temporary = kind == 4 ? 0L : MemoryUtil.nmemAlloc((long) TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES);
+        try {
+            long base = kind == 4 ? this.tintLatticesAddress + (long) localBlockIndex * TINT_LATTICE_SAMPLE_COUNT * Integer.BYTES : temporary;
+            if (kind != 4) writeTintLattice(base, slice, state, pos);
+            int[] lattice = new int[TINT_LATTICE_SAMPLE_COUNT];
+            for (int sample = 0; sample < lattice.length; sample++) {
+                lattice[sample] = MemoryUtil.memGetInt(base + (long) sample * Integer.BYTES);
+            }
+            StaticTerrainParityDiagnostics.recordNativeTintSource(
+                    sectionKey, pos.getX(), pos.getY(), pos.getZ(), String.valueOf(state.getBlock()), tint, lattice);
+        } finally {
+            if (temporary != 0L) MemoryUtil.nmemFree(temporary);
         }
-        StaticTerrainParityDiagnostics.recordNativeTintSource(
-                sectionKey, pos.getX(), pos.getY(), pos.getZ(), String.valueOf(state.getBlock()), tint, lattice);
     }
 
     private void populatePaddedGrids(LevelSlice slice) {
+        // Resolve and register each state through the synchronized registry on
+        // first use, then reuse its immutable id within this extraction only.
+        // At most PADDED_BLOCK_COUNT entries; nothing survives into a later
+        // snapshot or model reload. flushAll still rejects stale generations.
+        boolean worldIds = slice.writePaddedBlockStateIds(this.minX, this.minY, this.minZ,
+                MemorySegment.ofAddress(this.paddedStateIdsAddress).reinterpret((long) PADDED_BLOCK_COUNT * Integer.BYTES));
+        this.nativeCulling = worldIds
+            && PlatformBlockAccess.getInstance().getClass() == net.sodium.fabric.block.FabricBlockAccess.class
+            && NativeTerrainCulling.admitsGrid(MemorySegment.ofAddress(this.paddedStateIdsAddress)
+                .reinterpret((long)PADDED_BLOCK_COUNT * Integer.BYTES));
+        if (worldIds && !StaticTerrainParityDiagnostics.isEnabled()
+                && PlatformBlockAccess.getInstance().getClass() == net.sodium.fabric.block.FabricBlockAccess.class) {
+            MemorySegment[] lightViews = slice.borrowPaddedLightViews(this.minX, this.minY, this.minZ);
+            MemorySegment stateIdsView = MemorySegment.ofAddress(this.paddedStateIdsAddress)
+                .reinterpret((long) PADDED_BLOCK_COUNT * Integer.BYTES);
+            if (lightViews != null && NativeTerrainLighting.admits(stateIdsView)) {
+                this.populateBulkLightGrid(slice, lightViews, stateIdsView);
+                return;
+            }
+        }
+        var admittedIds = worldIds ? new IntOpenHashSet() : null;
+        var stateIds = worldIds ? null : new Reference2IntOpenHashMap<BlockState>();
+        if (stateIds != null) stateIds.defaultReturnValue(-1);
         for (int py = 0; py < PADDED_LENGTH; py++) {
             int y = this.minY + py - 1;
             for (int pz = 0; pz < PADDED_LENGTH; pz++) {
@@ -281,9 +392,22 @@ final class NativeSectionSnapshot implements AutoCloseable {
                 for (int px = 0; px < PADDED_LENGTH; px++) {
                     int x = this.minX + px - 1;
                     int index = paddedIndex(px, py, pz);
-                    BlockState state = slice.getBlockState(x, y, z);
-                    MemoryUtil.memPutInt(this.paddedStateIdsAddress + (long) index * Integer.BYTES,
-                            NativeStaticBlockModelRegistry.getStateId(state));
+                    BlockState state;
+                    if (worldIds) {
+                        int stateId = MemoryUtil.memGetInt(this.paddedStateIdsAddress + (long) index * Integer.BYTES);
+                        state = Block.BLOCK_STATE_REGISTRY.byId(stateId);
+                        if (admittedIds.add(stateId) && NativeStaticBlockModelRegistry.getStateId(state) != stateId) {
+                            throw new IllegalStateException("Native model admission changed a canonical world state id");
+                        }
+                    } else {
+                        state = slice.getBlockState(x, y, z);
+                        int stateId = stateIds.getInt(state);
+                        if (stateId == -1) {
+                            stateId = NativeStaticBlockModelRegistry.getStateId(state);
+                            stateIds.put(state, stateId);
+                        }
+                        MemoryUtil.memPutInt(this.paddedStateIdsAddress + (long) index * Integer.BYTES, stateId);
+                    }
                     MemoryUtil.memPutInt(this.paddedLightWordsAddress + (long) index * Integer.BYTES,
                             computeLightWord(slice, state, x, y, z));
                 }
@@ -291,13 +415,42 @@ final class NativeSectionSnapshot implements AutoCloseable {
         }
     }
 
+    private void populateBulkLightGrid(LevelSlice slice, MemorySegment[] lightViews, MemorySegment stateIds) {
+        var admittedIds = new IntOpenHashSet();
+        // Frozen's production light cache reuses one synchronous mutable position.
+        // These remaining contextual callbacks receive the same coordinate order.
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        try (java.lang.foreign.Arena inputs = java.lang.foreign.Arena.ofConfined()) {
+            MemorySegment contexts = inputs.allocate((long) PADDED_BLOCK_COUNT * NativeTerrainLighting.CONTEXT_STRIDE, 8);
+            for (int py = 0; py < PADDED_LENGTH; py++) {
+                for (int pz = 0; pz < PADDED_LENGTH; pz++) {
+                    for (int px = 0; px < PADDED_LENGTH; px++) {
+                        int index = paddedIndex(px, py, pz);
+                        int stateId = MemoryUtil.memGetInt(this.paddedStateIdsAddress + (long) index * Integer.BYTES);
+                        BlockState state = Block.BLOCK_STATE_REGISTRY.byId(stateId);
+                        if (admittedIds.add(stateId) && NativeStaticBlockModelRegistry.getStateId(state) != stateId)
+                            throw new IllegalStateException("Native model admission changed a canonical world state id");
+                        NativeTerrainLighting.writeContext(contexts.address() + (long) index * NativeTerrainLighting.CONTEXT_STRIDE,
+                            slice, state, pos.set(this.minX + px - 1, this.minY + py - 1, this.minZ + pz - 1));
+                    }
+                }
+            }
+            NativeTerrainLighting.prepare(lightViews, stateIds, contexts,
+                MemorySegment.ofAddress(this.paddedLightWordsAddress).reinterpret((long) PADDED_BLOCK_COUNT * Integer.BYTES));
+        }
+    }
+
     private static int paddedIndex(int x, int y, int z) {
         return (y * PADDED_LENGTH + z) * PADDED_LENGTH + x;
     }
 
+    /** Direction.values() clones its array; this runs for every model block. */
+    private static final Direction[] CULL_DIRECTIONS = Direction.values();
+
     private int modelCullMask(LevelSlice slice, BlockState state, BlockPos position) {
+        if (this.modelOcclusionCache == null) this.modelOcclusionCache = new BlockOcclusionCache();
         int mask = 0;
-        for (Direction direction : Direction.values()) {
+        for (Direction direction : CULL_DIRECTIONS) {
             if (!this.modelOcclusionCache.shouldDrawSide(state, slice, position, direction)) {
                 mask |= 1 << direction.get3DDataValue();
             }
@@ -311,6 +464,15 @@ final class NativeSectionSnapshot implements AutoCloseable {
 
     @Override
     public void close() {
+        try {
+            if (this.colorFields != null) { this.colorFields.close(); this.colorFields = null; }
+        } finally {
+            if (this.tintLatticesAddress != 0L) { MemoryUtil.nmemFree(this.tintLatticesAddress); this.tintLatticesAddress = 0L; }
+            this.freeSnapshot();
+        }
+    }
+
+    private void freeSnapshot() {
         if (this.address != 0L) {
             MemoryUtil.nmemFree(this.address);
             this.address = 0L;
@@ -353,14 +515,16 @@ final class NativeSectionSnapshot implements AutoCloseable {
                 | ((opaque ? 1 : 0) << 29)
                 | ((fullOpaque ? 1 : 0) << 30)
                 | ((fullCube ? 1 : 0) << 31);
-        StaticTerrainParityDiagnostics.recordAppearanceLightInput(
+        if (StaticTerrainParityDiagnostics.isEnabled()) {
+            StaticTerrainParityDiagnostics.recordAppearanceLightInput(
                 "native-section-snapshot",
                 x,
                 y,
                 z,
                 String.valueOf(state.getBlock()),
                 lightWord
-        );
+            );
+        }
         return lightWord;
     }
 
@@ -368,25 +532,46 @@ final class NativeSectionSnapshot implements AutoCloseable {
         if (NativeMeshingDiagnostics.forceWhiteTint()) {
             return 0xFFFFFFFF;
         }
-        Block block = state.getBlock();
+        return blockTint(slice, state, pos, tintKind(state.getBlock()), null);
+    }
+
+    static int colorSourceKind(BlockState state, BlockColors colors) {
+        if (NativeMeshingDiagnostics.forceWhiteTint()) return 0;
+        int kind = tintKind(state.getBlock());
+        if (kind >= TINT_GRASS && kind <= TINT_DRY_FOLIAGE) return kind;
+        return kind == TINT_REDSTONE || colors.hasColorProvider(state.getBlock()) ? 4 : 0;
+    }
+
+    private static int tintKind(Block block) {
         if (block == Blocks.GRASS_BLOCK || block == Blocks.FERN || block == Blocks.SHORT_GRASS
                 || block == Blocks.POTTED_FERN || block == Blocks.BUSH || block == Blocks.SUGAR_CANE
                 || block == Blocks.PINK_PETALS || block == Blocks.WILDFLOWERS
                 || block == Blocks.LARGE_FERN || block == Blocks.TALL_GRASS) {
-            return BiomeColors.getAverageGrassColor(slice, pos) | 0xFF000000;
+            return TINT_GRASS;
         }
         if (block == Blocks.OAK_LEAVES || block == Blocks.JUNGLE_LEAVES || block == Blocks.ACACIA_LEAVES
                 || block == Blocks.DARK_OAK_LEAVES || block == Blocks.VINE || block == Blocks.MANGROVE_LEAVES) {
-            return BiomeColors.getAverageFoliageColor(slice, pos) | 0xFF000000;
+            return TINT_FOLIAGE;
         }
         if (block == Blocks.LEAF_LITTER) {
-            return BiomeColors.getAverageDryFoliageColor(slice, pos) | 0xFF000000;
+            return TINT_DRY_FOLIAGE;
         }
         if (block == Blocks.REDSTONE_WIRE) {
-            return RedStoneWireBlock.getColorForPower(state.getValue(RedStoneWireBlock.POWER)) | 0xFF000000;
+            return TINT_REDSTONE;
         }
-        int color = Minecraft.getInstance().getBlockColors().getColor(state, slice, pos, 0);
-        return normalizeBlockTintColor(color);
+        return TINT_PROVIDER;
+    }
+
+    private static int blockTint(net.minecraft.world.level.BlockAndTintGetter slice, BlockState state,
+            BlockPos pos, int kind, BlockColors colors) {
+        return switch (kind) {
+            case TINT_GRASS -> BiomeColors.getAverageGrassColor(slice, pos) | 0xFF000000;
+            case TINT_FOLIAGE -> BiomeColors.getAverageFoliageColor(slice, pos) | 0xFF000000;
+            case TINT_DRY_FOLIAGE -> BiomeColors.getAverageDryFoliageColor(slice, pos) | 0xFF000000;
+            case TINT_REDSTONE -> RedStoneWireBlock.getColorForPower(state.getValue(RedStoneWireBlock.POWER)) | 0xFF000000;
+            default -> normalizeBlockTintColor((colors != null ? colors : Minecraft.getInstance().getBlockColors())
+                    .getColor(state, slice, pos, 0));
+        };
     }
 
     static int normalizeBlockTintColor(int color) {

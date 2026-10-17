@@ -2,43 +2,11 @@ package net.minecraft.client.resources.model;
 
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.client.renderer.block.model.ItemTransforms;
-import net.minecraft.client.renderer.block.model.TextureSlots;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.Nullable;
 
+/** Model file vocabulary Java still uses; model files are read by Rust (`assets/models/model.rs`). */
 @Environment(EnvType.CLIENT)
 public interface UnbakedModel {
 	String PARTICLE_TEXTURE_REFERENCE = "particle";
-
-	@Nullable
-	default Boolean ambientOcclusion() {
-		return null;
-	}
-
-	@Nullable
-	default UnbakedModel.GuiLight guiLight() {
-		return null;
-	}
-
-	@Nullable
-	default ItemTransforms transforms() {
-		return null;
-	}
-
-	default TextureSlots.Data textureSlots() {
-		return TextureSlots.Data.EMPTY;
-	}
-
-	@Nullable
-	default UnbakedGeometry geometry() {
-		return null;
-	}
-
-	@Nullable
-	default ResourceLocation parent() {
-		return null;
-	}
 
 	@Environment(EnvType.CLIENT)
 	public static enum GuiLight {

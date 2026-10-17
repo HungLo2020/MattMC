@@ -1,14 +1,74 @@
 package com.seibel.distanthorizons.core.dataObjects.render;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ColumnRenderSourceSemanticMaterialTest {
+	@ParameterizedTest(name = "height={0}, column={1}")
+	@CsvSource({"1, 0", "1, 64", "1, 4095", "4, 0", "4, 64", "4, 4095",
+		"128, 0", "128, 64", "128, 4095"})
+	void clearingColumnRemovesAllSidecarsWithoutChangingOtherColumns(int height, int targetColumn) {
+		try (ColumnRenderSource source = ColumnRenderSource.createEmpty(0L, height, -64)) {
+			int stone = source.internSemanticMaterial("minecraft:stone", "minecraft:plains");
+			List<ColumnRenderSource.SemanticMaterialSpan> spans = List.of(
+				new ColumnRenderSource.SemanticMaterialSpan(0, 4, stone,
+					ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 91L));
+			ColumnRenderSource.SemanticHorizontalContributor[] contributors = {
+				new ColumnRenderSource.SemanticHorizontalContributor(spans), null, null, null
+			};
+			LongArrayList[] rawContributors = {new LongArrayList(new long[] {11L}), null, null, null};
+			int[] columns = java.util.stream.IntStream.of(0, targetColumn - 1, targetColumn,
+				targetColumn + 1, ColumnRenderSource.WIDTH * ColumnRenderSource.WIDTH - 1)
+				.filter(column -> column >= 0 && column < ColumnRenderSource.WIDTH * ColumnRenderSource.WIDTH)
+				.distinct().toArray();
+			for (int column : columns) {
+				int x = column / ColumnRenderSource.WIDTH, z = column % ColumnRenderSource.WIDTH;
+				source.setSemanticHorizontalContributors(x, z, rawContributors);
+				source.setSemanticHorizontalUniformity(x, z, 0, true);
+				for (int slot = 0; slot < height; slot++) {
+					source.setSemanticMaterialId(x, z, slot, stone);
+					source.setSemanticVariantProvenance(x, z, slot, ColumnRenderSource.SEMANTIC_VARIANT_EXACT, 91L);
+					source.setSemanticMaterialSpans(x, z, slot, spans);
+					source.setSemanticHorizontalContributorSpans(x, z, slot, contributors);
+				}
+			}
+
+			source.clearSemanticMaterialsForColumn(targetColumn / ColumnRenderSource.WIDTH,
+				targetColumn % ColumnRenderSource.WIDTH);
+			// Replacing an already empty column must also leave its neighbors intact.
+			source.clearSemanticMaterialsForColumn(targetColumn / ColumnRenderSource.WIDTH,
+				targetColumn % ColumnRenderSource.WIDTH);
+			for (int column : columns) {
+				int x = column / ColumnRenderSource.WIDTH, z = column % ColumnRenderSource.WIDTH;
+				boolean cleared = column == targetColumn;
+				assertEquals(!cleared, source.hasSemanticHorizontalUniformity(x, z, 0));
+				if (cleared) assertNull(source.getSemanticHorizontalContributors(x, z));
+				else assertArrayEquals(rawContributors, source.getSemanticHorizontalContributors(x, z));
+				for (int slot = 0; slot < height; slot++) {
+					assertEquals(cleared ? ColumnRenderSource.SEMANTIC_MATERIAL_UNAVAILABLE : stone,
+						source.getSemanticMaterialId(x, z, slot));
+					assertEquals(cleared ? ColumnRenderSource.SEMANTIC_VARIANT_UNAVAILABLE : ColumnRenderSource.SEMANTIC_VARIANT_EXACT,
+						source.getSemanticVariantState(x, z, slot));
+					assertEquals(cleared ? List.of() : spans, source.getSemanticMaterialSpans(x, z, slot));
+					if (cleared) assertNull(source.getSemanticHorizontalContributorSpans(x, z, slot));
+					else assertArrayEquals(contributors, source.getSemanticHorizontalContributorSpans(x, z, slot));
+				}
+			}
+			assertEquals(1, source.semanticMaterials().size());
+		}
+	}
+
 	@Test
 	void semanticMaterialTableIsDeduplicatedAndColumnBound() {
 		ColumnRenderSource source = ColumnRenderSource.createEmpty(0L, 4, -64);

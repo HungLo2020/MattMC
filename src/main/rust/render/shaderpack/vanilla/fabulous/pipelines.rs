@@ -158,7 +158,7 @@ impl FabulousTransparencyPipelines {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -347,7 +347,7 @@ impl FabulousTransparencyBindings {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -558,7 +558,7 @@ impl FabulousAttachmentSet {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(sampler);
+                let _ = gal.retire(sampler);
                 return Err(error);
             }
         };
@@ -588,8 +588,8 @@ impl FabulousAttachmentSet {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(combined);
-                let _ = gal.destroy(sampler);
+                let _ = gal.retire(combined);
+                let _ = gal.retire(sampler);
                 return Err(error);
             }
         };
@@ -601,9 +601,9 @@ impl FabulousAttachmentSet {
         }) {
             Ok(handle) => handle,
             Err(error) => {
-                let _ = gal.destroy(resource_set);
-                let _ = gal.destroy(combined);
-                let _ = gal.destroy(sampler);
+                let _ = gal.retire(resource_set);
+                let _ = gal.retire(combined);
+                let _ = gal.retire(sampler);
                 return Err(error);
             }
         };

@@ -33,7 +33,9 @@ public class FlowerBedBlock extends VegetationBlock implements BonemealableBlock
 
 	public FlowerBedBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(AMOUNT, 1));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(AMOUNT, 1));
+		}
 		this.shapes = this.makeShapes();
 	}
 

@@ -2,6 +2,8 @@
 
 Trilocaris Tail is a food integrated from Alex's Caves. It can be eaten raw or cooked for a larger hunger and saturation gain.
 
+Registry ID: `minecraft:trilocaris_tail`. [Item registration](https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L1678)
+
 ## Obtaining
 
 [Trilocaris](../mobs/Trilocaris.md) have a loot-table entry for **0–1 raw tail**. That entry applies furnace smelting when the mob is on fire, allowing the cooked form instead. A drop is not guaranteed, and the checked table has no Looting count bonus.
@@ -19,7 +21,7 @@ These values come from the food registrations and saturation calculation. Actual
 
 ## Other uses
 
-Both raw and cooked tails are accepted in the current [Subterranodon](../mobs/Subterranodon.md) taming interaction. See the [source interaction](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/alexscaves/server/entity/living/SubterranodonEntity.java#L507-L523); this use has not been tested in a running world.
+Both raw and cooked tails feed [Subterranodons](../mobs/Subterranodon.md), but feeding does not always attempt taming. Age, love mode, and the held stack's size affect the result; see [Subterranodon feeding and taming](../mobs/Subterranodon.md#taming-and-owner-interactions) for the current source-reviewed rules and their verification scope.
 
 ## Related pages
 
@@ -29,7 +31,7 @@ Both raw and cooked tails are accepted in the current [Subterranodon](../mobs/Su
 
 ## Sources and verification
 
-Source-reviewed at [snapshot fffe4a073f0b](https://github.com/HungLo2020/MattMC/commit/fffe4a073f0b8d867902b067a6dd022cda31926f) on 2026-10-01; not an in-game test.
+Food, loot, and cooking source-reviewed at [snapshot fffe4a073f0b](https://github.com/HungLo2020/MattMC/commit/fffe4a073f0b8d867902b067a6dd022cda31926f) on 2026-10-01; not an in-game test. The Subterranodon interaction cross-reference was updated on 2026-10-10; the [mob page](../mobs/Subterranodon.md#sources-and-verification) records that newer review and its limits.
 
 - [Trilocaris loot](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/resources/data/minecraft/loot_table/entities/trilocaris.json)
 - [Food values](https://github.com/HungLo2020/MattMC/blob/fffe4a073f0b8d867902b067a6dd022cda31926f/src/main/java/net/minecraft/world/food/Foods.java)

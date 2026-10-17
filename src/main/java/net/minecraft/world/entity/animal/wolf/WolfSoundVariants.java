@@ -3,10 +3,8 @@ package net.minecraft.world.entity.animal.wolf;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.data.worldgen.BootstrapContext;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.RandomSource;
 
 public class WolfSoundVariants {
@@ -20,22 +18,6 @@ public class WolfSoundVariants {
 
 	private static ResourceKey<WolfSoundVariant> createKey(WolfSoundVariants.SoundSet soundSet) {
 		return ResourceKey.create(Registries.WOLF_SOUND_VARIANT, ResourceLocation.withDefaultNamespace(soundSet.getIdentifier()));
-	}
-
-	public static void bootstrap(BootstrapContext<WolfSoundVariant> bootstrapContext) {
-		register(bootstrapContext, CLASSIC, WolfSoundVariants.SoundSet.CLASSIC);
-		register(bootstrapContext, PUGLIN, WolfSoundVariants.SoundSet.PUGLIN);
-		register(bootstrapContext, SAD, WolfSoundVariants.SoundSet.SAD);
-		register(bootstrapContext, ANGRY, WolfSoundVariants.SoundSet.ANGRY);
-		register(bootstrapContext, GRUMPY, WolfSoundVariants.SoundSet.GRUMPY);
-		register(bootstrapContext, BIG, WolfSoundVariants.SoundSet.BIG);
-		register(bootstrapContext, CUTE, WolfSoundVariants.SoundSet.CUTE);
-	}
-
-	private static void register(
-		BootstrapContext<WolfSoundVariant> bootstrapContext, ResourceKey<WolfSoundVariant> resourceKey, WolfSoundVariants.SoundSet soundSet
-	) {
-		bootstrapContext.register(resourceKey, (WolfSoundVariant)SoundEvents.WOLF_SOUNDS.get(soundSet));
 	}
 
 	public static Holder<WolfSoundVariant> pickRandomSoundVariant(RegistryAccess registryAccess, RandomSource randomSource) {

@@ -29,7 +29,9 @@ public class JigsawBlock extends Block implements EntityBlock, GameMasterBlock {
 
 	public JigsawBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(ORIENTATION, FrontAndTop.NORTH_UP));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(ORIENTATION, FrontAndTop.NORTH_UP));
+		}
 	}
 
 	@Override

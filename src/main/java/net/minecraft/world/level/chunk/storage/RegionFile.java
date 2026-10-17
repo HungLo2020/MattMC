@@ -97,7 +97,14 @@ public class RegionFile implements AutoCloseable {
 	}
 
 	@Nullable
-	public synchronized CompoundTag readChunk(ChunkPos chunkPos) throws IOException {
+	public CompoundTag readChunk(ChunkPos chunkPos) throws IOException {
+		byte[] tape = this.readChunkTape(chunkPos);
+		return tape == null ? null : NativeNbtRegionAccess.readTape(tape);
+	}
+
+	/** The chunk's NBT as tape, or null when absent. */
+	@Nullable
+	public synchronized byte[] readChunkTape(ChunkPos chunkPos) throws IOException {
 		NativeRegionFileBridge.TapeResult tape;
 		long started = StoragePerfDiagnostics.start();
 		try {
@@ -108,6 +115,30 @@ public class RegionFile implements AutoCloseable {
 			throw exception;
 		}
 		NativeRegionFileBridge.TapeMetadata result = tape.result();
+        return this.finishTapeRead(chunkPos, result, started) ? tape.bytes() : null;
+    }
+
+    /** Single-pass Rust-owned tape for direct section decoding. */
+    @Nullable
+    public synchronized NativeChunkTape readOwnedTape(ChunkPos chunkPos) throws IOException {
+        long started = StoragePerfDiagnostics.start();
+        NativeRegionFileBridge.OwnedTapeResult result;
+        try {
+            result = NativeRegionFileBridge.readOwnedTape(this.nativeRegionHandle(), chunkPos.x, chunkPos.z, RegionFileRustValidation.enabled());
+        } catch (IOException exception) {
+            StoragePerfDiagnostics.recordError("region-read-nbt-rust", exception);
+            RegionFileRustValidation.recordRustError(this.path, chunkPos, "read-nbt", exception.getMessage());
+            throw exception;
+        }
+        try {
+            return this.finishTapeRead(chunkPos, result.result(), started) ? result.tape() : null;
+        } catch (RuntimeException | IOException | Error failure) {
+            if (result.tape() != null) result.tape().close();
+            throw failure;
+        }
+    }
+
+    private boolean finishTapeRead(ChunkPos chunkPos, NativeRegionFileBridge.TapeMetadata result, long started) throws IOException {
 		StoragePerfDiagnostics.recordRegionRead(
 			this.path,
 			chunkPos.x,
@@ -119,7 +150,7 @@ public class RegionFile implements AutoCloseable {
 			StoragePerfDiagnostics.elapsed(started)
 		);
 		if (!result.present()) {
-			return null;
+			return false;
 		}
 
 		RegionFileVersion regionFileVersion = RegionFileVersion.fromId(result.compressionId());
@@ -145,8 +176,8 @@ public class RegionFile implements AutoCloseable {
 			);
 		}
 		JvmProfiler.INSTANCE.onRegionFileRead(this.info, chunkPos, regionFileVersion, Math.toIntExact(result.compressedLength()));
-		return NativeNbtRegionAccess.readTape(tape.bytes());
-	}
+        return true;
+    }
 
 	public synchronized void writeBenchmarkPayload(ChunkPos chunkPos, byte[] encodedPayload) throws IOException {
 		this.write(chunkPos, ByteBuffer.wrap(encodedPayload));
@@ -251,8 +282,11 @@ public class RegionFile implements AutoCloseable {
 		RegionFileRustValidation.recordDelete(this.path, chunkPos, result.timestamp());
 	}
 
-	public synchronized void writeChunk(ChunkPos chunkPos, CompoundTag compoundTag) throws IOException {
-		byte[] tape = NativeNbtRegionAccess.writeTape(compoundTag);
+	public void writeChunk(ChunkPos chunkPos, CompoundTag compoundTag) throws IOException {
+		this.writeChunkTape(chunkPos, NativeNbtRegionAccess.writeTape(compoundTag));
+	}
+
+	public synchronized void writeChunkTape(ChunkPos chunkPos, byte[] tape) throws IOException {
 		NativeRegionFileBridge.WriteResult result;
 		long started = StoragePerfDiagnostics.start();
 		try {

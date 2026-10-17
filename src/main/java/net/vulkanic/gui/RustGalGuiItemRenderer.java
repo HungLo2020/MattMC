@@ -132,7 +132,11 @@ public final class RustGalGuiItemRenderer {
 			recordDiagnostic(selected[0] == null ? "special-renderer-empty" : foil[0] ? "special-renderer-foil" : "special-renderer-unavailable");
 			return List.of();
 		}
-		ScreenRectangle bounds = item.bounds();
+		// Rust applies the item's GUI pose to these bounds (mesh composite shader),
+		// so they must stay pose-local. item.bounds() is already transformed and
+		// scissored; container screens translate their pose by leftPos/topPos, so
+		// using it would offset every special item by that translation twice.
+		ScreenRectangle bounds = item.oversizedItemBounds();
 		int left = bounds == null ? item.x() : bounds.left();
 		int top = bounds == null ? item.y() : bounds.top();
 		int right = bounds == null ? item.x() + 16 : bounds.right();
@@ -646,7 +650,8 @@ public final class RustGalGuiItemRenderer {
 	}
 
 	private static final class TaczGuiQuadCapture {
-		private static final int MAX_QUADS = 4096;
+		// Rust GUI_MESH_MAX_VERTICES (65,536) at four vertices per quad.
+		private static final int MAX_QUADS = 16_384;
 		private final List<Batch> batches;
 
 		private TaczGuiQuadCapture() {
@@ -700,7 +705,10 @@ public final class RustGalGuiItemRenderer {
 		private int totalQuads() { return batches.stream().mapToInt(batch -> batch.vertices.length / 12).sum(); }
 
 		private List<PreparedBatch> prepareStatic(int guiScale, int pixelWidth, int pixelHeight, float originX, float originY) {
-			return prepareBatches(guiScale, pixelWidth, pixelHeight, originX, originY, null, 0xffffffff);
+			List<PreparedBatch> prepared = prepareBatches(guiScale, pixelWidth, pixelHeight, originX, originY, null, 0xffffffff);
+			// Static captures are cached and reused unchanged every frame.
+			for (PreparedBatch batch : prepared) VulkanicGalBridge.markStableGuiMeshGeometry(batch.vertices());
+			return prepared;
 		}
 
 		private List<PreparedBatch> prepareBatches(
@@ -820,6 +828,13 @@ public final class RustGalGuiItemRenderer {
 			// Frozen OversizedItemRenderer: ITEMS_3D only for block-lit models.
 			int lightingMode = item.itemStackRenderState().usesBlockLight()
 				? VulkanicGalBridge.GUI_MESH_LIGHTING_OVERSIZED_ITEM : VulkanicGalBridge.GUI_MESH_LIGHTING_OVERSIZED_ITEM_FLAT;
+			// Scrolling lists (creative tabs) clip their items like every other GUI mesh.
+			ScreenRectangle clip = item.scissorArea();
+			int clipMode = clip == null ? 0 : 1;
+			int clipLeft = clip == null ? 0 : clip.left();
+			int clipTop = clip == null ? 0 : clip.top();
+			int clipWidth = clip == null ? 0 : clip.width();
+			int clipHeight = clip == null ? 0 : clip.height();
 			List<VulkanicGalBridge.GuiMeshBatchRecord> records = new ArrayList<>(prepared.size());
 			for (PreparedBatch batch : prepared) {
 				if (!batch.glint()) {
@@ -827,12 +842,12 @@ public final class RustGalGuiItemRenderer {
 						VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL,
 						lightingMode, batch.asset().assetId(), token.sequence(), 0.1F,
 						identity, guiPose, left, top, right, bottom, guiWidth, guiHeight, width, height, 1,
-						0, 0, 0, 0, 0, batch.vertices(), batch.indices(), null, 0, null, null, null));
+						clipMode, clipLeft, clipTop, clipWidth, clipHeight, batch.vertices(), batch.indices(), null, 0, null, null, null));
 				} else {
 					records.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(layerOrder, records.size(), 4, 1,
 						batch.asset().assetId(), token.sequence(), 0.1F, identity, guiPose,
 						left, top, right, bottom, guiWidth, guiHeight, width, height, 1,
-						0, 0, 0, 0, 0, batch.vertices(), batch.indices(), null, 0, null, null, null));
+						clipMode, clipLeft, clipTop, clipWidth, clipHeight, batch.vertices(), batch.indices(), null, 0, null, null, null));
 				}
 				RustGalGuiRawImageAssets.stage(batch.asset());
 			}
@@ -927,9 +942,59 @@ public final class RustGalGuiItemRenderer {
 
 
 		@Override
+		public <S> void submitModelSemanticTexture(net.minecraft.client.model.Model<? super S> model, S state, PoseStack poseStack,
+			RenderType renderType, int light, int overlay, int color, ResourceLocation texture, int outline,
+			@Nullable net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
+			// The gun's retained Bedrock model, posed for this frame. GUI items are
+			// full-bright, so both light passes land in the same textured capture.
+			TaczGuiModelCapture vertices = new TaczGuiModelCapture();
+			model.renderToBuffer(poseStack, vertices, light, overlay, color);
+			if (!vertices.complete() || !capture.add(texture, vertices.positions(), vertices.uvs(), vertices.normals(), vertices.colors())) {
+				throw new IllegalStateException("TACZ GUI semantic capture rejected Bedrock model quads");
+			}
+		}
+
+		@Override
 		public void submitCustomGeometry(PoseStack poseStack, RenderType renderType, SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) {
 			throw new IllegalStateException("TACZ GUI semantic capture encountered arbitrary custom geometry");
 		}
+	}
+
+	/** Posed model vertices in TaczGuiQuadCapture's per-vertex array layout. */
+	private static final class TaczGuiModelCapture implements net.blaze3d.vertex.VertexConsumer {
+		private final it.unimi.dsi.fastutil.floats.FloatArrayList positions = new it.unimi.dsi.fastutil.floats.FloatArrayList();
+		private final it.unimi.dsi.fastutil.floats.FloatArrayList uvs = new it.unimi.dsi.fastutil.floats.FloatArrayList();
+		private final it.unimi.dsi.fastutil.floats.FloatArrayList normals = new it.unimi.dsi.fastutil.floats.FloatArrayList();
+		private final it.unimi.dsi.fastutil.ints.IntArrayList colors = new it.unimi.dsi.fastutil.ints.IntArrayList();
+
+		@Override public TaczGuiModelCapture addVertex(float x, float y, float z) {
+			positions.add(x); positions.add(y); positions.add(z);
+			uvs.add(0.0F); uvs.add(0.0F);
+			normals.add(0.0F); normals.add(0.0F); normals.add(0.0F);
+			colors.add(0xFFFFFFFF);
+			return this;
+		}
+		@Override public TaczGuiModelCapture setColor(int red, int green, int blue, int alpha) {
+			colors.set(colors.size() - 1, ARGB.color(alpha, red, green, blue));
+			return this;
+		}
+		@Override public TaczGuiModelCapture setUv(float u, float v) {
+			uvs.set(uvs.size() - 2, u); uvs.set(uvs.size() - 1, v);
+			return this;
+		}
+		@Override public TaczGuiModelCapture setUv1(int u, int v) { return this; }
+		@Override public TaczGuiModelCapture setUv2(int u, int v) { return this; }
+		@Override public TaczGuiModelCapture setNormal(float x, float y, float z) {
+			int last = normals.size();
+			normals.set(last - 3, x); normals.set(last - 2, y); normals.set(last - 1, z);
+			return this;
+		}
+
+		boolean complete() { return !colors.isEmpty() && colors.size() % 4 == 0; }
+		float[] positions() { return positions.toFloatArray(); }
+		float[] uvs() { return uvs.toFloatArray(); }
+		float[] normals() { return normals.toFloatArray(); }
+		int[] colors() { return colors.toIntArray(); }
 	}
 
 	private static List<RustGalGuiElementRenderState> enqueueModelPart(
@@ -1048,19 +1113,21 @@ public final class RustGalGuiItemRenderer {
 			return List.of();
 		}
 		GuiItemMeshSemanticCollector.GuiItemMesh mesh = collected.mesh();
-		boolean cacheableRaster = !item.itemStackRenderState().isAnimated();
-		if (cacheableRaster) {
-			for (GuiItemMeshSemanticCollector.GuiItemMeshLayer layer : mesh.layers()) {
-				if (layer.itemFoil() != null) {
-					cacheableRaster = false;
-					break;
-				}
+		// Foil items redraw their raster every frame (animated) but keep their
+		// identity, so cached topologies stay resident; foil and plain variants
+		// of one model never share a raster.
+		boolean foilItem = false;
+		for (GuiItemMeshSemanticCollector.GuiItemMeshLayer layer : mesh.layers()) {
+			if (layer.itemFoil() != null) {
+				foilItem = true;
+				break;
 			}
 		}
-		long cacheIdentity = cacheableRaster
-			? GuiItemSemanticIdentities.identityOrZero(item.itemStackRenderState().getModelIdentity()) : 0;
+		Object modelIdentity = item.itemStackRenderState().getModelIdentity();
+		long cacheIdentity = item.itemStackRenderState().isAnimated() || modelIdentity == null ? 0
+			: GuiItemSemanticIdentities.identityOrZero(foilItem ? new FoilRasterIdentity(modelIdentity) : modelIdentity);
 		VulkanicGalBridge.GuiItemCacheRecord itemCache = cacheIdentity != 0
-			? new VulkanicGalBridge.GuiItemCacheRecord(cacheIdentity, false) : null;
+			? new VulkanicGalBridge.GuiItemCacheRecord(cacheIdentity, foilItem, collected.stableTopology()) : null;
 		var clip = item.scissorArea();
 		float[] guiPose = mesh.guiPoseOwned();
 		int requestLayerOrder = dynamicLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order()
@@ -1073,35 +1140,57 @@ public final class RustGalGuiItemRenderer {
 			requestLayerOrder);
 		int estimatedBatchCount = 0;
 		for (GuiItemMeshSemanticCollector.GuiItemMeshLayer layer : mesh.layers()) estimatedBatchCount += layer.quads().size();
-		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>(Math.max(estimatedBatchCount, 1));
-		int batchLayerIndex = 0;
-		for (int layerIndex = 0; layerIndex < mesh.layers().size(); layerIndex++) {
-				GuiItemMeshSemanticCollector.GuiItemMeshLayer layer = mesh.layers().get(layerIndex);
-				float[] modelTransform = layer.modelTransformOwned();
-				for (GuiItemMeshSemanticCollector.GuiItemMeshQuad quad : layer.quads()) {
-					List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = layer.sourceFoilType() == 0
-						? quad.bridgeVertices() : quad.bridgeFoilVertices();
-					batches.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(
-						requestLayerOrder, batchLayerIndex++,
-						guiMaterialMode(layer.materialMode()),
-						// Ordinary inventory light space; Rust owns the light vectors.
-						layer.blockLight() ? VulkanicGalBridge.GUI_MESH_LIGHTING_INVENTORY_BLOCK : 1, quad.assetId(), token.sequence(),
-						(layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.CUTOUT
-							|| layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.GLINT) ? 0.1F : 0.0F,
-						modelTransform, guiPose, mesh.left(), mesh.top(), mesh.right(), mesh.bottom(),
-						guiWidth, guiHeight, 0, 0, 0,
-						clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
-						clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(),
-						vertices, QUAD_INDICES,
-						layer.itemFoil(), 0, null, mesh.blockItemRaster(), itemCache
-					));
-				}
-		}
-		if (batches.isEmpty()) return List.of();
+        var slot = mesh.template();
+        var template = slot == null ? null : slot.owner();
+        List<VulkanicGalBridge.GuiMeshBatchRecord> batches;
+        if (template == null) {
+            batches = new ArrayList<>(Math.max(estimatedBatchCount, 1));
+            int[] selectors = slot != null && slot.canRetain() ? new int[estimatedBatchCount] : null;
+            if (selectors != null) java.util.Arrays.fill(selectors, -1);
+			int batchLayerIndex = 0;
+			for (int layerIndex = 0; layerIndex < mesh.layers().size(); layerIndex++) {
+					GuiItemMeshSemanticCollector.GuiItemMeshLayer layer = mesh.layers().get(layerIndex);
+					float[] modelTransform = layer.modelTransformOwned();
+					for (GuiItemMeshSemanticCollector.GuiItemMeshQuad quad : layer.quads()) {
+						List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = layer.sourceFoilType() == 0
+							? quad.bridgeVertices() : quad.bridgeFoilVertices();
+                        if (selectors != null && layer.itemFoil() != null) selectors[batchLayerIndex] = layerIndex;
+						batches.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(
+							requestLayerOrder, batchLayerIndex++,
+							guiMaterialMode(layer.materialMode()),
+							// Ordinary inventory light space; Rust owns the light vectors.
+							layer.blockLight() ? VulkanicGalBridge.GUI_MESH_LIGHTING_INVENTORY_BLOCK : 1, quad.assetId(), token.sequence(),
+							(layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.CUTOUT
+								|| layer.materialMode() == GuiItemMeshSemanticCollector.MaterialMode.GLINT) ? 0.1F : 0.0F,
+							modelTransform, guiPose, mesh.left(), mesh.top(), mesh.right(), mesh.bottom(),
+							guiWidth, guiHeight, 0, 0, 0,
+							clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
+							clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(),
+							vertices, QUAD_INDICES,
+							layer.itemFoil(), 0, null, mesh.blockItemRaster(), itemCache, layer.nativeTransform()
+						));
+					}
+			}
+			if (batches.isEmpty()) return List.of();
+            if (selectors != null) template = slot.retain(batches, selectors, mesh.layers().size());
+        } else {
+            batches = List.of();
+        }
+        if (template != null) {
+            GraphicsFrameBenchmark.recordCounterSample("gui.item-template.instances", 1L);
+            GraphicsFrameBenchmark.recordCounterSample("gui.item-template.expanded-batches", template.batchCount());
+            var foils = new VulkanicGalBridge.StandardItemFoilRecord[mesh.layers().size()];
+            for (int layer = 0; layer < foils.length; layer++) foils[layer] = mesh.layers().get(layer).itemFoil();
+            batches = List.of(VulkanicGalBridge.GuiMeshBatchRecord.nativeItem(template, foils,
+                requestLayerOrder, token.sequence(), guiPose, mesh.left(), mesh.top(), mesh.right(), mesh.bottom(),
+                guiWidth, guiHeight, clip == null ? 0 : 1, clip == null ? 0 : clip.left(), clip == null ? 0 : clip.top(),
+                clip == null ? 0 : clip.width(), clip == null ? 0 : clip.height(), itemCache));
+        }
+
 		RustGalFrameCoordinator.publishReservedGuiMeshItemRequest(token, batches);
 		mesh.sources().forEach(GuiItemTextureSource::stage);
-		for (var batch : batches) {
-			var foil = batch.itemFoil();
+		for (var layer : mesh.layers()) {
+			var foil = layer.itemFoil();
 			if (foil != null) {
 				net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.observeSemanticClock(
 					item.x(), item.y(), foil.clockMillis(), foil.speed(), foil.strength());
@@ -1117,7 +1206,7 @@ public final class RustGalGuiItemRenderer {
 				for (BakedQuad face : layer.quads()) net.minecraft.client.dev.GraphicsAuditGuiFoilSource.record(face);
 			});
 		}
-		recordDiagnostic("mesh-accepted-layers=" + batches.size());
+		recordDiagnostic("mesh-accepted-layers=" + estimatedBatchCount);
 		return List.of(new RustGalGuiElementRenderState(
 			token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.item.standard3d", -1, -1.0F, GuiFillDirection.NONE,
 			mesh.left(), mesh.top(), mesh.right() - mesh.left(), mesh.bottom() - mesh.top(), guiWidth, guiHeight
@@ -1170,7 +1259,7 @@ public final class RustGalGuiItemRenderer {
 			: RustGalFrameCoordinator.enqueueGuiMeshItemRequest(snapshot.batches(), RustGalGuiRenderer.dynamicLayerId(dynamicLayerOrder), order, startedNanos);
 		snapshot.sources().forEach(GuiItemTextureSource::stage);
 		for (var batch : snapshot.batches()) {
-			var foil = batch.itemFoil();
+			var foil = batch.nativeTemplate() == null ? batch.itemFoil() : batch.layerFoils()[0];
 			if (foil != null) {
 				net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.observeSemanticClock(
 					item.x(), item.y(), foil.clockMillis(), foil.speed(), foil.strength());
@@ -1179,18 +1268,27 @@ public final class RustGalGuiItemRenderer {
 				break;
 			}
 		}
+		boolean traceFoilSource = net.minecraft.client.dev.GraphicsAuditGuiFoilSource.enabled();
 		item.itemStackRenderState().forEachSemanticLayer(layer -> {
+			net.minecraft.client.renderer.texture.TextureAtlasSprite recorded = null;
 			for (BakedQuad face : layer.quads()) {
-				net.minecraft.client.dev.GraphicsAuditGuiFoilSource.record(face);
+				if (traceFoilSource) net.minecraft.client.dev.GraphicsAuditGuiFoilSource.record(face);
 				var sprite = ((BakedQuadView)(Object)face).getSprite();
-				net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
-					sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+				// Sprite use is a set: record each run of faces once.
+				if (sprite != recorded) {
+					recorded = sprite;
+					net.vulkanic.world.RustGalWorldPrimitiveRenderer.recordAtlasSpriteUse(
+						sprite.semanticAnimationResource(), sprite.atlasLocation(), sprite.contents().name());
+				}
 			}
 		});
 		recordDiagnostic("flat-mesh-accepted-layers=" + snapshot.batches().size());
 		return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_ITEM, "minecraft.gui.item.flat",
 			-1, -1.0F, GuiFillDirection.NONE, item.x(), item.y(), 16, 16, guiWidth, guiHeight));
 	}
+
+	/** Raster identity of a standard-foil item, distinct from its plain model's. */
+	private record FoilRasterIdentity(Object modelIdentity) {}
 
 	private static int guiMaterialMode(GuiItemMeshSemanticCollector.MaterialMode mode) {
 		return switch (mode) {

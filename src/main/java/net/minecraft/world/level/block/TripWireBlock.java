@@ -53,17 +53,19 @@ public class TripWireBlock extends Block {
 
 	public TripWireBlock(Block block, BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(
-			this.stateDefinition
-				.any()
-				.setValue(POWERED, false)
-				.setValue(ATTACHED, false)
-				.setValue(DISARMED, false)
-				.setValue(NORTH, false)
-				.setValue(EAST, false)
-				.setValue(SOUTH, false)
-				.setValue(WEST, false)
-		);
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(
+				this.stateDefinition
+					.any()
+					.setValue(POWERED, false)
+					.setValue(ATTACHED, false)
+					.setValue(DISARMED, false)
+					.setValue(NORTH, false)
+					.setValue(EAST, false)
+					.setValue(SOUTH, false)
+					.setValue(WEST, false)
+			);
+		}
 		this.hook = block;
 	}
 

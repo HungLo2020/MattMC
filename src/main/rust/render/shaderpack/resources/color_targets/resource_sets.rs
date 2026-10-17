@@ -8,7 +8,7 @@ use super::*;
 /// program-local and may choose the previous feedback image or mip sampling.
 /// No Java/Iris sampler, texture unit, framebuffer, or native handle crosses
 /// this boundary.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ShaderPackSourceColorResources {
     pub(super) resources: TerrainSourceOwnedResourceSet,
     pub(super) combined_samplers: Vec<Handle>,
@@ -29,10 +29,10 @@ impl ShaderPackSourceColorResources {
 
     pub(crate) fn destroy(self, gal: &mut VulkanicGal) {
         for handle in self.combined_samplers.into_iter().rev() {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
         for handle in self.samplers.into_iter().rev() {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 }
@@ -398,7 +398,7 @@ pub(crate) fn prepare_source_color_resources(
     })();
     if result.is_err() {
         for handle in created.into_iter().rev() {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
     result

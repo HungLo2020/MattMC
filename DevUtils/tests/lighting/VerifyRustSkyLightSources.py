@@ -11,13 +11,13 @@ import statistics
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
-REFERENCE = '3b709a204'
+REFERENCE = '7a4d181717dc0c7da9086f1a17687dfd522ce417'
 PACKAGE = 'net.minecraft.world.level.lighting.'
 
 
 def run(command, log):
     with log.open('w') as stream:
-        subprocess.run(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT, check=True)
+        subprocess.run(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT, check=True, env={**os.environ, 'CARGO_TARGET_DIR': str(ROOT / 'build/rust/target')})
     return log.read_text()
 
 
@@ -38,13 +38,14 @@ def main():
         parser.error('Output must be under build/')
     out.mkdir(parents=True, exist_ok=True)
     original = subprocess.check_output(['git', 'show', REFERENCE + ':src/main/java/net/minecraft/world/level/lighting/ChunkSkyLightSources.java'], cwd=ROOT, text=True)
-    a = original.index('\tpublic void fillFrom(')
-    b = original.index('\n\tprivate int findLowestSourceY(', a)
-    source = ROOT / 'src/main/java/net/minecraft/world/level/lighting/ChunkSkyLightSources.java'
-    entry = '\tpublic void fillFrom(ChunkAccess chunkAccess) {\n\t\tif (net.minecraft.world.level.chunk.NativeSkyLightSources.fill(chunkAccess, this.minY, this.heightmap)) return;\n\t\tthis.fillFromJava(chunkAccess);\n\t}\n\n\t// Compatibility path for custom readers and unsupported packed layouts.\n'
-    legacy = original[a:b].replace('public void fillFrom(', 'void fillFromJava(', 1)
-    if source.read_text() != original[:a]+entry+legacy+original[b:]:
-        raise RuntimeError('Compatibility oracle or shared skylight-source helpers differ from pinned original')
+    oracle = (ROOT / 'src/test/java/net/minecraft/world/level/lighting/JavaSkyLightSources.java').read_text()
+    marker = '    /** Frozen7a4 algorithm, independently owned test payload;'
+    start = oracle.index(marker)
+    restored = oracle[:start] + oracle[oracle.rfind('}'):]
+    restored = restored.replace('final class JavaSkyLightSources extends ChunkSkyLightSources {', 'public class ChunkSkyLightSources {')
+    restored = restored.replace('JavaSkyLightSources(LevelHeightAccessor levelHeightAccessor) {\n        super(LevelHeightAccessor.create(0,16)); // Unused facade owner; oracle below keeps the exact frozen Java algorithm.', 'public ChunkSkyLightSources(LevelHeightAccessor levelHeightAccessor) {')
+    if restored != original:
+        raise RuntimeError('Independent Java source oracle differs from pinned Frozen implementation')
     (out / 'OriginalChunkSkyLightSources.java').write_text(original)
     cpfile = out / 'classpath.txt'
     init = out / 'classpath.gradle'
@@ -58,14 +59,16 @@ def main():
     (out / 'parity.xml').write_bytes(xml.read_bytes())
     if 'failures="0"' not in xml.read_text() or 'errors="0"' not in xml.read_text():
         raise RuntimeError('Parity failed')
-    run(['rustc', '--edition=2021', '--test', 'src/test/rust/worldgen.rs', '-o', str(out / 'worldgen-tests')], out / 'rust-build.log')
-    run([str(out / 'worldgen-tests'), 'skylight_sources'], out / 'rust-tests.log')
+    cargo = ['cargo', 'test', '--manifest-path', 'src/main/rust/Cargo.toml', '--locked', '--profile', 'suite', '--lib']
+    run(cargo + ['world::level::lighting::skylight_sources::', '--', '--test-threads=1'], out / 'rust-kernel-tests.log')
+    run(cargo + ['world::level::lighting::source_owner::', '--', '--test-threads=1'], out / 'rust-owner-tests.log')
     native = ROOT / 'build/rust/native'
     jvm = ['-Xbatch', '-Xms512m', '-Xmx3g', '-XX:+UseZGC', '-XX:+UseCompactObjectHeaders', '--enable-native-access=ALL-UNNAMED']
     base = ['taskset', '-c', str(args.cpu), 'java', *jvm, '-Dmattmc.rust.natives.dir=' + str(native), '-cp', cpfile.read_text().strip(), PACKAGE + 'NativeSkyLightSourcesVerification']
     files = list((ROOT / 'src/main/rust/world/level/lighting/skylight_sources').glob('*.rs'))
+    files += list((ROOT / 'src/main/rust/world/level/lighting/source_owner').glob('*.rs'))
     files += list((ROOT / 'src/test/java/net/minecraft/world/level/lighting').glob('*SkyLightSources*.java'))
-    files += [ROOT / p for p in ['src/main/java/net/minecraft/world/level/lighting/ChunkSkyLightSources.java', 'src/main/java/net/minecraft/world/level/chunk/NativeSkyLightSources.java', 'src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java', 'src/test/resources/worldgen/heightmap/chunks.json']]
+    files += [ROOT / p for p in ['src/main/java/net/minecraft/world/level/lighting/ChunkSkyLightSources.java', 'src/test/java/net/minecraft/world/level/chunk/NativeSkyLightSources.java', 'src/main/java/net/minecraft/world/level/lighting/NativeSkySourceOwner.java', 'src/main/java/net/minecraft/world/level/chunk/NativeSkySourceSections.java', 'src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java', 'src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java', 'src/test/resources/worldgen/heightmap/chunks.json']]
     files += [ROOT / 'src/main/rust/world/level/lighting/mod.rs', ROOT / 'src/main/rust/world/level/mod.rs', ROOT / 'src/main/java/net/minecraft/world/level/chunk/NativeHeightmap.java', Path(__file__).resolve()]
     report = {'reference': subprocess.check_output(['git','rev-parse',REFERENCE],cwd=ROOT,text=True).strip(),
               'scope': 'Complete fillFrom() caller: eligibility, local palette mapping, packed input transfer, ordinary FFM calls, output publication and consumption. Immutable registry/occlusion-table bootstrap and fixture loading excluded equally; no source-result cache.',

@@ -5,18 +5,14 @@ import com.google.common.collect.ImmutableList;
 import com.mojang.datafixers.util.Pair;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
-import it.unimi.dsi.fastutil.ints.IntBidirectionalIterator;
 import it.unimi.dsi.fastutil.ints.IntRBTreeSet;
 import it.unimi.dsi.fastutil.ints.IntSortedSet;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.stream.IntStream;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.levelgen.PositionalRandomFactory;
 import org.jetbrains.annotations.Nullable;
 
 public class PerlinNoise {
@@ -58,87 +54,30 @@ public class PerlinNoise {
 		return new PerlinNoise(randomSource, Pair.of(i, doubleList), true);
 	}
 
-	private static Pair<Integer, DoubleList> makeAmplitudes(IntSortedSet intSortedSet) {
-		if (intSortedSet.isEmpty()) {
-			throw new IllegalArgumentException("Need some octaves!");
-		} else {
-			int i = -intSortedSet.firstInt();
-			int j = intSortedSet.lastInt();
-			int k = i + j + 1;
-			if (k < 1) {
-				throw new IllegalArgumentException("Total number of octaves needs to be >= 1");
-			} else {
-				DoubleList doubleList = new DoubleArrayList(new double[k]);
-				IntBidirectionalIterator intBidirectionalIterator = intSortedSet.iterator();
+    private static Pair<Integer, DoubleList> makeAmplitudes(IntSortedSet octaves) {
+        return NativePerlin.amplitudes(octaves);
+    }
 
-				while (intBidirectionalIterator.hasNext()) {
-					int l = intBidirectionalIterator.nextInt();
-					doubleList.set(l + i, 1.0);
-				}
-
-				return Pair.of(-i, doubleList);
-			}
-		}
-	}
-
-	protected PerlinNoise(RandomSource randomSource, Pair<Integer, DoubleList> pair, boolean bl) {
-		this.firstOctave = pair.getFirst();
-		this.amplitudes = pair.getSecond();
-		int i = this.amplitudes.size();
-		int j = -this.firstOctave;
-		this.noiseLevels = new ImprovedNoise[i];
-		if (bl) {
-			PositionalRandomFactory positionalRandomFactory = randomSource.forkPositional();
-
-			for (int k = 0; k < i; k++) {
-				if (this.amplitudes.getDouble(k) != 0.0) {
-					int l = this.firstOctave + k;
-					this.noiseLevels[k] = new ImprovedNoise(positionalRandomFactory.fromHashOf("octave_" + l));
-				}
-			}
-		} else {
-			ImprovedNoise improvedNoise = new ImprovedNoise(randomSource);
-			if (j >= 0 && j < i) {
-				double d = this.amplitudes.getDouble(j);
-				if (d != 0.0) {
-					this.noiseLevels[j] = improvedNoise;
-				}
-			}
-
-			for (int kx = j - 1; kx >= 0; kx--) {
-				if (kx < i) {
-					double e = this.amplitudes.getDouble(kx);
-					if (e != 0.0) {
-						this.noiseLevels[kx] = new ImprovedNoise(randomSource);
-					} else {
-						skipOctave(randomSource);
-					}
-				} else {
-					skipOctave(randomSource);
-				}
-			}
-
-			if (Arrays.stream(this.noiseLevels).filter(Objects::nonNull).count() != this.amplitudes.stream().filter(double_ -> double_ != 0.0).count()) {
-				throw new IllegalStateException("Failed to create correct number of noise levels for given non-zero amplitudes");
-			}
-
-			if (j < i - 1) {
-				throw new IllegalArgumentException("Positive octaves are temporarily disabled");
-			}
-		}
-
-		this.lowestFreqInputFactor = Math.pow(2.0, -j);
-		this.lowestFreqValueFactor = Math.pow(2.0, i - 1) / (Math.pow(2.0, i) - 1.0);
-		this.maxValue = this.edgeValue(2.0);
-	}
+    void bindNormal(long driver,int slot){nativePlan.bindNormal(driver,slot);}
+    void bindBlended(long driver,int slot){nativePlan.bindBlended(driver,slot);}
+    DoubleList nativeAmplitudes(){return amplitudes;}
+    private final NativePerlin nativePlan;
+    protected PerlinNoise(RandomSource randomSource, Pair<Integer, DoubleList> pair, boolean modern) {
+        this.firstOctave = pair.getFirst();
+        this.amplitudes = pair.getSecond();
+        int count = this.amplitudes.size();
+        // Genuine public-octave identities retain their original parent custody.
+        this.noiseLevels = new ImprovedNoise[count];
+        this.nativePlan = new NativePerlin(randomSource, amplitudes, firstOctave, modern, noiseLevels);
+        this.lowestFreqInputFactor = nativePlan.input;
+        this.lowestFreqValueFactor = nativePlan.value;
+        this.maxValue = nativePlan.max;
+    }
 
 	protected double maxValue() {
 		return this.maxValue;
 	}
 
-	private static void skipOctave(RandomSource randomSource) {
-		randomSource.consumeCount(262);
-	}
 
 	public double getValue(double d, double e, double f) {
 		return this.getValue(d, e, f, 0.0, 0.0, false);
@@ -149,25 +88,9 @@ public class PerlinNoise {
 		return nativeNoise().sample(d, e, f, g, h, bl ? 1 : 0);
 	}
 
-	public double maxBrokenValue(double d) {
-		return this.edgeValue(d + 2.0);
-	}
-
-	private double edgeValue(double d) {
-		double e = 0.0;
-		double f = this.lowestFreqValueFactor;
-
-		for (int i = 0; i < this.noiseLevels.length; i++) {
-			ImprovedNoise improvedNoise = this.noiseLevels[i];
-			if (improvedNoise != null) {
-				e += this.amplitudes.getDouble(i) * d * f;
-			}
-
-			f /= 2.0;
-		}
-
-		return e;
-	}
+    public double maxBrokenValue(double value) {
+        return nativePlan.edge(amplitudes, value);
+    }
 
 	@Nullable
 	public ImprovedNoise getOctaveNoise(int i) {
@@ -226,19 +149,15 @@ public class PerlinNoise {
 	}
 
 	// The public factories accept mutable lists. Preserve changes made after first use.
-	boolean matchesAmplitudes(NativeNoise value) {
-		for (int i = 0; i < noiseLevels.length; i++)
-			if (noiseLevels[i] != null && Double.doubleToRawLongBits(amplitudes.getDouble(i)) !=
-				Double.doubleToRawLongBits(value.amplitudes[i])) return false;
-		return true;
-	}
+    boolean matchesAmplitudes(NativeNoise value) {
+        return nativePlan.matches(amplitudes, value);
+    }
 
 	int octaveCount() { return noiseLevels.length; }
 	double inputFactor() { return lowestFreqInputFactor; }
 	double valueFactor() { return lowestFreqValueFactor; }
-	void writeNative(java.lang.foreign.MemorySegment state, int start) {
-		for (int i = 0; i < noiseLevels.length; i++)
-			if (noiseLevels[i] != null) noiseLevels[i].writeNative(state, start + i, amplitudes.getDouble(i));
-	}
+    void writeNative(java.lang.foreign.MemorySegment state, int start) {
+        nativePlan.write(amplitudes, state, start);
+    }
 
 }

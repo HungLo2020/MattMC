@@ -6,6 +6,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.fog.FogData;
+import net.minecraft.client.renderer.fog.NativeFog;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.material.FogType;
@@ -22,16 +23,8 @@ public class PowderedSnowFogEnvironment extends FogEnvironment {
 
 	@Override
 	public void setupFog(FogData fogData, Entity entity, BlockPos blockPos, ClientLevel clientLevel, float f, DeltaTracker deltaTracker) {
-		if (entity.isSpectator()) {
-			fogData.environmentalStart = -8.0F;
-			fogData.environmentalEnd = f * 0.5F;
-		} else {
-			fogData.environmentalStart = 0.0F;
-			fogData.environmentalEnd = 2.0F;
-		}
-
-		fogData.skyEnd = fogData.environmentalEnd;
-		fogData.cloudEnd = fogData.environmentalEnd;
+        int flags = entity.isSpectator() ? 1 : 0;
+        NativeFog.ranges(fogData, 1, f, 0.0F, 0.0F, flags);
 	}
 
 	@Override

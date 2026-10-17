@@ -4,17 +4,11 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.util.objects.StatsMap;
-import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
-import org.lwjgl.system.MemoryUtil;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.*;
 
 /**
- * Java representation of one or more OpenGL buffers for rendering.
+ * One render section's built LOD column, published to the Rust collector.
  *
  * @see ColumnRenderBufferBuilder
  */
@@ -24,23 +18,24 @@ public class LodBufferContainer implements AutoCloseable
 	
 	/** number of bytes a single quad takes */
 	public static final int QUADS_BYTE_SIZE = LodUtil.LOD_VERTEX_FORMAT.getByteSize() * 4;
-	/** how big a single VBO can be in bytes */
-	public static final int MAX_VBO_BYTE_SIZE = 10 * 1024 * 1024; // 10 MB
-	public static final int MAX_QUADS_PER_BUFFER = MAX_VBO_BYTE_SIZE / QUADS_BYTE_SIZE;
-	public static final int FULL_SIZED_BUFFER = MAX_QUADS_PER_BUFFER * QUADS_BYTE_SIZE;
 	
 	
 	/** the position closest to minimum X/Z infinity and the level's lowest Y */
 	public final DhBlockPos minCornerBlockPos;
 	public final long pos;
 	
-	public boolean buffersUploaded = false;
 	/** True after this container published an immutable CPU semantic asset for
 	 * the selected Rust whole-frame route.  This is a lifecycle state, not a
 	 * Java GPU upload: retaining the container lets the owning render section
 	 * retire that asset from {@link #close()} at the normal DH boundary. */
 	private boolean rustSemanticBuffersPublished = false;
+    private Runnable rustVisibilityCloseListener;
+    public synchronized void setRustVisibilityCloseListener(Runnable listener) {
+        this.rustVisibilityCloseListener=listener;
+        if(!this.rustSemanticBuffersPublished) {this.rustVisibilityCloseListener=null;listener.run();}
+    }
 	private long rustSemanticColumnGeneration = 0L;
+	private net.vulkanic.world.DistantHorizonsSemanticCollector.SemanticColumnLease rustSemanticColumnLease;
 	
 	
 	private CompletableFuture<LodBufferContainer> uploadFuture = null;
@@ -98,15 +93,11 @@ public class LodBufferContainer implements AutoCloseable
 			if (!net.vulkanic.world.DistantHorizonsSemanticCollector.enabled()) {
 				throw new IllegalStateException("Rust whole-frame DH route selected without semantic collection");
 			}
-			LodQuadBuilder.SemanticVertexBufferBuild opaque = builder.makeOpaqueRustSemanticBuffers();
-			LodQuadBuilder.SemanticVertexBufferBuild transparent = builder.makeTransparentRustSemanticBuffers();
-			LodQuadBuilder.SemanticVertexBufferBuild transparentUp = builder.makeTransparentUpRustSemanticBuffers();
-			LodQuadBuilder.SemanticVertexBufferBuild transparentWaterUp = builder.makeTransparentWaterUpRustSemanticBuffers();
-			this.rustSemanticColumnGeneration = net.vulkanic.world.DistantHorizonsSemanticCollector.recordRustSemanticBuiltColumn(
-				this.pos, this.minCornerBlockPos, builder.semanticMaterials(), builder.semanticQuadCoverage(),
-				LodQuadBuilder.semanticQuadCoverage(opaque, transparent, transparentUp, transparentWaterUp),
-				opaque, transparent, transparentUp, transparentWaterUp
-			);
+			try (NativeDhBuiltColumn column = builder.makeNativeRustSemanticColumn()) {
+				this.rustSemanticColumnLease = net.vulkanic.world.DistantHorizonsSemanticCollector.recordOwnedNativeRustSemanticBuiltColumn(
+					this.pos, this.minCornerBlockPos, builder.semanticMaterials(), builder.semanticQuadCoverage(), column);
+			}
+			this.rustSemanticColumnGeneration = this.rustSemanticColumnLease.generation();
 			this.rustSemanticBuffersPublished = true;
 			// This route intentionally owns no Java GL VBO and schedules no Java GL
 			// upload. The immutable semantic packets now belong to the collector.
@@ -126,18 +117,25 @@ public class LodBufferContainer implements AutoCloseable
 	// helper methods //
 	//================//
 	
-	/** can be used when debugging */
-	
-	/** can be used when debugging */
-	
-	public boolean uploadInProgress() { return this.uploadFuture != null; }
-	public boolean renderDataReady() { return this.buffersUploaded || this.rustSemanticBuffersPublished; }
+	public boolean renderDataReady() { return this.rustSemanticBuffersPublished; }
 	/** A completed Rust build with no drawable segments is still a valid DH
 	 * quadtree result. It needs no zero-byte Vulkan asset. */
 	public boolean rustSemanticBuildHasNoDrawableGeometry()
 	{
 		return this.rustSemanticBuffersPublished && this.rustSemanticColumnGeneration == 0L;
 	}
+
+	/** For the render walk: -1 before a Rust build is published (or after
+	 * close), otherwise the generation built, 0 for no drawable geometry. The
+	 * walk asks the collector whether it is still current
+	 * ({@link #rustSemanticBuildLifecycleCurrent}), batched for the frame. */
+	public long rustSemanticWalkGeneration()
+	{
+		return this.rustSemanticBuffersPublished ? this.rustSemanticColumnGeneration : -1L;
+	}
+
+	/** The collector generation this container built; 0 for none or an empty build. */
+	public long rustSemanticColumnGeneration() { return this.rustSemanticColumnGeneration; }
 
 	/** True while this container still owns the collector generation it built. */
 	public boolean rustSemanticBuildLifecycleCurrent()
@@ -146,12 +144,6 @@ public class LodBufferContainer implements AutoCloseable
 			&& (this.rustSemanticColumnGeneration == 0L
 				|| net.vulkanic.world.DistantHorizonsSemanticCollector.hasColumn(
 					this.pos, this.rustSemanticColumnGeneration));
-	}
-	
-	public void debugDumpStats(StatsMap statsMap)
-	{
-		statsMap.incStat("RenderBuffers");
-		statsMap.incStat("SimpleRenderBuffers");
 	}
 	
 	
@@ -168,28 +160,20 @@ public class LodBufferContainer implements AutoCloseable
 	 * upload, or render state). 
 	 */
 	@Override
-	public void close()
+	public synchronized void close()
 	{
-		this.buffersUploaded = false;
-		boolean ownedRustSemanticLifecycle = this.rustSemanticBuffersPublished;
 		this.rustSemanticBuffersPublished = false;
-		// Keep the copied semantic asset lifecycle aligned with the legacy LOD
-		// container. This touches no native renderer object or GL state.
-		if (this.rustSemanticColumnGeneration != 0L)
+        Runnable listener=this.rustVisibilityCloseListener;this.rustVisibilityCloseListener=null;
+        if(listener!=null) listener.run();
+		// The published column lives exactly as long as this container.
+		// This touches no native renderer object or GL state.
+		// Only the lease retires anything: a container that never recorded a
+		// column owns no generation, so it must not retire the position by key
+		// (that would erase a newer section's generation at the same position).
+		if (this.rustSemanticColumnLease != null)
 		{
-			net.vulkanic.world.DistantHorizonsSemanticCollector.removeColumn(
-				this.pos, this.rustSemanticColumnGeneration
-			);
+			this.rustSemanticColumnLease.close();
 			this.rustSemanticColumnGeneration = 0L;
-		}
-		else if (!ownedRustSemanticLifecycle)
-		{
-			// Legacy observation snapshots do not retain their generation on this
-			// container and therefore still retire by identity. A Rust semantic
-			// empty build owns generation zero: it already removed the prior payload
-			// while it was current and must never erase a later non-empty generation
-			// when this old lifecycle marker closes asynchronously.
-			net.vulkanic.world.DistantHorizonsSemanticCollector.removeColumn(this.pos);
 		}
 	}
 	

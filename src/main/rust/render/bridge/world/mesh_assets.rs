@@ -12,6 +12,10 @@ use crate::render::worldrender::WORLD_MAX_MESH_VERTICES;
 use crate::render::worldrender::WORLD_MESH_ASSET_RESIDENCY;
 use crate::render::worldrender::WORLD_MESH_TEXTURE_RESIDENCY;
 
+/// `FfiWorldMeshAssetRecord::reserved0` bit: the vertices were staged by
+/// terrain assembly (`worldrender/terrain/staging.rs`), not sent.
+pub(crate) const WORLD_MESH_ASSET_STAGED_TERRAIN_VERTICES: u32 = 1;
+
 const MAX_WORLD_MESH_TEXTURE_PNG_BYTES_TOTAL: usize = WORLD_MAX_MESH_TEXTURE_DECODED_BYTES;
 const MAX_WORLD_MATERIAL_ASSET_COUNT: usize = WORLD_MAX_MESH_TEXTURE_ASSETS;
 
@@ -309,32 +313,54 @@ pub(crate) unsafe fn decode_world_mesh_asset_update(
             ));
         }
         let index_type = ffi_index_type(mesh.index_type)?;
-        let raw_vertices = read_limited_slice(mesh.vertices, false, "world mesh vertices")?;
-        if raw_vertices.len() > WORLD_MAX_MESH_VERTICES {
-            return Err(GalError::ffi(
-                StatusCode::LengthOverflow,
-                format!(
-                    "world mesh vertex count {} exceeds bounded limit {WORLD_MAX_MESH_VERTICES}",
-                    raw_vertices.len()
-                ),
-            ));
-        }
-        let mut vertices = Vec::with_capacity(raw_vertices.len());
-        for vertex in raw_vertices {
-            validate_item_size::<FfiWorldMeshVertex>(vertex.byte_size, "world mesh vertex")?;
-            vertices.push(WorldMeshVertex {
-                position: [vertex.x, vertex.y, vertex.z],
-                uv: [vertex.u, vertex.v],
-                shader_atlas_uv: [vertex.atlas_u, vertex.atlas_v],
-                shader_block_id: vertex.shader_block_id,
-                shader_material_type: vertex.shader_material_type,
-                terrain_material_bits: vertex.terrain_material_bits,
-                mid_block_packed: vertex.mid_block_packed,
-                color_argb: vertex.color_argb,
-                normal_packed: vertex.normal_packed,
-                light: vertex.light,
-            });
-        }
+        let vertices = if mesh.reserved0 & WORLD_MESH_ASSET_STAGED_TERRAIN_VERTICES != 0 {
+            // Static terrain: assembly staged the vertices in Rust. Copied, not
+            // taken: a rejected update is retried; Java discards the staged
+            // entry once this generation's upload is acknowledged.
+            if mesh.vertices.count != 0 {
+                return Err(GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    "a staged terrain mesh must not also carry vertices",
+                ));
+            }
+            crate::render::worldrender::terrain::staging::get(mesh.mesh_key, mesh.mesh_generation).ok_or_else(|| {
+                GalError::ffi(
+                    StatusCode::InvalidArgument,
+                    format!(
+                        "staged terrain vertices for mesh {} generation {} are missing",
+                        mesh.mesh_key, mesh.mesh_generation
+                    ),
+                )
+            })?
+        } else {
+            let raw_vertices = read_limited_slice(mesh.vertices, false, "world mesh vertices")?;
+            if raw_vertices.len() > WORLD_MAX_MESH_VERTICES {
+                return Err(GalError::ffi(
+                    StatusCode::LengthOverflow,
+                    format!(
+                        "world mesh vertex count {} exceeds bounded limit {WORLD_MAX_MESH_VERTICES}",
+                        raw_vertices.len()
+                    ),
+                ));
+            }
+            let mut vertices = Vec::with_capacity(raw_vertices.len());
+            for vertex in raw_vertices {
+                validate_item_size::<FfiWorldMeshVertex>(vertex.byte_size, "world mesh vertex")?;
+                vertices.push(WorldMeshVertex {
+                    position: [vertex.x, vertex.y, vertex.z],
+                    uv: [vertex.u, vertex.v],
+                    shader_atlas_uv: [vertex.atlas_u, vertex.atlas_v],
+                    shader_block_id: vertex.shader_block_id,
+                    shader_material_type: vertex.shader_material_type,
+                    terrain_material_bits: vertex.terrain_material_bits,
+                    mid_block_packed: vertex.mid_block_packed,
+                    color_argb: vertex.color_argb,
+                    normal_packed: vertex.normal_packed,
+                    light: vertex.light,
+                });
+            }
+            vertices
+        };
         let index_bytes = read_bounded_bytes(
             mesh.index_bytes,
             false,
@@ -607,4 +633,66 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_world_mesh_update_assets(
             }
         }
     })
+}
+
+/// Queued form of `mattmc_vulkanic_gal_world_mesh_update_assets`: the update
+/// is copied and decoded on the calling thread and applied by the frame
+/// worker after the jobs already queued, without joining them. A failure to
+/// apply is reported by the next queued-frame join, which fails closed.
+///
+/// # Safety
+/// `request` must address a valid request for the duration of the call.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_vulkanic_gal_world_mesh_update_assets_queued(
+    context_id: u64,
+    request: *const FfiWorldMeshAssetUpdateRequest,
+    status_out: *mut FfiStatusResult,
+) -> i32 {
+    let queued = with_queue(context_id, |pipeline| {
+        let checked = read_world_mesh_asset_update_request(request)?;
+        let input_bytes = input_bytes_for_world_mesh_asset_update(&checked);
+        let (generation, meshes, textures, sorted_indices, retirements) =
+            decode_world_mesh_asset_update(&checked, pipeline.capabilities().clone())?;
+        let handoff = pipeline.context_handoff();
+        pipeline.enqueue(move |queue| {
+            let handoff = handoff;
+            // SAFETY: queued jobs run on the worker, which owns the context
+            // until a bridge entry point joins (see `bridge::pipeline`).
+            let context = unsafe { &mut *handoff.0 };
+            context.ffi_calls += 1;
+            context.ffi_input_bytes = context.ffi_input_bytes.saturating_add(input_bytes);
+            let result = context
+                .gui_frontend
+                .invalidate_atlas_texture_views(
+                    &mut context.gal,
+                    textures.iter().map(|texture| texture.texture_id),
+                )
+                .and_then(|()| {
+                    context
+                        .world_primitive_frontend
+                        .apply_world_mesh_asset_update_with_sorted_and_retirements(
+                            &mut context.gal,
+                            generation,
+                            meshes,
+                            textures,
+                            sorted_indices,
+                            retirements,
+                        )
+                });
+            if let Err(error) = result {
+                set_last_error(context, &error);
+                record_queued_error(queue, &error);
+            }
+        })
+    });
+    match queued {
+        Ok(()) => {
+            write_status_out(status_out, FfiStatusResult { status: StatusCode::Ok as i32, ..FfiStatusResult::default() });
+            StatusCode::Ok as i32
+        }
+        Err(error) => {
+            write_status_out(status_out, status_result_from_error(&error));
+            error.code as i32
+        }
+    }
 }

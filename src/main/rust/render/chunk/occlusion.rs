@@ -92,7 +92,7 @@ fn fold_outgoing_directions(data: u64) -> i32 {
     (folded & GRAPH_DIRECTION_ALL as u64) as i32
 }
 
-fn angle_visibility_mask(camera_delta_x: f64, camera_delta_y: f64, camera_delta_z: f64) -> u64 {
+pub(crate) fn angle_visibility_mask(camera_delta_x: f64, camera_delta_y: f64, camera_delta_z: f64) -> u64 {
     let dx = camera_delta_x.abs();
     let dy = camera_delta_y.abs();
     let dz = camera_delta_z.abs();

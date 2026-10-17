@@ -15,8 +15,9 @@ use crate::render::shaderpack::programs::{
     ProgramIdentity, TerrainMaterialProgram, TerrainMaterialProgramKind,
 };
 use crate::render::shaderpack::contracts::terrain::{
-    bundled_complementary_hung_loified_source, derive_complementary_terrain_contract,
-    derive_complementary_terrain_contract_for_scope, TerrainPassContract, TerrainProgramScope,
+    bundled_complementary_hung_loified_source,
+    derive_terrain_contract_for_scope,
+    TerrainPassContract, TerrainProgramScope,
 };
 use crate::render::shaderpack::voxels::light_volume::{VoxelLightVolumeDescriptor, VoxelLightVolumeReadiness};
 
@@ -142,11 +143,7 @@ impl ShaderPackRuntimePlan {
                 "shader-pack source generation must match runtime generation",
             ));
         }
-        if scope == TerrainProgramScope::Default {
-            derive_complementary_terrain_contract(source)
-        } else {
-            derive_complementary_terrain_contract_for_scope(source, scope)
-        }
+        derive_terrain_contract_for_scope(source, scope)
     }
 
     pub fn terrain_material_from_source(

@@ -28,6 +28,18 @@ public final class IntegerProperty extends Property<Integer> {
 		return this.values;
 	}
 
+	/** Projects an already ordered native domain without rebuilding its range. */
+	IntegerProperty(String name, int[] values, int nativeDefinitionId) {
+		super(name, Integer.class, nativeDefinitionId);
+		if (values.length < 2 || values[0] < 0) throw new IllegalArgumentException("Invalid native integer domain: " + name);
+		for (int i = 1; i < values.length; i++) {
+			if ((long) values[i] != (long) values[0] + i) throw new IllegalArgumentException("Noncontiguous native integer domain: " + name);
+		}
+		this.min = values[0];
+		this.max = values[values.length - 1];
+		this.values = new IntImmutableList(values);
+	}
+
 	@Override
 	public boolean equals(Object object) {
 		if (this == object) {

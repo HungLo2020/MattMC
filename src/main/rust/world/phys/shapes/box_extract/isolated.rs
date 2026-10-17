@@ -3,7 +3,7 @@ use super::extract::row_bits;
 /// Any merge requires a face-adjacent pair. When none exists, every original
 /// box is one cell, emitted in y/x/z order. This checks actual occupancy, not a
 /// fixture name or density heuristic, and writes nothing when it declines.
-pub(super) fn extract(words: &[u64], dims: [usize; 3], output: &mut [i32]) -> Option<usize> {
+pub(super) fn visit<F: FnMut([i32; 6])>(words: &[u64], dims: [usize; 3], emit: &mut F) -> Option<usize> {
     let [nx, ny, nz] = dims;
     if nz > 64 { return None; }
     for x in 0..nx {
@@ -23,7 +23,7 @@ pub(super) fn extract(words: &[u64], dims: [usize; 3], output: &mut [i32]) -> Op
             let mut bits = row_bits(words, (x * ny + y) * nz, nz);
             while bits != 0 {
                 let z = bits.trailing_zeros() as i32;
-                output[count * 6..count * 6 + 6].copy_from_slice(&[
+                emit([
                     x as i32, y as i32, z, x as i32 + 1, y as i32 + 1, z + 1,
                 ]);
                 count += 1;

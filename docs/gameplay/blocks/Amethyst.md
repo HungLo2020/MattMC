@@ -8,9 +8,9 @@ Preserve **Budding Amethyst** when mining a geode: it is the renewable growth bl
 | --- | ---: | --- |
 | <span id="amethyst-block">Block of Amethyst, `minecraft:amethyst_block`</span> | 0 | Full building block and vibration resonator |
 | <span id="budding-amethyst">Budding Amethyst, `minecraft:budding_amethyst`</span> | 0 | Full block that grows crystals on its faces |
-| <span id="small-bud">Small Amethyst Bud, `minecraft:small_amethyst_bud`</span> | 1 | First growth stage |
-| <span id="medium-bud">Medium Amethyst Bud, `minecraft:medium_amethyst_bud`</span> | 2 | Second growth stage |
-| <span id="large-bud">Large Amethyst Bud, `minecraft:large_amethyst_bud`</span> | 4 | Third growth stage |
+| <span id="small-bud">[Small Amethyst Bud](../items/SmallAmethystBud.md), `minecraft:small_amethyst_bud`</span> | 1 | First growth stage |
+| <span id="medium-bud">[Medium Amethyst Bud](../items/MediumAmethystBud.md), `minecraft:medium_amethyst_bud`</span> | 2 | Second growth stage |
+| <span id="large-bud">[Large Amethyst Bud](../items/LargeAmethystBud.md), `minecraft:large_amethyst_bud`</span> | 4 | Third growth stage |
 | <span id="cluster">Amethyst Cluster, `minecraft:amethyst_cluster`</span> | 5 | Mature, shard-bearing crystal |
 
 All six have **hardness 1.5 and blast resistance 1.5**, and all are in the pickaxe mining-speed tag. The two full blocks require a correct tool for their ordinary drop gate; the buds and cluster do not. A faster tool is not the same as a required drop tool. [Properties and classes][blocks] · [Pickaxe tag][pickaxe] · [Harvest gate][player] [gate]
@@ -47,7 +47,7 @@ Buds and clusters can be waterlogged. The growth target permits amount-eight Wat
 | Cluster without Silk Touch, using a listed pickaxe | 4 Shards before Fortune |
 | Cluster without Silk Touch or a listed pickaxe | 2 Shards before any explosion decay |
 
-The maximum-harvest item tag explicitly lists **Wood, Stone, Copper, Iron, Gold, Diamond and Netherite Pickaxes**. The cluster's larger yield is an item-tag condition inside loot, not a higher-material-tier requirement. The buds and cluster have no correct-tool gate, so their Silk Touch branch does not require a pickaxe tier. Use a normal unbroken Silk Touch pickaxe when moving crystals for a straightforward setup. [All six loot tables][loot-amethyst_block] [loot-budding_amethyst] [loot-small_amethyst_bud] [loot-medium_amethyst_bud] [loot-large_amethyst_bud] [loot-amethyst_cluster] · [Maximum-harvest tag][harvest] · [Tier tags][wood] [stone] [iron] [diamond]
+The maximum-harvest item tag explicitly lists **Wood, Stone, Copper, Iron, Gold, Diamond and Netherite Pickaxes**. The cluster's larger yield is an item-tag condition inside loot, not a higher-material-tier requirement. The buds and cluster have no correct-tool gate, so their Silk Touch branch does not require a pickaxe tier. Use a normal unbroken Silk Touch pickaxe when moving crystals for a straightforward setup. [All six loot tables][loot-amethyst_block] [loot-budding_amethyst][] [loot-small_amethyst_bud][] [loot-medium_amethyst_bud][] [loot-large_amethyst_bud][] [loot-amethyst_cluster] · [Maximum-harvest tag][harvest] · [Tier tags][wood] [stone][] [iron][] [diamond]
 
 Fortune applies only to the **four-Shard pickaxe branch**. Fortune I can yield 4 or 8; II can yield 4, 8 or 12; III can yield 4, 8, 12 or 16. These outcomes are not equally likely: the base multiplier has extra weight. Silk Touch takes priority, and Fortune on a different tool does not improve the two-Shard fallback. [Loot branch order][loot-amethyst_cluster] · [Ore-drop multiplier][fortune]
 
@@ -72,7 +72,7 @@ Projectiles hitting this family run the inherited Amethyst chime callback on the
 | 1 Shard + 2 Copper Ingots | 1 Spyglass; vertical Shard above the two Ingots |
 | 3 Shards + 1 Sculk Sensor | 1 Calibrated Sculk Sensor; one Shard above and one on each side of the Sensor |
 
-These are the checked direct crafting recipes. The block recipe does not make Budding Amethyst, and there is **no reverse recipe returning Shards from a Block of Amethyst** in the bundled recipe inventory. See [Tinted Glass](GlassAndPanes.md#tinted-glass) for its placed behavior. [Recipes][recipe-amethyst_block] [recipe-tinted_glass] [recipe-spyglass] [recipe-calibrated_sculk_sensor]
+These are the checked direct crafting recipes. The block recipe does not make Budding Amethyst, and there is **no reverse recipe returning Shards from a Block of Amethyst** in the bundled recipe inventory. See [Tinted Glass](GlassAndPanes.md#tinted-glass) for its placed behavior. [Recipes][recipe-amethyst_block] [recipe-tinted_glass][] [recipe-spyglass][] [recipe-calibrated_sculk_sensor]
 
 Shards also carry the **Amethyst armor-trim material** on their item registration. Use the [Smithing guide](../smithing/Smithing.md) for the wider process. A Shard is the bundled item accepted by the **Allay duplication interaction**, which requires a dancing Allay whose duplication flag is ready; successful duplication resets both animals' cooldowns to 6,000 ticks. Simply handing a Shard to an arbitrary Allay does not establish that duplication will occur. [Trim material][items] · [Active trim lookup][trim-lookup] [trim-recipe] · [Duplication tag][allay-tag] · [Interaction and cooldown][allay]
 

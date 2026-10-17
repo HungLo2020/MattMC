@@ -12,6 +12,8 @@ When available as an item, use it while targeting source water. Its placement ha
 
 For Survival transport, let the eggs hatch and use a [Water Bucket](WaterBucket.md) on a living [Tadpole](../mobs/Tadpole.md), creating a [Bucket of Tadpole](BucketOfTadpole.md).
 
+If placed eggs seem slow, use the block guide's [hatching checklist](../blocks/Frogspawn.md#if-the-eggs-are-not-hatching) before changing random-tick settings or trying Bone Meal.
+
 Related: [Frogspawn block](../blocks/Frogspawn.md) · [Frog](../mobs/Frog.md) · [Tadpole](../mobs/Tadpole.md) · [Items](Items.md)
 
 ## Sources and verification

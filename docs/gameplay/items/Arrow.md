@@ -20,6 +20,7 @@ For a redstone use, an arrow can hold an [Oak Button](../blocks/Buttons.md#arrow
 
 - [Skeleton](../mobs/Skeleton.md)
 - [Bow](Bow.md), [Crossbow](Crossbow.md)
+- [Bow enchantments](../enchanting/BowEnchantments.md): Power, Punch, Flame and Infinity
 - [Items](Items.md)
 
 ## Sources and verification

@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 import com.google.common.collect.ImmutableList;
 
@@ -101,7 +100,7 @@ public class WorldGenStructFeatManager extends StructureManager
 	public List<StructureStart> startsForStructure(SectionPos sectionPos, Structure structure)
 	{
 		ChunkAccess chunk = _getChunk(sectionPos.x(), sectionPos.z(), ChunkStatus.STRUCTURE_REFERENCES);
-		if (chunk == null) return (List<StructureStart>) Stream.empty();
+		if (chunk == null) return List.of();
 		
 		// Copied from StructureFeatureManager::startsForFeature(...)
 		LongSet longSet = chunk.getReferencesForStructure(structure);
@@ -116,7 +115,7 @@ public class WorldGenStructFeatManager extends StructureManager
 	{
 		SectionPos sectionPos = SectionPos.of(blockPos);
 		ChunkAccess chunk = _getChunk(sectionPos.x(), sectionPos.z(), ChunkStatus.STRUCTURE_REFERENCES);
-		if (chunk == null) return (Map<Structure, LongSet>) Stream.empty();
+		if (chunk == null) return Map.of();
 		return chunk.getAllReferences();
 	}
 }

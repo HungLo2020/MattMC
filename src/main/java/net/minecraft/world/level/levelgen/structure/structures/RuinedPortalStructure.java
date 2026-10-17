@@ -28,6 +28,7 @@ import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureType;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 
 public class RuinedPortalStructure extends Structure {
@@ -64,6 +65,71 @@ public class RuinedPortalStructure extends Structure {
 
 	public RuinedPortalStructure(Structure.StructureSettings structureSettings, RuinedPortalStructure.Setup setup) {
 		this(structureSettings, List.of(setup));
+	}
+
+	@Override
+	public int[] nativeStub() {
+		return new int[]{5, 0, 0};
+	}
+
+	// The template sizes for the last manager asked: every portal's (x, y, z), giant portals last.
+	@org.jetbrains.annotations.Nullable
+	private volatile Object[] nativeSizes;
+
+	@Override
+	public int[] nativeStubParams(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager structureTemplateManager,
+		ChunkGenerator chunkGenerator, LevelHeightAccessor levelHeightAccessor) {
+		Object[] cached = this.nativeSizes;
+		int[] sizes;
+		if (cached != null && cached[0] == structureTemplateManager) {
+			sizes = (int[])cached[1];
+		} else {
+			sizes = new int[39];
+			for (int i = 0; i < 13; i++) {
+				String path = i < 10 ? STRUCTURE_LOCATION_PORTALS[i] : STRUCTURE_LOCATION_GIANT_PORTALS[i - 10];
+				net.minecraft.core.Vec3i size = structureTemplateManager.getOrCreate(ResourceLocation.withDefaultNamespace(path)).getSize();
+				sizes[i * 3] = size.getX();
+				sizes[i * 3 + 1] = size.getY();
+				sizes[i * 3 + 2] = size.getZ();
+			}
+			this.nativeSizes = new Object[]{structureTemplateManager, sizes};
+		}
+		int[] params = new int[1 + this.setups.size() * 3 + sizes.length];
+		params[0] = this.setups.size();
+		for (int i = 0; i < this.setups.size(); i++) {
+			RuinedPortalStructure.Setup setup = this.setups.get(i);
+			params[1 + i * 3] = setup.placement().ordinal();
+			params[2 + i * 3] = Float.floatToRawIntBits(setup.airPocketProbability());
+			params[3 + i * 3] = Float.floatToRawIntBits(setup.weight());
+		}
+		System.arraycopy(sizes, 0, params, 1 + this.setups.size() * 3, sizes.length);
+		return params;
+	}
+
+	@Override
+	public void nativeStubPieces(StructurePiecesBuilder structurePiecesBuilder, Structure.GenerationContext generationContext, BlockPos stub,
+		Rotation rotation, long[] extra, int[] pieces) {
+		// Rust drew the setup, air pocket, template, rotation, mirror and findSuitableY's values.
+		RuinedPortalStructure.Setup setup = this.setups.get((int)extra[0]);
+		RuinedPortalPiece.Properties properties = new RuinedPortalPiece.Properties();
+		properties.airPocket = (extra[2] & 1) != 0;
+		properties.mossiness = setup.mossiness();
+		properties.overgrown = setup.overgrown();
+		properties.vines = setup.vines();
+		properties.replaceWithBlackstone = setup.replaceWithBlackstone();
+		int template = (int)extra[1];
+		ResourceLocation resourceLocation = ResourceLocation.withDefaultNamespace(template < 10 ? STRUCTURE_LOCATION_PORTALS[template]
+			: STRUCTURE_LOCATION_GIANT_PORTALS[template - 10]);
+		StructureTemplate structureTemplate = generationContext.structureTemplateManager().getOrCreate(resourceLocation);
+		Mirror mirror = (extra[2] & 2) != 0 ? Mirror.FRONT_BACK : Mirror.NONE;
+		BlockPos pivot = new BlockPos(structureTemplate.getSize().getX() / 2, 0, structureTemplate.getSize().getZ() / 2);
+		if (setup.canBeCold()) {
+			properties.cold = isCold(stub, generationContext.chunkGenerator().getBiomeSource().getNoiseBiome(QuartPos.fromBlock(stub.getX()),
+				QuartPos.fromBlock(stub.getY()), QuartPos.fromBlock(stub.getZ()), generationContext.randomState().sampler()),
+				generationContext.chunkGenerator().getSeaLevel());
+		}
+		structurePiecesBuilder.addPiece(new RuinedPortalPiece(generationContext.structureTemplateManager(), stub, setup.placement(), properties,
+			resourceLocation, structureTemplate, rotation, mirror, pivot));
 	}
 
 	@Override

@@ -24,17 +24,9 @@ public record SpawnParticlesEffect(
 	SpawnParticlesEffect.VelocitySource verticalVelocity,
 	FloatProvider speed
 ) implements EnchantmentEntityEffect {
-	public static final MapCodec<SpawnParticlesEffect> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				ParticleTypes.CODEC.fieldOf("particle").forGetter(SpawnParticlesEffect::particle),
-				SpawnParticlesEffect.PositionSource.CODEC.fieldOf("horizontal_position").forGetter(SpawnParticlesEffect::horizontalPosition),
-				SpawnParticlesEffect.PositionSource.CODEC.fieldOf("vertical_position").forGetter(SpawnParticlesEffect::verticalPosition),
-				SpawnParticlesEffect.VelocitySource.CODEC.fieldOf("horizontal_velocity").forGetter(SpawnParticlesEffect::horizontalVelocity),
-				SpawnParticlesEffect.VelocitySource.CODEC.fieldOf("vertical_velocity").forGetter(SpawnParticlesEffect::verticalVelocity),
-				FloatProvider.CODEC.optionalFieldOf("speed", ConstantFloat.ZERO).forGetter(SpawnParticlesEffect::speed)
-			)
-			.apply(instance, SpawnParticlesEffect::new)
-	);
+	/** The native codec's `spawn_particles` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<SpawnParticlesEffect> CODEC = (MapCodec<SpawnParticlesEffect>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:spawn_particles");
 
 	public static SpawnParticlesEffect.PositionSource offsetFromEntityPosition(float f) {
 		return new SpawnParticlesEffect.PositionSource(SpawnParticlesEffect.PositionSourceType.ENTITY_POSITION, f, 1.0F);

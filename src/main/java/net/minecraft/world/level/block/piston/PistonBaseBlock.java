@@ -62,7 +62,9 @@ public class PistonBaseBlock extends DirectionalBlock {
 
 	public PistonBaseBlock(boolean bl, BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(EXTENDED, false));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(EXTENDED, false));
+		}
 		this.isSticky = bl;
 	}
 

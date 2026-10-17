@@ -13,14 +13,9 @@ import net.minecraft.world.item.enchantment.LevelBasedValue;
 import net.minecraft.world.phys.Vec3;
 
 public record DamageEntity(LevelBasedValue minDamage, LevelBasedValue maxDamage, Holder<DamageType> damageType) implements EnchantmentEntityEffect {
-	public static final MapCodec<DamageEntity> CODEC = RecordCodecBuilder.mapCodec(
-		instance -> instance.group(
-				LevelBasedValue.CODEC.fieldOf("min_damage").forGetter(DamageEntity::minDamage),
-				LevelBasedValue.CODEC.fieldOf("max_damage").forGetter(DamageEntity::maxDamage),
-				DamageType.CODEC.fieldOf("damage_type").forGetter(DamageEntity::damageType)
-			)
-			.apply(instance, DamageEntity::new)
-	);
+	/** The native codec's `damage_entity` case (`content/data/enchant.rs`). */
+	@SuppressWarnings("unchecked")
+	public static final MapCodec<DamageEntity> CODEC = (MapCodec<DamageEntity>)(MapCodec<?>)EnchantmentEntityEffect.CODEC.dispatchCase("minecraft:damage_entity");
 
 	@Override
 	public void apply(ServerLevel serverLevel, int i, EnchantedItemInUse enchantedItemInUse, Entity entity, Vec3 vec3) {

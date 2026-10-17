@@ -209,7 +209,6 @@ public class GuiRenderer implements AutoCloseable {
 		if (net.vulkanic.world.RustGalTerrainRenderer.isResourceReloadStaging()) {
 			return;
 		}
-		net.minecraft.client.dev.GraphicsAuditGuiFoilTiming.beginFrame();
 		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
 		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
 		this.renderState.forEachItem(guiItemRenderState -> {

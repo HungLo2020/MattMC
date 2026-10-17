@@ -8,6 +8,8 @@ The bundled **plains** and **forest** biome monster tables list ordinary zombies
 
 Normal ground spawning requires a non-Peaceful difficulty, suitable ground, and the monster darkness checks. In the bundled Overworld, **block light must be 0**, with additional sky/local-light tests. Lighting spawnable ground helps prevent new natural spawns. Group sizes describe spawn attempts, not a guaranteed number of mobs. [Spawn registration][placement] · [Monster rules][monster] · [Ground check][mob-spawn] · [Overworld settings][overworld]
 
+Shared [population caps and player-distance checks](../mechanics/NaturalSpawning.md) also apply to ordinary natural attempts.
+
 Zombies can also come from **monster-room spawners**. The room generator chooses zombies in two of its four equally selected entries; plains generation includes that feature. [Room generator][monster-room] · [Generation wiring][plains]
 
 In Creative, use the [Zombie Spawn Egg](../items/ZombieSpawnEgg.md). With command permission, use `/summon minecraft:zombie`.

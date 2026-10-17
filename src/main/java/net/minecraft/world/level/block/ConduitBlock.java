@@ -38,7 +38,9 @@ public class ConduitBlock extends BaseEntityBlock implements SimpleWaterloggedBl
 
 	public ConduitBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, true));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(WATERLOGGED, true));
+		}
 	}
 
 	@Override

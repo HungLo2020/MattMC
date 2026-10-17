@@ -34,17 +34,29 @@ At **age 8**, the top can instead grow a **Cactus Flower** if a cactus would be 
 
 For a display plant, use a [Flower Pot](FlowerPot.md#supported-plants). Its separate potting and growth rules apply; a potted cactus is not a growing cactus column.
 
+### Collecting flowers repeatedly
+
+**Removing only the flower does not reset the cactus's age.** The age-8 tick advances the top to age 9 even when it produces a flower. After you pick that flower, the same top resumes aging rather than making another age-8 attempt. On a column at least three blocks tall, it eventually stops at age 15 without growing a replacement top. [Current growth routine][repeat-growth]
+
+For another attempt on a **three-block column**, collect any flower, then **break and replant just the top cactus block**, leaving the lower two and their support in place. An ordinarily harvested cactus item does not retain the old age; replanting uses the current **age-0 default**. Leave air above the replanted top and wait for random ticks. This restarts one 25% flower attempt, not a guaranteed flower or a fixed harvest timer. A missed attempt needs another reset; stacking higher does not improve the chance. Keep loose drops away from the remaining plant's [damaging sides](#contact-and-loose-item-hazards). [Native cactus definition][repeat-definition] · [Default age][repeat-default] · [Cactus loot][repeat-loot] · [Item placement][repeat-placement] · [Default placement state][repeat-state] · [Attempt and height limit][repeat-growth]
+
+If the cactus stays intact but never flowers, check clearance at the **prospective flower's height**, one block above the top cactus. The attempt applies cactus survival rules at that position: none of its four horizontal neighbors may be solid or contain lava, and the block directly above that position must not be liquid. A wall beside the future flower can therefore prevent an attempt even if it does not break the existing cactus. With air above the cactus, that blocked age-8 opportunity still advances its age; clearing the wall later does not rewind it. [Attempt position and aging][repeat-growth] · [Survival checks][repeat-support]
+
 ## Contact and loose-item hazards
 
 The active contact callback applies **1 damage point**, equivalent to **half a heart before damage handling**, using the cactus damage type. Entity-specific immunity and protection can still affect the result. Avoid brushing against the plant or standing on its top. [Cactus callback][damage] · [Collision dispatch][collision] · [Server damage dispatch][hurt]
 
 **Dropped items can be destroyed by cactus**, including harvested cactus that lands against another part of the plant. An ordinary item entity starts with **5 health** and loses health to accepted contact hits; reaching zero discards it. Item damage resistance is checked, so this is not a promise that every possible item vanishes immediately. Keep collection paths clear of the plant. [Item health][item-health] · [Item damage and destruction][item-damage] · [Item resistance][item-resistance]
 
+For decoration beside a path, see [potted Cactus contact behavior](FlowerPot.md#cactus-and-wither-rose-displays).
+
 Related: [Cactus item](../items/Cactus.md) · [Green Dye](../items/GreenDye.md) · [Cactus Flower](../items/CactusFlower.md) · [Flower Pot](FlowerPot.md) · [Blocks](Blocks.md)
 
 ## Sources and verification
 
 Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`. Checked registrations, bundled biome/feature wiring, placement and neighbor callbacks, current random-tick and entity-contact dispatch, Bone Meal targeting, and ordinary loot. No in-game generation, farming, placement, support-removal, mining, explosion, or damage test was run. Data packs can change world generation, tags, and loot.
+
+Repeat-flower collection and clearance were source-reviewed on **2026-10-15** at `6c069f5851cb3d6e1549ee478909559c2783cfe6`, including the native default/physical definitions and active random-tick callback path. The reset sequence is inferred from placement and growth code; no flower farm, collection-rate or gameplay test was run. Earlier citations retain their original review scope. [Native ticking property][repeat-physical] · [Current callback dispatch][repeat-dispatch]
 
 [block]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/Blocks.java#L1946-L1961
 [growth]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/CactusBlock.java#L25-L82
@@ -76,3 +88,12 @@ Source-reviewed on **2026-10-02** at `3e85592c4c78ebb420302360667a6c230dc0318d`.
 [item-damage]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/entity/item/ItemEntity.java#L264-L286
 [item-resistance]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/item/ItemStack.java#L1101-L1104
 [scheduled]: https://github.com/HungLo2020/MattMC/blob/3e85592c4c78ebb420302360667a6c230dc0318d/src/main/java/net/minecraft/world/level/block/CactusBlock.java#L46-L51
+[repeat-growth]: https://github.com/HungLo2020/MattMC/blob/6c069f5851cb3d6e1549ee478909559c2783cfe6/src/main/java/net/minecraft/world/level/block/CactusBlock.java#L56-L84
+[repeat-support]: https://github.com/HungLo2020/MattMC/blob/6c069f5851cb3d6e1549ee478909559c2783cfe6/src/main/java/net/minecraft/world/level/block/CactusBlock.java#L114-L125
+[repeat-definition]: https://github.com/HungLo2020/MattMC/blob/6c069f5851cb3d6e1549ee478909559c2783cfe6/src/main/rust/content/block/definitions/catalog.rs#L305-L306
+[repeat-default]: https://github.com/HungLo2020/MattMC/blob/6c069f5851cb3d6e1549ee478909559c2783cfe6/src/main/rust/content/block/definitions/templates.rs#L63
+[repeat-loot]: https://github.com/HungLo2020/MattMC/blob/6c069f5851cb3d6e1549ee478909559c2783cfe6/src/main/resources/data/minecraft/loot_table/blocks/cactus.json#L1-L21
+[repeat-placement]: https://github.com/HungLo2020/MattMC/blob/6c069f5851cb3d6e1549ee478909559c2783cfe6/src/main/java/net/minecraft/world/item/BlockItem.java#L110-L125
+[repeat-state]: https://github.com/HungLo2020/MattMC/blob/6c069f5851cb3d6e1549ee478909559c2783cfe6/src/main/java/net/minecraft/world/level/block/Block.java#L444-L447
+[repeat-physical]: https://github.com/HungLo2020/MattMC/blob/6c069f5851cb3d6e1549ee478909559c2783cfe6/src/main/rust/content/block/definitions/physics.rs#L397-L403
+[repeat-dispatch]: https://github.com/HungLo2020/MattMC/blob/6c069f5851cb3d6e1549ee478909559c2783cfe6/src/main/java/net/minecraft/world/level/chunk/NativeRandomTicks.java#L170-L176

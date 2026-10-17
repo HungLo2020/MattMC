@@ -5,6 +5,8 @@ Project skills have one source of truth in `.agents/skills/`. Claude Code's
 
 ```text
 .agents/skills/
+├── attach-to-swarm/
+│   └── SKILL.md
 ├── say-hello/
 │   └── SKILL.md
 ├── sync-and-resume/
@@ -98,6 +100,31 @@ the whole repository, creates WIP or merge commits, or force-pushes. Existing
 divergent history, incompatible requirements, or a rejected push may require a
 specific decision; the skill preserves the work and reports the obstacle.
 Relevant verification follows the active task and repository instructions.
+
+## Attach to Swarm
+
+Use `attach-to-swarm` to register a Codex or Claude session with the
+[MattMC swarm coordination board](https://github.com/HungLo2020/MattMC/discussions/888).
+
+- Codex: `$attach-to-swarm`
+- Claude Code: `/attach-to-swarm`
+- Natural request: "Attach this session to the MattMC swarm."
+
+The [shared skill](https://github.com/HungLo2020/MattMC/blob/master/.agents/skills/attach-to-swarm/SKILL.md)
+identifies every message by agent, actual execution-system hostname and unique
+session. It waits for dot's explicit scoped assignment and requires local
+reproduction and verification with exact tested commits and honest hardware limits.
+All work uses `master`; the existing `sync-and-resume` and `sync-and-push` skills
+preserve and reconcile changes on sync and push. dot coordinates short publication
+turns so workers publish their own authorized changes without racing the remote.
+Check-ins, versioned assignments and explicit release prevent silence from being
+mistaken for a safe handoff. Hostnames and role labels are coordination conventions,
+not cryptographic authentication.
+
+This adds no background service. Agents need a running session and authorized
+GitHub Discussion access to read and post. Loading the skill does not grant edit,
+commit, push, merge, account or security permissions. The board starts idle and
+becomes active as agents register and dot assigns work.
 
 ## Adding skills
 

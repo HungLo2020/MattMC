@@ -11,7 +11,6 @@ import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.color.block.BlockColors;
-import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
@@ -22,14 +21,26 @@ public class ModelGroupCollector {
 	static final int SINGLETON_MODEL_GROUP = -1;
 	private static final int INVISIBLE_MODEL_GROUP = 0;
 
-	public static Object2IntMap<BlockState> build(BlockColors blockColors, BlockStateModelLoader.LoadedModels loadedModels) {
+	/**
+	 * Groups states whose models render alike: the same equality group (one
+	 * per blockstate variant entry, or per multipart definition and set of
+	 * matching selectors, from Rust's loader) and the same values of the
+	 * block's coloring properties.
+	 */
+	public static Object2IntMap<BlockState> build(BlockColors blockColors, NativeModels nativeModels) {
 		Map<Block, List<Property<?>>> map = new HashMap();
 		Map<ModelGroupCollector.GroupKey, Set<BlockState>> map2 = new HashMap();
-		loadedModels.models().forEach((blockState, unbakedRoot) -> {
+		List<BlockState> states = nativeModels.states();
+		int[] groups = nativeModels.groups();
+		for (int index = 0; index < states.size(); index++) {
+			if (groups[index] < 0) {
+				continue;
+			}
+			BlockState blockState = states.get(index);
 			List<Property<?>> list = (List<Property<?>>)map.computeIfAbsent(blockState.getBlock(), block -> List.copyOf(blockColors.getColoringProperties(block)));
-			ModelGroupCollector.GroupKey groupKey = ModelGroupCollector.GroupKey.create(blockState, unbakedRoot, list);
+			ModelGroupCollector.GroupKey groupKey = ModelGroupCollector.GroupKey.create(blockState, groups[index], list);
 			((Set)map2.computeIfAbsent(groupKey, groupKeyx -> Sets.newIdentityHashSet())).add(blockState);
-		});
+		}
 		int i = 1;
 		Object2IntMap<BlockState> object2IntMap = new Object2IntOpenHashMap<>();
 		object2IntMap.defaultReturnValue(-1);
@@ -56,10 +67,9 @@ public class ModelGroupCollector {
 
 	@Environment(EnvType.CLIENT)
 	record GroupKey(Object equalityGroup, List<Object> coloringValues) {
-		public static ModelGroupCollector.GroupKey create(BlockState blockState, BlockStateModel.UnbakedRoot unbakedRoot, List<Property<?>> list) {
+		public static ModelGroupCollector.GroupKey create(BlockState blockState, int equalityGroup, List<Property<?>> list) {
 			List<Object> list2 = getColoringValues(blockState, list);
-			Object object = unbakedRoot.visualEqualityGroup(blockState);
-			return new ModelGroupCollector.GroupKey(object, list2);
+			return new ModelGroupCollector.GroupKey(equalityGroup, list2);
 		}
 
 		private static List<Object> getColoringValues(BlockState blockState, List<Property<?>> list) {

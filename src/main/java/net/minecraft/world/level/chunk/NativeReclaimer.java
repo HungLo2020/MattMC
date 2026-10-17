@@ -1,0 +1,360 @@
+package net.minecraft.world.level.chunk;
+
+import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
+import java.lang.foreign.MemoryLayout;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SegmentAllocator;
+import java.lang.foreign.StructLayout;
+import java.lang.foreign.ValueLayout;
+import java.lang.invoke.MethodHandle;
+import java.lang.ref.PhantomReference;
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicLong;
+import net.logging.LogUtils;
+import net.minecraft.util.NativeLibraryLoader;
+import org.slf4j.Logger;
+
+/**
+ * Releases chunk-section native objects once their Java owner is unreachable.
+ *
+ * <p>Each registration is one phantom reference holding the raw pointer, and
+ * a dedicated thread releases dead references in batches through
+ * {@code mattmc_native_release_batch} (Rust {@code world/level/chunk/reclaim.rs}).
+ * An {@code Arena.ofAuto()} per object instead costs an implicit session, a
+ * shared resource list, cleanup actions and a JDK {@code Common-Cleaner}
+ * registration, and that single shared thread fell millions of releases
+ * behind during world generation, retaining gigabytes of native memory.
+ *
+ * <p>The referent decides the lifetime: register the segment or object that
+ * every reader of the native memory holds (an owner's segment, a view), and
+ * keep using segments derived from it only while the referent is reachable.
+ */
+public final class NativeReclaimer {
+    static final byte LIVE_SECTION = 1;
+    static final byte LIVE_SECTION_VIEW = 2;
+    static final byte LIVE_BIOME = 3;
+    static final byte LIVE_BIOME_VIEW = 4;
+    static final byte SECTION_COUNTERS = 5;
+    static final byte DH_CONTRIBUTORS = 6;
+    // Kind 7 (saved contributor batches) is retired.
+    static final byte SECTION_SNAPSHOT = 8;
+    static final byte LIGHT_LAYER = 9;
+    static final byte LIGHT_VIEW = 10;
+    static final byte DH_HEIGHTMAPS = 11;
+    static final byte DH_SOURCES = 12;
+    static final byte DH_LIGHT_FIELD = 13;
+    static final byte CHUNK_INPUTS = 14;
+    static final byte BIOME_CHUNK_INPUTS = 15;
+    static final byte LIGHT_MAP = 16;
+    static final byte LIGHT_MAP_VIEW = 17;
+    private static final int KINDS = 18;
+
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final int BATCH = 1024;
+    private static final MethodHandle RELEASE_BATCH = NativeLibraryLoader.downcallHandle("mattmc_rust",
+        "mattmc_native_release_batch", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    private static final ReferenceQueue<Object> QUEUE = new ReferenceQueue<>();
+    /** Keeps each registration reachable until it is released. */
+    private static final Set<Owner> LIVE = ConcurrentHashMap.newKeySet();
+    private static final AtomicLong RELEASED = new AtomicLong();
+    private static final AtomicLong REGISTRATIONS = new AtomicLong();
+    // Allocation-free increments inside the ownership commit boundary.
+    private static final AtomicLong[] REGISTERED_BY_KIND = new AtomicLong[KINDS];
+    /** Unreleased registrations (each holds roughly 1.5 KB of native memory) allowed to accumulate between pressure collections. */
+    private static final int GC_STEP = Math.max(1024, Integer.getInteger("mattmc.nativeReclaimer.gcStep", 262_144));
+    private static final long MIN_GC_INTERVAL_MS = 1000;
+    private static final Semaphore GC_REQUEST = new Semaphore(0);
+    private static volatile int gcMark = GC_STEP;
+
+    static class Owner extends PhantomReference<Object> {
+        final long address;
+        final byte kind;
+        final Owner leader;
+        // Guarded by leader. A pair commits/cancels as one transaction, while
+        // each individual record can be claimed only once by the drainer.
+        boolean committed, cancelled, claimed;
+
+        Owner(Object referent, long address, byte kind) {
+            this(referent,address,kind,null);
+        }
+        Owner(Object referent, long address, byte kind, Owner leader) {
+            super(referent, QUEUE);
+            this.address = address;
+            this.kind = kind;
+            this.leader = leader == null ? this : leader;
+        }
+        boolean claim() {
+            synchronized (leader) {
+                if (!leader.committed || cancelled || claimed) return false;
+                claimed = true;
+                LIVE.remove(this);
+                return true;
+            }
+        }
+    }
+    /** Additional state belongs only to lighting registrations. The action must
+     * refer weakly to its domain resources, never to this record's referent. */
+    static final class LightOwner extends Owner {
+        private final Runnable cleanup;
+        private boolean notified;
+
+        LightOwner(Object referent, long address, byte kind, Owner leader, Runnable cleanup) {
+            super(referent, address, kind, leader);
+            this.cleanup = cleanup;
+        }
+
+        void released() {
+            synchronized (leader) {
+                if (notified) return;
+                notified = true;
+            }
+            // Both registration and native release have finished before VM
+            // effects run; reentry must not acquire an already-held gate.
+            cleanup.run();
+        }
+    }
+    /** Package-private modeled failure ordering seam; absent in production. */
+    interface RegistrationProbe { void at(int stage, Owner first, Owner second); }
+
+    static {
+        for (int i = 0; i < KINDS; i++) REGISTERED_BY_KIND[i] = new AtomicLong();
+        start(NativeReclaimer::drain, "MattMC-Native-Reclaimer");
+        start(NativeReclaimer::collectUnderPressure, "MattMC-Native-Reclaimer-GC");
+        if (Boolean.getBoolean("mattmc.dev.nativeReclaimerStats")) start(NativeReclaimer::logStats, "MattMC-Native-Reclaimer-Stats");
+    }
+
+    private NativeReclaimer() {
+    }
+
+    private static void start(Runnable body, String name) {
+        Thread thread = new Thread(body, name);
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /** Releases {@code pointer} (a reference of {@code kind}) once {@code referent} is unreachable. */
+    static void register(Object referent, MemorySegment pointer, byte kind) {
+        try {
+            validate(referent,pointer,kind);
+            registerRecords(new Owner(referent,pointer.address(),kind),null,null);
+        } finally { Reference.reachabilityFence(referent); Reference.reachabilityFence(pointer); }
+    }
+    private static void validate(Object referent, MemorySegment pointer, byte kind) {
+        if (referent == null || pointer.address() == 0 || kind < 0 || kind >= KINDS)
+            throw new IllegalArgumentException("Missing native owner or invalid kind");
+    }
+    private static void cancel(Owner record, Throwable original) {
+        if (record == null) return;
+        record.cancelled = true;
+        try { LIVE.remove(record); }
+        catch (RuntimeException | Error cleanup) {
+            // Cancellation already prevents a native claim even if removing a
+            // hash-table entry itself fails. Keep the original adoption error.
+            try { original.addSuppressed(cleanup); } catch (RuntimeException | Error ignored) {}
+        }
+    }
+    private static void registerRecords(Owner first, Owner second, RegistrationProbe probe) {
+        long previous;
+        synchronized (first) {
+            try {
+                if (probe != null) probe.at(0,first,second);
+                LIVE.add(first);
+                if (probe != null) probe.at(1,first,second);
+                if (second != null) {
+                    if (probe != null) probe.at(2,first,second);
+                    LIVE.add(second);
+                    if (probe != null) probe.at(3,first,second);
+                }
+                if (probe != null) probe.at(4,first,second);
+                REGISTERED_BY_KIND[first.kind].incrementAndGet();
+                if (second != null) REGISTERED_BY_KIND[second.kind].incrementAndGet();
+                previous = REGISTRATIONS.getAndAdd(second == null ? 1 : 2);
+                first.committed = true;
+            } catch (RuntimeException | Error failure) {
+                cancel(first,failure); cancel(second,failure);
+                throw failure;
+            }
+        }
+        // Ownership has transferred. Optional pressure work cannot escape as
+        // a failed registration and cause the caller to release it again.
+        try {
+            if (probe != null) probe.at(5,first,second);
+            long added = second == null ? 1 : 2;
+            if ((previous >>> 10) != ((previous + added) >>> 10)
+                && LIVE.size() >= gcMark && GC_REQUEST.availablePermits() == 0) GC_REQUEST.release();
+        } catch (RuntimeException | Error ignored) {}
+    }
+
+    /**
+     * Releases a light-storage map owner and its metadata view once {@code map}
+     * (the Java object every call fences) is unreachable.
+     * Successful registration transfers both leases; a thrown registration
+     * transfers neither, so the caller releases both during rollback.
+     */
+    public static void registerLightMap(Object map, MemorySegment owner, MemorySegment view) {
+        registerLightMap(map,owner,view,null);
+    }
+    static void registerLightMap(Object map, MemorySegment owner, MemorySegment view, RegistrationProbe probe) {
+        registerLightMap(map, owner, view, null, probe);
+    }
+    /** Register a paired legacy light map with a weak domain cleanup action.
+     * Each successfully released record notifies, even across batch boundaries. */
+    public static void registerLightMapCleanup(Object map, MemorySegment owner, MemorySegment view, Runnable cleanup) {
+        registerLightMap(map, owner, view, java.util.Objects.requireNonNull(cleanup), null);
+    }
+    static void registerLightMap(Object map, MemorySegment owner, MemorySegment view, Runnable cleanup, RegistrationProbe probe) {
+        try {
+            validate(map,owner,LIGHT_MAP); validate(map,view,LIGHT_MAP_VIEW);
+            Owner first = cleanup == null ? new Owner(map,owner.address(),LIGHT_MAP)
+                : new LightOwner(map,owner.address(),LIGHT_MAP,null,cleanup);
+            Owner second = cleanup == null ? new Owner(map,view.address(),LIGHT_MAP_VIEW,first)
+                : new LightOwner(map,view.address(),LIGHT_MAP_VIEW,first,cleanup);
+            registerRecords(first,second,probe);
+        } finally {
+            Reference.reachabilityFence(map); Reference.reachabilityFence(owner); Reference.reachabilityFence(view);
+        }
+    }
+
+    /** The current light-map root owns its borrowed metadata, so it registers
+     * once. Its cleanup action must hold only weak domain references. */
+    public static void registerLightMapOwner(Object map, MemorySegment owner, Runnable cleanup) {
+        registerLightMapOwner(map, owner, cleanup, null);
+    }
+    static void registerLightMapOwner(Object map, MemorySegment owner, Runnable cleanup, RegistrationProbe probe) {
+        try {
+            validate(map, owner, LIGHT_MAP);
+            registerRecords(new LightOwner(map, owner.address(), LIGHT_MAP, null,
+                java.util.Objects.requireNonNull(cleanup)), null, probe);
+        } finally { Reference.reachabilityFence(map); Reference.reachabilityFence(owner); }
+    }
+
+    /** Registrations not yet released, and releases so far (diagnostics and tests). */
+    static int pending() { return LIVE.size(); }
+    static long released() { return RELEASED.get(); }
+    static long registered(byte kind) { return REGISTERED_BY_KIND[kind].get(); }
+
+    private static void drain() {
+        // Thread-confined scratch, allocated once for the process.
+        MemorySegment kinds = Arena.global().allocate(BATCH);
+        MemorySegment pointers = Arena.global().allocate(ValueLayout.ADDRESS, BATCH);
+        LightOwner[] lighting = new LightOwner[BATCH];
+        while (true) {
+            try {
+                int count = 0;
+                Owner owner = (Owner)QUEUE.remove();
+                while (owner != null) {
+                    if (owner.claim()) {
+                        kinds.set(ValueLayout.JAVA_BYTE, count, owner.kind);
+                        pointers.setAtIndex(ValueLayout.JAVA_LONG, count, owner.address);
+                        lighting[count] = owner instanceof LightOwner light ? light : null;
+                        if (++count == BATCH) break;
+                    }
+                    owner = (Owner)QUEUE.poll();
+                }
+                if (count == 0) continue;
+                releaseBatch(kinds, pointers, count, lighting, RELEASE_BATCH);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Throwable failure) {
+                LOGGER.error("Native reclaimer batch failed", failure);
+            } finally {
+                // Also discard notification records after a failed downcall;
+                // without a returned prefix no release may be assumed.
+                java.util.Arrays.fill(lighting, null);
+            }
+        }
+    }
+
+    /** The returned native prefix is the sole authority for notifications.
+     * The handle parameter lets focused tests model partial/failed release
+     * without ever sending their fake addresses to native destruction. */
+    static int releaseBatch(MemorySegment kinds, MemorySegment pointers, int count,
+                            LightOwner[] lighting, MethodHandle release) throws Throwable {
+        int released = (int)release.invokeExact(kinds, pointers, count);
+        if (released < 0 || released > count) throw new IllegalStateException("Invalid native release prefix: " + released);
+        RELEASED.addAndGet(released);
+        for (int i = 0; i < released; i++) {
+            LightOwner owner = lighting[i];
+            if (owner != null) {
+                try { owner.released(); }
+                catch (Throwable failure) { LOGGER.error("Native lighting retirement cleanup failed", failure); }
+            }
+        }
+        if (released != count) {
+            LOGGER.error("Native reclaimer stopped at unknown kind {}; {} pointers leaked", kinds.get(ValueLayout.JAVA_BYTE, released), count - released);
+        }
+        return released;
+    }
+
+    /**
+     * Native memory creates no heap pressure, so ZGC can go minutes without the
+     * old-generation collection that discovers dead promoted owners, and DH
+     * world generation then retained gigabytes of dead sections. As the JDK
+     * does for direct buffers, request a collection once unreleased
+     * registrations grow {@link #GC_STEP} past the level the previous one left.
+     * The collection is concurrent; only this thread waits for it.
+     */
+    private static void collectUnderPressure() {
+        while (true) {
+            try {
+                GC_REQUEST.acquire();
+                GC_REQUEST.drainPermits();
+                long started = System.nanoTime();
+                int before = LIVE.size();
+                System.gc();
+                // Let the drainer release what the collection discovered before setting the next mark.
+                for (int i = 0; i < 30; i++) {
+                    long released = RELEASED.get();
+                    Thread.sleep(100);
+                    if (RELEASED.get() == released) break;
+                }
+                int after = LIVE.size();
+                gcMark = after + GC_STEP;
+                LOGGER.debug("Native reclaimer collection: {} -> {} pending in {} ms", before, after, (System.nanoTime() - started) / 1_000_000);
+                Thread.sleep(MIN_GC_INTERVAL_MS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Throwable failure) {
+                LOGGER.error("Native reclaimer collection failed", failure);
+            }
+        }
+    }
+
+    /** {@code -Dmattmc.dev.nativeReclaimerStats=true}: registrations and glibc malloc totals every 5 seconds. */
+    private static void logStats() {
+        StructLayout mallinfo2 = MemoryLayout.structLayout(ValueLayout.JAVA_LONG.withName("arena"), ValueLayout.JAVA_LONG.withName("ordblks"),
+            ValueLayout.JAVA_LONG.withName("smblks"), ValueLayout.JAVA_LONG.withName("hblks"), ValueLayout.JAVA_LONG.withName("hblkhd"),
+            ValueLayout.JAVA_LONG.withName("usmblks"), ValueLayout.JAVA_LONG.withName("fsmblks"), ValueLayout.JAVA_LONG.withName("uordblks"),
+            ValueLayout.JAVA_LONG.withName("fordblks"), ValueLayout.JAVA_LONG.withName("keepcost"));
+        Linker linker = Linker.nativeLinker();
+        MethodHandle info = linker.defaultLookup().find("mallinfo2").map(symbol -> linker.downcallHandle(symbol, FunctionDescriptor.of(mallinfo2))).orElse(null);
+        MemorySegment out = Arena.global().allocate(mallinfo2);
+        SegmentAllocator into = (size, alignment) -> out;
+        while (true) {
+            try {
+                Thread.sleep(5000);
+                StringBuilder kinds = new StringBuilder();
+                for (int i = 1; i < KINDS; i++) kinds.append(i == 1 ? "" : ",").append(REGISTERED_BY_KIND[i].get());
+                LOGGER.info("Native reclaimer stats pending={} released={} registered={}", LIVE.size(), RELEASED.get(), kinds);
+                if (info != null) {
+                    var result = (MemorySegment)info.invokeExact(into);
+                    LOGGER.info("Native reclaimer malloc arenaMB={} inUseMB={} freeMB={} mmapMB={}", result.get(ValueLayout.JAVA_LONG, 0) >> 20,
+                        result.get(ValueLayout.JAVA_LONG, 56) >> 20, result.get(ValueLayout.JAVA_LONG, 64) >> 20, result.get(ValueLayout.JAVA_LONG, 32) >> 20);
+                }
+            } catch (InterruptedException interrupted) {
+                return;
+            } catch (Throwable failure) {
+                LOGGER.warn("Native reclaimer stats failed", failure);
+                return;
+            }
+        }
+    }
+}

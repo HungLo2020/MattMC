@@ -175,11 +175,74 @@ impl GuiItemCache {
     }
 }
 
+/// Copy-on-write vector: clones share one allocation, so persistent GUI
+/// geometry decoded once is reused every frame without copying; mutation
+/// copies only while shared.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SharedVec<T>(std::sync::Arc<Vec<T>>);
+
+impl<T> std::ops::Deref for SharedVec<T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Vec<T> {
+        &self.0
+    }
+}
+
+impl<T: Clone> std::ops::DerefMut for SharedVec<T> {
+    fn deref_mut(&mut self) -> &mut Vec<T> {
+        std::sync::Arc::make_mut(&mut self.0)
+    }
+}
+
+impl<T> From<Vec<T>> for SharedVec<T> {
+    fn from(values: Vec<T>) -> Self {
+        Self(std::sync::Arc::new(values))
+    }
+}
+
+impl<T> FromIterator<T> for SharedVec<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self::from(iter.into_iter().collect::<Vec<_>>())
+    }
+}
+
+impl<'a, T> IntoIterator for &'a SharedVec<T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a, T: Clone> IntoIterator for &'a mut SharedVec<T> {
+    type Item = &'a mut T;
+    type IntoIter = std::slice::IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        std::sync::Arc::make_mut(&mut self.0).iter_mut()
+    }
+}
+
+impl<T: Clone> IntoIterator for SharedVec<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        std::sync::Arc::try_unwrap(self.0).unwrap_or_else(|shared| (*shared).clone()).into_iter()
+    }
+}
+
 /// A material-homogeneous indexed mesh for one GUI item layer. `asset_id`
 /// refers to a Rust-owned raw image asset, never a Minecraft atlas object.
 #[derive(Clone, Debug, PartialEq)]
 pub struct GuiMeshBatchRequest {
     pub item_cache: Option<GuiItemCache>,
+    /// Identity of vertex/index data the caller keeps immutable in persistent
+    /// memory for its context's lifetime; unchanged meshes are then
+    /// recognised without rehashing every vertex.
+    pub persistent_geometry: Option<GuiPersistentGeometry>,
     /// Private native contract: copied model-space bounds, original normals,
     /// and GUI scale. No caller-selected offscreen extent/guard/raster matrix.
     pub block_item_raster: Option<GuiBlockItemRaster>,
@@ -221,8 +284,17 @@ pub struct GuiMeshBatchRequest {
     pub clip_top: i32,
     pub clip_width: i32,
     pub clip_height: i32,
-    pub vertices: Vec<GuiMeshVertex>,
-    pub indices: Vec<u32>,
+    pub vertices: SharedVec<GuiMeshVertex>,
+    pub indices: SharedVec<u32>,
+}
+
+/// Address identity of persistent caller geometry plus the caller's store
+/// generation (a cleared store may reuse addresses).
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct GuiPersistentGeometry {
+    pub vertices: u64,
+    pub indices: u64,
+    pub generation: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -317,34 +389,55 @@ pub struct GuiMeshPreparedDraw {
     pub clip_height: i32,
     pub vertices: Vec<GuiMeshPreparedVertex>,
     pub indices: Vec<u32>,
+    /// Affine texture transform applied to `local_uv` in the vertex shader
+    /// (`[column0, column1, translation]`). Standard item foil animates only
+    /// this per-draw uniform, so its geometry stays resident across frames.
+    pub uv_transform: [[f32; 2]; 3],
+    /// Content identity of `vertices`/`indices` when they came from the
+    /// prepared-geometry memo (its key); `None` when the full geometry
+    /// fingerprint must be computed, e.g. after atlas UV remapping.
+    pub geometry_identity: Option<u64>,
 }
+
+/// Identity `GuiMeshPreparedDraw::uv_transform`.
+pub const GUI_MESH_IDENTITY_UV_TRANSFORM: [[f32; 2]; 3] = [[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]];
 
 /// Stable process-local identity for copied GUI geometry. Transform, clip,
 /// and layer fields are intentionally excluded: those remain per-draw
 /// uniforms, while this key permits immutable vertex/index residency across
 /// frames without retaining Java objects or native pointers.
 pub fn geometry_fingerprint(draw: &GuiMeshPreparedDraw) -> u64 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    hasher.write_u64(draw.vertices.len() as u64);
-    for vertex in &draw.vertices {
-        for value in vertex.position {
-            hasher.write_u32(value.to_bits());
-        }
-        for value in vertex.local_uv {
-            hasher.write_u32(value.to_bits());
-        }
-        for value in vertex.color {
-            hasher.write_u32(value.to_bits());
-        }
-        for value in vertex.normal {
-            hasher.write_u32(value.to_bits());
-        }
+    // GUI item caches fingerprint every mesh draw each frame. Pack the same
+    // fields as before into one buffer and hash it with XXH3 instead of
+    // streaming every component through SipHash.
+    thread_local! {
+        static BYTES: std::cell::RefCell<Vec<u8>> = const { std::cell::RefCell::new(Vec::new()) };
     }
-    hasher.write_u64(draw.indices.len() as u64);
-    for index in &draw.indices {
-        hasher.write_u32(*index);
-    }
-    hasher.finish()
+    BYTES.with(|bytes| {
+        let mut bytes = bytes.borrow_mut();
+        bytes.clear();
+        bytes.reserve(16 + draw.vertices.len() * 48 + std::mem::size_of_val(draw.indices.as_slice()));
+        bytes.extend_from_slice(&(draw.vertices.len() as u64).to_le_bytes());
+        for vertex in &draw.vertices {
+            // One fixed-size block per vertex keeps the copy branch-free.
+            let mut block = [0u8; 48];
+            let values = vertex
+                .position
+                .iter()
+                .chain(&vertex.local_uv)
+                .chain(&vertex.color)
+                .chain(&vertex.normal);
+            for (chunk, value) in block.chunks_exact_mut(4).zip(values) {
+                chunk.copy_from_slice(&value.to_bits().to_le_bytes());
+            }
+            bytes.extend_from_slice(&block);
+        }
+        bytes.extend_from_slice(&(draw.indices.len() as u64).to_le_bytes());
+        for index in &draw.indices {
+            bytes.extend_from_slice(&index.to_le_bytes());
+        }
+        xxhash_rust::xxh3::xxh3_64(&bytes)
+    })
 }
 
 /// One non-overlapping range in a persistent GUI-mesh stream. A command list

@@ -893,7 +893,7 @@ impl WorldLodDirectCompositionResources {
         })();
         if result.is_err() {
             for handle in created.into_iter().rev() {
-                let _ = gal.destroy(handle);
+                let _ = gal.retire(handle);
             }
         }
         result
@@ -941,7 +941,7 @@ impl WorldLodDirectCompositionResources {
             self.color_view,
             self.color_texture,
         ] {
-            let _ = gal.destroy(handle);
+            let _ = gal.retire(handle);
         }
     }
 
@@ -1156,6 +1156,7 @@ impl WorldLodDirectCompositionResources {
     pub(crate) fn append_vanilla_snapshot(
         &self,
         frame_target: Handle,
+        owned_color_texture: Option<Handle>,
         vanilla_depth_source: Handle,
         previous_color: TextureUsageState,
         previous_depth: TextureUsageState,
@@ -1176,11 +1177,36 @@ impl WorldLodDirectCompositionResources {
             TextureUsageState::DepthStencilAttachment,
             TextureUsageState::TransferSrc,
         )));
-        ops.push(CommandOp::CopyFrameTargetToTexture {
-            src: frame_target,
-            dst: self.vanilla_color_texture,
-            extent: self.extent,
-        });
+        if let Some(color) = owned_color_texture {
+            ops.push(CommandOp::Barrier(texture_barrier(
+                color,
+                TextureUsageState::ColorAttachment,
+                TextureUsageState::TransferSrc,
+            )));
+            ops.push(CommandOp::CopyTexture(TextureImageCopyRegion {
+                row_order: TextureRowOrder::Preserve,
+                src_texture: color,
+                src_mip: 0,
+                src_layer: 0,
+                src_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                dst_texture: self.vanilla_color_texture,
+                dst_mip: 0,
+                dst_layer: 0,
+                dst_origin: TextureOrigin3d { x: 0, y: 0, z: 0 },
+                extent: self.extent,
+            }));
+            ops.push(CommandOp::Barrier(texture_barrier(
+                color,
+                TextureUsageState::TransferSrc,
+                TextureUsageState::ColorAttachment,
+            )));
+        } else {
+            ops.push(CommandOp::CopyFrameTargetToTexture {
+                src: frame_target,
+                dst: self.vanilla_color_texture,
+                extent: self.extent,
+            });
+        }
         ops.push(CommandOp::CopyTexture(TextureImageCopyRegion {
             row_order: TextureRowOrder::Preserve,
             src_texture: vanilla_depth_source,

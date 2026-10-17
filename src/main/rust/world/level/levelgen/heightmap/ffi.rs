@@ -1,8 +1,44 @@
 //! Frame: eight i32 metadata fields, 256 pending type masks, then six packed maps.
 //! Buffers are aligned, caller-owned, disjoint from the frame, and borrowed only
 //! during this ordinary call. A negative result may leave private scratch updated.
+
+/// Scans one section. `ids` holds the state id of each local palette entry
+/// (`id_len` of them), or is null for the global palette, whose ids are
+/// state ids. Masks come from the installed block registry; -1 when it is
+/// not installed or a state is a custom subclass.
+/// # Safety
+/// Pointers address their stated counts, aligned, for this call.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_heightmap_section(
+    words: *const u64,
+    word_len: i32,
+    ids: *const u32,
+    id_len: i32,
+    frame: *mut u8,
+    frame_len: i32,
+) -> i32 {
+    let Some(view) = super::installed_masks() else { return -1 };
+    if ids.is_null() {
+        if view.custom || id_len as usize != view.masks.len() {
+            return -1;
+        }
+        return section(words, word_len, view.masks.as_ptr(), id_len, frame, frame_len);
+    }
+    if !(1..=256).contains(&id_len) || ids as usize % 4 != 0 {
+        return -1;
+    }
+    let mut masks = [0u32; 256];
+    for (mask, &id) in masks.iter_mut().zip(std::slice::from_raw_parts(ids, id_len as usize)) {
+        match view.masks.get(id as usize) {
+            Some(&m) if m != super::CUSTOM => *mask = m,
+            _ => return -1,
+        }
+    }
+    section(words, word_len, masks.as_ptr(), id_len, frame, frame_len)
+}
+
+/// [`mattmc_heightmap_section`] with each palette entry's mask in `flags`.
+pub(super) unsafe fn section(
     words: *const u64,
     word_len: i32,
     flags: *const u32,

@@ -30,7 +30,7 @@ import net.minecraft.server.Bootstrap;
 import net.minecraft.server.packs.PackLocationInfo;
 import net.minecraft.server.packs.PackResources;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.PathPackResources;
+import net.minecraft.server.packs.NativePackResources;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.packs.repository.ServerPacksSource;
 import net.minecraft.server.packs.resources.MultiPackResourceManager;
@@ -224,7 +224,7 @@ class AmbersolHarvestingTest {
         packs.add(ServerPacksSource.createVanillaPackSource());
         if (overlay != null) {
             var info = new PackLocationInfo("ambersol-test", Component.literal("Ambersol test"), PackSource.WORLD, Optional.empty());
-            packs.add(new PathPackResources(info, overlay));
+            packs.add(NativePackResources.directory(info, overlay, List.of()));
         }
         return new MultiPackResourceManager(PackType.SERVER_DATA, packs);
     }

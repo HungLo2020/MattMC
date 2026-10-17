@@ -1,7 +1,7 @@
 //! Immutable density spline programs. Every intermediate is Java-width float.
 mod coordinates;
-mod evaluate;
+pub(crate) mod evaluate;
 mod ffi;
-mod program;
+pub(crate) mod program;
 #[cfg(test)]
 mod tests;

@@ -76,43 +76,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_acquire(
         let result = (|| -> GalResult<FfiFrameAcquireResult> {
             let request = read_struct(request, "frame acquire request")?;
             validate_header::<FfiFrameAcquireRequest>(request.header)?;
-            let acquired = context.gal.acquire_frame(FrameAcquireDesc {
-                correlation_id: FrameCorrelationId(request.correlation_id),
-                expected_extent: request.expected_extent.into(),
-            })?;
-            let frame_target = if matches!(
-                acquired.status,
-                FrameAcquireStatus::Minimized | FrameAcquireStatus::Resized
-            ) {
-                Handle::NULL
-            } else if let Some(cached) = context.frame_targets.get(&acquired.render_target) {
-                cached.handle
-            } else {
-                let handle = context.gal.create_frame_target(FrameTargetDesc {
-                    label: format!("ffi.frame-target.{}", acquired.frame.0),
-                    frame_id: acquired.frame.0,
-                    render_target: acquired.render_target,
-                    extent: acquired.extent,
-                    color_format: acquired.color_format,
-                })?;
-                context
-                    .frame_targets
-                    .insert(acquired.render_target, CachedFrameTarget { handle });
-                handle
-            };
-            Ok(FfiFrameAcquireResult {
-                status: StatusCode::Ok as i32,
-                error_domain: 0,
-                frame_id: acquired.frame.0,
-                correlation_id: acquired.correlation_id.0,
-                acquire_status: acquire_status_raw(acquired.status),
-                frame_target: FfiHandle::from(frame_target),
-                frame_target_identity: acquired.render_target.0,
-                extent: acquired.extent.into(),
-                color_format: acquired.color_format as u32,
-                metrics: context_metrics(context),
-                ..FfiFrameAcquireResult::default()
-            })
+            acquire_frame_target(context, request.correlation_id, request.expected_extent.into())
         })();
         match result {
             Ok(value) => {
@@ -215,31 +179,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
         let result = (|| -> GalResult<FfiFramePresentResult> {
             let request = read_struct(request, "frame present request")?;
             validate_header::<FfiFramePresentRequest>(request.header)?;
-            let presented = context.gal.present_frame(PresentFrameDesc {
-                frame: VulkanicFrameId(request.frame_id),
-                correlation_id: FrameCorrelationId(request.correlation_id),
-                wait_for: SubmissionId(request.wait_submission_id),
-            })?;
-            // Vulkan presentation waits on the queue's render-finished
-            // semaphore. Poll completed timeline work here so resource
-            // retirement remains bounded without reintroducing a CPU wait for
-            // the frame that was just queued for presentation.
-            context.gal.retire_completed()?;
-            if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
-                println!(
-                    "vulkan.submission.present-retire frame={} waited={} retired_through={}",
-                    presented.frame.0, request.wait_submission_id, presented.completed_submission.0,
-                );
-            }
-            Ok(FfiFramePresentResult {
-                status: StatusCode::Ok as i32,
-                frame_id: presented.frame.0,
-                correlation_id: presented.correlation_id.0,
-                present_status: present_status_raw(presented.status),
-                completed_submission_id: presented.completed_submission.0,
-                frame_target_identity: presented.render_target.0,
-                ..FfiFramePresentResult::default()
-            })
+            present_frame_and_retire(context, request.frame_id, request.correlation_id, request.wait_submission_id)
         })();
         match result {
             Ok(value) => {
@@ -261,6 +201,101 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_present(
             }
         }
     })
+}
+
+/// Presents an acquired frame after `wait_submission_id` and polls completed
+/// timeline work; shared by the synchronous and pipelined present paths.
+/// Acquires the next presentable image and its cached frame target; the
+/// target is null when the surface is minimized or was resized.
+pub(crate) fn acquire_frame_target(
+    context: &mut BridgeContext,
+    correlation_id: u64,
+    expected_extent: crate::render::vulkanic::resources::Extent3d,
+) -> GalResult<FfiFrameAcquireResult> {
+    let acquired = context.gal.acquire_frame(FrameAcquireDesc {
+        correlation_id: FrameCorrelationId(correlation_id),
+        expected_extent,
+    })?;
+    let frame_target = if matches!(
+        acquired.status,
+        FrameAcquireStatus::Minimized | FrameAcquireStatus::Resized
+    ) {
+        Handle::NULL
+    } else if let Some(cached) = context.frame_targets.get(&acquired.render_target) {
+        cached.handle
+    } else {
+        let handle = context.gal.create_frame_target(FrameTargetDesc {
+            label: format!("ffi.frame-target.{}", acquired.frame.0),
+            frame_id: acquired.frame.0,
+            render_target: acquired.render_target,
+            extent: acquired.extent,
+            color_format: acquired.color_format,
+        })?;
+        context
+            .frame_targets
+            .insert(acquired.render_target, CachedFrameTarget { handle });
+        handle
+    };
+    Ok(FfiFrameAcquireResult {
+        status: StatusCode::Ok as i32,
+        error_domain: 0,
+        frame_id: acquired.frame.0,
+        correlation_id: acquired.correlation_id.0,
+        acquire_status: acquire_status_raw(acquired.status),
+        frame_target: FfiHandle::from(frame_target),
+        frame_target_identity: acquired.render_target.0,
+        extent: acquired.extent.into(),
+        color_format: acquired.color_format as u32,
+        metrics: context_metrics(context),
+        ..FfiFrameAcquireResult::default()
+    })
+}
+
+pub(crate) fn present_frame_and_retire(
+    context: &mut BridgeContext,
+    frame_id: u64,
+    correlation_id: u64,
+    wait_submission_id: u64,
+) -> GalResult<FfiFramePresentResult> {
+    let presented = context.gal.present_frame(PresentFrameDesc {
+        frame: VulkanicFrameId(frame_id),
+        correlation_id: FrameCorrelationId(correlation_id),
+        wait_for: SubmissionId(wait_submission_id),
+    })?;
+    // Vulkan presentation waits on the queue's render-finished
+    // semaphore. Poll completed timeline work here so resource
+    // retirement remains bounded without reintroducing a CPU wait for
+    // the frame that was just queued for presentation.
+    context.gal.retire_completed()?;
+    if std::env::var_os("MATTMC_TRACE_SUBMISSIONS").is_some() {
+        crate::core::console::stdout(format_args!(
+            "vulkan.submission.present-retire frame={} waited={} retired_through={}",
+            presented.frame.0, wait_submission_id, presented.completed_submission.0,
+        ));
+    }
+    Ok(FfiFramePresentResult {
+        status: StatusCode::Ok as i32,
+        frame_id: presented.frame.0,
+        correlation_id: presented.correlation_id.0,
+        present_status: present_status_raw(presented.status),
+        completed_submission_id: presented.completed_submission.0,
+        frame_target_identity: presented.render_target.0,
+        ..FfiFramePresentResult::default()
+    })
+}
+
+/// Releases an acquired frame after a failed transaction; shared by the
+/// cancel entry point and a failed pipelined frame.
+pub(crate) fn cancel_acquired_frame(context: &mut BridgeContext, frame_id: u64) -> GalResult<()> {
+    context
+        .gal
+        .cancel_frame(crate::render::vulkanic::frame::FrameId(frame_id))?;
+    context
+        .gui_frontend
+        .discard_prepared_post_effects(&mut context.gal);
+    // The swapchain recreation waits for device quiescence, so all
+    // cached frame-target wrappers are now safe to retire as well.
+    destroy_all_frame_targets(context)
 }
 
 #[no_mangle]
@@ -288,15 +323,7 @@ pub unsafe extern "C" fn mattmc_vulkanic_gal_frame_cancel(
         let result = (|| -> GalResult<()> {
             let request = read_struct(request, "frame cancel request")?;
             validate_header::<FfiFrameCancelRequest>(request.header)?;
-            context
-                .gal
-                .cancel_frame(crate::render::vulkanic::frame::FrameId(request.frame_id))?;
-            context
-                .gui_frontend
-                .discard_prepared_post_effects(&mut context.gal);
-            // The swapchain recreation waits for device quiescence, so all
-            // cached frame-target wrappers are now safe to retire as well.
-            destroy_all_frame_targets(context)
+            cancel_acquired_frame(context, request.frame_id)
         })();
         match result {
             Ok(()) => {
@@ -435,7 +462,7 @@ fn capture_frame_target(gal: &mut VulkanicGal, target: Handle) -> GalResult<(u32
     }) {
         Ok(buffer) => buffer,
         Err(error) => {
-            let _ = gal.destroy(texture);
+            let _ = gal.retire(texture);
             return Err(error);
         }
     };
@@ -482,8 +509,8 @@ fn capture_frame_target(gal: &mut VulkanicGal, target: Handle) -> GalResult<(u32
             .ok_or_else(|| GalError::backend("frame capture readback did not complete"))
             .map(|read| read.bytes)
     });
-    let _ = gal.destroy(readback);
-    let _ = gal.destroy(texture);
+    let _ = gal.retire(readback);
+    let _ = gal.retire(texture);
     let mut bytes = result?;
     if bytes.len() as u64 != byte_count {
         return Err(GalError::backend("frame capture readback has an unexpected size"));

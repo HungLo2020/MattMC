@@ -1,7 +1,6 @@
 package net.minecraft.network.chat;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import com.mojang.serialization.MapCodec;
 import java.util.Optional;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.world.entity.Entity;
@@ -20,5 +19,4 @@ public interface ComponentContents {
 		return MutableComponent.create(this);
 	}
 
-	MapCodec<? extends ComponentContents> codec();
 }

@@ -33,7 +33,8 @@ def strip_boxes(source):
 def strip_box_list(source):
     if source.count(LIST_DISPATCH) != 1:
         raise RuntimeError('Expected exactly one known box-list dispatch')
-    return source.replace(LIST_DISPATCH, '', 1)
+    from VerifyRustVoxelClosestPoint import strip_closest_point
+    return strip_closest_point(source.replace(LIST_DISPATCH, '', 1))
 
 
 def run(command, log):

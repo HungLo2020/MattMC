@@ -32,12 +32,6 @@ public class ChunkHolder extends GenerationChunkHolder {
 	public static final ChunkResult<LevelChunk> UNLOADED_LEVEL_CHUNK = ChunkResult.error("Unloaded level chunk");
 	private static final CompletableFuture<ChunkResult<LevelChunk>> UNLOADED_LEVEL_CHUNK_FUTURE = CompletableFuture.completedFuture(UNLOADED_LEVEL_CHUNK);
 	private final LevelHeightAccessor levelHeightAccessor;
-	private volatile CompletableFuture<ChunkResult<LevelChunk>> fullChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
-	private volatile CompletableFuture<ChunkResult<LevelChunk>> tickingChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
-	private volatile CompletableFuture<ChunkResult<LevelChunk>> entityTickingChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
-	private int oldTicketLevel;
-	private int ticketLevel;
-	private int queueLevel;
 	private boolean hasChangedSections;
 	private final ShortSet[] changedBlocksPerSection;
 	private final BitSet blockChangedLightSectionFilter = new BitSet();
@@ -45,10 +39,6 @@ public class ChunkHolder extends GenerationChunkHolder {
 	private final LevelLightEngine lightEngine;
 	private final ChunkHolder.LevelChangeListener onLevelChange;
 	private final ChunkHolder.PlayerProvider playerProvider;
-	private boolean wasAccessibleSinceLastSave;
-	private CompletableFuture<?> pendingFullStateConfirmation = CompletableFuture.completedFuture(null);
-	private CompletableFuture<?> sendSync = CompletableFuture.completedFuture(null);
-	private CompletableFuture<?> saveSync = CompletableFuture.completedFuture(null);
 
 	public ChunkHolder(
 		ChunkPos chunkPos,
@@ -58,28 +48,41 @@ public class ChunkHolder extends GenerationChunkHolder {
 		ChunkHolder.LevelChangeListener levelChangeListener,
 		ChunkHolder.PlayerProvider playerProvider
 	) {
+		this(chunkPos, i, levelHeightAccessor, levelLightEngine, levelChangeListener, playerProvider, null, -1);
+	}
+
+	/** A holder whose level state the registry already holds for {@code registryId}. */
+	ChunkHolder(
+		ChunkPos chunkPos,
+		int i,
+		LevelHeightAccessor levelHeightAccessor,
+		LevelLightEngine levelLightEngine,
+		ChunkHolder.LevelChangeListener levelChangeListener,
+		ChunkHolder.PlayerProvider playerProvider,
+		@Nullable NativeChunkHolders registry,
+		int registryId
+	) {
 		super(chunkPos);
 		this.levelHeightAccessor = levelHeightAccessor;
 		this.lightEngine = levelLightEngine;
 		this.onLevelChange = levelChangeListener;
 		this.playerProvider = playerProvider;
-		this.oldTicketLevel = ChunkLevel.MAX_LEVEL + 1;
-		this.ticketLevel = this.oldTicketLevel;
-		this.queueLevel = this.oldTicketLevel;
-		this.setTicketLevel(i);
+        this.generationOwner().initializeLifecycle(registry == null ? ChunkLevel.MAX_LEVEL + 1 : i,
+            ChunkLevel.MAX_LEVEL + 1, UNLOADED_LEVEL_CHUNK_FUTURE);
+        if (registry == null) this.setTicketLevel(i);
 		this.changedBlocksPerSection = new ShortSet[levelHeightAccessor.getSectionsCount()];
 	}
 
 	public CompletableFuture<ChunkResult<LevelChunk>> getTickingChunkFuture() {
-		return this.tickingChunkFuture;
+		return this.readyFuture(1);
 	}
 
 	public CompletableFuture<ChunkResult<LevelChunk>> getEntityTickingChunkFuture() {
-		return this.entityTickingChunkFuture;
+		return this.readyFuture(2);
 	}
 
 	public CompletableFuture<ChunkResult<LevelChunk>> getFullChunkFuture() {
-		return this.fullChunkFuture;
+		return this.readyFuture(0);
 	}
 
 	@Nullable
@@ -89,37 +92,45 @@ public class ChunkHolder extends GenerationChunkHolder {
 
 	@Nullable
 	public LevelChunk getChunkToSend() {
-		return !this.sendSync.isDone() ? null : this.getTickingChunk();
+		return !this.sync(NativeChunkGeneration.Holder.READY_BASE + 4, "isDone()").isDone() ? null : this.getTickingChunk();
 	}
 
 	public CompletableFuture<?> getSendSyncFuture() {
-		return this.sendSync;
+		return this.generationOwner().binding(NativeChunkGeneration.Holder.READY_BASE + 4);
 	}
 
-	public void addSendDependency(CompletableFuture<?> completableFuture) {
-		if (this.sendSync.isDone()) {
-			this.sendSync = completableFuture;
-		} else {
-			this.sendSync = this.sendSync.thenCombine(completableFuture, (object, object2) -> null);
-		}
-	}
+    public void addSendDependency(CompletableFuture<?> completableFuture) {
+        this.combineDependency(NativeChunkGeneration.Holder.READY_BASE + 4, 1, completableFuture);
+    }
 
 	public CompletableFuture<?> getSaveSyncFuture() {
-		return this.saveSync;
+		return this.generationOwner().binding(NativeChunkGeneration.Holder.READY_BASE + 5);
 	}
 
 	public boolean isReadyForSaving() {
-		return this.saveSync.isDone();
+		return this.sync(NativeChunkGeneration.Holder.READY_BASE + 5, "isDone()").isDone();
 	}
 
 	@Override
-	protected void addSaveDependency(CompletableFuture<?> completableFuture) {
-		if (this.saveSync.isDone()) {
-			this.saveSync = completableFuture;
-		} else {
-			this.saveSync = this.saveSync.thenCombine(completableFuture, (object, object2) -> null);
-		}
-	}
+    protected void addSaveDependency(CompletableFuture<?> completableFuture) {
+        this.combineDependency(NativeChunkGeneration.Holder.READY_BASE + 5, 2, completableFuture);
+    }
+
+    private void combineDependency(int slot, int operation, CompletableFuture<?> dependency) {
+        NativeChunkGeneration.Holder owner = this.generationOwner();
+        boolean done = this.sync(slot, "isDone()").isDone();
+        long command = owner.dependencyCommand(operation, done);
+        int target = (int)(command >>> 8);
+        switch ((int)(command & 255)) {
+            case 31: owner.binding(target, dependency); break;
+            case 32: owner.binding(target, this.sync(target,
+                "thenCombine(java.util.concurrent.CompletionStage, java.util.function.BiFunction)").thenCombine(dependency, NativeChunkGeneration.fenceCombiner())); break;
+            default: throw new IllegalStateException("Unknown native dependency command");
+        }
+    }
+    private CompletableFuture<ChunkResult<LevelChunk>> readyFuture(int index) {
+        return this.generationOwner().binding(NativeChunkGeneration.Holder.READY_BASE + index);
+    }
 
 	public boolean blockChanged(BlockPos blockPos) {
 		LevelChunk levelChunk = this.getTickingChunk();
@@ -238,101 +249,88 @@ public class ChunkHolder extends GenerationChunkHolder {
 		list.forEach(serverPlayer -> serverPlayer.connection.send(packet));
 	}
 
-	@Override
-	public int getTicketLevel() {
-		return this.ticketLevel;
-	}
+    @Override
+    public int getTicketLevel() { return this.generationOwner().level(0); }
+    @Override
+    public int getQueueLevel() { return this.generationOwner().level(2); }
+    private void setQueueLevel(int value) { this.generationOwner().levelChange(1, value); }
+    public void setTicketLevel(int value) { this.generationOwner().levelChange(0, value); }
 
-	@Override
-	public int getQueueLevel() {
-		return this.queueLevel;
-	}
+    /** Detach affects registry membership only: the same incarnation retains all state. */
+    void detach(long unused) {}
+    /** Loading already changed the same native incarnation; no Java mirror is required. */
+    void mirrorTicketLevel(int unused) {}
 
-	private void setQueueLevel(int i) {
-		this.queueLevel = i;
-	}
+    protected void updateFutures(ChunkMap map, Executor executor) {
+        this.generationOwner().lifecycle(0, new LifecycleFrame(map, executor, null));
+    }
+    public boolean wasAccessibleSinceLastSave() { return this.generationOwner().level(3) != 0; }
+    public void refreshAccessibility() { this.generationOwner().levelChange(2, 0); }
 
-	public void setTicketLevel(int i) {
-		this.ticketLevel = i;
-	}
+    /** Only actual engine effects; Rust owns branching, membership and commit order. */
+    private final class LifecycleFrame implements NativeChunkGeneration.LifecycleEffect {
+        final ChunkMap map;
+        final Executor executor;
+        final CompletableFuture<?> dependency;
+        CompletableFuture<Void> confirmation;
+        CompletableFuture<ChunkResult<LevelChunk>> promotion;
+        LifecycleFrame(ChunkMap map, Executor executor, CompletableFuture<?> dependency) {
+            this.map = map; this.executor = executor; this.dependency = dependency;
+        }
+        private CompletableFuture<?> future(int slot) { return ChunkHolder.this.generationOwner().binding(slot); }
+        public long apply(int op, int slot, int kind) {
+            NativeChunkGeneration.Holder owner = ChunkHolder.this.generationOwner();
+            switch (op) {
+                case 30: return ChunkHolder.this.sync(slot, "isDone()").isDone() ? 1 : 0;
+                case 31: owner.binding(slot, dependency); break;
+                case 32: owner.binding(slot, ChunkHolder.this.sync(slot,
+                    "thenCombine(java.util.concurrent.CompletionStage, java.util.function.BiFunction)").thenCombine(dependency, NativeChunkGeneration.fenceCombiner())); break;
+                case 33:
+                    owner.binding(slot, switch (kind) {
+                        case 0 -> map.prepareAccessibleChunk(ChunkHolder.this);
+                        case 1 -> map.prepareTickingChunk(ChunkHolder.this);
+                        case 2 -> map.prepareEntityTickingChunk(ChunkHolder.this);
+                        default -> throw new IllegalStateException();
+                    }); break;
+                case 34: promotion = ChunkHolder.this.binding(slot); break;
+                case 35: ChunkHolder.this.addSaveDependency(future(slot)); break;
+                case 36: future(slot).cancel(false); break;
+                case 37:
+                    CompletableFuture<Void> next = NativeChunkGeneration.newChunkFuture();
+                    FullChunkStatus status = FullChunkStatus.values()[kind];
+                    ChunkMap chunkMap = map;
+                    ChunkHolder chunkHolder = ChunkHolder.this;
+                    next.thenRunAsync(() -> chunkMap.onFullChunkStatusChange(chunkHolder.pos, status), executor);
+                    owner.binding(slot, next);
+                    confirmation = next;
+                    break;
+                case 38:
+                    CompletableFuture<Void> captured = confirmation;
+                    if (promotion == null) throw new NullPointerException("Cannot invoke \"java.util.concurrent.CompletableFuture.thenAccept(java.util.function.Consumer)\" because \"completableFuture\" is null");
+                    promotion.thenAccept(result -> result.ifSuccess(chunk -> captured.complete(null)));
+                    break;
+                case 39: ChunkHolder.this.<CompletableFuture<ChunkResult<LevelChunk>>>binding(slot).complete(UNLOADED_LEVEL_CHUNK); break;
+                case 40: owner.binding(slot, UNLOADED_LEVEL_CHUNK_FUTURE); break;
+                case 41: return future(slot) == UNLOADED_LEVEL_CHUNK_FUTURE ? 1 : 0;
+                case 42: throw (IllegalStateException)Util.pauseInIde(new IllegalStateException());
+                case 43: map.onFullChunkStatusChange(ChunkHolder.this.pos, FullChunkStatus.values()[slot]); break;
+                case 44: ChunkHolder.this.onLevelChange.onLevelChange(ChunkHolder.this.pos,
+                    ChunkHolder.this::getQueueLevel, owner.level(0), ChunkHolder.this::setQueueLevel); break;
+                default: throw new IllegalStateException("Unknown native holder effect " + op);
+            }
+            return 0;
+        }
+    }
+    private <T> T binding(int slot) { return this.generationOwner().binding(slot); }
+    private CompletableFuture<?> sync(int slot, String method) {
+        CompletableFuture<?> value = this.binding(slot);
+        if (value == null) {
+            String field = slot == NativeChunkGeneration.Holder.READY_BASE + 4 ? "sendSync" : "saveSync";
+            throw new NullPointerException("Cannot invoke \"java.util.concurrent.CompletableFuture." + method + "\" because \"this." + field + "\" is null");
+        }
+        return value;
+    }
 
-	private void scheduleFullChunkPromotion(
-		ChunkMap chunkMap, CompletableFuture<ChunkResult<LevelChunk>> completableFuture, Executor executor, FullChunkStatus fullChunkStatus
-	) {
-		this.pendingFullStateConfirmation.cancel(false);
-		CompletableFuture<Void> completableFuture2 = new CompletableFuture();
-		completableFuture2.thenRunAsync(() -> chunkMap.onFullChunkStatusChange(this.pos, fullChunkStatus), executor);
-		this.pendingFullStateConfirmation = completableFuture2;
-		completableFuture.thenAccept(chunkResult -> chunkResult.ifSuccess(levelChunk -> completableFuture2.complete(null)));
-	}
-
-	private void demoteFullChunk(ChunkMap chunkMap, FullChunkStatus fullChunkStatus) {
-		this.pendingFullStateConfirmation.cancel(false);
-		chunkMap.onFullChunkStatusChange(this.pos, fullChunkStatus);
-	}
-
-	protected void updateFutures(ChunkMap chunkMap, Executor executor) {
-		FullChunkStatus fullChunkStatus = ChunkLevel.fullStatus(this.oldTicketLevel);
-		FullChunkStatus fullChunkStatus2 = ChunkLevel.fullStatus(this.ticketLevel);
-		boolean bl = fullChunkStatus.isOrAfter(FullChunkStatus.FULL);
-		boolean bl2 = fullChunkStatus2.isOrAfter(FullChunkStatus.FULL);
-		this.wasAccessibleSinceLastSave |= bl2;
-		if (!bl && bl2) {
-			this.fullChunkFuture = chunkMap.prepareAccessibleChunk(this);
-			this.scheduleFullChunkPromotion(chunkMap, this.fullChunkFuture, executor, FullChunkStatus.FULL);
-			this.addSaveDependency(this.fullChunkFuture);
-		}
-
-		if (bl && !bl2) {
-			this.fullChunkFuture.complete(UNLOADED_LEVEL_CHUNK);
-			this.fullChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
-		}
-
-		boolean bl3 = fullChunkStatus.isOrAfter(FullChunkStatus.BLOCK_TICKING);
-		boolean bl4 = fullChunkStatus2.isOrAfter(FullChunkStatus.BLOCK_TICKING);
-		if (!bl3 && bl4) {
-			this.tickingChunkFuture = chunkMap.prepareTickingChunk(this);
-			this.scheduleFullChunkPromotion(chunkMap, this.tickingChunkFuture, executor, FullChunkStatus.BLOCK_TICKING);
-			this.addSaveDependency(this.tickingChunkFuture);
-		}
-
-		if (bl3 && !bl4) {
-			this.tickingChunkFuture.complete(UNLOADED_LEVEL_CHUNK);
-			this.tickingChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
-		}
-
-		boolean bl5 = fullChunkStatus.isOrAfter(FullChunkStatus.ENTITY_TICKING);
-		boolean bl6 = fullChunkStatus2.isOrAfter(FullChunkStatus.ENTITY_TICKING);
-		if (!bl5 && bl6) {
-			if (this.entityTickingChunkFuture != UNLOADED_LEVEL_CHUNK_FUTURE) {
-				throw (IllegalStateException)Util.pauseInIde(new IllegalStateException());
-			}
-
-			this.entityTickingChunkFuture = chunkMap.prepareEntityTickingChunk(this);
-			this.scheduleFullChunkPromotion(chunkMap, this.entityTickingChunkFuture, executor, FullChunkStatus.ENTITY_TICKING);
-			this.addSaveDependency(this.entityTickingChunkFuture);
-		}
-
-		if (bl5 && !bl6) {
-			this.entityTickingChunkFuture.complete(UNLOADED_LEVEL_CHUNK);
-			this.entityTickingChunkFuture = UNLOADED_LEVEL_CHUNK_FUTURE;
-		}
-
-		if (!fullChunkStatus2.isOrAfter(fullChunkStatus)) {
-			this.demoteFullChunk(chunkMap, fullChunkStatus2);
-		}
-
-		this.onLevelChange.onLevelChange(this.pos, this::getQueueLevel, this.ticketLevel, this::setQueueLevel);
-		this.oldTicketLevel = this.ticketLevel;
-	}
-
-	public boolean wasAccessibleSinceLastSave() {
-		return this.wasAccessibleSinceLastSave;
-	}
-
-	public void refreshAccessibility() {
-		this.wasAccessibleSinceLastSave = ChunkLevel.fullStatus(this.ticketLevel).isOrAfter(FullChunkStatus.FULL);
-	}
 
 	@FunctionalInterface
 	public interface LevelChangeListener {

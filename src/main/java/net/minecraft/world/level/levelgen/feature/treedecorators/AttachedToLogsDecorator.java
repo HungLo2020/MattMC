@@ -32,6 +32,7 @@ public class AttachedToLogsDecorator extends TreeDecorator {
 
 	@Override
 	public void place(TreeDecorator.Context context) {
+		if (net.minecraft.world.level.levelgen.NativeFallenTrees.attached(this, context)) return;
 		RandomSource randomSource = context.random();
 
 		for (BlockPos blockPos : Util.shuffledCopy(context.logs(), randomSource)) {

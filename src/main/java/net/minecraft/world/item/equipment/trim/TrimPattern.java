@@ -1,7 +1,6 @@
 package net.minecraft.world.item.equipment.trim;
 
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -13,14 +12,7 @@ import net.minecraft.resources.RegistryFileCodec;
 import net.minecraft.resources.ResourceLocation;
 
 public record TrimPattern(ResourceLocation assetId, Component description, boolean decal) {
-	public static final Codec<TrimPattern> DIRECT_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				ResourceLocation.CODEC.fieldOf("asset_id").forGetter(TrimPattern::assetId),
-				ComponentSerialization.CODEC.fieldOf("description").forGetter(TrimPattern::description),
-				Codec.BOOL.fieldOf("decal").orElse(false).forGetter(TrimPattern::decal)
-			)
-			.apply(instance, TrimPattern::new)
-	);
+	public static final Codec<TrimPattern> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(net.minecraft.resources.NativeData.Kind.TRIM_PATTERN, false, net.minecraft.resources.NativeDataProjections::trimPattern, net.minecraft.resources.NativeDataProjections::trimPatternOut);
 	public static final StreamCodec<RegistryFriendlyByteBuf, TrimPattern> DIRECT_STREAM_CODEC = StreamCodec.composite(
 		ResourceLocation.STREAM_CODEC,
 		TrimPattern::assetId,

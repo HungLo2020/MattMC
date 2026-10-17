@@ -100,6 +100,7 @@ public class InventoryMenu extends AbstractCraftingMenu {
 
 	@Override
 	public ItemStack quickMoveStack(Player player, int i) {
+		if(this.nativeMenuForAction()!=null)return this.quickMoveOwned(player,i);
 		ItemStack itemStack = ItemStack.EMPTY;
 		Slot slot = this.slots.get(i);
 		if (slot.hasItem()) {

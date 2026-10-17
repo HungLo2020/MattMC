@@ -8,7 +8,8 @@ import net.minecraft.world.level.ChunkPos;
 public class CarvingMask {
 	private final int minY;
 	private final BitSet mask;
-	private CarvingMask.Mask additionalMask = (ix, jx, k) -> false;
+	private static final CarvingMask.Mask NONE = (ix, jx, k) -> false;
+	private CarvingMask.Mask additionalMask = NONE;
 
 	public CarvingMask(int i, int j) {
 		this.minY = j;
@@ -43,6 +44,17 @@ public class CarvingMask {
 			int l = i >> 8;
 			return chunkPos.getBlockAt(j, l + this.minY, k);
 		});
+	}
+
+	/** Whether only this mask's own bits decide {@link #get} (no blending mask). */
+	public boolean hasOnlyOwnBits() {
+		return this.additionalMask == NONE;
+	}
+
+	/** Replaces this mask's bits with a native stage's result. */
+	public void installGenerated(long[] words) {
+		this.mask.clear();
+		this.mask.or(BitSet.valueOf(words));
 	}
 
 	public long[] toArray() {

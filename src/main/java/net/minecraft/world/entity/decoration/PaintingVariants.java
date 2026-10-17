@@ -1,10 +1,6 @@
 package net.minecraft.world.entity.decoration;
 
-import java.util.Optional;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.data.worldgen.BootstrapContext;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 
@@ -60,77 +56,6 @@ public class PaintingVariants {
 	public static final ResourceKey<PaintingVariant> SUNFLOWERS = create("sunflowers");
 	public static final ResourceKey<PaintingVariant> TIDES = create("tides");
 	public static final ResourceKey<PaintingVariant> DENNIS = create("dennis");
-
-	public static void bootstrap(BootstrapContext<PaintingVariant> bootstrapContext) {
-		register(bootstrapContext, KEBAB, 1, 1);
-		register(bootstrapContext, AZTEC, 1, 1);
-		register(bootstrapContext, ALBAN, 1, 1);
-		register(bootstrapContext, AZTEC2, 1, 1);
-		register(bootstrapContext, BOMB, 1, 1);
-		register(bootstrapContext, PLANT, 1, 1);
-		register(bootstrapContext, WASTELAND, 1, 1);
-		register(bootstrapContext, POOL, 2, 1);
-		register(bootstrapContext, COURBET, 2, 1);
-		register(bootstrapContext, SEA, 2, 1);
-		register(bootstrapContext, SUNSET, 2, 1);
-		register(bootstrapContext, CREEBET, 2, 1);
-		register(bootstrapContext, WANDERER, 1, 2);
-		register(bootstrapContext, GRAHAM, 1, 2);
-		register(bootstrapContext, MATCH, 2, 2);
-		register(bootstrapContext, BUST, 2, 2);
-		register(bootstrapContext, STAGE, 2, 2);
-		register(bootstrapContext, VOID, 2, 2);
-		register(bootstrapContext, SKULL_AND_ROSES, 2, 2);
-		register(bootstrapContext, WITHER, 2, 2, false);
-		register(bootstrapContext, FIGHTERS, 4, 2);
-		register(bootstrapContext, POINTER, 4, 4);
-		register(bootstrapContext, PIGSCENE, 4, 4);
-		register(bootstrapContext, BURNING_SKULL, 4, 4);
-		register(bootstrapContext, SKELETON, 4, 3);
-		register(bootstrapContext, EARTH, 2, 2, false);
-		register(bootstrapContext, WIND, 2, 2, false);
-		register(bootstrapContext, WATER, 2, 2, false);
-		register(bootstrapContext, FIRE, 2, 2, false);
-		register(bootstrapContext, DONKEY_KONG, 4, 3);
-		register(bootstrapContext, BAROQUE, 2, 2);
-		register(bootstrapContext, HUMBLE, 2, 2);
-		register(bootstrapContext, MEDITATIVE, 1, 1);
-		register(bootstrapContext, PRAIRIE_RIDE, 1, 2);
-		register(bootstrapContext, UNPACKED, 4, 4);
-		register(bootstrapContext, BACKYARD, 3, 4);
-		register(bootstrapContext, BOUQUET, 3, 3);
-		register(bootstrapContext, CAVEBIRD, 3, 3);
-		register(bootstrapContext, CHANGING, 4, 2);
-		register(bootstrapContext, COTAN, 3, 3);
-		register(bootstrapContext, ENDBOSS, 3, 3);
-		register(bootstrapContext, FERN, 3, 3);
-		register(bootstrapContext, FINDING, 4, 2);
-		register(bootstrapContext, LOWMIST, 4, 2);
-		register(bootstrapContext, ORB, 4, 4);
-		register(bootstrapContext, OWLEMONS, 3, 3);
-		register(bootstrapContext, PASSAGE, 4, 2);
-		register(bootstrapContext, POND, 3, 4);
-		register(bootstrapContext, SUNFLOWERS, 3, 3);
-		register(bootstrapContext, TIDES, 3, 3);
-		register(bootstrapContext, DENNIS, 3, 3);
-	}
-
-	private static void register(BootstrapContext<PaintingVariant> bootstrapContext, ResourceKey<PaintingVariant> resourceKey, int i, int j) {
-		register(bootstrapContext, resourceKey, i, j, true);
-	}
-
-	private static void register(BootstrapContext<PaintingVariant> bootstrapContext, ResourceKey<PaintingVariant> resourceKey, int i, int j, boolean bl) {
-		bootstrapContext.register(
-			resourceKey,
-			new PaintingVariant(
-				i,
-				j,
-				resourceKey.location(),
-				Optional.of(Component.translatable(resourceKey.location().toLanguageKey("painting", "title")).withStyle(ChatFormatting.YELLOW)),
-				bl ? Optional.of(Component.translatable(resourceKey.location().toLanguageKey("painting", "author")).withStyle(ChatFormatting.GRAY)) : Optional.empty()
-			)
-		);
-	}
 
 	private static ResourceKey<PaintingVariant> create(String string) {
 		return ResourceKey.create(Registries.PAINTING_VARIANT, ResourceLocation.withDefaultNamespace(string));

@@ -36,7 +36,7 @@ public class SynchronizeRegistriesTask implements ConfigurationTask {
 		DynamicOps<Tag> dynamicOps = this.registries.compositeAccess().createSerializationContext(NbtOps.INSTANCE);
 		RegistrySynchronization.packRegistries(
 			dynamicOps,
-			this.registries.getAccessFrom(RegistryLayer.WORLDGEN),
+			this.registries,
 			set,
 			(resourceKey, list) -> consumer.accept(new ClientboundRegistryDataPacket(resourceKey, list))
 		);

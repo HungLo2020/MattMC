@@ -148,6 +148,21 @@ pub struct FfiGuiMeshBatchRequest {
     pub block_item_layout: u32,
     pub item_cache_identity: u64,
     pub item_cache_mode: u32,
+    /// Immutable CPU transform owner. Mode 0 uses the inline matrix, 1 right, 2 left.
+    pub native_item_transform: u64,
+    pub native_item_transform_mode: u32,
+    /// Positive immutable CPU template identity, never an address or GPU handle.
+    pub native_item_template: u64,
+    pub item_layer_foils: FfiSlice<FfiGuiItemLayerFoil>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FfiGuiItemLayerFoil {
+    pub mode: u32,
+    pub clock_millis: u64,
+    pub speed: f64,
+    pub strength: f32,
 }
 
 #[repr(C)]
@@ -227,6 +242,9 @@ pub struct FfiGuiRawImageUpdateRequest {
     pub generation: u64,
     pub assets: FfiSlice<FfiGuiRawImageAssetPayload>,
     pub negotiated_feature_bits: u64,
+    /// Nonempty: complete live identity set, with pixels supplied only for updates.
+    /// Empty: legacy full replacement (including an explicit empty reset).
+    pub retained_asset_ids: FfiSlice<u64>,
 }
 
 /// Immutable semantic atlas identity and region, never pixels or GPU handles.

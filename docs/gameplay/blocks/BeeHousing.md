@@ -57,13 +57,29 @@ Wait until the Bees you intend to move are inside, then mine the home with a **S
 
 Both Silk Touch loot paths copy the **stored Bees and honey level** into the item. The placement path reapplies the block-state and Bee components, and released Bees receive the new hive position. Keep the new entrance clear and provide flowers nearby. [Copied nest data][nest-loot] · [Copied hive data][hive-loot] · [Placement restoration][place] · [Bee component restoration][components] · [New hive position][new-home]
 
-The mining differences are important:
+For ordinary Survival mining:
 
 - **Bee Nest without Silk Touch:** the bundled block-loot table provides no nest item
 - **Beehive without Silk Touch:** the table drops an ordinary empty Beehive, without copying its stored Bees or honey
 - **Either occupied home without Silk Touch:** the mining callback requests emergency release and angers nearby Bees
 
 Silk Touch is the bundled enchantment in the tag that suppresses that mining-release routine. Campfire smoke is not a substitute: although it affects how released occupants respond, the ordinary mining callback still calls the separate nearby-Bee anger routine. [Mining callback][mining] · [Silk Touch tag][silk-tag] · [Released-occupant response][release-target] · [Loot differences][hive-loot]
+
+## Creative recovery
+
+Creative breaking has a separate recovery rule. With **doTileDrops enabled**,
+breaking either a Bee Nest or Beehive drops an item containing its stored Bees
+and honey level if **at least one Bee is inside or the honey level is above 0**.
+Silk Touch is unnecessary for this Creative drop. An empty, honey-free home
+produces no such item; disabling doTileDrops disables this recovery.
+[Creative drop conditions][creative-drop] · [Server breaking order][creative-routing]
+
+Wait for the Bees you want to move to enter first. Only occupants already
+stored inside travel in the dropped item; nearby flying Bees are not collected.
+Placing the recovered home restores those occupants and its saved honey level.
+This also explains why a recovered occupied home differs from an ordinary empty
+Creative inventory item. [Stored Bee components][creative-components] ·
+[Placement restoration][creative-place]
 
 ## Fully worn Shears
 
@@ -81,6 +97,8 @@ The durability handler ignores further wear once a stack is broken. Therefore th
 - [Blocks](Blocks.md)
 
 ## Verification scope
+
+The Creative recovery section and its Survival/Creative distinction were source-reviewed at `c357b63cd5afcc0951344c33ad2f4568d5c77e4f` on 2026-10-13. The active server breaking callback, Creative ability, game rule and component restoration were checked; no in-game Creative break/place or colony test was run. Earlier sections retain their dated review below.
 
 Source-reviewed at MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2` on 2026-10-01. Shared block/BlockEntity registration, the server ticker, home lookup, entry/release, occupant serialization and item components, honey progression, manual and dispenser harvest callbacks, smoke, Silk Touch, loot, and broken-Shears routing were inspected. No in-game colony, harvest, smoke, moving-hive, dispenser, or broken-tool test was run.
 
@@ -125,3 +143,8 @@ Source-reviewed at MattMC commit `b81c01943c9f3254e713c365a1dd633392929cb2` on 2
 [silk-tag]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/resources/data/minecraft/tags/enchantment/prevents_bee_spawns_when_mining.json
 [broken-guard]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/ItemStack.java#L354-L370
 [broken-stack]: https://github.com/HungLo2020/MattMC/blob/b81c01943c9f3254e713c365a1dd633392929cb2/src/main/java/net/minecraft/world/item/ItemStack.java#L449-L485
+
+[creative-drop]: https://github.com/HungLo2020/MattMC/blob/c357b63cd5afcc0951344c33ad2f4568d5c77e4f/src/main/java/net/minecraft/world/level/block/BeehiveBlock.java#L278-L297
+[creative-routing]: https://github.com/HungLo2020/MattMC/blob/c357b63cd5afcc0951344c33ad2f4568d5c77e4f/src/main/java/net/minecraft/server/level/ServerPlayerGameMode.java#L273-L295
+[creative-components]: https://github.com/HungLo2020/MattMC/blob/c357b63cd5afcc0951344c33ad2f4568d5c77e4f/src/main/java/net/minecraft/world/level/block/entity/BeehiveBlockEntity.java#L302-L314
+[creative-place]: https://github.com/HungLo2020/MattMC/blob/c357b63cd5afcc0951344c33ad2f4568d5c77e4f/src/main/java/net/minecraft/world/item/BlockItem.java#L64-L126

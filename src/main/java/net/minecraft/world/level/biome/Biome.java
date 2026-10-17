@@ -2,11 +2,7 @@ package net.minecraft.world.level.biome;
 
 import com.google.common.collect.ImmutableList;
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
-import it.unimi.dsi.fastutil.longs.Long2FloatLinkedOpenHashMap;
 import java.util.Optional;
-import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
@@ -22,36 +18,18 @@ import net.minecraft.world.level.ColorMapColorUtil;
 import net.minecraft.world.level.FoliageColor;
 import net.minecraft.world.level.GrassColor;
 import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LiquidBlock;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.LegacyRandomSource;
 import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.synth.PerlinSimplexNoise;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import net.sodium.client.world.biome.BiomeColorMaps;
 import org.jetbrains.annotations.Nullable;
 
 public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBiome {
-	public static final Codec<Biome> DIRECT_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				Biome.ClimateSettings.CODEC.forGetter(biome -> biome.climateSettings),
-				BiomeSpecialEffects.CODEC.fieldOf("effects").forGetter(biome -> biome.specialEffects),
-				BiomeGenerationSettings.CODEC.forGetter(biome -> biome.generationSettings),
-				MobSpawnSettings.CODEC.forGetter(biome -> biome.mobSettings)
-			)
-			.apply(instance, Biome::new)
+	public static final Codec<Biome> DIRECT_CODEC = net.minecraft.resources.NativeData.codec(
+		net.minecraft.resources.NativeData.Kind.BIOME, false, NativeBiomes::project, NativeBiomes::unproject
 	);
-	public static final Codec<Biome> NETWORK_CODEC = RecordCodecBuilder.create(
-		instance -> instance.group(
-				Biome.ClimateSettings.CODEC.forGetter(biome -> biome.climateSettings),
-				BiomeSpecialEffects.CODEC.fieldOf("effects").forGetter(biome -> biome.specialEffects)
-			)
-			.apply(
-				instance, (climateSettings, biomeSpecialEffects) -> new Biome(climateSettings, biomeSpecialEffects, BiomeGenerationSettings.EMPTY, MobSpawnSettings.EMPTY)
-			)
+	public static final Codec<Biome> NETWORK_CODEC = net.minecraft.resources.NativeData.codec(
+		net.minecraft.resources.NativeData.Kind.BIOME, true, NativeBiomes::project, NativeBiomes::unproject
 	);
 	public static final Codec<Holder<Biome>> CODEC = RegistryFileCodec.create(Registries.BIOME, DIRECT_CODEC);
 	public static final Codec<HolderSet<Biome>> LIST_CODEC = RegistryCodecs.homogeneousList(Registries.BIOME, DIRECT_CODEC);
@@ -60,7 +38,6 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		new WorldgenRandom(new LegacyRandomSource(3456L)), ImmutableList.of(-2, -1, 0)
 	);
 	public static final PerlinSimplexNoise BIOME_INFO_NOISE = new PerlinSimplexNoise(new WorldgenRandom(new LegacyRandomSource(2345L)), ImmutableList.of(0));
-	private static final int TEMPERATURE_CACHE_SIZE = 1024;
 	// VoxelMap: Made accessible
 	public final Biome.ClimateSettings climateSettings;
 	private final BiomeGenerationSettings generationSettings;
@@ -75,15 +52,7 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	private int customFoliageColor;
 	private int defaultColorIndex;
 	private BiomeSpecialEffects cachedSpecialEffects;
-	private final ThreadLocal<Long2FloatLinkedOpenHashMap> temperatureCache = ThreadLocal.withInitial(() -> Util.make(() -> {
-		Long2FloatLinkedOpenHashMap long2FloatLinkedOpenHashMap = new Long2FloatLinkedOpenHashMap(1024, 0.25F) {
-			@Override
-			protected void rehash(int i) {
-			}
-		};
-		long2FloatLinkedOpenHashMap.defaultReturnValue(Float.NaN);
-		return long2FloatLinkedOpenHashMap;
-	}));
+	private final ThreadLocal<NativeBiomeTemperature> temperatureCache = ThreadLocal.withInitial(NativeBiomeTemperature::new);
 
 	Biome(
 		Biome.ClimateSettings climateSettings,
@@ -99,6 +68,11 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		sodium$setupColors();
 	}
 
+	/** The Rust-stored definition this biome projects (`content/data`), or 0 for biomes built in Java. */
+	public long nativeHandle() {
+		return ((net.minecraft.resources.NativeData.DataCodec<Biome>)DIRECT_CODEC).nativeHandle(this);
+	}
+
 	public int getSkyColor() {
 		return this.specialEffects.getSkyColor();
 	}
@@ -111,99 +85,63 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		return this.climateSettings.hasPrecipitation();
 	}
 
-	public Biome.Precipitation getPrecipitationAt(BlockPos blockPos, int i) {
-		if (!this.hasPrecipitation()) {
-			return Biome.Precipitation.NONE;
-		} else {
-			return this.coldEnoughToSnow(blockPos, i) ? Biome.Precipitation.SNOW : Biome.Precipitation.RAIN;
-		}
+	public Biome.Precipitation getPrecipitationAt(BlockPos blockPos, int seaLevel) {
+        return switch (NativeBiomeWeather.evaluate(this, blockPos, null, 0, seaLevel, false)) {
+            case 0 -> Biome.Precipitation.NONE;
+            case 1 -> Biome.Precipitation.RAIN;
+            case 2 -> Biome.Precipitation.SNOW;
+            default -> throw new IllegalStateException("Invalid native precipitation value");
+        };
+    }
+
+    void bindWeatherTemperature(long driver) {
+        NativeBiomeTemperature cache = this.temperatureCache.get();
+        Biome.TemperatureModifier modifier = this.climateSettings.temperatureModifier();
+        cache.bindWeather(driver, modifier == null ? -1 : modifier.ordinal());
+    }
+
+	private boolean temperatureTest(BlockPos blockPos, int seaLevel, int mode) {
+		long key = blockPos.asLong();
+		return this.temperatureCache.get().test(this, blockPos, key, seaLevel, mode);
 	}
 
-	private float getHeightAdjustedTemperature(BlockPos blockPos, int i) {
-		float f = this.climateSettings.temperatureModifier.modifyTemperature(blockPos, this.getBaseTemperature());
-		int j = i + 17;
-		if (blockPos.getY() > j) {
-			float g = (float)(TEMPERATURE_NOISE.getValue(blockPos.getX() / 8.0F, blockPos.getZ() / 8.0F, false) * 8.0);
-			return f - (g + blockPos.getY() - j) * 0.05F / 40.0F;
-		} else {
-			return f;
-		}
+	float invokeTemperatureModifier(BlockPos blockPos, float base) {
+		return this.climateSettings.temperatureModifier.modifyTemperature(blockPos, base);
 	}
 
-	@Deprecated
-	private float getTemperature(BlockPos blockPos, int i) {
-		long l = blockPos.asLong();
-		Long2FloatLinkedOpenHashMap long2FloatLinkedOpenHashMap = (Long2FloatLinkedOpenHashMap)this.temperatureCache.get();
-		float f = long2FloatLinkedOpenHashMap.get(l);
-		if (!Float.isNaN(f)) {
-			return f;
-		} else {
-			float g = this.getHeightAdjustedTemperature(blockPos, i);
-			if (long2FloatLinkedOpenHashMap.size() == 1024) {
-				long2FloatLinkedOpenHashMap.removeFirstFloat();
-			}
-
-			long2FloatLinkedOpenHashMap.put(l, g);
-			return g;
-		}
+	/** Immutable synthesis views are bound only when the native policy requests them. */
+	static net.minecraft.world.level.levelgen.synth.NativeNoiseState temperatureNoise(int kind) {
+		return switch (kind) {
+			case 0 -> FROZEN_TEMPERATURE_NOISE.nativeState();
+			case 1 -> BIOME_INFO_NOISE.nativeState();
+			case 2 -> TEMPERATURE_NOISE.nativeState();
+			default -> throw new IllegalArgumentException("Unknown temperature synthesis binding " + kind);
+		};
 	}
 
 	public boolean shouldFreeze(LevelReader levelReader, BlockPos blockPos) {
-		return this.shouldFreeze(levelReader, blockPos, true);
-	}
+        return this.shouldFreeze(levelReader, blockPos, true);
+    }
 
-	public boolean shouldFreeze(LevelReader levelReader, BlockPos blockPos, boolean bl) {
-		if (this.warmEnoughToRain(blockPos, levelReader.getSeaLevel())) {
-			return false;
-		} else {
-			if (levelReader.isInsideBuildHeight(blockPos.getY()) && levelReader.getBrightness(LightLayer.BLOCK, blockPos) < 10) {
-				BlockState blockState = levelReader.getBlockState(blockPos);
-				FluidState fluidState = levelReader.getFluidState(blockPos);
-				if (fluidState.getType() == Fluids.WATER && blockState.getBlock() instanceof LiquidBlock) {
-					if (!bl) {
-						return true;
-					}
-
-					boolean bl2 = levelReader.isWaterAt(blockPos.west())
-						&& levelReader.isWaterAt(blockPos.east())
-						&& levelReader.isWaterAt(blockPos.north())
-						&& levelReader.isWaterAt(blockPos.south());
-					if (!bl2) {
-						return true;
-					}
-				}
-			}
-
-			return false;
-		}
-	}
+    public boolean shouldFreeze(LevelReader levelReader, BlockPos blockPos, boolean edge) {
+        return NativeBiomeWeather.evaluate(this, blockPos, levelReader, 1, 0, edge) != 0;
+    }
 
 	public boolean coldEnoughToSnow(BlockPos blockPos, int i) {
 		return !this.warmEnoughToRain(blockPos, i);
 	}
 
 	public boolean warmEnoughToRain(BlockPos blockPos, int i) {
-		return this.getTemperature(blockPos, i) >= 0.15F;
+		return this.temperatureTest(blockPos, i, 0);
 	}
 
 	public boolean shouldMeltFrozenOceanIcebergSlightly(BlockPos blockPos, int i) {
-		return this.getTemperature(blockPos, i) > 0.1F;
+		return this.temperatureTest(blockPos, i, 1);
 	}
 
 	public boolean shouldSnow(LevelReader levelReader, BlockPos blockPos) {
-		if (this.getPrecipitationAt(blockPos, levelReader.getSeaLevel()) != Biome.Precipitation.SNOW) {
-			return false;
-		} else {
-			if (levelReader.isInsideBuildHeight(blockPos.getY()) && levelReader.getBrightness(LightLayer.BLOCK, blockPos) < 10) {
-				BlockState blockState = levelReader.getBlockState(blockPos);
-				if ((blockState.isAir() || blockState.is(Blocks.SNOW)) && Blocks.SNOW.defaultBlockState().canSurvive(levelReader, blockPos)) {
-					return true;
-				}
-			}
-
-			return false;
-		}
-	}
+        return NativeBiomeWeather.evaluate(this, blockPos, levelReader, 2, 0, false) != 0;
+    }
 
 	public BiomeGenerationSettings getGenerationSettings() {
 		return this.generationSettings;
@@ -402,17 +340,6 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	}
 
 	public record ClimateSettings(boolean hasPrecipitation, float temperature, Biome.TemperatureModifier temperatureModifier, float downfall) {
-		public static final MapCodec<Biome.ClimateSettings> CODEC = RecordCodecBuilder.mapCodec(
-			instance -> instance.group(
-					Codec.BOOL.fieldOf("has_precipitation").forGetter(climateSettings -> climateSettings.hasPrecipitation),
-					Codec.FLOAT.fieldOf("temperature").forGetter(climateSettings -> climateSettings.temperature),
-					Biome.TemperatureModifier.CODEC
-						.optionalFieldOf("temperature_modifier", Biome.TemperatureModifier.NONE)
-						.forGetter(climateSettings -> climateSettings.temperatureModifier),
-					Codec.FLOAT.fieldOf("downfall").forGetter(climateSettings -> climateSettings.downfall)
-				)
-				.apply(instance, Biome.ClimateSettings::new)
-		);
 	}
 
 	public static enum Precipitation implements StringRepresentable {
@@ -435,30 +362,17 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 
 	public static enum TemperatureModifier implements StringRepresentable {
 		NONE("none") {
-			@Override
-			public float modifyTemperature(BlockPos blockPos, float f) {
-				return f;
+			@Override public float modifyTemperature(BlockPos blockPos, float value) {
+				return NativeBiomeTemperature.modifier(0, blockPos, value);
 			}
 		},
 		FROZEN("frozen") {
-			@Override
-			public float modifyTemperature(BlockPos blockPos, float f) {
-				double d = Biome.FROZEN_TEMPERATURE_NOISE.getValue(blockPos.getX() * 0.05, blockPos.getZ() * 0.05, false) * 7.0;
-				double e = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() * 0.2, blockPos.getZ() * 0.2, false);
-				double g = d + e;
-				if (g < 0.3) {
-					double h = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() * 0.09, blockPos.getZ() * 0.09, false);
-					if (h < 0.8) {
-						return 0.2F;
-					}
-				}
-
-				return f;
+			@Override public float modifyTemperature(BlockPos blockPos, float value) {
+				return NativeBiomeTemperature.modifier(1, blockPos, value);
 			}
 		};
 
 		private final String name;
-		public static final Codec<Biome.TemperatureModifier> CODEC = StringRepresentable.fromEnum(Biome.TemperatureModifier::values);
 
 		public abstract float modifyTemperature(BlockPos blockPos, float f);
 

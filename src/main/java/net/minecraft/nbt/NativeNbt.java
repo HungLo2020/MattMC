@@ -235,6 +235,19 @@ final class NativeNbt {
 		return TapeWriter.writeRoot(tag);
 	}
 
+	/** {@link #writeTape} with {@code placeholder} (by identity, wherever it
+	 * occurs as a named entry) written as the given complete record tape. */
+	static byte[] writeTape(CompoundTag tag, Tag placeholder, byte[] splice) throws IOException {
+		return TapeWriter.writeRoot(tag, placeholder, splice);
+	}
+
+	/** The tape of {@code tag} as an unnamed list element. */
+	static byte[] elementTape(Tag tag) throws IOException {
+		TapeWriter writer = new TapeWriter(64);
+		writer.writeTag("", tag);
+		return writer.output.toByteArray();
+	}
+
 	static ReencodeResult decodeToTape(byte[] input, int inputCompression, CompressionLimits compressionLimits, Limits limits) {
 		long initialCapacity = Math.max(INITIAL_OUTPUT_CAPACITY, Math.min((long)Integer.MAX_VALUE, Math.max(1L, (long)input.length * 4L)));
 		return callWithOutputBuffer(initialCapacity, (output, outputCapacity) ->
@@ -601,13 +614,21 @@ final class NativeNbt {
 		private static final int MAGIC = 0x5442544E;
 		private static final int HEADER_LEN = 8;
 		private final ByteArrayOutputStream output;
+		private Tag placeholder;
+		private byte[] splice;
 
 		private TapeWriter(int initialCapacity) {
 			this.output = new ByteArrayOutputStream(initialCapacity);
 		}
 
 		static byte[] writeRoot(CompoundTag tag) throws IOException {
-			TapeWriter writer = new TapeWriter(estimateRootBytes(tag));
+			return writeRoot(tag, null, null);
+		}
+
+		static byte[] writeRoot(CompoundTag tag, Tag placeholder, byte[] splice) throws IOException {
+			TapeWriter writer = new TapeWriter(estimateRootBytes(tag) + (splice == null ? 0 : splice.length));
+			writer.placeholder = placeholder;
+			writer.splice = splice;
 			writer.writeIntLE(MAGIC);
 			writer.writeShortLE(1);
 			writer.writeShortLE(0);
@@ -624,6 +645,10 @@ final class NativeNbt {
 		}
 
 		private void writeTag(String name, Tag tag) throws IOException {
+			if (tag == this.placeholder && this.placeholder != null) {
+				this.output.write(this.splice);
+				return;
+			}
 			byte tagId = tag.getId();
 			byte listElementId = Tag.TAG_END;
 			int count = 0;

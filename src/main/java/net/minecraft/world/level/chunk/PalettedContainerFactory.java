@@ -24,8 +24,9 @@ public record PalettedContainerFactory(
 		BlockState blockState = Blocks.AIR.defaultBlockState();
 		Registry<Biome> registry = registryAccess.lookupOrThrow(Registries.BIOME);
 		Strategy<Holder<Biome>> strategy2 = Strategy.createForBiomes(registry.asHolderIdMap());
+		NativeLiveBiomeSection.register(strategy2, registry);
 		Holder.Reference<Biome> reference = registry.getOrThrow(Biomes.PLAINS);
-		return new PalettedContainerFactory(
+		var factory = new PalettedContainerFactory(
 			strategy,
 			blockState,
 			PalettedContainer.codecRW(BlockState.CODEC, strategy, blockState),
@@ -33,6 +34,8 @@ public record PalettedContainerFactory(
 			reference,
 			PalettedContainer.codecRO(registry.holderByNameCodec(), strategy2, reference)
 		);
+		NativeChunkSections.registerFactory(factory);
+		return factory;
 	}
 
 	public PalettedContainer<BlockState> createForBlockStates() {

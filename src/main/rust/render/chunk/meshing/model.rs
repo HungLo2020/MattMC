@@ -144,6 +144,7 @@ pub(super) unsafe fn append_direct_compact_static_model_quad(
     facing: usize,
     profile_static_substages: bool,
     profile_scan_substages: bool,
+    color_fields: Option<&crate::world::level::biome::color_fields::SectionColorFields>,
 ) -> Result<(), i32> {
     if facing >= MODEL_QUAD_FACING_COUNT || !is_compact_fast_format(format) {
         return Err(ERR_INVALID_ARGUMENT);
@@ -183,7 +184,7 @@ pub(super) unsafe fn append_direct_compact_static_model_quad(
     let tint_started = profile_start(profile_static_substages);
     let scan_tint_started = profile_start(profile_scan_substages);
     let applies_tint = static_quad_applies_tint(quad_record, state);
-    trace_static_terrain_native_tint(block, state, quad_record, applies_tint);
+    trace_static_terrain_native_tint(block, state, quad_record, applies_tint, color_fields);
     builder
         .profile
         .add_optional_stage(PROFILE_STATIC_TINT, tint_started);
@@ -249,7 +250,14 @@ pub(super) unsafe fn append_direct_compact_static_model_quad(
         if applies_tint {
             color = multiply_argb(
                 color,
-                native_vertex_tint_color(&block, state, source.x, source.y, source.z),
+                native_vertex_tint_color_from_fields(
+                    &block,
+                    state,
+                    source.x,
+                    source.y,
+                    source.z,
+                    color_fields,
+                ),
             );
         }
         if format.separate_ao {
@@ -609,6 +617,7 @@ fn trace_static_terrain_native_tint(
     state: NativeMeshingState,
     source: StaticModelQuadRecord,
     applies_tint: bool,
+    color_fields: Option<&crate::world::level::biome::color_fields::SectionColorFields>,
 ) {
     let Some(root) = std::env::var_os("MATTMC_STATIC_TERRAIN_NATIVE_LIGHT_TRACE_DIR") else {
         return;
@@ -629,12 +638,19 @@ fn trace_static_terrain_native_tint(
     {
         return;
     }
-    let lattice = block
-        .tint_lattice
-        .iter()
-        .flatten()
-        .flatten()
-        .map(|color| format!("\"{:08x}\"", *color as u32))
+    let local_index =
+        ((block.local_y as usize * 16) + block.local_z as usize) * 16 + block.local_x as usize;
+    let lattice = (0..64)
+        .map(|index| {
+            let x = index & 3;
+            let z = (index >> 2) & 3;
+            let y = index >> 4;
+            let color = match color_fields {
+                Some(fields) => fields.sample(local_index, x, y, z),
+                None => block.tint_lattice[y][z][x],
+            };
+            format!("\"{:08x}\"", color as u32)
+        })
         .collect::<Vec<_>>()
         .join(",");
     let vertices = source
@@ -702,28 +718,18 @@ pub(super) fn native_model_offset(
     if state.offset_type == OFFSET_NONE {
         return (0.0, 0.0, 0.0);
     }
-    let seed = mth_seed(block.absolute_x, 0, block.absolute_z);
-    let max_h = state.max_horizontal_offset;
-    let x = ((((seed & 15) as f32) / 15.0 - 0.5) * 0.5).clamp(-max_h, max_h);
-    let z = ((((seed >> 8 & 15) as f32) / 15.0 - 0.5) * 0.5).clamp(-max_h, max_h);
-    if state.offset_type == OFFSET_XYZ {
-        let y = (((seed >> 4 & 15) as f32) / 15.0 - 1.0) * state.max_vertical_offset;
-        (x, y, z)
-    } else if state.offset_type == OFFSET_XZ {
-        (x, 0.0, z)
-    } else {
-        (0.0, 0.0, 0.0)
-    }
-}
-
-pub(super) fn mth_seed(x: i32, y: i32, z: i32) -> i64 {
-    let mut value =
-        (x as i64).wrapping_mul(3_129_871) ^ (z as i64).wrapping_mul(116_129_781) ^ (y as i64);
-    value = value
-        .wrapping_mul(value)
-        .wrapping_mul(42_317_861)
-        .wrapping_add(value.wrapping_mul(11));
-    value >> 16
+    let kind = match state.offset_type {
+        OFFSET_XZ => crate::content::block::OffsetType::Xz,
+        OFFSET_XYZ => crate::content::block::OffsetType::Xyz,
+        _ => return (0.0, 0.0, 0.0),
+    };
+    let config = crate::content::block::offset::Config {
+        kind,
+        horizontal: state.max_horizontal_offset,
+        vertical: state.max_vertical_offset,
+    };
+    let [x, y, z] = config.offset(block.absolute_x, block.absolute_z);
+    (x as f32, y as f32, z as f32)
 }
 
 #[cfg(test)]

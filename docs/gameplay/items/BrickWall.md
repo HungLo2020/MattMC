@@ -1,17 +1,34 @@
 # Brick Wall
 
+**Brick Wall** (`minecraft:brick_wall`) is the connecting wall form of [Bricks](Bricks.md). Use it with the other [family shapes](../blocks/ClayAndBricks.md#brick-slabs-stairs-and-walls) when planning a matching build. [Item binding][item] · [Registration helper][factory]
+
 ## Obtaining
 
-Brick Wall can be obtained from the Creative Menu and by collecting or crafting its block where applicable.
+At a [Crafting Table](../blocks/CraftingTable.md), fill **two rows of three Bricks blocks → 6 Brick Walls**. A [Stonecutter](../blocks/Stonecutter.md) gives **1 wall per Bricks block**, the same yield with a smaller batch. Both recipes use full **Bricks blocks**, not loose [Brick](Brick.md) items. [Crafting][craft] · [Stonecutting][cut]
+
+Use an **unbroken pickaxe**, including Wood, to collect the placed block. Ordinary mining returns **1 Brick Wall item**. Hand breaking or an unsuitable tool does not collect it. Silk Touch is unnecessary and Fortune adds no multiplier. Explosion recovery has a separate survival condition. [Exact loot][loot] · [Tool and collection rules](../blocks/ClayAndBricks.md#building-and-collecting-bricks)
 
 ## Usage
 
-Brick Wall is placed in the world as a block and used for building, decoration, utility, or environmental detail.
+Use walls for narrow boundaries, posts and edging. The [family guide](../blocks/ClayAndBricks.md#brick-slabs-stairs-and-walls) compares the available masonry forms; the [shared wall placement rules](../blocks/Stone.md#placing-shaped-blocks) explain how neighboring blocks affect the wall profile.
 
 ## Behavior
 
-When placed, it behaves as the corresponding block. Breaking the block returns drops according to the block's normal loot rules.
+The wall connects to adjacent walls, suitable sturdy block faces, **Iron Bars, Copper Bars or glass panes**, and correctly aligned Fence Gates. Its connections update with its neighbors, and it can be waterlogged where Water can exist. Bars and panes qualify through the shared bar-block behavior. [Wall connections and placement][shape] · [Bars and pane registrations][bars] · [Copper Bars inheritance][copper-bars] · [Stained pane inheritance][stained-panes]
 
 ## Notes
 
-* This item is the item form of the `minecraft:brick_wall` block.
+This item places the `minecraft:brick_wall` block. The [family recipe guide](../blocks/ClayAndBricks.md#brick-slabs-stairs-and-walls) compares the recipes; use the [shared masonry guide](../blocks/Stone.md#placing-shaped-blocks) for detailed placement. [Block registration][block] · [Items](Items.md)
+
+Source-reviewed on **2026-10-04** at `78e8e0423084f010bb47e36132550619b37644c2`. Checked item/block bindings, exact production recipes, complete loot, mining tags and tool gates, and the relevant placement or interaction rules. No in-game crafting, smelting, mining, placement or interaction test was run. Data packs can change recipes, tags and loot.
+
+[item]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L607
+[factory]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/item/Items.java#L2750-L2782
+[block]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Blocks.java#L5271
+[loot]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/loot_table/blocks/brick_wall.json
+[craft]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/crafting/brick_wall.json
+[cut]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/resources/data/minecraft/recipe/stonecutting/brick_wall_from_bricks_stonecutting.json
+[shape]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/WallBlock.java#L105-L170
+[bars]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/Blocks.java#L2307-L2331
+[copper-bars]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/WeatheringCopperBarsBlock.java#L11-L25
+[stained-panes]: https://github.com/HungLo2020/MattMC/blob/78e8e0423084f010bb47e36132550619b37644c2/src/main/java/net/minecraft/world/level/block/StainedGlassPaneBlock.java#L8-L25

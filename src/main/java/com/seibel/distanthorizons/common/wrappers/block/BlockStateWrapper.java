@@ -67,6 +67,16 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	public final BlockState blockState;
 	/** technically final, but since it requires a method call to generate it can't be marked as such */
 	private String serialString;
+    private volatile net.minecraft.world.level.chunk.NativeDhTintCache nativeTintCache;
+    public net.minecraft.world.level.chunk.NativeDhTintCache nativeTintCache() {
+        if (getClass() != BlockStateWrapper.class || serialString == null || serialString.length() > 65536) return null;
+        var cached = nativeTintCache;
+        if (cached != null) return cached;
+        synchronized (this) {
+            if (nativeTintCache == null) nativeTintCache = new net.minecraft.world.level.chunk.NativeDhTintCache(serialString);
+            return nativeTintCache;
+        }
+    }
 	private final int hashCode;
 	/** Should be between {@link LodUtil#BLOCK_FULLY_OPAQUE} and {@link LodUtil#BLOCK_FULLY_OPAQUE} */
 	private final int opacity;
@@ -342,45 +352,8 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	
 	@Override
 	public int getOpacity() { return this.opacity; }
-	private int calculateOpacity()
-	{
-		// get block properties (defaults to the values used by air)
-		boolean canOcclude = this.getCanOcclude();
-		boolean propagatesSkyLightDown = this.getPropagatesSkyLightDown();
-		
-		
-		
-		// this method isn't perfect, but works well enough for our use case
-		int opacity;
-		if (this.isAir())
-		{
-			opacity = LodUtil.BLOCK_FULLY_TRANSPARENT;
-		}
-		else if (this.isLiquid() && !canOcclude)
-		{
-			// probably not a waterlogged block (which should block light entirely)
-			
-			// +1 to indicate that the block is translucent (in between transparent and opaque) 
-			opacity = LodUtil.BLOCK_FULLY_TRANSPARENT + 1;
-		}
-		else if (propagatesSkyLightDown && !canOcclude)
-		{
-			// probably glass or some other fully transparent block
-			
-			// !canOcclude is required to ignore stairs and slabs since
-			// propagateSkyLightDown is true for them, but they're solid and don't actually let light through
-			
-			opacity = LodUtil.BLOCK_FULLY_TRANSPARENT;
-		}
-		else
-		{
-			// default for all other blocks
-			opacity = LodUtil.BLOCK_FULLY_OPAQUE;
-		}
-		
-		
-		return opacity;
-	}
+	/** Shared with Rust's block catalog (NativeCollisionGeometry.dhOpacity), so both agree exactly. */
+	private int calculateOpacity() { return net.minecraft.world.level.block.NativeCollisionGeometry.dhOpacity(this.blockState); }
 	private boolean getCanOcclude()
 	{
 		// defaults to the value used by air
@@ -443,15 +416,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	public boolean isAir(BlockState blockState) { return blockState == null || blockState.isAir(); }
 	
 	@Override
-	public boolean isSolid()
-	{
-		if (this.isAir())
-		{
-			return false;
-		}
-		
-		return !this.blockState.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).isEmpty();
-	}
+	public boolean isSolid() { return net.minecraft.world.level.block.NativeCollisionGeometry.dhSolid(this.blockState); }
 	
 	@Override
 	public boolean isLiquid()

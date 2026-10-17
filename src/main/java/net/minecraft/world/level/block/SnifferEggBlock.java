@@ -40,7 +40,9 @@ public class SnifferEggBlock extends Block {
 
 	public SnifferEggBlock(BlockBehaviour.Properties properties) {
 		super(properties);
-		this.registerDefaultState(this.stateDefinition.any().setValue(HATCH, 0));
+		if (!this.hasNativeStateDefinition()) {
+			this.registerDefaultState(this.stateDefinition.any().setValue(HATCH, 0));
+		}
 	}
 
 	@Override

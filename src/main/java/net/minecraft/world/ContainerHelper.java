@@ -26,7 +26,8 @@ public class ContainerHelper {
 		ValueOutput.TypedOutputList<ItemStackWithSlot> typedOutputList = valueOutput.list("Items", ItemStackWithSlot.CODEC);
 
 		for (int i = 0; i < nonNullList.size(); i++) {
-			ItemStack itemStack = nonNullList.get(i);
+			// The codec only reads each stack, so native pending contents are saved from a copy, not materialized.
+			ItemStack itemStack = nonNullList instanceof net.minecraft.world.item.NativeItemSlots rows ? rows.getForSave(i) : nonNullList.get(i);
 			if (!itemStack.isEmpty()) {
 				typedOutputList.add(new ItemStackWithSlot(i, itemStack));
 			}

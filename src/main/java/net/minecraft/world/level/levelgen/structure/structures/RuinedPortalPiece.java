@@ -160,6 +160,8 @@ public class RuinedPortalPiece extends TemplateStructurePiece {
 		if (boundingBox.isInside(boundingBox2.getCenter())) {
 			boundingBox.encapsulate(boundingBox2);
 			super.postProcess(worldGenLevel, structureManager, chunkGenerator, randomSource, boundingBox, chunkPos, blockPos);
+			// The native tail already spread the netherrack, drip columns, vines and leaves.
+			if (this.nativeTail) return;
 			this.spreadNetherrack(randomSource, worldGenLevel);
 			this.addNetherrackDripColumnsBelowPortal(randomSource, worldGenLevel);
 			if (this.properties.vines || this.properties.overgrown) {
@@ -174,6 +176,19 @@ public class RuinedPortalPiece extends TemplateStructurePiece {
 				});
 			}
 		}
+	}
+
+	@Override
+	protected long[] nativeTailWords() {
+		long[] words = this.nativeTailWords(0);
+		words[2] = 1;
+		words[3] = this.verticalPlacement.ordinal();
+		words[4] = this.properties.cold ? 1 : 0;
+		words[5] = this.properties.overgrown ? 1 : 0;
+		words[6] = this.properties.vines ? 1 : 0;
+		long[] box = {this.boundingBox.minX(), this.boundingBox.minY(), this.boundingBox.minZ(), this.boundingBox.maxX(), this.boundingBox.maxY(), this.boundingBox.maxZ()};
+		System.arraycopy(box, 0, words, 7, 6);
+		return words;
 	}
 
 	@Override

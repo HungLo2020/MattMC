@@ -513,6 +513,24 @@ fn vulkan_gui_sample_with_material(
     blur: Option<(i32, i32)>,
     material: crate::render::guirender::items::material::GuiAffineMaterial,
 ) -> Option<Vec<u8>> {
+    vulkan_gui_sample_with_source_format(stratum, pixels, u0, u1, tiles, height, invert, prewarm_alpha, atlas_region, mixed, blur, material, GuiRawImageSourceFormat::Rgba8)
+}
+
+fn vulkan_gui_sample_with_source_format(
+    stratum: u32,
+    pixels: Vec<u8>,
+    u0: f32,
+    u1: f32,
+    tiles: Option<crate::render::guirender::tiling::GuiTileGeometry>,
+    height: u32,
+    invert: bool,
+    prewarm_alpha: bool,
+    atlas_region: Option<[u32; 4]>,
+    mixed: bool,
+    blur: Option<(i32, i32)>,
+    material: crate::render::guirender::items::material::GuiAffineMaterial,
+    source_format: GuiRawImageSourceFormat,
+) -> Option<Vec<u8>> {
     let mut gal = match vulkan_gal("MattMC GUI vignette frontend conformance") {
         Ok(gal) => gal,
         Err(error) => {
@@ -640,8 +658,8 @@ fn vulkan_gui_sample_with_material(
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 41,
-                    format: GuiRawImageFormat::Rgba8,
-                    width: (pixels.len() / 4) as u32 / height,
+                    format: source_format,
+                    width: (pixels.len() / source_format.bytes_per_pixel()) as u32 / height,
                     height,
                     pixels,
                 }],
@@ -715,7 +733,7 @@ fn vulkan_gui_sample_with_material(
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 42,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 1,
                     height: 1,
                     pixels: vec![0, 0, 255, 128],
@@ -2562,6 +2580,102 @@ fn blur_boundary_replay_copies_owned_render_targets_with_explicit_attachment_bar
     .unwrap();
 }
 
+#[test]
+fn blur_boundary_declares_scratch_targets_for_source_frame_gui_validation() {
+    let mut gal = mock_gal();
+    let target = frame_target(&mut gal);
+    let mut frontend = GuiFrontend::default();
+    let (ops, stats) = frontend
+        .append_frame_ops_with_tiled_blur_boundary(
+            &mut gal,
+            1,
+            target,
+            target,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            1,
+            0,
+            false,
+        )
+        .unwrap();
+    let scratch_targets: Vec<Handle> = ops
+        .iter()
+        .filter_map(|op| match op {
+            CommandOp::BeginPass { target: pass_target, .. } if *pass_target != target => {
+                Some(*pass_target)
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(!scratch_targets.is_empty(), "blur must ping-pong through scratch targets");
+    for scratch in &scratch_targets {
+        assert!(stats.owned_intermediate_targets.contains(scratch));
+    }
+    crate::render::worldrender::WorldPrimitiveFrontend::validate_source_gui_ops(
+        &ops,
+        target,
+        &stats.owned_intermediate_targets,
+    )
+    .expect("menu blur scratch passes are declared GUI-owned intermediates");
+    crate::render::worldrender::WorldPrimitiveFrontend::validate_source_gui_ops(&ops, target, &[])
+        .expect_err("undeclared blur scratch targets must still be rejected");
+}
+
+#[test]
+fn custom_post_effect_reports_owned_intermediates_for_source_frame_gui_validation() {
+    let mut gal = mock_gal();
+    let target = frame_target(&mut gal);
+    let mut frontend = GuiFrontend::default();
+    let vertex = br#"#version 330
+out vec2 texCoord;
+void main() { texCoord = vec2(0.0); }
+"#;
+    let fragment = br#"#version 330
+in vec2 texCoord;
+uniform sampler2D InSampler;
+out vec4 fragColor;
+void main() { fragColor = texture(InSampler, texCoord); }
+"#;
+    let pass = |input: &str, output: &str| CustomPostEffectSource {
+        input_row_order: crate::render::vulkanic::commands::TextureRowOrder::Preserve,
+        sampler_info_uniform: None,
+        vertex_shader: vertex.to_vec(),
+        fragment_shader: fragment.to_vec(),
+        input_count: 1,
+        input_bilinear: vec![false; 1],
+        input_targets: vec![input.to_owned()],
+        input_images: vec![None],
+        input_use_depth: vec![false],
+        output_target: output.to_owned(),
+        uniform_blocks: Vec::new(),
+    };
+    let (ops, owned_targets) = frontend
+        .append_custom_post_effect_with_owned_targets(
+            &mut gal,
+            target,
+            target,
+            "minecraft:test_owned_intermediate",
+            &[
+                pass("minecraft:main", "intermediate"),
+                pass("intermediate", "minecraft:main"),
+            ],
+            None,
+        )
+        .unwrap();
+    let intermediate = frontend.custom_post_effect_intermediates["intermediate"].target;
+    assert_eq!(vec![intermediate], owned_targets);
+    crate::render::worldrender::WorldPrimitiveFrontend::validate_source_gui_ops(
+        &ops,
+        target,
+        &owned_targets,
+    )
+    .expect("declared custom post-effect intermediate is admitted");
+    crate::render::worldrender::WorldPrimitiveFrontend::validate_source_gui_ops(&ops, target, &[])
+        .expect_err("undeclared custom post-effect intermediate must still be rejected");
+}
+
 fn mock_gal() -> VulkanicGal {
     let mut capabilities = vulkan_capabilities();
     capabilities.features.presentation = true;
@@ -2724,7 +2838,7 @@ fn native_model_item_uses_registered_owned_image_without_borrowing_an_atlas() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 2,
                 height: 2,
                 pixels: vec![255; 16],
@@ -2838,6 +2952,7 @@ fn model_overlay_passes_finish_before_foil_without_changing_authored_layers() {
 fn mesh_batch(layer_index: u32) -> GuiMeshBatchRequest {
     GuiMeshBatchRequest {
         item_cache: None,
+        persistent_geometry: None,
         block_item_raster: None,
         item_raster_scale: 0,
         item_lighting: None,
@@ -2893,8 +3008,8 @@ fn mesh_batch(layer_index: u32) -> GuiMeshBatchRequest {
                 source_face: 0,
                 source_foil_type: 0,
             },
-        ],
-        indices: vec![0, 1, 2],
+        ].into(),
+        indices: vec![0, 1, 2].into(),
     }
 }
 
@@ -3019,7 +3134,7 @@ fn rotating_panorama_meshes_stay_within_the_bounded_rust_stream() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 6,
                 pixels: vec![255; 24],
@@ -3039,7 +3154,7 @@ fn rotating_panorama_meshes_stay_within_the_bounded_rust_stream() {
         panorama.model_transform = [
             1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ];
-        panorama.vertices = vec![
+        *panorama.vertices = vec![
             GuiMeshVertex {
                 position: [0.0, 1.0, frame as f32 / 10.0],
                 atlas_uv: [0.0, 0.0],
@@ -3068,7 +3183,7 @@ fn rotating_panorama_meshes_stay_within_the_bounded_rust_stream() {
                 source_foil_type: 0,
             },
         ];
-        panorama.indices = vec![0, 1, 2];
+        *panorama.indices = vec![0, 1, 2];
         let stats = frontend
             .submit_frame_with_affine_quads_and_mesh_batches(
                 &mut gal,
@@ -3326,6 +3441,54 @@ fn inventory_mesh_atlas_uses_explicit_owner_and_native_sprite_uv_mapping() {
 }
 
 #[test]
+fn cached_gui_items_survive_other_items_in_the_same_frame() {
+    use crate::render::guirender::mesh::GuiItemCache;
+    let mut gal = mock_gal();
+    let target = frame_target(&mut gal);
+    let mut frontend = GuiFrontend::default();
+    frontend.apply_raw_image_update(&mut gal, 1, vec![GuiRawImageAssetPayload {
+        sampling: None, asset_id: 7, format: GuiRawImageSourceFormat::Rgba8,
+        width: 1, height: 1, pixels: vec![255; 4],
+    }]).unwrap();
+    for step in 0..3 {
+        let batches = [1, if step == 2 { 3 } else { 2 }].map(|identity| {
+            let mut request = mesh_batch(0);
+            request.sequence = identity;
+            request.item_cache = Some(GuiItemCache { identity, animated: false });
+            request.item_raster_scale = 1;
+            request.render_extent = [0, 0];
+            request.guard_pixels = 0;
+            request.lighting_mode = GuiMeshLightingMode::FrontModel;
+            request.item_lighting = Some(crate::render::guirender::items::material::GuiFlatItemLighting {
+                lightmap_generation: 1, rgb: [1.0; 3],
+            });
+            request.model_transform = [
+                1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.,
+            ];
+            request
+        });
+        let (operations, stats) = frontend
+            .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                &mut gal, 1, target, target, None, None, None, false,
+                vec![], vec![], batches.into(),
+            ).unwrap();
+        assert_eq!(stats.mesh_item_count, 2);
+        assert_eq!(stats.mesh_batch_count, [2, 0, 1][step],
+            "unchanged cached items must survive other items and one identity replacement");
+        let token = gal.submit(SubmissionBatch {
+            label: "cached multi-item frame".into(),
+            command_lists: vec![CommandList::from(CommandListDesc {
+                label: "cached multi-item commands".into(), operations,
+            })],
+        }).unwrap();
+        gal.retire_through_for_test(token.submission).unwrap();
+    }
+    frontend.reset(&mut gal).unwrap();
+    gal.destroy(target).unwrap();
+    assert_eq!(gal.metrics().resource_creates, gal.metrics().resource_destroys);
+}
+
+#[test]
 fn vulkan_item_cache_retains_pixels_moves_composition_and_invalidates_identity_and_reload() {
     use crate::render::guirender::items::raster::GuiItemRasterTarget;
     use crate::render::guirender::mesh::GuiItemCache;
@@ -3358,7 +3521,7 @@ fn vulkan_item_cache_retains_pixels_moves_composition_and_invalidates_identity_a
                         vec![GuiRawImageAssetPayload {
                             sampling: None,
                             asset_id: 7,
-                            format: GuiRawImageFormat::Rgba8,
+                            format: GuiRawImageSourceFormat::Rgba8,
                             width: 1,
                             height: 1,
                             pixels: if step == 0 {
@@ -3624,7 +3787,7 @@ fn vulkan_pending_mesh_preparations_match_separate_submissions() {
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 7,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 1,
                     height: 1,
                     pixels: vec![255; 4],
@@ -3812,7 +3975,7 @@ fn pending_mesh_stream_survives_interleaved_upload_completion() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![255; 4],
@@ -3865,11 +4028,13 @@ fn pending_mesh_stream_survives_interleaved_upload_completion() {
         vertex_range(&second),
         "completed asset uploads must not release a pending draw's stream"
     );
+    let second_range = vertex_range(&second);
     drop((first, second));
     let retry = prepare(&mut frontend, &mut gal);
-    assert_eq!(
-        first_range,
-        vertex_range(&retry),
+    // Neither discarded preparation wrote its range, so the retry uploads
+    // again into one of the released reservations rather than a third range.
+    assert!(
+        [first_range, second_range].contains(&vertex_range(&retry)),
         "discarded preparations must release reservations without a fake submission"
     );
     let accepted = gal
@@ -3895,6 +4060,67 @@ fn pending_mesh_stream_survives_interleaved_upload_completion() {
 }
 
 #[test]
+fn accepted_mesh_geometry_stays_resident_across_frames_until_idle() {
+    let mut gal = mock_gal();
+    let target = frame_target(&mut gal);
+    let mut frontend = GuiFrontend::default();
+    frontend
+        .apply_raw_image_update(
+            &mut gal,
+            1,
+            vec![GuiRawImageAssetPayload {
+                sampling: None,
+                asset_id: 7,
+                format: GuiRawImageSourceFormat::Rgba8,
+                width: 1,
+                height: 1,
+                pixels: vec![255; 4],
+            }],
+        )
+        .unwrap();
+    let prepare = |frontend: &mut GuiFrontend, gal: &mut VulkanicGal, batches: Vec<GuiMeshBatchRequest>| {
+        frontend
+            .append_frame_ops_with_affine_quads_and_mesh_batches_to_target(
+                gal, 1, target, target, None, None, None, false, Vec::new(), Vec::new(), batches,
+            )
+            .unwrap()
+            .0
+    };
+    let uploads_vertices = |ops: &[CommandOp]| {
+        ops.iter().any(|op| matches!(op, CommandOp::HostWriteBuffer { data, .. } if data.len() == 3 * 48))
+    };
+    let submit = |gal: &mut VulkanicGal, operations: Vec<CommandOp>| {
+        let token = gal
+            .submit(SubmissionBatch {
+                label: "resident mesh frame".into(),
+                command_lists: vec![CommandList::from(CommandListDesc {
+                    label: "resident mesh commands".into(),
+                    operations,
+                })],
+            })
+            .unwrap();
+        gal.retire_through(token.submission).unwrap();
+    };
+    let first = prepare(&mut frontend, &mut gal, vec![mesh_batch(0)]);
+    assert!(uploads_vertices(&first));
+    submit(&mut gal, first);
+    // The next frame draws the same geometry from the accepted upload.
+    let second = prepare(&mut frontend, &mut gal, vec![mesh_batch(0)]);
+    assert!(!uploads_vertices(&second), "unchanged accepted GUI geometry must not re-upload");
+    submit(&mut gal, second);
+    // Unused for the idle window, the completed range is released; frames
+    // keep drawing other geometry meanwhile.
+    let mut other = mesh_batch(0);
+    other.vertices[0].position[0] += 0.25;
+    for _ in 0..=GUI_MESH_GEOMETRY_IDLE_TRANSACTIONS + 1 {
+        let frame = prepare(&mut frontend, &mut gal, vec![other.clone()]);
+        submit(&mut gal, frame);
+    }
+    assert_eq!(frontend.mesh_geometry_cache.len(), 1, "only the still-drawn geometry stays resident");
+    frontend.reset(&mut gal).unwrap();
+}
+
+#[test]
 fn discarded_mesh_preparation_does_not_publish_attachment_layout() {
     let mut gal = mock_gal();
     let target = frame_target(&mut gal);
@@ -3906,7 +4132,7 @@ fn discarded_mesh_preparation_does_not_publish_attachment_layout() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![255; 4],
@@ -3986,7 +4212,7 @@ fn owned_mesh_items_rasterize_layers_then_compose_once_into_the_gui_target() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![255, 255, 255, 255],
@@ -4166,7 +4392,7 @@ fn entity_preview_submission_stats_prove_body_and_armor_raster_selection() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![255, 255, 255, 255],
@@ -4249,7 +4475,7 @@ fn mesh_items_share_compositor_program_and_packed_uniform_stream() {
                 GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 7,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 1,
                     height: 1,
                     pixels: vec![255, 255, 255, 255],
@@ -4257,7 +4483,7 @@ fn mesh_items_share_compositor_program_and_packed_uniform_stream() {
                 GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 8,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 1,
                     height: 1,
                     pixels: vec![255, 255, 255, 255],
@@ -4879,7 +5105,7 @@ fn raw_image_assets_are_copied_validated_and_rendered_as_affine_quads() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 41,
-                format: GuiRawImageFormat::Alpha8,
+                format: GuiRawImageSourceFormat::Alpha8,
                 width: 2,
                 height: 2,
                 pixels: pixels.clone(),
@@ -4942,7 +5168,7 @@ fn unchanged_raw_image_generation_retains_dynamic_gpu_resources() {
     let payload = GuiRawImageAssetPayload {
         sampling: None,
         asset_id: 41,
-        format: GuiRawImageFormat::Rgba8,
+        format: GuiRawImageSourceFormat::Rgba8,
         width: 1,
         height: 1,
         pixels: vec![1, 2, 3, 4],
@@ -4980,7 +5206,7 @@ fn gui_textures_share_one_immutable_pipeline_per_explicit_raster_contract() {
                 GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 41,
-                    format: GuiRawImageFormat::Alpha8,
+                    format: GuiRawImageSourceFormat::Alpha8,
                     width: 2,
                     height: 2,
                     pixels: vec![255; 4],
@@ -4988,7 +5214,7 @@ fn gui_textures_share_one_immutable_pipeline_per_explicit_raster_contract() {
                 GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 42,
-                    format: GuiRawImageFormat::Alpha8,
+                    format: GuiRawImageSourceFormat::Alpha8,
                     width: 2,
                     height: 2,
                     pixels: vec![127; 4],
@@ -5038,7 +5264,7 @@ fn dynamic_gui_blend_strata_share_one_explicit_texture_resource() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 41,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 2,
                 height: 2,
                 pixels: vec![1; 16],
@@ -5174,7 +5400,7 @@ fn gui_glint_sampler_is_explicit_shared_image_safe_and_failure_atomic() {
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 41,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 2,
                     height: 2,
                     pixels: vec![127; 16],
@@ -5238,7 +5464,7 @@ fn gui_glint_sampler_is_explicit_shared_image_safe_and_failure_atomic() {
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 41,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 2,
                     height: 2,
                     pixels: vec![255; 16],
@@ -5271,7 +5497,7 @@ fn gui_glint_resource_sampling_metadata_only_reload_rebinds_without_changing_sha
                     generation,
                     vec![GuiRawImageAssetPayload {
                         asset_id: 41,
-                        format: GuiRawImageFormat::Rgba8,
+                        format: GuiRawImageSourceFormat::Rgba8,
                         width: 2,
                         height: 2,
                         pixels: vec![127; 16],
@@ -5338,7 +5564,7 @@ fn vulkan_gui_shared_image_reload_retires_every_binding_and_upload_buffer() {
                 vec![GuiRawImageAssetPayload {
                     sampling: None,
                     asset_id: 41,
-                    format: GuiRawImageFormat::Rgba8,
+                    format: GuiRawImageSourceFormat::Rgba8,
                     width: 2,
                     height: 2,
                     pixels: vec![generation as u8; 16],
@@ -5409,7 +5635,7 @@ fn explicit_atlas_declarations_cannot_alias_copied_images_or_admit_fallback_samp
     let payload = || GuiRawImageAssetPayload {
         sampling: None,
         asset_id: 101,
-        format: GuiRawImageFormat::Rgba8,
+        format: GuiRawImageSourceFormat::Rgba8,
         width: 1,
         height: 1,
         pixels: vec![255; 4],
@@ -5450,7 +5676,7 @@ fn changed_dynamic_gui_image_retires_shared_texture_before_recreation() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 41,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 2,
                 height: 2,
                 pixels: vec![1; 16],
@@ -5484,7 +5710,7 @@ fn changed_dynamic_gui_image_retires_shared_texture_before_recreation() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 41,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 2,
                 height: 2,
                 pixels: vec![2; 16],
@@ -5592,7 +5818,7 @@ fn malformed_raw_image_update_rolls_back_without_destroying_valid_generation() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 7,
-                format: GuiRawImageFormat::Rgba8,
+                format: GuiRawImageSourceFormat::Rgba8,
                 width: 1,
                 height: 1,
                 pixels: vec![1, 2, 3, 4],
@@ -5606,7 +5832,7 @@ fn malformed_raw_image_update_rolls_back_without_destroying_valid_generation() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 8,
-                format: GuiRawImageFormat::Alpha8,
+                format: GuiRawImageSourceFormat::Alpha8,
                 width: 2,
                 height: 2,
                 pixels: vec![1, 2, 3],
@@ -5620,6 +5846,52 @@ fn malformed_raw_image_update_rolls_back_without_destroying_valid_generation() {
 }
 
 #[test]
+fn raw_image_patch_retains_pixels_without_copying_and_evicts_missing_identities() {
+    let mut gal = mock_gal();
+    let mut frontend = GuiFrontend::default();
+    let image = |asset_id, value| GuiRawImageAssetPayload {
+        sampling: None, asset_id, format: GuiRawImageSourceFormat::Rgba8,
+        width: 1, height: 1, pixels: vec![value; 4],
+    };
+    frontend.apply_raw_image_update(&mut gal, 1, vec![image(7, 10), image(8, 20)]).unwrap();
+    let retained_pixels = frontend.raw_images[&7].pixels.as_ptr();
+    frontend.apply_raw_image_patch(&mut gal, 2, vec![image(8, 30)], vec![7, 8]).unwrap();
+    assert_eq!(retained_pixels, frontend.raw_images[&7].pixels.as_ptr());
+    assert_eq!(vec![30; 4], frontend.raw_images[&8].pixels);
+    frontend.apply_raw_image_patch(&mut gal, 3, vec![], vec![7]).unwrap();
+    assert!(!frontend.raw_images.contains_key(&8));
+    assert_eq!(retained_pixels, frontend.raw_images[&7].pixels.as_ptr());
+    frontend.apply_raw_image_patch(&mut gal, 4, vec![], vec![]).unwrap();
+    assert!(frontend.raw_images.is_empty());
+}
+
+#[test]
+fn raw_image_patch_rejection_preserves_generation_for_retry() {
+    let mut gal = mock_gal();
+    let mut frontend = GuiFrontend::default();
+    let image = |asset_id| GuiRawImageAssetPayload {
+        sampling: None, asset_id, format: GuiRawImageSourceFormat::Rgba8,
+        width: 1, height: 1, pixels: vec![1; 4],
+    };
+    frontend.apply_raw_image_update(&mut gal, 1, vec![image(7)]).unwrap();
+    let pixels = frontend.raw_images[&7].pixels.as_ptr();
+    for (updates, ids) in [
+        (vec![], vec![7, 9]), (vec![], vec![7, 7]), (vec![], vec![0, 7]),
+        (vec![image(8)], vec![7]),
+        (vec![GuiRawImageAssetPayload { pixels: vec![1; 3], ..image(8) }], vec![7, 8]),
+    ] {
+        assert!(frontend.apply_raw_image_patch(&mut gal, 2, updates, ids).is_err());
+        assert_eq!(1, frontend.raw_image_generation);
+        assert_eq!(1, frontend.raw_images.len());
+        assert_eq!(pixels, frontend.raw_images[&7].pixels.as_ptr());
+    }
+    frontend.apply_raw_image_patch(&mut gal, 2, vec![image(8)], vec![7, 8]).unwrap();
+    assert_eq!(2, frontend.raw_image_generation);
+    assert_eq!(2, frontend.raw_images.len());
+    assert!(frontend.apply_raw_image_patch(&mut gal, 2, vec![], vec![7, 8]).is_err());
+}
+
+#[test]
 fn oversized_raw_image_pixel_count_is_rejected_before_payload_validation() {
     let mut gal = mock_gal();
     let mut frontend = GuiFrontend::default();
@@ -5630,7 +5902,7 @@ fn oversized_raw_image_pixel_count_is_rejected_before_payload_validation() {
             vec![GuiRawImageAssetPayload {
                 sampling: None,
                 asset_id: 99,
-                format: GuiRawImageFormat::Alpha8,
+                format: GuiRawImageSourceFormat::Alpha8,
                 width: 8192,
                 height: 8192,
                 pixels: Vec::new(),
@@ -5729,4 +6001,36 @@ fn custom_post_effect_cleanup_orders_dependents_before_sampler_inputs() {
             HandleKind::Texture,
         ]
     );
+}
+
+#[test]
+fn indexed_map_image_admission_uses_frozen_rgba_and_keeps_gpu_format_explicit() {
+    let mut gal = mock_gal();
+    let mut frontend = GuiFrontend::default();
+    let payload = GuiRawImageAssetPayload {
+        sampling: None, asset_id: 991, format: GuiRawImageSourceFormat::MapColor8,
+        width: 256, height: 1, pixels: (0..=255).collect(),
+    };
+    frontend.apply_raw_image_update(&mut gal, 1, vec![payload.clone()]).unwrap();
+    let image = &frontend.raw_images[&991];
+    assert_eq!(GuiRawImageFormat::Rgba8, image.format);
+    assert_eq!(include_bytes!("../../../content/map_color/frozen-native-rgba.bin").as_slice(), image.pixels);
+    let mut malformed = payload;
+    malformed.pixels.pop();
+    assert!(frontend.apply_raw_image_update(&mut gal, 2, vec![malformed]).is_err());
+    assert_eq!(1, frontend.raw_image_generation);
+    assert_eq!(1024, frontend.raw_images[&991].pixels.len());
+    frontend.apply_raw_image_update(&mut gal, 3, vec![]).unwrap();
+    assert!(frontend.raw_images.is_empty());
+}
+
+#[test]
+fn vulkan_indexed_map_images_preserve_red_blue_channels_through_gal_upload_and_draw() {
+    let bytes = vulkan_gui_sample_with_source_format(
+        GUI_OPAQUE_BLIT_STRATUM, vec![18,50], 0.0,1.0,None,2,false,false,None,false,None,
+        crate::render::guirender::items::material::GuiAffineMaterial::Unlit,
+        GuiRawImageSourceFormat::MapColor8,
+    ).expect("Vulkan required for indexed map channel regression");
+    let frozen = include_bytes!("../../../content/map_color/frozen-native-rgba.bin");
+    assert_eq!([&frozen[18*4..19*4],&frozen[50*4..51*4]].concat(),bytes);
 }
