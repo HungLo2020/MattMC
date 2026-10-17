@@ -82,7 +82,8 @@ Focused regression checks:
 
 ```sh
 ./gradlew test --tests net.vulkanic.world.HeldItemBlockStateLightTest
-cd src/main/rust && cargo test --release held_light
+CARGO_TARGET_DIR=build/rust/target cargo test --locked \
+  --manifest-path src/main/rust/Cargo.toml --profile suite --lib held_light
 ```
 
 These checks cover semantic values and native uniform preparation. They do not
