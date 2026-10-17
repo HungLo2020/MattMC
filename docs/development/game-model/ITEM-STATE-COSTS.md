@@ -236,6 +236,25 @@ Debt: a full grid is still 1.7× Frozen. What remains is the per-stack generic
 access in `CraftingInput` (`isEmpty`, count and item-holder reads), which is
 covered by the accepted generic access envelope, not by grid storage.
 
+### Furnace ticks
+
+`--workload furnace` (`FurnaceTimingReference.java`) times one complete
+`AbstractFurnaceBlockEntity.serverTick` of a lit furnace smelting iron ore,
+including every seventh tick's burn. The level, recipe lookup and fuel values are
+plain subclasses created without their constructors, so no mocking framework runs
+on the timed path. Release library `c650d427…`; quiet medians:
+
+| Run | Frozen ns | Current ns | Current B/tick | C/Frozen |
+|---|---:|---:|---:|---:|
+| `build/s34-furnace-ctl`, without the template | 266 | 780 | 215 | 2.93 |
+| `build/s34-furnace-4`, stock result template | 274 | 511 | 33 | 1.86 |
+| `build/s34-v30/furnace`, same change on `03f1df23` (release `cd37e286…`) | 106 | 340 | 33 | 3.21 |
+
+The two template runs disagree: Frozen measured 274 ns in one and 106 ns in the
+other. No ratio from this screen is treated as stable. Frozen allocates 40 B per tick. Debt: a tick is still 1.9× Frozen. The rest is
+per-stack generic access (`isEmpty`, count and maximum-size reads) and the native
+component comparison of the result slot.
+
 ### Copy churn and the owner table
 
 `copy_churn` (in `--workload equality`) times `ItemStack.copy` of a damaged
@@ -252,6 +271,22 @@ contention. The sharding was not published; its patch is kept in
 Debt: `copy()` is about 0.7–0.9 µs against about 2–9 ns in Frozen. The
 ownership exit is a copy that registers no owner or Cleaner until it escapes.
 That has to keep facade identity (the handle) and the lifetime contracts.
+
+A later attribution on `8341a0b6`, with release library `c650d427…` and scratch
+harnesses only, splits a damaged-sword copy of about 310 ns into parts:
+- A pure-Java Cleaner register-and-retire under churn costs about 52 ns, against
+  7 ns for a plain allocation.
+- The native `stack_copy_leased` costs 220–260 ns and `owner_release` about
+  200 ns, timed in a Rust loop with no JVM.
+
+In that harness, churned and kept-alive copies cost the same (about 300–330 ns).
+Two native changes made no measurable difference over three A/B pairs, so they
+were not kept:
+- dropping the released owner after the owner-table lock is released;
+- replacing the table's SipHash with a multiplicative handle hasher.
+
+What remains is native allocation and registration per copy. Short-lived copies
+therefore need consumers that do not create a facade copy at all.
 
 `build/s34-v21` (crafting grid rows) ran on a noisier machine: rows on paths
 the change does not touch moved several-fold against earlier screens, for

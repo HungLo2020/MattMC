@@ -215,7 +215,9 @@ public abstract class AbstractFurnaceBlockEntity extends BaseContainerBlockEntit
 		int i
 	) {
 		if (!nonNullList.get(0).isEmpty() && recipeHolder != null) {
-			ItemStack itemStack = recipeHolder.value().assemble(singleRecipeInput, registryAccess);
+			// The stock result is only compared here: read it instead of a transient copy.
+			ItemStack template = recipeHolder.value().resultIfPlainCopy();
+			ItemStack itemStack = template != null ? template : recipeHolder.value().assemble(singleRecipeInput, registryAccess);
 			if (itemStack.isEmpty()) {
 				return false;
 			} else {
@@ -242,7 +244,9 @@ public abstract class AbstractFurnaceBlockEntity extends BaseContainerBlockEntit
 	) {
 		if (recipeHolder != null && canBurn(registryAccess, recipeHolder, singleRecipeInput, nonNullList, i)) {
 			ItemStack itemStack = nonNullList.get(0);
-			ItemStack itemStack2 = recipeHolder.value().assemble(singleRecipeInput, registryAccess);
+			// One copy of a stock result (the original copied its transient copy).
+			ItemStack template = recipeHolder.value().resultIfPlainCopy();
+			ItemStack itemStack2 = template != null ? template : recipeHolder.value().assemble(singleRecipeInput, registryAccess);
 			ItemStack itemStack3 = nonNullList.get(2);
 			if (itemStack3.isEmpty()) {
 				nonNullList.set(2, itemStack2.copy());

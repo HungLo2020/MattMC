@@ -60,6 +60,20 @@ public abstract class SingleItemRecipe implements Recipe<SingleRecipeInput> {
 		return this.result.copy();
 	}
 
+	/**
+	 * The result itself, for consumers that only compare what {@link #assemble}
+	 * returns or copy it once: only for the stock cooking recipe classes (whose
+	 * assemble is exactly this copy) and a result whose copy runs no item code.
+	 * Null otherwise, and the caller assembles as before.
+	 */
+	@Nullable
+	public final ItemStack resultIfPlainCopy() {
+		Class<?> type = this.getClass();
+		if (type != SmeltingRecipe.class && type != BlastingRecipe.class && type != SmokingRecipe.class && type != CampfireCookingRecipe.class) return null;
+		ItemStack result = this.result;
+		return result.isEmpty() || result.getItem().nativeTransferCopyIsPure() ? result : null;
+	}
+
 	@FunctionalInterface
 	public interface Factory<T extends SingleItemRecipe> {
 		T create(String string, Ingredient ingredient, ItemStack itemStack);

@@ -453,6 +453,20 @@ gets a broadcast-only link while its quick move, `remove` and `onTake` stay on
 the original path. `NativeCraftingGridTest.nativeResultContainerMatchesTheOriginal`
 compares 300 random operations, at indices -1 to 2, against a subclass container.
 
+## Furnace results
+
+Every furnace tick checks whether its smelting result fits (`canBurn`, up to twice
+a tick), and the original called `recipe.assemble`, a copy of the result, just to
+compare it. `SingleItemRecipe.resultIfPlainCopy` returns the result itself for the
+stock cooking recipe classes (`SmeltingRecipe`, `BlastingRecipe`, `SmokingRecipe`,
+`CampfireCookingRecipe`). Their `assemble` is exactly that copy, and the result's
+copy runs no item code. Furnaces compare that template instead and, on a burn,
+copy it once (the original copied its transient copy). A recipe subclass, another
+recipe type or an impure result item keeps the original `assemble` path. Furnace
+contents stay in their Java list: native rows would make each per-tick slot read
+dearer. `NativeFurnaceTest` compares 2000 random ticks of the template path with a
+recipe subclass that assembles.
+
 ## Bulk row reads
 
 `toArray` on native rows (what `List.copyOf` and `ArrayList` copies call) reads
