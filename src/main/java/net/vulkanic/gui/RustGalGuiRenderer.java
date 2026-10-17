@@ -1026,6 +1026,21 @@ public final class RustGalGuiRenderer {
 		Matrix3x2f pose, @Nullable ScreenRectangle clip, @Nullable Integer sourceLayerOrder,
 		GuiModelPipSemanticCollector.ModelPose setup, int tint, int materialMode
 	) {
+		return tryEnqueueModelPip(model, texture, x0, y0, x1, y1, scale, pose, clip, sourceLayerOrder, setup,
+			tint, materialMode, -1);
+	}
+
+	/**
+	 * Model PIP capture with an explicit Rust GUI lighting mode, or -1 for the
+	 * capture's default (entity-preview or upright model lights). GUI item
+	 * icons pass Frozen's item lighting instead.
+	 */
+	@Nullable
+	public static List<RustGalGuiElementRenderState> tryEnqueueModelPip(
+		Model<?> model, ResourceLocation texture, int x0, int y0, int x1, int y1, float scale,
+		Matrix3x2f pose, @Nullable ScreenRectangle clip, @Nullable Integer sourceLayerOrder,
+		GuiModelPipSemanticCollector.ModelPose setup, int tint, int materialMode, int lightingMode
+	) {
 		if (materialMode < 1 || materialMode > 4) return null;
 		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
 		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
@@ -1045,7 +1060,8 @@ public final class RustGalGuiRenderer {
 		if (result == null) return null;
 		int layerOrder = sourceLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder(sourceLayerOrder);
 		VulkanicGalBridge.GuiMeshBatchRecord batch = result.batch();
-		batch = new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, batch.layerIndex(), batch.materialMode(), batch.lightingMode(),
+		batch = new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, batch.layerIndex(), batch.materialMode(),
+			lightingMode >= 0 ? lightingMode : batch.lightingMode(),
 			batch.assetId(), batch.sequence(), batch.alphaCutoff(), batch.modelTransform(), batch.guiPose(),
 			batch.left(), batch.top(), batch.right(), batch.bottom(), batch.guiWidth(), batch.guiHeight(),
 			batch.renderWidth(), batch.renderHeight(), batch.guardPixels(), batch.clipMode(), batch.clipLeft(), batch.clipTop(), batch.clipWidth(), batch.clipHeight(), batch.vertices(), batch.indices());
@@ -1061,7 +1077,71 @@ public final class RustGalGuiRenderer {
 			bounds.left(), bounds.top(), bounds.width(), bounds.height(), guiWidth, guiHeight));
 	}
 
-	private static int guiModelMaterialMode(Model<?> model, ResourceLocation texture) {
+	/** One model of a multi-part GUI model PIP (see {@link #tryEnqueueModelPipGroup}). */
+	public record ModelPipPart(Model<?> model, ResourceLocation texture, GuiModelPipSemanticCollector.ModelPose setup,
+		int tint, int materialMode) {
+		public ModelPipPart(Model<?> model, ResourceLocation texture, GuiModelPipSemanticCollector.ModelPose setup) {
+			this(model, texture, setup, 0xffffffff, guiModelMaterialMode(model, texture));
+		}
+	}
+
+	/**
+	 * Copies several models of one GUI item as a single mesh request. Rust then
+	 * shares one depth target across them, as Frozen draws every part into the
+	 * same depth buffer; separate requests would composite later parts over
+	 * earlier ones regardless of depth. Atomic: any rejected part declines all.
+	 */
+	@Nullable
+	public static List<RustGalGuiElementRenderState> tryEnqueueModelPipGroup(
+		List<ModelPipPart> parts, int x0, int y0, int x1, int y1, float scale,
+		Matrix3x2f pose, @Nullable ScreenRectangle clip, @Nullable Integer sourceLayerOrder, int lightingMode
+	) {
+		if (parts == null || parts.isEmpty() || pose == null || x1 <= x0 || y1 <= y0 || !Float.isFinite(scale) || scale <= 0.0F) {
+			return null;
+		}
+		int guiWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+		int guiHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+		int guiScale = Math.max(1, Minecraft.getInstance().getWindow().getGuiScale());
+		float[] guiPose = {pose.m00(), pose.m01(), pose.m10(), pose.m11(), pose.m20(), pose.m21()};
+		List<GuiModelPipSemanticCollector.Result> results = new ArrayList<>(parts.size());
+		for (ModelPipPart part : parts) {
+			if (part.model() == null || part.texture() == null || part.setup() == null
+				|| part.materialMode() < 1 || part.materialMode() > 4) return null;
+			GuiModelPipSemanticCollector.Result result;
+			try {
+				result = GuiModelPipSemanticCollector.collect(part.model(), part.texture(), x0, y0, x1, y1, scale,
+					guiScale, guiWidth, guiHeight, guiPose, clip, part.setup(), part.tint(), part.materialMode());
+			} catch (RuntimeException error) {
+				recordTextRouteDiagnostic("model-pip-group-rejected=" + part.model().getClass().getName());
+				return null;
+			}
+			if (result == null) return null;
+			results.add(result);
+		}
+		int layerOrder = sourceLayerOrder == null ? GuiRenderStratum.GUI_ITEM.order() : dynamicLayerOrder(sourceLayerOrder);
+		List<VulkanicGalBridge.GuiMeshBatchRecord> batches = new ArrayList<>(results.size());
+		for (GuiModelPipSemanticCollector.Result result : results) {
+			VulkanicGalBridge.GuiMeshBatchRecord batch = result.batch();
+			batches.add(new VulkanicGalBridge.GuiMeshBatchRecord(layerOrder, batches.size(), batch.materialMode(),
+				lightingMode >= 0 ? lightingMode : batch.lightingMode(),
+				batch.assetId(), batch.sequence(), batch.alphaCutoff(), batch.modelTransform(), batch.guiPose(),
+				batch.left(), batch.top(), batch.right(), batch.bottom(), batch.guiWidth(), batch.guiHeight(),
+				batch.renderWidth(), batch.renderHeight(), batch.guardPixels(), batch.clipMode(), batch.clipLeft(), batch.clipTop(),
+				batch.clipWidth(), batch.clipHeight(), batch.vertices(), batch.indices()));
+		}
+		RustGalFrameScheduler.Token token = RustGalFrameCoordinator.enqueueGuiMeshItemRequest(
+			List.copyOf(batches), sourceLayerOrder == null ? GuiRenderStratum.GUI_ITEM.id() : dynamicLayerId(sourceLayerOrder),
+			layerOrder, System.nanoTime());
+		for (GuiModelPipSemanticCollector.Result result : results) {
+			for (RustGalGuiRawImageAssets.Asset asset : result.assets()) RustGalGuiRawImageAssets.stage(asset);
+		}
+		ScreenRectangle bounds = results.getFirst().bounds();
+		return List.of(new RustGalGuiElementRenderState(token, GuiRenderStratum.GUI_ITEM,
+			"minecraft.gui.model-pip", -1, -1.0F, GuiFillDirection.NONE,
+			bounds.left(), bounds.top(), bounds.width(), bounds.height(), guiWidth, guiHeight));
+	}
+
+	static int guiModelMaterialMode(Model<?> model, ResourceLocation texture) {
 		if (model == null || texture == null) return -1;
 		try {
 			RenderType renderType = model.renderType(texture);

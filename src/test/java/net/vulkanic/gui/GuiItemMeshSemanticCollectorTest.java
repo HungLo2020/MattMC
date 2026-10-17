@@ -269,6 +269,32 @@ class GuiItemMeshSemanticCollectorTest {
 	}
 
 	@Test
+	void specialItemPipPoseMatchesFrozenGuiItemProjection() {
+		// Frozen GuiRenderer.renderItemToAtlas: translate(center) scale(k,-k,k), then the
+		// item's display transform. The model PIP capture applies scale(s,s,-s) itself.
+		var display = new net.minecraft.client.renderer.block.model.ItemTransform(
+			new org.joml.Vector3f(30, 225, 0), new org.joml.Vector3f(0, 0.1F, 0), new org.joml.Vector3f(0.625F, 0.625F, 0.625F));
+		var transform = new net.blaze3d.vertex.PoseStack.Pose();
+		display.apply(false, transform);
+		var selected = new net.minecraft.client.renderer.item.ItemStackRenderState.SpecialRender(null, null, transform);
+		int guiScale = 3;
+		float k = guiScale * RustGalGuiItemRenderer.GUI_ITEM_MODEL_SCALE;
+
+		var captured = new net.blaze3d.vertex.PoseStack();
+		captured.scale(k, k, -k);
+		RustGalGuiItemRenderer.applyGuiItemTransform(captured, selected);
+
+		var frozen = new net.blaze3d.vertex.PoseStack();
+		frozen.scale(k, -k, k);
+		frozen.last().mulPose(transform.pose());
+
+		float[] actual = captured.last().pose().get(new float[16]);
+		float[] expected = frozen.last().pose().get(new float[16]);
+		for (int index = 0; index < 16; index++) assertEquals(expected[index], actual[index], 1.0e-4F, "matrix element " + index);
+		assertEquals(16.0F, RustGalGuiItemRenderer.GUI_ITEM_MODEL_SCALE);
+	}
+
+	@Test
 	void zeroAreaQuadsAreDroppedButOrdinaryFacesAreKept() {
 		// An edge-on face of the flytrap's flat elements: corners coincide pairwise.
 		var edgeOn = quad(new float[] {

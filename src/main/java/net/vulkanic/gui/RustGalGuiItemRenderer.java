@@ -141,23 +141,27 @@ public final class RustGalGuiItemRenderer {
 		int top = bounds == null ? item.y() : bounds.top();
 		int right = bounds == null ? item.x() + 16 : bounds.right();
 		int bottom = bounds == null ? item.y() + 16 : bounds.bottom();
+		// Frozen GuiRenderer lights item icons with ITEMS_3D (block-lit models) or
+		// ITEMS_FLAT, in the same (k, -k, k) space applyGuiItemTransform produces.
+		int itemLighting = item.itemStackRenderState().usesBlockLight()
+			? VulkanicGalBridge.GUI_MESH_LIGHTING_OVERSIZED_ITEM : VulkanicGalBridge.GUI_MESH_LIGHTING_OVERSIZED_ITEM_FLAT;
 		List<RustGalGuiElementRenderState> result;
 		String rejectionName;
 		if (selectedRenderer instanceof TridentSpecialRenderer trident) {
-			List<RustGalGuiElementRenderState> tridentBase = RustGalGuiRenderer.tryEnqueueModelPip(
-				trident.model(), TridentModel.TEXTURE, left, top, right, bottom, 1.0F,
+			List<RustGalGuiElementRenderState> tridentBase = itemPip(itemLighting, 
+				trident.model(), TridentModel.TEXTURE, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
 				pose -> {
-					pose.mulPose(selected[0].transform().pose());
+					applyGuiItemTransform(pose, selected[0]);
 					pose.scale(1.0F, -1.0F, -1.0F);
 				}
 			);
 			if (foil[0]) {
-				List<RustGalGuiElementRenderState> tridentGlint = RustGalGuiRenderer.tryEnqueueModelPip(
-					trident.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, 1.0F,
+				List<RustGalGuiElementRenderState> tridentGlint = itemPip(itemLighting, 
+					trident.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 					item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
-						pose.mulPose(selected[0].transform().pose());
+						applyGuiItemTransform(pose, selected[0]);
 						pose.scale(1.0F, -1.0F, -1.0F);
 					}, 0xffffffff, 4
 				);
@@ -172,18 +176,18 @@ public final class RustGalGuiItemRenderer {
 		} else if (selectedRenderer instanceof ChestSpecialRenderer chest) {
 			ChestModel model = chest.model();
 			model.setupAnim(chest.openness());
-			result = RustGalGuiRenderer.tryEnqueueModelPip(
-				model, chest.material().texture(), left, top, right, bottom, 1.0F,
+			result = itemPip(itemLighting, 
+				model, chest.material().texture(), left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
-				pose -> pose.mulPose(selected[0].transform().pose())
+				pose -> applyGuiItemTransform(pose, selected[0])
 			);
 			if (foil[0]) {
-				List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
-					model, ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, 1.0F,
+				List<RustGalGuiElementRenderState> glint = itemPip(itemLighting, 
+					model, ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 					item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						model.setupAnim(chest.openness());
-						pose.mulPose(selected[0].transform().pose());
 					}, 0xffffffff, 4
 				);
 				if (glint != null) {
@@ -194,23 +198,23 @@ public final class RustGalGuiItemRenderer {
 			}
 			rejectionName = "special-renderer-chest-rejected";
 		} else if (selectedRenderer instanceof HangingSignSpecialRenderer hangingSign) {
-			result = RustGalGuiRenderer.tryEnqueueModelPip(
-				hangingSign.model(), hangingSign.material().texture(), left, top, right, bottom, 1.0F,
+			result = itemPip(itemLighting, 
+				hangingSign.model(), hangingSign.material().texture(), left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
 				pose -> {
+					applyGuiItemTransform(pose, selected[0]);
 					HangingSignRenderer.translateBase(pose, 0.0F);
 					pose.scale(1.0F, -1.0F, -1.0F);
-					pose.mulPose(selected[0].transform().pose());
 				}
 			);
 			if (foil[0]) {
-				List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
-					hangingSign.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, 1.0F,
+				List<RustGalGuiElementRenderState> glint = itemPip(itemLighting, 
+					hangingSign.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 					item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						HangingSignRenderer.translateBase(pose, 0.0F);
 						pose.scale(1.0F, -1.0F, -1.0F);
-						pose.mulPose(selected[0].transform().pose());
 					}, 0xffffffff, 4
 				);
 				if (glint != null) {
@@ -221,21 +225,21 @@ public final class RustGalGuiItemRenderer {
 			}
 			rejectionName = "special-renderer-hanging-sign-rejected";
 		} else if (selectedRenderer instanceof StandingSignSpecialRenderer standingSign) {
-			result = RustGalGuiRenderer.tryEnqueueModelPip(
-				standingSign.model(), standingSign.material().texture(), left, top, right, bottom, 1.0F,
+			result = itemPip(itemLighting, 
+				standingSign.model(), standingSign.material().texture(), left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
 				pose -> {
+					applyGuiItemTransform(pose, selected[0]);
 					SignRenderer.applyInHandTransforms(pose);
-					pose.mulPose(selected[0].transform().pose());
 				}
 			);
 			if (foil[0]) {
-				List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
-					standingSign.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, 1.0F,
+				List<RustGalGuiElementRenderState> glint = itemPip(itemLighting, 
+					standingSign.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 					item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						SignRenderer.applyInHandTransforms(pose);
-						pose.mulPose(selected[0].transform().pose());
 					}, 0xffffffff, 4
 				);
 				if (glint != null) {
@@ -246,23 +250,23 @@ public final class RustGalGuiItemRenderer {
 			}
 			rejectionName = "special-renderer-standing-sign-rejected";
 		} else if (selectedRenderer instanceof CopperGolemStatueSpecialRenderer copperGolem) {
-			result = RustGalGuiRenderer.tryEnqueueModelPip(
-				copperGolem.model(), copperGolem.texture(), left, top, right, bottom, 1.0F,
+			result = itemPip(itemLighting, 
+				copperGolem.model(), copperGolem.texture(), left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
 				pose -> {
+					applyGuiItemTransform(pose, selected[0]);
 					pose.translate(0.5F, 1.5F, 0.5F);
 					pose.scale(-1.0F, -1.0F, 1.0F);
-					pose.mulPose(selected[0].transform().pose());
 				}
 			);
 			if (foil[0]) {
-				List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
-					copperGolem.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, 1.0F,
+				List<RustGalGuiElementRenderState> glint = itemPip(itemLighting, 
+					copperGolem.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 					item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						pose.translate(0.5F, 1.5F, 0.5F);
 						pose.scale(-1.0F, -1.0F, 1.0F);
-						pose.mulPose(selected[0].transform().pose());
 					}, 0xffffffff, 4
 				);
 				if (glint != null) {
@@ -273,42 +277,28 @@ public final class RustGalGuiItemRenderer {
 			}
 			rejectionName = "special-renderer-copper-golem-rejected";
 		} else if (selectedRenderer instanceof BedSpecialRenderer bed) {
-			List<RustGalGuiElementRenderState> pieces = new ArrayList<>(2);
-			for (int piece = 0; piece < 2; piece++) {
-				boolean foot = piece == 1;
-				List<RustGalGuiElementRenderState> pieceElements = RustGalGuiRenderer.tryEnqueueModelPip(
-					foot ? bed.footModel() : bed.headModel(), bed.material().texture(), left, top, right, bottom, 1.0F,
-					item.pose(), item.scissorArea(), dynamicLayerOrder,
-					pose -> {
+			// Head and foot (and their glints) share one depth target, like Frozen.
+			List<RustGalGuiRenderer.ModelPipPart> parts = new ArrayList<>(4);
+			for (int pass = 0; pass < (foil[0] ? 2 : 1); pass++) {
+				boolean glintPass = pass == 1;
+				for (int piece = 0; piece < 2; piece++) {
+					boolean foot = piece == 1;
+					net.minecraft.client.model.Model<?> model = foot ? bed.footModel() : bed.headModel();
+					GuiModelPipSemanticCollector.ModelPose setup = pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						pose.translate(0.0F, 0.5625F, foot ? -1.0F : 0.0F);
 						pose.mulPose(Axis.XP.rotationDegrees(90.0F));
 						pose.translate(0.5F, 0.5F, 0.5F);
 						pose.mulPose(Axis.ZP.rotationDegrees(180.0F));
 						pose.translate(-0.5F, -0.5F, -0.5F);
-						pose.mulPose(selected[0].transform().pose());
-					}
-				);
-				if (pieceElements != null) pieces.addAll(pieceElements);
-			}
-			if (foil[0]) {
-				for (int piece = 0; piece < 2; piece++) {
-					boolean foot = piece == 1;
-					List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
-						foot ? bed.footModel() : bed.headModel(), ItemRenderer.ENCHANTED_GLINT_ITEM,
-						left, top, right, bottom, 1.0F, item.pose(), item.scissorArea(), dynamicLayerOrder,
-						pose -> {
-							pose.translate(0.0F, 0.5625F, foot ? -1.0F : 0.0F);
-							pose.mulPose(Axis.XP.rotationDegrees(90.0F));
-							pose.translate(0.5F, 0.5F, 0.5F);
-							pose.mulPose(Axis.ZP.rotationDegrees(180.0F));
-							pose.translate(-0.5F, -0.5F, -0.5F);
-							pose.mulPose(selected[0].transform().pose());
-						}, 0xffffffff, 4
-					);
-					if (glint != null) pieces.addAll(glint);
+					};
+					parts.add(glintPass
+						? new RustGalGuiRenderer.ModelPipPart(model, ItemRenderer.ENCHANTED_GLINT_ITEM, setup, 0xffffffff, 4)
+						: new RustGalGuiRenderer.ModelPipPart(model, bed.material().texture(), setup));
 				}
 			}
-			result = pieces;
+			result = RustGalGuiRenderer.tryEnqueueModelPipGroup(parts, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
+				item.pose(), item.scissorArea(), dynamicLayerOrder, itemLighting);
 			rejectionName = "special-renderer-bed-rejected";
 		} else if (selectedRenderer instanceof ShieldSpecialRenderer shield) {
 			return tryEnqueueShieldItem(item, selected[0], shield, foil[0], guiWidth, guiHeight, dynamicLayerOrder);
@@ -319,47 +309,47 @@ public final class RustGalGuiItemRenderer {
 			BannerPatternLayers patterns = selected[0].argument() instanceof BannerPatternLayers layers
 				? layers : BannerPatternLayers.EMPTY;
 			List<RustGalGuiElementRenderState> bannerLayers = new ArrayList<>();
-			List<RustGalGuiElementRenderState> base = RustGalGuiRenderer.tryEnqueueModelPip(
-				model, ModelBakery.BANNER_BASE.texture(), left, top, right, bottom, 1.0F,
+			List<RustGalGuiElementRenderState> base = itemPip(itemLighting, 
+				model, ModelBakery.BANNER_BASE.texture(), left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
 				pose -> {
+					applyGuiItemTransform(pose, selected[0]);
 					pose.translate(0.5F, 0.0F, 0.5F);
 					pose.scale(0.6666667F, -0.6666667F, -0.6666667F);
-					pose.mulPose(selected[0].transform().pose());
 				}
 			);
 			if (base != null) bannerLayers.addAll(base);
 			int baseTint = banner.baseColor().getTextureDiffuseColor();
-			List<RustGalGuiElementRenderState> flagBase = RustGalGuiRenderer.tryEnqueueModelPip(
-				flagModel, ModelBakery.BANNER_BASE.texture(), left, top, right, bottom, 1.0F,
+			List<RustGalGuiElementRenderState> flagBase = itemPip(itemLighting, 
+				flagModel, ModelBakery.BANNER_BASE.texture(), left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
 				pose -> {
+					applyGuiItemTransform(pose, selected[0]);
 					pose.translate(0.5F, 0.0F, 0.5F);
 					pose.scale(0.6666667F, -0.6666667F, -0.6666667F);
-					pose.mulPose(selected[0].transform().pose());
 				}, baseTint
 			);
 			if (flagBase != null) bannerLayers.addAll(flagBase);
 			for (BannerPatternLayers.Layer layer : patterns.layers().subList(0, Math.min(16, patterns.layers().size()))) {
-				List<RustGalGuiElementRenderState> pattern = RustGalGuiRenderer.tryEnqueueModelPip(
+				List<RustGalGuiElementRenderState> pattern = itemPip(itemLighting, 
 					flagModel, net.minecraft.client.renderer.Sheets.getBannerMaterial(layer.pattern()).texture(),
-					left, top, right, bottom, 1.0F, item.pose(), item.scissorArea(), dynamicLayerOrder,
+					left, top, right, bottom, GUI_ITEM_MODEL_SCALE, item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						pose.translate(0.5F, 0.0F, 0.5F);
 						pose.scale(0.6666667F, -0.6666667F, -0.6666667F);
-						pose.mulPose(selected[0].transform().pose());
 					}, layer.color().getTextureDiffuseColor()
 				);
 				if (pattern != null) bannerLayers.addAll(pattern);
 			}
 			if (foil[0]) {
-				List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
-					flagModel, ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, 1.0F,
+				List<RustGalGuiElementRenderState> glint = itemPip(itemLighting, 
+					flagModel, ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 					item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						pose.translate(0.5F, 0.0F, 0.5F);
 						pose.scale(0.6666667F, -0.6666667F, -0.6666667F);
-						pose.mulPose(selected[0].transform().pose());
 					}, 0xffffffff, 4
 				);
 				if (glint != null) bannerLayers.addAll(glint);
@@ -372,31 +362,31 @@ public final class RustGalGuiItemRenderer {
 				recordDiagnostic("special-renderer-skull-texture-unavailable");
 				return List.of();
 			}
-			result = RustGalGuiRenderer.tryEnqueueModelPip(
-				skull.model(), texture, left, top, right, bottom, 1.0F,
+			result = itemPip(itemLighting, 
+				skull.model(), texture, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
 				pose -> {
+					applyGuiItemTransform(pose, selected[0]);
 					pose.translate(0.5F, 0.0F, 0.5F);
 					pose.scale(-1.0F, -1.0F, 1.0F);
 					SkullModelBase.State state = new SkullModelBase.State();
 					state.animationPos = skull.animation();
 					state.yRot = 180.0F;
 					 skull.model().setupAnim(state);
-					pose.mulPose(selected[0].transform().pose());
 				}
 			);
 			if (foil[0]) {
-				List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
-					skull.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, 1.0F,
+				List<RustGalGuiElementRenderState> glint = itemPip(itemLighting, 
+					skull.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 					item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						pose.translate(0.5F, 0.0F, 0.5F);
 						pose.scale(-1.0F, -1.0F, 1.0F);
 						SkullModelBase.State state = new SkullModelBase.State();
 						state.animationPos = skull.animation();
 						state.yRot = 180.0F;
 						skull.model().setupAnim(state);
-						pose.mulPose(selected[0].transform().pose());
 					}, 0xffffffff, 4
 				);
 				if (glint != null) {
@@ -411,29 +401,29 @@ public final class RustGalGuiItemRenderer {
 			if (selected[0].argument() instanceof PlayerSkinRenderCache.RenderInfo info) {
 				texture = info.playerSkin().body().texturePath();
 			}
-			result = RustGalGuiRenderer.tryEnqueueModelPip(
-				playerHead.model(), texture, left, top, right, bottom, 1.0F,
+			result = itemPip(itemLighting, 
+				playerHead.model(), texture, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
 				pose -> {
+					applyGuiItemTransform(pose, selected[0]);
 					pose.translate(0.5F, 0.0F, 0.5F);
 					pose.scale(-1.0F, -1.0F, 1.0F);
 					SkullModelBase.State state = new SkullModelBase.State();
 					state.yRot = 180.0F;
 					playerHead.model().setupAnim(state);
-					pose.mulPose(selected[0].transform().pose());
 				}
 			);
 			if (foil[0]) {
-				List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
-					playerHead.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, 1.0F,
+				List<RustGalGuiElementRenderState> glint = itemPip(itemLighting, 
+					playerHead.model(), ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 					item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						pose.translate(0.5F, 0.0F, 0.5F);
 						pose.scale(-1.0F, -1.0F, 1.0F);
 						SkullModelBase.State state = new SkullModelBase.State();
 						state.yRot = 180.0F;
 						playerHead.model().setupAnim(state);
-						pose.mulPose(selected[0].transform().pose());
 					}, 0xffffffff, 4
 				);
 				if (glint != null) {
@@ -447,29 +437,29 @@ public final class RustGalGuiItemRenderer {
 			ShulkerBoxRenderer renderer = shulker.renderer();
 			ShulkerBoxRenderer.ShulkerBoxModel model = renderer.model();
 			model.setupAnim(shulker.openness());
-			result = RustGalGuiRenderer.tryEnqueueModelPip(
-				model, shulker.material().texture(), left, top, right, bottom, 1.0F,
+			result = itemPip(itemLighting, 
+				model, shulker.material().texture(), left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
 				pose -> {
+					applyGuiItemTransform(pose, selected[0]);
 					pose.translate(0.5F, 0.5F, 0.5F);
 					pose.scale(0.9995F, 0.9995F, 0.9995F);
 					pose.mulPose(shulker.orientation().getRotation());
 					pose.scale(1.0F, -1.0F, -1.0F);
 					pose.translate(0.0F, -1.0F, 0.0F);
-					pose.mulPose(selected[0].transform().pose());
 				}
 			);
 			if (foil[0]) {
-				List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
-					model, ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, 1.0F,
+				List<RustGalGuiElementRenderState> glint = itemPip(itemLighting, 
+					model, ItemRenderer.ENCHANTED_GLINT_ITEM, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 					item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						pose.translate(0.5F, 0.5F, 0.5F);
 						pose.scale(0.9995F, 0.9995F, 0.9995F);
 						pose.mulPose(shulker.orientation().getRotation());
 						pose.scale(1.0F, -1.0F, -1.0F);
 						pose.translate(0.0F, -1.0F, 0.0F);
-						pose.mulPose(selected[0].transform().pose());
 					}, 0xffffffff, 4
 				);
 				if (glint != null) {
@@ -480,21 +470,21 @@ public final class RustGalGuiItemRenderer {
 			}
 			rejectionName = "special-renderer-shulker-rejected";
 		} else if (selectedRenderer instanceof ConduitSpecialRenderer conduit) {
-			result = RustGalGuiRenderer.tryEnqueueModelPartPip(
-				conduit.model(), ConduitRenderer.SHELL_TEXTURE.texture(), left, top, right, bottom, 1.0F,
+			result = itemPartPip(itemLighting, 
+				conduit.model(), ConduitRenderer.SHELL_TEXTURE.texture(), left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
 				item.pose(), item.scissorArea(), dynamicLayerOrder,
 				pose -> {
+					applyGuiItemTransform(pose, selected[0]);
 					pose.translate(0.5F, 0.5F, 0.5F);
-					pose.mulPose(selected[0].transform().pose());
 				}
 			);
 			if (foil[0]) {
-				List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
+				List<RustGalGuiElementRenderState> glint = itemPip(itemLighting, 
 					new Model.Simple(conduit.model(), RenderType::entitySolid), ItemRenderer.ENCHANTED_GLINT_ITEM,
-					left, top, right, bottom, 1.0F, item.pose(), item.scissorArea(), dynamicLayerOrder,
+					left, top, right, bottom, GUI_ITEM_MODEL_SCALE, item.pose(), item.scissorArea(), dynamicLayerOrder,
 					pose -> {
+						applyGuiItemTransform(pose, selected[0]);
 						pose.translate(0.5F, 0.5F, 0.5F);
-						pose.mulPose(selected[0].transform().pose());
 					}, 0xffffffff, 4
 				);
 				if (glint != null) {
@@ -508,46 +498,29 @@ public final class RustGalGuiItemRenderer {
 			DecoratedPotRenderer renderer = pot.renderer();
 			PotDecorations decorations = selected[0].argument() instanceof PotDecorations value
 				? value : PotDecorations.EMPTY;
-			List<RustGalGuiElementRenderState> potParts = new ArrayList<>(7);
-			List<RustGalGuiElementRenderState> baseParts = enqueueModelParts(
-				List.of(renderer.neckPart(), renderer.topPart(), renderer.bottomPart()),
-				net.minecraft.client.renderer.Sheets.DECORATED_POT_BASE.texture(), left, top, right, bottom, item, dynamicLayerOrder, selected[0]
-			);
-			if (baseParts != null) potParts.addAll(baseParts);
-			List<RustGalGuiElementRenderState> front = enqueueModelPart(
-				renderer.frontSidePart(), renderer.sideMaterial(decorations.front()).texture(), left, top, right, bottom,
-				item, dynamicLayerOrder, selected[0]
-			);
-			if (front != null) potParts.addAll(front);
-			List<RustGalGuiElementRenderState> back = enqueueModelPart(
-				renderer.backSidePart(), renderer.sideMaterial(decorations.back()).texture(), left, top, right, bottom,
-				item, dynamicLayerOrder, selected[0]
-			);
-			if (back != null) potParts.addAll(back);
-			List<RustGalGuiElementRenderState> leftSide = enqueueModelPart(
-				renderer.leftSidePart(), renderer.sideMaterial(decorations.left()).texture(), left, top, right, bottom,
-				item, dynamicLayerOrder, selected[0]
-			);
-			if (leftSide != null) potParts.addAll(leftSide);
-			List<RustGalGuiElementRenderState> rightSide = enqueueModelPart(
-				renderer.rightSidePart(), renderer.sideMaterial(decorations.right()).texture(), left, top, right, bottom,
-				item, dynamicLayerOrder, selected[0]
-			);
-			if (rightSide != null) potParts.addAll(rightSide);
+			// Every pot part shares one depth target, like Frozen: separately
+			// composited, the later sides painted over the neck.
+			GuiModelPipSemanticCollector.ModelPose setup = pose -> applyGuiItemTransform(pose, selected[0]);
+			ResourceLocation base = net.minecraft.client.renderer.Sheets.DECORATED_POT_BASE.texture();
+			List<net.minecraft.client.model.geom.ModelPart> partModels = List.of(
+				renderer.neckPart(), renderer.topPart(), renderer.bottomPart(), renderer.frontSidePart(),
+				renderer.backSidePart(), renderer.leftSidePart(), renderer.rightSidePart());
+			List<ResourceLocation> textures = List.of(base, base, base,
+				renderer.sideMaterial(decorations.front()).texture(), renderer.sideMaterial(decorations.back()).texture(),
+				renderer.sideMaterial(decorations.left()).texture(), renderer.sideMaterial(decorations.right()).texture());
+			List<RustGalGuiRenderer.ModelPipPart> parts = new ArrayList<>(14);
+			for (int index = 0; index < partModels.size(); index++) {
+				parts.add(new RustGalGuiRenderer.ModelPipPart(
+					new Model.Simple(partModels.get(index), RenderType::entitySolid), textures.get(index), setup));
+			}
 			if (foil[0]) {
-				List<net.minecraft.client.model.geom.ModelPart> glintParts = List.of(
-					renderer.neckPart(), renderer.topPart(), renderer.bottomPart(), renderer.frontSidePart(),
-					renderer.backSidePart(), renderer.leftSidePart(), renderer.rightSidePart());
-				for (net.minecraft.client.model.geom.ModelPart part : glintParts) {
-					List<RustGalGuiElementRenderState> glint = RustGalGuiRenderer.tryEnqueueModelPip(
-						new Model.Simple(part, RenderType::entitySolid), ItemRenderer.ENCHANTED_GLINT_ITEM,
-						left, top, right, bottom, 1.0F, item.pose(), item.scissorArea(), dynamicLayerOrder,
-						pose -> pose.mulPose(selected[0].transform().pose()), 0xffffffff, 4
-					);
-					if (glint != null) potParts.addAll(glint);
+				for (net.minecraft.client.model.geom.ModelPart part : partModels) {
+					parts.add(new RustGalGuiRenderer.ModelPipPart(new Model.Simple(part, RenderType::entitySolid),
+						ItemRenderer.ENCHANTED_GLINT_ITEM, setup, 0xffffffff, 4));
 				}
 			}
-			result = potParts;
+			result = RustGalGuiRenderer.tryEnqueueModelPipGroup(parts, left, top, right, bottom, GUI_ITEM_MODEL_SCALE,
+				item.pose(), item.scissorArea(), dynamicLayerOrder, itemLighting);
 			rejectionName = "special-renderer-decorated-pot-rejected";
 		} else if (selectedRenderer instanceof TaczGlock17SpecialRenderer tacz) {
 			result = tryEnqueueTaczItem(tacz, selected[0], item, foil[0], left, top, right, bottom, dynamicLayerOrder);
@@ -997,26 +970,56 @@ public final class RustGalGuiItemRenderer {
 		int[] colors() { return colors.toIntArray(); }
 	}
 
-	private static List<RustGalGuiElementRenderState> enqueueModelPart(
-		net.minecraft.client.model.geom.ModelPart part, ResourceLocation texture, int left, int top, int right, int bottom,
-		GuiItemRenderState item, @Nullable Integer dynamicLayerOrder, ItemStackRenderState.SpecialRender selected
-	) {
-		return RustGalGuiRenderer.tryEnqueueModelPartPip(
-			part, texture, left, top, right, bottom, 1.0F, item.pose(), item.scissorArea(), dynamicLayerOrder,
-			pose -> pose.mulPose(selected.transform().pose())
-		);
+	/**
+	 * Model pixels per block for GUI item previews: Frozen's
+	 * GuiRenderer.renderItemToAtlas scales by the slot size (16 GUI pixels).
+	 */
+	static final float GUI_ITEM_MODEL_SCALE = 16.0F;
+
+	/**
+	 * Frozen renders a GUI item with {@code scale(k, -k, k)}, then the layer's
+	 * display transform, then the special renderer's own pose. The model PIP
+	 * capture applies {@code scale(s, s, -s)}; flip Y and Z to match before the
+	 * display transform. Renderer poses follow this call.
+	 */
+	static void applyGuiItemTransform(PoseStack pose, ItemStackRenderState.SpecialRender selected) {
+		pose.scale(1.0F, -1.0F, -1.0F);
+		pose.mulPose(selected.transform().pose());
 	}
 
-	private static List<RustGalGuiElementRenderState> enqueueModelParts(
-		List<net.minecraft.client.model.geom.ModelPart> parts, ResourceLocation texture, int left, int top, int right, int bottom,
-		GuiItemRenderState item, @Nullable Integer dynamicLayerOrder, ItemStackRenderState.SpecialRender selected
+	/** Special-item model PIP with the item icon's lighting (see tryEnqueueModelPip). */
+	private static List<RustGalGuiElementRenderState> itemPip(int lighting,
+		net.minecraft.client.model.Model<?> model, ResourceLocation texture, int x0, int y0, int x1, int y1, float scale,
+		org.joml.Matrix3x2f pose, @Nullable ScreenRectangle clip, @Nullable Integer layer, GuiModelPipSemanticCollector.ModelPose setup
 	) {
-		List<RustGalGuiElementRenderState> result = new ArrayList<>();
-		for (net.minecraft.client.model.geom.ModelPart part : parts) {
-			List<RustGalGuiElementRenderState> elements = enqueueModelPart(part, texture, left, top, right, bottom, item, dynamicLayerOrder, selected);
-			if (elements != null) result.addAll(elements);
-		}
-		return result;
+		return itemPip(lighting, model, texture, x0, y0, x1, y1, scale, pose, clip, layer, setup, 0xffffffff);
+	}
+
+	private static List<RustGalGuiElementRenderState> itemPip(int lighting,
+		net.minecraft.client.model.Model<?> model, ResourceLocation texture, int x0, int y0, int x1, int y1, float scale,
+		org.joml.Matrix3x2f pose, @Nullable ScreenRectangle clip, @Nullable Integer layer, GuiModelPipSemanticCollector.ModelPose setup,
+		int tint
+	) {
+		return itemPip(lighting, model, texture, x0, y0, x1, y1, scale, pose, clip, layer, setup, tint,
+			RustGalGuiRenderer.guiModelMaterialMode(model, texture));
+	}
+
+	private static List<RustGalGuiElementRenderState> itemPip(int lighting,
+		net.minecraft.client.model.Model<?> model, ResourceLocation texture, int x0, int y0, int x1, int y1, float scale,
+		org.joml.Matrix3x2f pose, @Nullable ScreenRectangle clip, @Nullable Integer layer, GuiModelPipSemanticCollector.ModelPose setup,
+		int tint, int materialMode
+	) {
+		return RustGalGuiRenderer.tryEnqueueModelPip(model, texture, x0, y0, x1, y1, scale, pose, clip, layer, setup,
+			tint, materialMode, lighting);
+	}
+
+	private static List<RustGalGuiElementRenderState> itemPartPip(int lighting,
+		net.minecraft.client.model.geom.ModelPart part, ResourceLocation texture, int x0, int y0, int x1, int y1, float scale,
+		org.joml.Matrix3x2f pose, @Nullable ScreenRectangle clip, @Nullable Integer layer, GuiModelPipSemanticCollector.ModelPose setup
+	) {
+		if (part == null) return List.of();
+		return itemPip(lighting, new net.minecraft.client.model.Model.Simple(part, RenderType::entitySolid), texture,
+			x0, y0, x1, y1, scale, pose, clip, layer, setup);
 	}
 
 	public static boolean standard3dRouteEnabled() {

@@ -50,6 +50,19 @@ GPU resources, passes, submission and presentation remain owned by Rust/GAL.
   (`GuiItemMeshSemanticCollector.isZeroAreaQuad`); the rasterizer would draw
   nothing for them. Example: edge-on faces of flat model elements, such as the
   flytrap's.
+- Special-renderer item icons (beds, heads, chests, banners, pots and signs) are
+  model picture-in-pictures in `RustGalGuiItemRenderer`. They match Frozen's
+  `GuiRenderer.renderItemToAtlas` in three ways:
+  - Scale: 16 pixels per block (`GUI_ITEM_MODEL_SCALE`).
+  - Pose order (`applyGuiItemTransform`): the `(k, -k, k)` orientation, then
+    the display transform, then the renderer's own pose.
+  - Lighting: item lighting, `OversizedItem` (ITEMS_3D) or
+    `OversizedItemFlat` (ITEMS_FLAT), selected by `usesBlockLight()`.
+
+  Parts that overlap, such as the decorated pot's neck and sides, use
+  `tryEnqueueModelPipGroup`, so they share one depth target. Compared with a
+  Frozen OpenGL screenshot of the same inventory, every item is within noise
+  except 4 edge pixels on the banner.
 - Owned frontend requests keep geometry alive after template release. Copy-on-write
   storage prevents later source mutation from changing captured geometry.
 - Native geometry identities include a non-reused generation; caller cache
