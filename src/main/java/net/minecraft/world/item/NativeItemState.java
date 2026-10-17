@@ -1229,6 +1229,10 @@ public final class NativeItemState {
             if(slot!=null&&inventory.nativeEquipmentRowsBound())return SlotLink.createEquipment(inventory.nativeMainSlotsForTransfer().actualOwner(),slot,index-slot.ordinal());
         }else if(net.minecraft.world.level.block.entity.NativeStockContainer.exact(container)&&index>=0&&index<27){
             var chest=(net.minecraft.world.level.block.entity.NativeStockContainer)container;return chest.nativeContainerForSlots().slot(chest,index,0);
+        }else if(container!=null&&container.getClass()==net.minecraft.world.inventory.ResultContainer.class){
+            // The exact result container reads cell 0 for any index: only index 0 links it.
+            var result=(net.minecraft.world.inventory.ResultContainer)container;
+            return index==0&&result.nativeContainerForSlots()!=null?result.nativeContainerForSlots().slot(result,0,0):null;
         }else if(container!=null&&container.getClass()==net.minecraft.world.inventory.TransientCraftingContainer.class){
             // An exact crafting grid keeps native rows (TransientCraftingContainer); its slots link them.
             var grid=(net.minecraft.world.inventory.TransientCraftingContainer)container;

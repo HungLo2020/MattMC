@@ -8,8 +8,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import org.jetbrains.annotations.Nullable;
 
-public class ResultContainer implements Container, RecipeCraftingHolder {
-	private final NonNullList<ItemStack> itemStacks = NonNullList.withSize(1, ItemStack.EMPTY);
+public class ResultContainer implements Container, RecipeCraftingHolder, net.minecraft.world.level.block.entity.NativeStockContainer {
+	/**
+	 * Exact instances keep the single result cell in native rows (a container cell, as
+	 * crafting grids do), so the result slot's broadcast digests it natively; every
+	 * method below is unchanged, including reading cell 0 for any index.
+	 */
+	private final net.minecraft.world.item.NativeItemState.ContainerCell nativeContainer = this.getClass() == ResultContainer.class
+		? net.minecraft.world.item.NativeItemState.ContainerCell.create(net.minecraft.world.item.NativeItemSlots.withSize(1)) : null;
+	private final NonNullList<ItemStack> itemStacks = this.nativeContainer != null ? this.nativeContainer.facade() : NonNullList.withSize(1, ItemStack.EMPTY);
 	@Nullable
 	private RecipeHolder<?> recipeUsed;
 
@@ -61,6 +68,16 @@ public class ResultContainer implements Container, RecipeCraftingHolder {
 	@Override
 	public void clearContent() {
 		this.itemStacks.clear();
+	}
+
+	@Override
+	public net.minecraft.world.item.NativeItemSlots nativeSlotsForTransfer() {
+		return this.nativeContainer != null && this.itemStacks instanceof net.minecraft.world.item.NativeItemSlots rows ? rows : null;
+	}
+
+	@Override
+	public net.minecraft.world.item.NativeItemState.ContainerCell nativeContainerForSlots() {
+		return this.nativeContainer;
 	}
 
 	@Override

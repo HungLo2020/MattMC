@@ -227,7 +227,8 @@ class NativeBroadcastTest {
         assertNotNull(helmet.broadcastLinkForMenu());
         assertTrue(helmet.broadcastLinkForMenu().isEquipment());
         assertNotNull(menu.getSlot(45).broadcastLinkForMenu(), "the offhand slot keeps Slot.getItem");
-        assertNull(menu.getSlot(0).broadcastLinkForMenu(), "the result slot reads a non-native container");
+        assertNotNull(menu.getSlot(0).broadcastLinkForMenu(), "the result slot keeps Slot.getItem over the native result cell");
+        assertNull(menu.getSlot(0).nativeLinkForMenu(), "ResultSlot keeps the original quick-move path");
     }
 
     // A null equipment (legal for Inventory's constructor) keeps the original prefix:

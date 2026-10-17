@@ -441,6 +441,14 @@ Other sizes keep the original list and its exceptions, for example
 (`constructorBoundariesMatchTheOriginal`). `NativeCraftingGridTest` compares 400
 random container operations, with their notification order, against a subclass grid.
 
+An exact `ResultContainer`, the result cell of crafting and of the anvil, smithing,
+grindstone, loom, stonecutter and cartography menus, keeps its single cell in native rows
+the same way. It reads cell 0 for any index, so only a slot at index 0 links it.
+Every method is unchanged. `ResultSlot` keeps `Slot.getItem`, so the result slot
+gets a broadcast-only link while its quick move, `remove` and `onTake` stay on
+the original path. `NativeCraftingGridTest.nativeResultContainerMatchesTheOriginal`
+compares 300 random operations, at indices -1 to 2, against a subclass container.
+
 ## Broadcast-only slot links
 
 A menu row can carry a second, broadcast-only link (`MenuSlot::digest`, from

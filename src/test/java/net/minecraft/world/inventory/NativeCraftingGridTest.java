@@ -77,4 +77,35 @@ class NativeCraftingGridTest {
         }
         assertTrue(construct(true, -3, -3).endsWith("native true"), "a positive product of negative dimensions keeps native rows like the original list size");
     }
+
+    // The exact ResultContainer keeps its one cell in native rows; every method,
+    // including reading cell 0 for any index, must match a subclass container.
+    static List<String> result(boolean exact) {
+        var events = new ArrayList<String>();
+        ResultContainer container = exact ? new ResultContainer() : new ResultContainer() {};
+        assertEquals(exact, container.nativeSlotsForTransfer() != null);
+        var random = new java.util.Random(31);
+        for (int step = 0; step < 300; step++) {
+            int index = random.nextInt(4) - 1;
+            switch (random.nextInt(6)) {
+                case 0 -> { container.setItem(index, random.nextInt(4) == 0 ? ItemStack.EMPTY : new ItemStack(Items.STICK, 1 + random.nextInt(64))); events.add("set " + index); }
+                case 1 -> { var stack = container.getItem(index); events.add("get " + index + " " + stack.getItem() + "x" + stack.getCount()); }
+                case 2 -> { var taken = container.removeItem(index, 1 + random.nextInt(8)); events.add("remove " + taken.getItem() + "x" + taken.getCount()); }
+                case 3 -> { var taken = container.removeItemNoUpdate(index); events.add("take " + taken.getItem() + "x" + taken.getCount()); }
+                case 4 -> events.add("empty " + container.isEmpty());
+                default -> { if (random.nextInt(6) == 0) { container.clearContent(); events.add("clear"); } }
+            }
+        }
+        container.setRecipeUsed(null); events.add("recipe " + container.getRecipeUsed());
+        return events;
+    }
+    @Test void nativeResultContainerMatchesTheOriginal() {
+        assertEquals(result(false), result(true));
+        var container = new ResultContainer();
+        var linked = new Slot(container, 0, 0, 0); var other = new Slot(container, 1, 0, 0);
+        assertNotNull(linked.nativeLinkForMenu()); assertNull(other.nativeLinkForMenu(), "only index 0 links the single cell");
+        container.setItem(0, new ItemStack(Items.STICK, 4));
+        assertSame(container.getItem(0), linked.getItem()); assertSame(container.getItem(0), other.getItem());
+        assertEquals(1, other.getContainerSlot());
+    }
 }
