@@ -28,9 +28,10 @@ immutable evaluation snapshots. No borrowed VM address crosses a callback.
 The existing [Perlin graph](RUST-PERLIN.md), [Normal producer](RUST-NORMAL.md)
 and [noise sampling ABI](RUST-NOISE.md) remain shared. The extended reader keeps
 single and paired behavior, raw amplitude bits, callback order and physical
-retirement. Random-source state/consumption algorithms and remaining worldgen
-orchestration/compatibility still need migration; this increment does not
-complete noise or world generation.
+retirement. Default source state and leaf consumption now share the actual
+[random-source owners](RUST-RANDOM-SOURCES.md). Derived-source VM factories and
+remaining worldgen orchestration/compatibility still need connected migration;
+this increment does not complete noise or world generation.
 
 Any future fused source path must preserve both source and private generator
 subclass dispatch. Xoroshiro's Java `long * float` calculation rounds before

@@ -48,7 +48,7 @@ and [leaf builder](https://github.com/HungLo2020/MattMC/blob/master/src/main/rus
 ## Remaining ownership and verification
 
 This is a working slice, not a completed random subsystem. Scalar VM-facing
-orchestration, wrapper count/delegation, positional/fork policy and decoration
+orchestration, wrapper integration, positional/fork policy and decoration
 state handoffs still need connected ownership work. The thin
 Java facade and final Rust caller must share the same runtime.
 
@@ -263,3 +263,116 @@ dependency impact, not relabeled as new combined aggregates. See
 `build/worldgen/legacy-source/35308-impact/after.json` and the `combined-*`
 receipts. The separately owned skylight callback/lifecycle work remains outside
 this checkpoint; no whole-worldgen or final performance completion is claimed.
+
+## Wrapper count, seed and leaf production
+
+`WorldgenRandom` count and seed arithmetic now live in Rust. Default leaves
+consume the actual backing source through a native kernel owning both count
+and source data until its last draw; a completed leaf retains neither owner.
+Java supplies real target identities and requested virtual effects. No native
+borrow crosses a callback. These calls use ordinary FFM.
+
+Count commits precede custom draw failures. Preserve a count created by a
+constructor hook before the final target field is assigned, read a target
+replaced by a callback again for the next bit request, and keep the wrapper's
+Gaussian cache independent of delegated reseeds. Two bit requests still consume
+two backing Xoroshiro words. These constraints also apply to private generator
+callbacks and feature/salt seed effects that reenter and throw after seed commit.
+
+Original Frozen, complete published `ac11e032` and Current first matched ten
+public dangerous contracts and 18,456 count/seed/fork/backing-state observations
+(SHA256 `68461e6556b768e74e8a011b2807882f1975753a2b00327a73aad2350e052427`).
+Expanded contracts pass 15 per runtime, with 2,280 additional leaf/count-overflow/
+slime observations matching all three references. The corrected working release
+(`475a8e16`) passes 276 focused checks and 70 native module checks. Four safe
+production fault controls detect lost count commits, signed word shifts,
+widened feature-seed overflow and leaked base ownership. Actual pending kernels
+continue after facade/arena collection, then retire both count and source.
+The two later single-effect prefix cases have portable and ordinary receipts;
+they are not relabeled into the earlier 276 focused aggregate.
+
+Run compatibility and the bounded production screen with complete reference
+classpaths and matching libraries:
+
+```sh
+python3 DevUtils/tests/worldgen/random_source/VerifyWorldgenSources.py \
+  --pre-runtime build/worldgen/worldgen-random/pre-ac11-runtime \
+  --output build/worldgen/<new-wrapper-contract-directory>
+python3 DevUtils/tests/worldgen/random_source/VerifyWorldgenScreen.py \
+  --pre-runtime build/worldgen/worldgen-random/pre-ac11-runtime \
+  --output build/worldgen/<new-wrapper-screen-directory>
+```
+
+The screen measures actual leaf construction, four seed operations and wrapper
+creation plus those operations. It checks source successors, counts, native
+frame/owner work and retirement. `--smoke` is functional preparation, not a
+performance measurement. The original four-frame screen remains at
+`build/worldgen/worldgen-random/combined-screen`, with exact source snapshots.
+Two unnecessary single-effect feature/salt frames were removed: shared native
+arithmetic now supplies the original virtual VM seed call directly. Decoration
+and large-feature operations retain their real pending frames.
+
+The corrected `two-frame-screen` verifies two frames per seed group and complete
+retirement. Seed groups remain slower at 702–800ns versus 250–374ns pre, with 244
+additional Java bytes. Creation plus seeds costs 902–1060ns versus 537–588ns pre,
+also 244 additional bytes. Old/new timing ranges overlap: actual frame removal
+is proven, an isolated timing improvement is not. Legacy leaf construction
+measured 3.89–4.70µs versus 6.08–6.72µs pre; Xoroshiro measured 5.33–6.34µs versus
+6.88–8.00µs pre, but its original overlapping screen remains inconclusive.
+Frozen latency debt remains. Actual work/retirement and zero swap are verified;
+process RSS does not attribute native allocation. See `resource-assessment.json`.
+The connected exit is native derived-source factories and whole consumers,
+removing temporary VM owner factories and per-bit bridges. Final budgets,
+hardware and whole random/worldgen completion remain open.
+
+The `34279686` plus wrapper image passed fresh mandatory tiers: 2,739 ordinary
+Java tests with six skips, 193 parity, 11 slow and 3,199 Rust tests with nine
+ignored. Fresh FULL and CARVERS-resume each generated and saved 648 chunks per
+runtime. All eight regions match published pre exactly; standard dimensions
+match Frozen, retaining 162 original Primordial differences. Failure injection
+preserves nine rollback chunks, CARVERS in memory and absence on disk;
+cancellation releases 660 holders and matches 169 statuses with its permitted
+data differences. Stock fresh/reopen and player pending-shutdown/own-save/reopen
+also pass. Receipts under `build/worldgen/worldgen-random/stable-*` retain this
+actual 342-based scope. Reconciliation with the later lighting retirement
+checkpoint requires affected combined-image checks; earlier aggregates are not
+relabeled. This checkpoint does not complete world generation.
+
+The later `7619d2db` lighting reconciliation changes five Java sources and 13
+Main class files; 13,923 other classes, all 1,295 Rust sources, release `475a8e16`,
+build configuration and 117 dependencies remain exact. Fresh combined checks
+pass 312 focused cases plus original checked lighting effects, idle 1/128/cycle
+retirement and modeled/real release-prefix cases. A short-process external
+native-mapping sampler missed one completed modeled test; its failure is kept.
+An in-process mapped-file/hash observer verified all three unchanged release
+tests without a delay, manual drain or changed assertion.
+
+Fresh Current FULL and CARVERS-resume runs on 7619 each generated and saved 648
+chunks, compared against explicitly preserved reference rows with byte-exact
+audit classes and matching settings. All eight pre regions match; standard
+Frozen dimensions match with the same 162 Primordial differences. Fresh stock
+and player shutdown/own-save/reopen checks also pass. See `7619-impact`,
+`7619-focused`, `7619-light-release`, `7619-full-*` and `7619-saves` under the
+same evidence root. Earlier broad/resource receipts retain their actual 342
+scope; unchanged inputs justify reuse, not relabeled aggregate results.
+
+The subsequent crafting-row update (`2bcdbe2c`) changes three item/menu Java
+families, with 16 changed Main files and 13,920 others exact; Rust, native
+library, source/noise classes and build/dependency inputs remain unchanged.
+Its fresh item 15 and real hopper 16/save checks pass on all three runtimes.
+Incoming review separately reproduced three negative/wrapped-negative grid
+constructor failures against the actual built facade: its structural exception
+differed from original Frozen/pre `NegativeArraySizeException`. Keep that
+negative receipt; the normal crafting results do not certify invalid sizes.
+
+The standalone correction (`3d04cb0d`) changes only one Main class. The final
+paired image passes 315 focused checks, including the new constructor-boundary
+contract. The exact original observer bytecode now matches Frozen/pre for all
+three reproduced cases and exception messages; all other 13,935 Main classes,
+Rust/configuration/dependencies and the release library remain byte-exact.
+Receipts are `3d04-focused-final`, `3d04-impact` and
+`3d04-crafting-ctor-corrected`. An earlier input snapshot overlapped its sync;
+its passing XML is retained with a failed source guard and does not count as
+acceptance. Capture inputs only after Git operations settle. Earlier mandatory,
+world, resource and affected item receipts retain their actual image scopes,
+with the explicit unchanged-input impact records above.

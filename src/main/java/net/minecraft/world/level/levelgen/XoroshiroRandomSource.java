@@ -20,6 +20,7 @@ public class XoroshiroRandomSource implements RandomSource {
  private long word(){var root=observed();return root==null?nativeSource.next():root.nextLong();}
  private boolean nativeWords(){var root=observed();return getClass()==XoroshiroRandomSource.class&&(root==null||root.getClass()==Xoroshiro128PlusPlus.class);}
  static NativeXoroshiroSource nativeGaussianProducer(RandomSource source){if(source==null||source.getClass()!=XoroshiroRandomSource.class)return null;var actual=(XoroshiroRandomSource)source;return actual.nativeWords()?actual.nativeSource:null;}
+ static NativeXoroshiroSource nativeWorldgenProducer(RandomSource source){if(source==null||source.getClass()!=XoroshiroRandomSource.class)return null;var actual=(XoroshiroRandomSource)source;if(actual.nativeSource==null)return null;return actual.nativeWords()?actual.nativeSource:null;}
  public MarsagliaPolarGaussian nativeGaussian(){return gaussianSource;}
  public Xoroshiro128PlusPlus nativeGenerator(){return generator();}
  public static long nativeNoiseLeaf(RandomSource source,boolean simplex){if(source==null||source.getClass()!=XoroshiroRandomSource.class)return 0;var actual=(XoroshiroRandomSource)source;var root=actual.observed();if(root!=null&&root.getClass()!=Xoroshiro128PlusPlus.class)return 0;return actual.nativeSource.leaf(simplex);}

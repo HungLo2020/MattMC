@@ -43,7 +43,8 @@ final class NativeNoiseSeed {
         Arena arena=Arena.ofAuto();
         long builder=0;
         try {
-            long produced=net.minecraft.world.level.levelgen.LegacyRandomSource.nativeNoiseLeaf(randomSource,simplex);
+            long produced=net.minecraft.world.level.levelgen.WorldgenRandom.nativeNoiseLeaf(randomSource,simplex);
+            if(produced==0)produced=net.minecraft.world.level.levelgen.LegacyRandomSource.nativeNoiseLeaf(randomSource,simplex);
             if(produced==0)produced=net.minecraft.world.level.levelgen.XoroshiroRandomSource.nativeNoiseLeaf(randomSource,simplex);
             if(produced==0){
             builder=(long)BUILDER.invokeExact(simplex?1:0);

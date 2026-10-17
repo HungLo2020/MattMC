@@ -42,6 +42,7 @@ final class NativeLegacySource {
         long value = id;
         return value != 0 ? value : initialize();
     }
+    long initializedHandle() { return id; }
     private synchronized long initialize() {
         if (id != 0) return id;
         Arena arena = Arena.ofAuto();

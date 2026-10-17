@@ -118,6 +118,10 @@ fn from_legacy(source: Arc<crate::world::level::levelgen::owned_legacy::Source>,
     })
 }
 
+fn from_worldgen(kernel: crate::world::level::levelgen::owned_worldgen::Kernel, simplex: bool) -> Result<Arc<Leaf>, ()> {
+    try_from_draws(simplex, |op,arg| match op {1=>kernel.double().map(f64::to_bits),2=>kernel.bounded(arg as i32).map(|value|value as u64),_=>unreachable!()})
+}
+
 fn from_xoroshiro(
     source: std::sync::Arc<crate::world::level::levelgen::owned_xoroshiro::OwnedXoroshiro>,
     simplex: bool,
@@ -186,6 +190,11 @@ pub(super) mod ffi {
     pub unsafe extern "C" fn mattmc_noise_seed_from_legacy_source(id: u64, simplex: i32) -> u64 {
         let source = crate::world::level::levelgen::owned_legacy::ffi::retain(id);
         from_legacy(source, simplex != 0).map_or(0, |leaf| Arc::into_raw(leaf).expose_provenance() as u64)
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn mattmc_noise_seed_from_worldgen(id:u64,kind:i32,source:u64,simplex:i32)->u64 {
+        let Some(kernel)=crate::world::level::levelgen::owned_worldgen::ffi::kernel(id,kind,source)else{return 0;};
+        from_worldgen(kernel,simplex!=0).map_or(0,|leaf|Arc::into_raw(leaf).expose_provenance()as u64)
     }
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_noise_seed_builder(simplex: i32) -> u64 {
@@ -385,4 +394,17 @@ pub(super) mod tests {
         });
         assert!(result.is_err());assert!(weak.upgrade().is_none());
     }
+    #[test]
+    fn actual_worldgen_leaf_retires_count_and_backing_at_last_draw() { unsafe {
+        use crate::world::level::levelgen::{owned_worldgen::ffi as wg,owned_legacy::ffi as legacy};
+        for simplex in [false,true] {
+            let id=wg::mattmc_worldgen_new();let source=legacy::mattmc_random_source_legacy_new();
+            let watch=wg::mattmc_worldgen_weak_new(id);let sw=Arc::downgrade(&legacy::retain(source));
+            let kernel=wg::kernel(id,1,source).unwrap();wg::mattmc_worldgen_release(id);legacy::mattmc_random_source_legacy_release(source);
+            assert_eq!(wg::mattmc_worldgen_weak_count(watch),1);assert_eq!(sw.strong_count(),1);
+            let leaf=from_worldgen(kernel,simplex).unwrap();assert_eq!(wg::mattmc_worldgen_weak_count(watch),0);assert_eq!(sw.strong_count(),0);
+            assert_eq!(leaf.permutation.len(),256);wg::mattmc_worldgen_weak_release(watch);
+        }
+    }}
+
 }

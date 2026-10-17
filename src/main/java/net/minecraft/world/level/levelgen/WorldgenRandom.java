@@ -5,7 +5,7 @@ import net.minecraft.util.RandomSource;
 
 public class WorldgenRandom extends LegacyRandomSource {
 	private final RandomSource randomSource;
-	private int count;
+	private volatile NativeWorldgenSource nativeState;
 
 	public WorldgenRandom(RandomSource randomSource) {
 		super(0L);
@@ -17,18 +17,24 @@ public class WorldgenRandom extends LegacyRandomSource {
 		return this.randomSource;
 	}
 
-	public int getCount() {
-		return this.count;
+	private NativeWorldgenSource state() {
+		var value=this.nativeState;
+		if(value==null){synchronized(this){value=this.nativeState;if(value==null)this.nativeState=value=new NativeWorldgenSource();}}
+		return value;
 	}
 
-	/** Internal native invocation handoff of this wrapper's actual draw count. */
-	public int nativeCount() {
-		return this.count;
-	}
-
-	/** Native draws and genuine Java callbacks share the original physical field. */
-	public void nativeSetCount(int count) {
-		this.count = count;
+	public int getCount() { var value=this.nativeState;return value==null?0:value.count(); }
+	public int nativeCount() { var value=this.nativeState;return value==null?0:value.count(); }
+	public void nativeSetCount(int count) { this.state().count(count); }
+	final RandomSource nativeTarget() { return this.randomSource; }
+	final int nativeNextLegacy(int bits) { return ((LegacyRandomSource)this.randomSource).next(bits); }
+	final long nativeNextWord() { return this.randomSource.nextLong(); }
+	final NativeWorldgenSource nativeState() { return this.state(); }
+	public static long nativeNoiseLeaf(RandomSource source,boolean simplex) {
+		if(source==null||source.getClass()!=WorldgenRandom.class)return 0;
+		var actual=(WorldgenRandom)source;var target=NativeWorldgenSource.target(actual.randomSource);
+		if(target.id()==0)return 0;
+		try{return actual.state().leaf(target,simplex);}finally{java.lang.ref.Reference.reachabilityFence(actual);}
 	}
 
 	@Override
@@ -42,10 +48,7 @@ public class WorldgenRandom extends LegacyRandomSource {
 	}
 
 	@Override
-	public int next(int i) {
-		this.count++;
-		return this.randomSource instanceof LegacyRandomSource legacyRandomSource ? legacyRandomSource.next(i) : (int)(this.randomSource.nextLong() >>> 64 - i);
-	}
+	public int next(int bits) { return this.state().next(this,bits); }
 
 	@Override
 	public synchronized void setSeed(long l) {
@@ -54,36 +57,11 @@ public class WorldgenRandom extends LegacyRandomSource {
 		}
 	}
 
-	public long setDecorationSeed(long l, int i, int j) {
-		this.setSeed(l);
-		long m = this.nextLong() | 1L;
-		long n = this.nextLong() | 1L;
-		long o = i * m + j * n ^ l;
-		this.setSeed(o);
-		return o;
-	}
-
-	public void setFeatureSeed(long l, int i, int j) {
-		long m = l + i + 10000 * j;
-		this.setSeed(m);
-	}
-
-	public void setLargeFeatureSeed(long l, int i, int j) {
-		this.setSeed(l);
-		long m = this.nextLong();
-		long n = this.nextLong();
-		long o = i * m ^ j * n ^ l;
-		this.setSeed(o);
-	}
-
-	public void setLargeFeatureWithSalt(long l, int i, int j, int k) {
-		long m = i * 341873128712L + j * 132897987541L + l + k;
-		this.setSeed(m);
-	}
-
-	public static RandomSource seedSlimeChunk(int i, int j, long l, long m) {
-		return RandomSource.create(l + i * i * 4987142 + i * 5947611 + j * j * 4392871L + j * 389711 ^ m);
-	}
+	public long setDecorationSeed(long seed,int x,int z) { return NativeWorldgenSource.seed(this,1,seed,x,z,0); }
+	public void setFeatureSeed(long seed,int index,int step) { NativeWorldgenSource.seed(this,3,seed,index,step,0); }
+	public void setLargeFeatureSeed(long seed,int x,int z) { NativeWorldgenSource.seed(this,2,seed,x,z,0); }
+	public void setLargeFeatureWithSalt(long seed,int x,int z,int salt) { NativeWorldgenSource.seed(this,4,seed,x,z,salt); }
+	public static RandomSource seedSlimeChunk(int x,int z,long seed,long salt) { return RandomSource.create(NativeWorldgenSource.slime(seed,x,z,salt)); }
 
 	public static enum Algorithm {
 		LEGACY(LegacyRandomSource::new),
