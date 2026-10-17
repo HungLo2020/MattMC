@@ -16,3 +16,5 @@
   Frozen verification.
 
 - [Shared biome temperature](RUST-TEMPERATURE.md): native temperature policy, shared per-thread FIFO history, callback ordering and verification.
+
+- [Shared biome weather policy](RUST-WEATHER.md): native precipitation/freezing/snow decisions, actual temperature-child lifetime and ordered world observations.

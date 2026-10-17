@@ -114,8 +114,9 @@ a top-material upcall. Java retains registry/chunk facades and genuine VM lifecy
 request/holder/task progression, stage admission/completion and native invocation,
 pending-consumer and callback binding leases. This is an intermediate connected
 checkpoint, not completion of world generation: Java compatibility algorithms,
-noise/seed construction, higher-level freezing/snow policies and other documented
-generation dependencies remain. The [shared biome temperature/cache](../biome/RUST-TEMPERATURE.md)
+noise/seed construction, Java compatibility and other documented generation
+dependencies remain. The [shared biome weather policy](../biome/RUST-WEATHER.md)
+now owns precipitation, freezing and snow decisions with an embedded temperature child. The [shared biome temperature/cache](../biome/RUST-TEMPERATURE.md)
 now lives in Rust behind the existing public callers. Each guide defines its actual ownership and gates.
 
 ### Heightmaps

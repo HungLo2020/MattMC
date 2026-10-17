@@ -59,8 +59,10 @@ verification, not as a second production cache.
 
 Noise object construction and seed initialization remain Java-owned. The shared
 noise evaluator is already native. Higher-level precipitation, freezing and snow
-policies still execute through their existing Java callers; their ownership is
-remaining whole-world-generation work. See the [surface constraints](../levelgen/RUST-SURFACE.md#temperature)
+now use the [native weather policy](RUST-WEATHER.md) with an embedded actual
+temperature child and ordered world observations. Remaining world-generation
+work includes noise construction, compatibility paths and the separately
+reserved region/effect handoff. See the [surface constraints](../levelgen/RUST-SURFACE.md#temperature)
 and [decoration ordering](../levelgen/feature/RUST-DECORATION.md#what-runs-in-rust).
 
 ## Intermediate verification — October 16, 2026

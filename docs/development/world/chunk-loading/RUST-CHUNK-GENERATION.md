@@ -524,8 +524,9 @@ are 323,368→330,028 fresh and 216,587→221,258 reopened; loaded requests rema
 not acceptance timings or pure-FFI/native-allocation/synchronization shares.
 
 HungLoDE/Codex retains complete world-generation ownership. Continue connected
-producer/state/consumer migrations, including remaining Java compatibility, noise
-construction and higher-level freezing policies. The subsequent
+producer/state/consumer migrations, including remaining Java compatibility and noise
+construction. The subsequent [biome weather migration](../biome/RUST-WEATHER.md)
+removes the higher-level Java precipitation/freezing/snow decisions. The subsequent
 [shared temperature/cache migration](../biome/RUST-TEMPERATURE.md) removes that
 Java implementation; neither increment completes world generation. Server-owned region/effect and lighting reservations remain fenced.
 Original failed controls, source snapshots, full runtime receipts, screen and

@@ -116,6 +116,11 @@ final class NativeBiomeTemperature {
             } catch (Throwable failure) { original = failure; failed = 1; }
         }
     }
+    /** The weather parent's actual child adopts this cache before this VM lease ends. */
+    void bindWeather(long driver, int modifier) {
+        try { NativeBiomeWeather.bind(driver, id, modifier); }
+        finally { Reference.reachabilityFence(this); }
+    }
     /** Opt-in verifier only; copies the actual current-thread cache in FIFO order. */
     long[] snapshot() {
         try (Arena arena = Arena.ofConfined()) {

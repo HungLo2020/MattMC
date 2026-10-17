@@ -5,7 +5,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, Mutex,
 };
-mod ffi;
+pub(super) mod ffi;
 const CAPACITY: usize = 1024;
 static LIVE: AtomicU64 = AtomicU64::new(0);
 static CREATED: AtomicU64 = AtomicU64::new(0);
@@ -19,11 +19,11 @@ struct Store {
     values: HashMap<i64, f32>,
     order: VecDeque<i64>,
 }
-struct Cache {
+pub(super) struct Cache {
     store: Mutex<Store>,
 }
 impl Cache {
-    fn create() -> Option<Arc<Self>> {
+    pub(super) fn create() -> Option<Arc<Self>> {
         let mut store = Store::default();
         store.values.try_reserve(CAPACITY).ok()?;
         store.order.try_reserve(CAPACITY).ok()?;
@@ -33,7 +33,7 @@ impl Cache {
             store: Mutex::new(store),
         }))
     }
-    fn lookup(&self, key: i64, mode: i32) -> i32 {
+    pub(super) fn lookup(&self, key: i64, mode: i32) -> i32 {
         let value = self
             .store
             .lock()
@@ -80,8 +80,8 @@ fn predicate(value: f32, mode: i32) -> bool {
 }
 // VM commands: 1 base value, 2 Y, 3 X, 4 Z, 5 synthesis, 6 null modifier throw.
 #[repr(C)]
-struct Frame {
-    header: [u64; 4],
+pub(super) struct Frame {
+    pub(super) header: [u64; 4],
     cache: Option<Arc<Cache>>,
     key: i64,
     sea: i32,
@@ -98,7 +98,7 @@ struct Frame {
     terminal: Option<i32>,
 }
 impl Frame {
-    fn new(
+    pub(super) fn new(
         cache: Option<Arc<Cache>>,
         key: i64,
         sea: i32,
@@ -169,7 +169,7 @@ impl Frame {
             _ => self.effect(99, 6),
         }
     }
-    fn next(&mut self, response: u64, failed: bool) -> i32 {
+    pub(super) fn next(&mut self, response: u64, failed: bool) -> i32 {
         if let Some(done) = self.terminal {
             return done;
         }

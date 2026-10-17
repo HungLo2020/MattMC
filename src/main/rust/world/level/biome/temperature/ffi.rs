@@ -1,6 +1,6 @@
 //! Private biome service entry points. Only FFI borrows caller-owned noise data.
 use super::*;
-unsafe fn retain(id: u64) -> Arc<Cache> {
+pub(in crate::world::level::biome) unsafe fn retain(id: u64) -> Arc<Cache> {
     let p = std::ptr::with_exposed_provenance::<Cache>(id as usize);
     Arc::increment_strong_count(p);
     Arc::from_raw(p)

@@ -18,15 +18,9 @@ import net.minecraft.world.level.ColorMapColorUtil;
 import net.minecraft.world.level.FoliageColor;
 import net.minecraft.world.level.GrassColor;
 import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LiquidBlock;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.LegacyRandomSource;
 import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.synth.PerlinSimplexNoise;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import net.sodium.client.world.biome.BiomeColorMaps;
 import org.jetbrains.annotations.Nullable;
 
@@ -91,13 +85,20 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		return this.climateSettings.hasPrecipitation();
 	}
 
-	public Biome.Precipitation getPrecipitationAt(BlockPos blockPos, int i) {
-		if (!this.hasPrecipitation()) {
-			return Biome.Precipitation.NONE;
-		} else {
-			return this.coldEnoughToSnow(blockPos, i) ? Biome.Precipitation.SNOW : Biome.Precipitation.RAIN;
-		}
-	}
+	public Biome.Precipitation getPrecipitationAt(BlockPos blockPos, int seaLevel) {
+        return switch (NativeBiomeWeather.evaluate(this, blockPos, null, 0, seaLevel, false)) {
+            case 0 -> Biome.Precipitation.NONE;
+            case 1 -> Biome.Precipitation.RAIN;
+            case 2 -> Biome.Precipitation.SNOW;
+            default -> throw new IllegalStateException("Invalid native precipitation value");
+        };
+    }
+
+    void bindWeatherTemperature(long driver) {
+        NativeBiomeTemperature cache = this.temperatureCache.get();
+        Biome.TemperatureModifier modifier = this.climateSettings.temperatureModifier();
+        cache.bindWeather(driver, modifier == null ? -1 : modifier.ordinal());
+    }
 
 	private boolean temperatureTest(BlockPos blockPos, int seaLevel, int mode) {
 		long key = blockPos.asLong();
@@ -119,34 +120,12 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	}
 
 	public boolean shouldFreeze(LevelReader levelReader, BlockPos blockPos) {
-		return this.shouldFreeze(levelReader, blockPos, true);
-	}
+        return this.shouldFreeze(levelReader, blockPos, true);
+    }
 
-	public boolean shouldFreeze(LevelReader levelReader, BlockPos blockPos, boolean bl) {
-		if (this.warmEnoughToRain(blockPos, levelReader.getSeaLevel())) {
-			return false;
-		} else {
-			if (levelReader.isInsideBuildHeight(blockPos.getY()) && levelReader.getBrightness(LightLayer.BLOCK, blockPos) < 10) {
-				BlockState blockState = levelReader.getBlockState(blockPos);
-				FluidState fluidState = levelReader.getFluidState(blockPos);
-				if (fluidState.getType() == Fluids.WATER && blockState.getBlock() instanceof LiquidBlock) {
-					if (!bl) {
-						return true;
-					}
-
-					boolean bl2 = levelReader.isWaterAt(blockPos.west())
-						&& levelReader.isWaterAt(blockPos.east())
-						&& levelReader.isWaterAt(blockPos.north())
-						&& levelReader.isWaterAt(blockPos.south());
-					if (!bl2) {
-						return true;
-					}
-				}
-			}
-
-			return false;
-		}
-	}
+    public boolean shouldFreeze(LevelReader levelReader, BlockPos blockPos, boolean edge) {
+        return NativeBiomeWeather.evaluate(this, blockPos, levelReader, 1, 0, edge) != 0;
+    }
 
 	public boolean coldEnoughToSnow(BlockPos blockPos, int i) {
 		return !this.warmEnoughToRain(blockPos, i);
@@ -161,19 +140,8 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	}
 
 	public boolean shouldSnow(LevelReader levelReader, BlockPos blockPos) {
-		if (this.getPrecipitationAt(blockPos, levelReader.getSeaLevel()) != Biome.Precipitation.SNOW) {
-			return false;
-		} else {
-			if (levelReader.isInsideBuildHeight(blockPos.getY()) && levelReader.getBrightness(LightLayer.BLOCK, blockPos) < 10) {
-				BlockState blockState = levelReader.getBlockState(blockPos);
-				if ((blockState.isAir() || blockState.is(Blocks.SNOW)) && Blocks.SNOW.defaultBlockState().canSurvive(levelReader, blockPos)) {
-					return true;
-				}
-			}
-
-			return false;
-		}
-	}
+        return NativeBiomeWeather.evaluate(this, blockPos, levelReader, 2, 0, false) != 0;
+    }
 
 	public BiomeGenerationSettings getGenerationSettings() {
 		return this.generationSettings;
