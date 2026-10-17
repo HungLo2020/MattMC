@@ -28,11 +28,13 @@ engine or world simulation out of Java.
   nested native propagation is excluded. The original single-thread caller
   contract remains; this does not certify arbitrary concurrent or reentrant use.
 
-Java still owns `blockNodesToCheck`, section admission, contextual callbacks,
-column extraction, per-engine publication and compatibility propagation loops.
-The server's outer batch/scheduling policy has its separate
-[threaded coordinator](RUST-THREADED-LIGHTING.md).
-Rust owns pending queues even when those compatibility loops execute. No GPU
+The connected [light coordinator](RUST-LIGHT-COORDINATOR.md) now owns stock node
+membership, section admission, columns and publication. Java retains genuine
+world/object callbacks and compatibility paths. Stock block/sky source seeding
+uses Rust; custom readers and mixed or escaped layers still have Java source
+loops that remain part of the unfinished lighting migration. Rust owns their
+pending queues as well. The server's outer batch/scheduling and request policy
+has its separate [threaded coordinator](RUST-THREADED-LIGHTING.md). No GPU
 resource, presenter or rendering boundary is involved.
 
 ## Verify changes

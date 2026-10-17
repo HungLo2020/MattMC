@@ -186,7 +186,106 @@ pub unsafe extern "C" fn mattmc_light_level_check(token: *const LevelToken, pos:
 mod tests {
     use super::*;
     use super::super::{ffi, NODES};
-    use crate::world::level::lighting::{maps::ffi as maps, propagation::work::Queues};
+    use crate::world::level::lighting::{maps::ffi as maps, propagation::{self, work::Queues}};
+
+    #[test]
+    fn request_frame_keeps_actual_level_after_both_callers_release_then_drops_it() {
+        use crate::world::level::lighting::requests::*;
+        unsafe {
+            // Each suspension is a genuine VM boundary in a production request.
+            for (kind, post, expected) in [(0, 0, 32), (1, 1, 39), (2, 0, 40)] {
+                let registry = maps::mattmc_light_map_registry_create();
+                let map = Arc::from_raw(maps::mattmc_light_map_create(registry));
+                maps::mattmc_light_map_registry_release(registry);
+                let owner = ffi::mattmc_light_coordinator_create(Arc::as_ptr(&map), 0);
+                let work = Arc::new(Queues::default());
+                let binding = ffi::mattmc_light_coordinator_bind(owner, Arc::as_ptr(&work), 0);
+                let level = mattmc_light_level_create(binding.cast(), std::ptr::null());
+                Arc::increment_strong_count(level.cast::<Level>());
+                let observed = Arc::from_raw(level.cast::<Level>());
+                let weak = Arc::downgrade(&observed);
+                drop(observed);
+                let request = mattmc_light_request_create(level, kind, 0, 0);
+                let frame = mattmc_light_request_begin(request, post);
+                let mut out = [0i64; 7];
+                assert_eq!(mattmc_light_request_read(frame, out.as_mut_ptr()), expected);
+                mattmc_light_request_release(request);
+                mattmc_light_level_release(level);
+                ffi::mattmc_light_coordinator_bind_release(binding);
+                ffi::mattmc_light_coordinator_release(owner);
+                assert!(weak.upgrade().is_some(), "suspended frame owns the actual level");
+                // Dropping an invocation models a throwing VM effect, not success.
+                mattmc_light_request_end(frame);
+                assert!(weak.upgrade().is_none(), "no native owner survives abandoned invocation");
+            }
+        }
+    }
+
+    #[test]
+    fn abandoned_request_releases_actual_block_sky_child_and_retries_committed_prefix() {
+        use crate::world::level::lighting::requests::*;
+        unsafe {
+            let registry = maps::mattmc_light_map_registry_create();
+            let block_map = Arc::from_raw(maps::mattmc_light_map_create(registry));
+            let sky_map = Arc::from_raw(maps::mattmc_light_map_create(registry));
+            let block_owner = ffi::mattmc_light_coordinator_create(Arc::as_ptr(&block_map), 0);
+            let sky_owner = ffi::mattmc_light_coordinator_create(Arc::as_ptr(&sky_map), 1);
+            let block_work = Arc::new(Queues::default());
+            let sky_work = Arc::new(Queues::default());
+            let block = ffi::mattmc_light_coordinator_bind(block_owner, Arc::as_ptr(&block_work), 0);
+            let sky = ffi::mattmc_light_coordinator_bind(sky_owner, Arc::as_ptr(&sky_work), 1);
+            let level = mattmc_light_level_create(block.cast(), sky.cast());
+            assert!(status(level, propagation::section_pos(0, 2, 0), false).is_null());
+            let mut slot = 0;
+            let reservation = maps::mattmc_light_map_reserve(registry, &mut slot);
+            let identity = maps::mattmc_light_map_identity_create(registry);
+            let opaque = sky_map.entry(*Box::from_raw(reservation), None, identity).unwrap();
+            sky_map.set(propagation::section_pos(0, 1, 0), Some(Arc::clone(&opaque)));
+            sky_map.clear_cache(false);
+            let request = mattmc_light_request_create(level, 0, 0, 0);
+            let frame = mattmc_light_request_begin(request, 0);
+            let mut out = [0i64; 7];
+            assert_eq!(mattmc_light_request_read(frame, out.as_mut_ptr()), 32);
+            for (reply, expected) in [(0, 33), (1, 34), (0, 35), (0, 16)] {
+                assert_eq!(mattmc_light_request_step(frame, reply, std::ptr::null(), out.as_mut_ptr()), expected);
+            }
+            assert_eq!(out[6], 0, "block prefix completes before sky callback");
+            let mut retired = [0u32; 64];
+            let count = maps::mattmc_light_map_retired(registry, retired.as_mut_ptr(), 64);
+            assert!(count > 0);
+            assert_eq!(maps::mattmc_light_map_retired_ack(registry, retired.as_ptr(), count as u32), 0);
+            assert_eq!(mattmc_light_request_step(frame, 0, std::ptr::null(), out.as_mut_ptr()), 1);
+            assert_eq!(out[6], 1);
+            assert_eq!(out[0], i64::from(opaque.id));
+            Arc::increment_strong_count(level.cast::<Level>());
+            let observed = Arc::from_raw(level.cast::<Level>());
+            assert_eq!(Arc::strong_count(&observed), 4,
+                "original caller, request, real child and observer each retain the level");
+            drop(observed);
+            mattmc_light_request_end(frame);
+            // Retrying the original request starts its live section scan again,
+            // while the already committed block/sky status prefix stays applied.
+            let retry = mattmc_light_request_begin(request, 0);
+            assert_eq!(mattmc_light_request_read(retry, out.as_mut_ptr()), 32);
+            for (reply, expected) in [(0, 33), (1, 34), (0, 35), (0, 33), (1, 0)] {
+                assert_eq!(mattmc_light_request_step(retry, reply, std::ptr::null(), out.as_mut_ptr()), expected);
+            }
+            mattmc_light_request_end(retry);
+            Arc::increment_strong_count(level.cast::<Level>());
+            let observed = Arc::from_raw(level.cast::<Level>());
+            let weak = Arc::downgrade(&observed);
+            drop(observed);
+            mattmc_light_level_release(level);
+            ffi::mattmc_light_coordinator_bind_release(block);
+            ffi::mattmc_light_coordinator_bind_release(sky);
+            ffi::mattmc_light_coordinator_release(block_owner);
+            ffi::mattmc_light_coordinator_release(sky_owner);
+            assert!(weak.upgrade().is_some(), "queued request alone retains both actual engines");
+            mattmc_light_request_release(request);
+            assert!(weak.upgrade().is_none());
+            maps::mattmc_light_map_registry_release(registry);
+        }
+    }
 
     #[test]
     fn produced_snapshot_is_owned_until_claim_or_abandoned_vm_publication(){

@@ -70,6 +70,10 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 	}
 
 	protected void updateChunkStatus(ChunkPos chunkPos) {
+        LightRequest request=getClass()==ThreadedLevelLightEngine.class?nativeLightRequest(2,null,chunkPos,false,LOGGER):null;
+        if(request!=null){
+            this.addTask(chunkPos.x,chunkPos.z,()->0,TaskType.PRE_UPDATE,Util.name((Runnable)request::pre,()->"updateChunkStatus "+chunkPos+" true"));return;
+        }
 		this.addTask(chunkPos.x, chunkPos.z, () -> 0, ThreadedLevelLightEngine.TaskType.PRE_UPDATE, Util.name((Runnable)(() -> {
 			super.retainData(chunkPos, false);
 			super.setLightEnabled(chunkPos, false);
@@ -200,6 +204,12 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 
 	public CompletableFuture<ChunkAccess> initializeLight(ChunkAccess chunkAccess, boolean bl) {
 		ChunkPos chunkPos = chunkAccess.getPos();
+        LightRequest request=getClass()==ThreadedLevelLightEngine.class?nativeLightRequest(0,chunkAccess,chunkPos,bl,LOGGER):null;
+        if(request!=null){
+            this.addTask(chunkPos.x,chunkPos.z,TaskType.PRE_UPDATE,Util.name((Runnable)request::pre,()->"initializeLight: "+chunkPos));
+            Runnable completion=request.postTask(chunkAccess);
+            return CompletableFuture.supplyAsync(()->{completion.run();return chunkAccess;},runnable->this.addTask(chunkPos.x,chunkPos.z,TaskType.POST_UPDATE,runnable));
+        }
 		this.addTask(chunkPos.x, chunkPos.z, ThreadedLevelLightEngine.TaskType.PRE_UPDATE, Util.name((Runnable)(() -> {
 			LevelChunkSection[] levelChunkSections = chunkAccess.getSectionsForRead();
 
@@ -221,6 +231,12 @@ public class ThreadedLevelLightEngine extends LevelLightEngine implements AutoCl
 	public CompletableFuture<ChunkAccess> lightChunk(ChunkAccess chunkAccess, boolean bl) {
 		ChunkPos chunkPos = chunkAccess.getPos();
 		chunkAccess.setLightCorrect(false);
+        LightRequest request=getClass()==ThreadedLevelLightEngine.class?nativeLightRequest(1,chunkAccess,chunkPos,bl,LOGGER):null;
+        if(request!=null){
+            this.addTask(chunkPos.x,chunkPos.z,TaskType.PRE_UPDATE,Util.name((Runnable)request::pre,()->"lightChunk "+chunkPos+" "+bl));
+            Runnable completion=request.postTask(chunkAccess);
+            return CompletableFuture.supplyAsync(()->{completion.run();return chunkAccess;},runnable->this.addTask(chunkPos.x,chunkPos.z,TaskType.POST_UPDATE,runnable));
+        }
 		this.addTask(chunkPos.x, chunkPos.z, ThreadedLevelLightEngine.TaskType.PRE_UPDATE, Util.name((Runnable)(() -> {
 			if (!bl) {
 				super.propagateLightSources(chunkPos);

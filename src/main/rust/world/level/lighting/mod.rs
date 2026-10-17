@@ -6,5 +6,6 @@ pub(crate) mod layers;
 pub(crate) mod maps;
 pub(crate) mod task_batch;
 pub(crate) mod coordinator;
+pub(crate) mod requests;
 
 pub(crate) mod dh;

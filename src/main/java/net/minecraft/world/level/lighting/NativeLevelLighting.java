@@ -111,8 +111,26 @@ final class NativeLevelLighting {
             finally{resources.drainForCoordinator();Reference.reachabilityFence(this);}
         }
     }
-    private void resume(long frame,MemorySegment tasks,long cursor,MemorySegment output)throws Throwable{
-        int action=frame==0?(int)TASK_CONTEXT.invokeExact(tasks,cursor,0,0L,MemorySegment.NULL,output):(int)FRAME_READ.invokeExact(frame,output);
+    void resumeRequest(long frame,NativeLightRequests request,MemorySegment output)throws Throwable{resume(frame,MemorySegment.NULL,0,output,request);}
+    void drainRequestResources(){resources.drainForCoordinator();Reference.reachabilityFence(this);}
+    private void applyRequestImport(long frame,int target)throws Throwable{
+        LightEngine<?,?> engine=target==0?block:target==1?sky:null;
+        if(engine==null)throw new IllegalStateException("Missing native light effect context");
+        try {
+            synchronized(engine.storage.queuedSections){
+                int status=NativeLightRequests.applyImport(frame);
+                if(status==-20)throw new OutOfMemoryError("Native lighting table allocation failed");
+                if(status!=0)throw new IllegalStateException("Native light coordinator rejected operation: "+status);
+            }
+        } finally {
+            resources.drainForCoordinator();
+            Reference.reachabilityFence(this);
+        }
+    }
+    private void resume(long frame,MemorySegment tasks,long cursor,MemorySegment output)throws Throwable{resume(frame,tasks,cursor,output,null);}
+    private void resume(long frame,MemorySegment tasks,long cursor,MemorySegment output,NativeLightRequests request)throws Throwable{
+        int action=request!=null?NativeLightRequests.read(frame,output):frame==0?(int)TASK_CONTEXT.invokeExact(tasks,cursor,0,0L,MemorySegment.NULL,output):(int)FRAME_READ.invokeExact(frame,output);
+        net.minecraft.world.level.chunk.LevelChunkSection[] levelChunkSections=null;
         MemorySegment result=MemorySegment.NULL;
         NativeLightingMap resultMap=null;
         net.minecraft.world.level.block.state.BlockState nodeState=null;
@@ -120,6 +138,24 @@ final class NativeLevelLighting {
             for(;;){
                 NativeLightCoordinator.checkEffectStatus(action,output);
                 if(action==0)return;
+                if(request!=null&&action>=32){
+                    long scalar=0;
+                    switch(action){
+                        case 32->levelChunkSections=request.chunk.getSectionsForRead();
+                        case 33->scalar=request.chunk.getSectionsCount();
+                        case 34->{net.minecraft.world.level.chunk.LevelChunkSection levelChunkSection=levelChunkSections[(int)output.getAtIndex(ValueLayout.JAVA_LONG,0)];scalar=levelChunkSection.hasOnlyAir()?1:0;}
+                        case 35->scalar=request.host.levelHeightAccessor.getSectionYFromSectionIndex((int)output.getAtIndex(ValueLayout.JAVA_LONG,0));
+                        case 37->scalar=net.minecraft.SharedConstants.DEBUG_VERBOSE_SERVER_EVENTS?1:0;
+                        case 38->request.logger.debug("LIT {}",request.position);
+                        case 40->scalar=request.host.getMinLightSection();
+                        case 41->scalar=request.host.getMaxLightSection();
+                        case 42->scalar=request.host.levelHeightAccessor.getMinSectionY();
+                        case 43->scalar=request.host.levelHeightAccessor.getMaxSectionY();
+                        case 44->applyRequestImport(frame,(int)output.getAtIndex(ValueLayout.JAVA_LONG,6));
+                        default->throw new IllegalStateException("Unknown native request effect "+action);
+                    }
+                    action=NativeLightRequests.step(frame,scalar,MemorySegment.NULL,output);continue;
+                }
                 int target=(int)output.getAtIndex(ValueLayout.JAVA_LONG,6);
                 LightEngine<?,?> engine=target==0?block:target==1?sky:null;
                 if(engine==null)throw new IllegalStateException("Missing native light effect context");
@@ -139,7 +175,7 @@ final class NativeLevelLighting {
                         (int)output.getAtIndex(ValueLayout.JAVA_LONG,1)>>8,(int)output.getAtIndex(ValueLayout.JAVA_LONG,1)>>4&15,
                         (int)output.getAtIndex(ValueLayout.JAVA_LONG,2));
                     case 5->{
-                        MemorySegment snapshot=frame==0?(MemorySegment)TASK_RESOURCE.invokeExact(tasks,cursor):(MemorySegment)FRAME_RESOURCE.invokeExact(frame);
+                        MemorySegment snapshot=request!=null?NativeLightRequests.resource(frame):frame==0?(MemorySegment)TASK_RESOURCE.invokeExact(tasks,cursor):(MemorySegment)FRAME_RESOURCE.invokeExact(frame);
                         engine.storage.publishNativeMap(map.adoptSnapshot(snapshot));
                     }
                     case 6->engine.storage.chunkSource.onLightUpdate(target==0?net.minecraft.world.level.LightLayer.BLOCK:net.minecraft.world.level.LightLayer.SKY,
@@ -161,7 +197,7 @@ final class NativeLevelLighting {
                     case 23->{}
                     default->throw new IllegalStateException("Unknown native level-light effect "+action);
                 }
-                try{action=frame==0?(int)TASK_CONTEXT.invokeExact(tasks,cursor,1,scalar,result,output):(int)FRAME_STEP.invokeExact(frame,scalar,result,output);}
+                try{action=request!=null?NativeLightRequests.step(frame,scalar,result,output):frame==0?(int)TASK_CONTEXT.invokeExact(tasks,cursor,1,scalar,result,output):(int)FRAME_STEP.invokeExact(frame,scalar,result,output);}
                 finally{map.releaseCoordinatorEntry(result);result=MemorySegment.NULL;}
             }
         }finally{if(result.address()!=0)resultMap.releaseCoordinatorEntry(result);}

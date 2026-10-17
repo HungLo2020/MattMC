@@ -30,6 +30,66 @@ All Java tiers and nine omission controls pass; the full Rust run retains its
 the adapted actual-consumer audit retains baseline equivalence and original
 coverage thresholds. New cost acceptance remains pending; historical verification below does not certify performance.
 
+## Request ownership under development
+
+A local prototype moves stock initialization, light completion and unload
+selection/loops into the shared native `lighting/requests` owner. It retains the
+actual existing level allocation; each invocation owns its cursor and real child
+lighting continuations. Java retains the actual chunk/array/logger captures,
+world observations, original queued-section monitors and `CompletableFuture`
+effects. A cancelled future still skips its original POST supplier.
+
+The corrected release candidate (`bce20d62`, Main 13,909) matches Frozen and the
+published `43f3c309` control on all four request observers: live arrays/counts,
+PRE retry, unload, cancellation, submission rejection, throwing/reentrant POST,
+helpful null-section errors and physical capture/retirement boundaries. It also
+matches all 50,144 existing threaded observations and passes 45 focused Java
+lighting tests. Native tests exercise actual level/child retention across
+abandoned effects. Earlier capture and queued-root retirement failures are
+preserved; the contracts below explain their fixes. Fresh Java tiers pass 2,589
+ordinary tests (10 skipped), 193 parity and 11 slow tests; the full native suite
+retains its 57 known host-rendering failures. Complete lighting acceptance
+remains pending. Derived engines and noncanonical positions retain compatibility
+dispatch.
+
+Run the portable request observers after building and preserving the three
+classpaths. Frozen loads no Rust library; Current's lifetime observer additionally
+checks physical native request/frame allocations. The runner records the library
+actually mapped by each native JVM and guards the selected classes, resources,
+dependencies and observer source. Use `--observer <class>` to rerun only an
+affected observer; the default runs all four, including queued-entry retirement
+before unload's next live height observation.
+
+```sh
+python3 DevUtils/tests/lighting/threaded/VerifyLightRequests.py \
+  --java-home "$JAVA_HOME" --output build/threaded-lighting/requests-new \
+  --profile-description 'actual build/profile identity' \
+  --frozen-classpath /path/frozen-classpath.txt \
+  --pre-classpath /path/preserved-pre-classpath.txt --pre-native /path/pre-native \
+  --current-classpath /path/current-classpath.txt --current-native /path/current-native
+python3 DevUtils/tests/lighting/threaded/BenchmarkLightRequests.py \
+  --java-home "$JAVA_HOME" --oracle build/threaded-lighting/requests-new \
+  --output build/threaded-lighting/request-cost-new
+```
+
+The short screen requires a successful four-observer receipt with unchanged
+inputs. It measures real initialization, source propagation and unload, checks
+the emitter and enabled column, compares complete untimed state fingerprints,
+and retains every timing/resource sample. Run it alone after builds/checks stop;
+eight samples without compilation or GC are required per image. Its result
+establishes comparable work and records debt, not final performance acceptance.
+
+The first matched release screen measures 467.1 µs per initialization/source/
+unload cycle, versus 248.8 µs on Frozen and 316.6 µs on published `43f3c309`.
+Java allocation is 8,464 bytes per cycle versus 213,896 and 8,352 respectively;
+all images have at least eight samples without measured JIT/GC and zero swap.
+The same new native image with the exact old threaded producer measures
+308.8 µs, narrowing the extra cost to the request path. Physical request/frame
+owners return to zero after collection. This latency regression is explicit
+intermediate debt, not a final 10%/25% budget pass or a claim that the cost is
+unavoidable. Removing remaining Java source-loop policy and reducing request
+transport/lifetime churn remain owned lighting work.
+
 ## Contracts when editing
 
 - A pass captures only its maximum count. It reads live membership while
@@ -60,6 +120,14 @@ coverage thresholds. New cost acceptance remains pending; historical verificatio
   queued-section monitor at PRE; preparing it during transport changes error
   timing and loses the original pending-task retry. A missing sky engine skips
   this binding while retaining the original argument captures until POST.
+- Keep request captures specific to their original phase. Initialization PRE
+  needs the chunk; `lightChunk` PRE needs only the engine/position/flag. If light
+  POST submission fails, the still-queued PRE must let the chunk go. Light POST
+  holds its chunk and actual native owner, without retaining the Java PRE
+  context. Cancellation continues to skip the original future supplier.
+- Release queued-entry VM roots after each null import, outside the original
+  queued-section monitor and before the next live height observation. Deferring
+  the resource drain to request completion changes observable weak lifetimes.
 
 ## Verification
 

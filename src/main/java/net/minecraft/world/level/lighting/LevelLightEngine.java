@@ -58,6 +58,16 @@ public class LevelLightEngine implements LightEventListener {
     protected final void applyNativeLightImport(java.lang.foreign.MemorySegment tasks,long cursor,int target,DataLayer source) { this.nativeLevel.applyImport(tasks,cursor,target,source); }
     protected final void resumeNativeLightContext(java.lang.foreign.MemorySegment tasks,long cursor){this.nativeLevel.resumeTask(tasks,cursor);}
 
+    protected interface LightRequest {
+        void pre();
+        Runnable postTask(net.minecraft.world.level.chunk.ChunkAccess chunk);
+    }
+    @Nullable
+    protected final LightRequest nativeLightRequest(int kind,net.minecraft.world.level.chunk.ChunkAccess chunk,ChunkPos position,boolean value,org.slf4j.Logger logger){
+        return nativeLevel!=null&&nativeLevel.matches(blockEngine,skyEngine)&&position!=null&&position.getClass()==ChunkPos.class
+            ?new NativeLightRequests(nativeLevel,this,kind,chunk,position,value,logger):null;
+    }
+
 	@Override
 	public boolean hasLightWork() {
         if(this.nativeLevel!=null&&this.nativeLevel.matches(this.blockEngine,this.skyEngine))return this.nativeLevel.hasWork();
