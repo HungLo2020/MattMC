@@ -1,8 +1,9 @@
-//! Noise synthesis families. Seed construction remains in Java.
+//! Noise synthesis and native leaf seed construction.
 #[cfg(target_arch = "x86_64")]
 mod avx2_helpers;
 mod blended;
 mod common;
+mod construction;
 mod dispatch;
 #[cfg(target_arch = "x86_64")]
 mod dispatch_avx2;

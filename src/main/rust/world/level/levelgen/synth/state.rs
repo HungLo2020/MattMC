@@ -1,4 +1,4 @@
-//! Java-owned immutable permutation and octave ABI.
+//! Immutable evaluation snapshot ABI, populated from native leaf permutations.
 /// ABI v1: native endian, 8-byte alignment, followed by n1+n2+n3 Octaves.
 #[repr(C)]
 pub struct State {
@@ -39,7 +39,7 @@ impl Octave {
     }
     #[inline(always)]
     pub(crate) fn p12(&self, i: i32) -> i32 {
-        // Packed by Java alongside the permutation; avoids division in Simplex.
+        // Packed from the native leaf permutation; avoids division in Simplex.
         (self.p32[(i & 255) as usize] >> 8) & 15
     }
 }

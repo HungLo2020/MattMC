@@ -4,28 +4,17 @@ import com.google.common.annotations.VisibleForTesting;
 import net.minecraft.util.RandomSource;
 
 public final class ImprovedNoise {
-	private final byte[] p;
+	private final NativeNoiseSeed seed;
 	public final double xo;
 	public final double yo;
 	public final double zo;
 
 	public ImprovedNoise(RandomSource randomSource) {
-		this.xo = randomSource.nextDouble() * 256.0;
-		this.yo = randomSource.nextDouble() * 256.0;
-		this.zo = randomSource.nextDouble() * 256.0;
-		this.p = new byte[256];
-
-		for (int i = 0; i < 256; i++) {
-			this.p[i] = (byte)i;
-		}
-
-		for (int i = 0; i < 256; i++) {
-			int j = randomSource.nextInt(256 - i);
-			byte b = this.p[i];
-			this.p[i] = this.p[i + j];
-			this.p[i + j] = b;
-		}
-	}
+        this.seed = new NativeNoiseSeed(randomSource, false);
+        this.xo = seed.offset(0);
+        this.yo = seed.offset(1);
+        this.zo = seed.offset(2);
+    }
 
 	public double noise(double d, double e, double f) {
 		return nativeNoise().sample(d, e, f);
@@ -42,7 +31,7 @@ public final class ImprovedNoise {
 
 	@VisibleForTesting
 	public void parityConfigString(StringBuilder stringBuilder) {
-		NoiseUtils.parityNoiseOctaveConfigString(stringBuilder, this.xo, this.yo, this.zo, this.p);
+		NoiseUtils.parityNoiseOctaveConfigString(stringBuilder, this.xo, this.yo, this.zo, this.seed.diagnosticPermutation());
 	}
 
 	private volatile NativeNoise nativeNoise;
@@ -63,7 +52,7 @@ public final class ImprovedNoise {
 	}
 
 	void writeNative(java.lang.foreign.MemorySegment state, int index, double amplitude) {
-		NativeNoise.octave(state, index, xo, yo, zo, amplitude, p);
+		seed.write(state, index, amplitude);
 	}
 
 }

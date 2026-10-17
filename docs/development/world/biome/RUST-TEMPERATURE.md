@@ -57,8 +57,8 @@ cache in FIFO order without making temperature calls. It must restore the native
 post-state even if the Java replay fails. These copies exist only for explicit
 verification, not as a second production cache.
 
-Noise object construction and seed initialization remain Java-owned. The shared
-noise evaluator is already native. Higher-level precipitation, freezing and snow
+The shared noise evaluator and [leaf permutation construction](../levelgen/RUST-NOISE.md)
+are native. Composite noise construction and random-source state remain Java-owned. Higher-level precipitation, freezing and snow
 now use the [native weather policy](RUST-WEATHER.md) with an embedded actual
 temperature child and ordered world observations. Remaining world-generation
 work includes noise construction, compatibility paths and the separately

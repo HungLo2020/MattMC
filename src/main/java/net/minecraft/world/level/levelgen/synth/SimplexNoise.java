@@ -3,28 +3,17 @@ package net.minecraft.world.level.levelgen.synth;
 import net.minecraft.util.RandomSource;
 
 public class SimplexNoise {
-	private final int[] p = new int[512];
+	private final NativeNoiseSeed seed;
 	public final double xo;
 	public final double yo;
 	public final double zo;
 
 	public SimplexNoise(RandomSource randomSource) {
-		this.xo = randomSource.nextDouble() * 256.0;
-		this.yo = randomSource.nextDouble() * 256.0;
-		this.zo = randomSource.nextDouble() * 256.0;
-		int i = 0;
-
-		while (i < 256) {
-			this.p[i] = i++;
-		}
-
-		for (int ix = 0; ix < 256; ix++) {
-			int j = randomSource.nextInt(256 - ix);
-			int k = this.p[ix];
-			this.p[ix] = this.p[j + ix];
-			this.p[j + ix] = k;
-		}
-	}
+        this.seed = new NativeNoiseSeed(randomSource, true);
+        this.xo = seed.offset(0);
+        this.yo = seed.offset(1);
+        this.zo = seed.offset(2);
+    }
 
 	public double getValue(double d, double e) {
 		return nativeNoise().simplex2(d, e);
@@ -59,9 +48,7 @@ public class SimplexNoise {
 	}
 
 	void writeNative(java.lang.foreign.MemorySegment state, int index) {
-		byte[] permutation = new byte[256];
-		for (int i = 0; i < 256; i++) permutation[i] = (byte)p[i];
-		NativeNoise.octave(state, index, xo, yo, zo, 1.0, permutation);
+		seed.write(state, index, 1.0);
 	}
 
 }

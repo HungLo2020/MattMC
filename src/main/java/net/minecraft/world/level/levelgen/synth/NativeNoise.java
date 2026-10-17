@@ -9,7 +9,7 @@ import java.lang.invoke.MethodHandle;
 import net.minecraft.util.NativeLibraryLoader;
 
 /** Immutable, GC-owned ABI state. No Rust allocation/handle registry and no Java callbacks.
- * Permutations and coefficients originate in the unchanged Java seed constructors.
+ * Permutations originate in shared native leaf builders; Java supplies octave coefficients.
  */
 final class NativeNoise implements NativeNoiseState {
 	static final int HEADER = 80;
@@ -78,20 +78,6 @@ final class NativeNoise implements NativeNoiseState {
 			amplitudes[i] = data.get(ValueLayout.JAVA_DOUBLE, HEADER + (long)i * OCTAVE + 24);
 	}
 
-	static void octave(MemorySegment data, int index, double x, double y, double z, double amplitude, byte[] p) {
-		long offset = HEADER + (long)index * OCTAVE;
-		data.set(ValueLayout.JAVA_DOUBLE, offset, x);
-		data.set(ValueLayout.JAVA_DOUBLE, offset + 8, y);
-		data.set(ValueLayout.JAVA_DOUBLE, offset + 16, z);
-		data.set(ValueLayout.JAVA_DOUBLE, offset + 24, amplitude);
-		data.set(ValueLayout.JAVA_LONG, offset + 32, 1);
-		MemorySegment.copy(p, 0, data, ValueLayout.JAVA_BYTE, offset + 40, 256);
-		for (int i = 0; i < 256; i++) {
-			int permutation = p[i] & 255;
-			// Low byte: permutation. High byte: precomputed Simplex gradient index.
-			data.set(ValueLayout.JAVA_INT, offset + 296 + i * 4L, permutation | ((permutation % 12) << 8));
-		}
-	}
 
 	double sample(double x, double y, double z) {
 		if (!critical) return sampleSlow(x, y, z, 0.0, 0.0, 0);
