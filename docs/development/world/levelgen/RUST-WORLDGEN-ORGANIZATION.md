@@ -88,7 +88,7 @@ for biome column selection. On eligible chunks, `chunk.rs` evaluates columns
 and commits blocks over [shared native chunk storage](RUST-SURFACE-STORAGE.md);
 Rust also answers eligible gradient/noise/minimum-level requests there. Eligible storage also uses the native [column pass](RUST-SURFACE-STORAGE.md#column-pass)
 and badlands/frozen-ocean extensions. Compatibility paths retain Java traversal,
-temperature/cache answers and custom callbacks as described in the
+shared temperature caller bindings and custom callbacks as described in the
 [surface guide](RUST-SURFACE.md). Batched rule
 programs are cached per surface system; extension/continuation programs remain
 per context. Compatibility paths retain Java block commits while using the
@@ -114,8 +114,9 @@ a top-material upcall. Java retains registry/chunk facades and genuine VM lifecy
 request/holder/task progression, stage admission/completion and native invocation,
 pending-consumer and callback binding leases. This is an intermediate connected
 checkpoint, not completion of world generation: Java compatibility algorithms,
-shared biome temperature/cache behavior and other documented generation
-dependencies remain. Each guide defines its actual ownership and gates.
+noise/seed construction, higher-level freezing/snow policies and other documented
+generation dependencies remain. The [shared biome temperature/cache](../biome/RUST-TEMPERATURE.md)
+now lives in Rust behind the existing public callers. Each guide defines its actual ownership and gates.
 
 ### Heightmaps
 

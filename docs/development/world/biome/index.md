@@ -14,3 +14,5 @@
 - [Live biome ownership and color sampling](RUST-LIVE-BIOMES.md): retained native
   sections/index, live identity queries, direct sky/fog sampling, generation-validated reuse and scoped
   Frozen verification.
+
+- [Shared biome temperature](RUST-TEMPERATURE.md): native temperature policy, shared per-thread FIFO history, callback ordering and verification.

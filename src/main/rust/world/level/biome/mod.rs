@@ -4,3 +4,4 @@ pub(crate) mod climate;
 pub(crate) mod search;
 pub(crate) mod color_fields;
 pub(crate) mod live;
+pub(crate) mod temperature;

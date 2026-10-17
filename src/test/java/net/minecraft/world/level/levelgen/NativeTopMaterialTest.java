@@ -158,12 +158,35 @@ class NativeTopMaterialTest {
         field.setAccessible(true);
         java.util.Map<String, List<long[]>> out = new java.util.TreeMap<>();
         for (var holder : NativeNoiseFillTest.registries.lookupOrThrow(Registries.BIOME).listElements().toList()) {
-            var map = (it.unimi.dsi.fastutil.longs.Long2FloatLinkedOpenHashMap)((ThreadLocal<?>)field.get(holder.value())).get();
+            Object cache = ((ThreadLocal<?>)field.get(holder.value())).get();
+            var snapshot = cache.getClass().getDeclaredMethod("snapshot");
+            snapshot.setAccessible(true);
+            long[] pairs = (long[])snapshot.invoke(cache);
             List<long[]> entries = new ArrayList<>();
-            for (var entry : map.long2FloatEntrySet()) entries.add(new long[]{entry.getLongKey(), Float.floatToRawIntBits(entry.getFloatValue())});
+            for (int at = 0; at < pairs.length; at += 2) entries.add(new long[]{pairs[at], (int)pairs[at + 1]});
             if (!entries.isEmpty()) out.put(holder.key().location().toString(), entries);
         }
         return out;
+    }
+
+    /** Ask the actual public consumer from empty history, then restore this
+     * thread's actual FIFO. This replaces reflection on the removed Java
+     * arithmetic helper without copying its algorithm or changing test history. */
+    static boolean uncachedWarm(Biome biome, net.minecraft.core.BlockPos pos, int seaLevel) throws ReflectiveOperationException {
+        var field = Biome.class.getDeclaredField("temperatureCache");
+        field.setAccessible(true);
+        Object cache = ((ThreadLocal<?>)field.get(biome)).get();
+        var snapshot = cache.getClass().getDeclaredMethod("snapshot");
+        var restore = cache.getClass().getDeclaredMethod("restore", long[].class);
+        snapshot.setAccessible(true);
+        restore.setAccessible(true);
+        long[] before = (long[])snapshot.invoke(cache);
+        try {
+            restore.invoke(cache, (Object)new long[0]);
+            return biome.warmEnoughToRain(pos, seaLevel);
+        } finally {
+            restore.invoke(cache, (Object)before);
+        }
     }
 
     static String describe(java.util.Map<String, List<long[]>> caches) {
@@ -269,10 +292,8 @@ class NativeTopMaterialTest {
             for (long key : entry.getValue()) {
                 total++;
                 var pos = net.minecraft.core.BlockPos.of(key);
-                var m = Biome.class.getDeclaredMethod("getHeightAdjustedTemperature", net.minecraft.core.BlockPos.class, int.class);
-                m.setAccessible(true);
-                float zero = (float)m.invoke(biome, pos, 0), level = (float)m.invoke(biome, pos, overworld.value().seaLevel());
-                if ((zero >= 0.15F) != (level >= 0.15F)) distinguishing++;
+                boolean zero = uncachedWarm(biome, pos, 0), level = uncachedWarm(biome, pos, overworld.value().seaLevel());
+                if (zero != level) distinguishing++;
             }
         }
         var java = history(setting, carves, keys, false);

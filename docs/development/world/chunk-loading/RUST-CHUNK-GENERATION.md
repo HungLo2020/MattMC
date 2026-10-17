@@ -524,9 +524,10 @@ are 323,368→330,028 fresh and 216,587→221,258 reopened; loaded requests rema
 not acceptance timings or pure-FFI/native-allocation/synchronization shares.
 
 HungLoDE/Codex retains complete world-generation ownership. Continue connected
-producer/state/consumer migrations, including remaining Java compatibility and
-shared temperature/cache behavior, rather than treating this checkpoint as system
-completion. Server-owned region/effect and lighting reservations remain fenced.
+producer/state/consumer migrations, including remaining Java compatibility, noise
+construction and higher-level freezing policies. The subsequent
+[shared temperature/cache migration](../biome/RUST-TEMPERATURE.md) removes that
+Java implementation; neither increment completes world generation. Server-owned region/effect and lighting reservations remain fenced.
 Original failed controls, source snapshots, full runtime receipts, screen and
 bounded diagnostic data remain under `build/chunk-generation/s33-*` and
 `build/full-generation/s33-*`; superseded images are not relabeled.

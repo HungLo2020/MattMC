@@ -1,20 +1,21 @@
 package net.minecraft.world.level.levelgen;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.concurrent.atomic.LongAdder;
-import it.unimi.dsi.fastutil.longs.Long2FloatLinkedOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
 
 /**
- * Verification only ({@code -Dmattmc.worldgen.verifyDecoration=true}): Java's
+ * Verification only ({@code -Dmattmc.worldgen.verifyDecoration=true}): the shared native
  * per-thread biome temperature caches around a native {@code SnowAndFreezeFeature}
- * placement. Snapshots read each biome's cache map on the current thread
+ * placement. Snapshots read each biome's actual cache on the current thread
  * directly (never through a temperature call). The caches before the native
  * placement are restored for Java's replay, so both routes start from the same
  * history; their resulting caches (entries and insertion order, which is the
@@ -29,6 +30,7 @@ import net.minecraft.world.level.biome.Biome;
  */
 final class NativeFreezeVerification {
 	private static final Field CACHE;
+	private static final Method SNAPSHOT, RESTORE;
 	private static final boolean SEED = Boolean.getBoolean("mattmc.worldgen.verifyFreezeSeed");
 	static final LongAdder VERIFIED = new LongAdder(), MISMATCHED = new LongAdder();
 
@@ -36,6 +38,11 @@ final class NativeFreezeVerification {
 		try {
 			CACHE = Biome.class.getDeclaredField("temperatureCache");
 			CACHE.setAccessible(true);
+            Class<?> type = Class.forName("net.minecraft.world.level.biome.NativeBiomeTemperature");
+            SNAPSHOT = type.getDeclaredMethod("snapshot");
+            RESTORE = type.getDeclaredMethod("restore", long[].class);
+            SNAPSHOT.setAccessible(true);
+            RESTORE.setAccessible(true);
 		} catch (ReflectiveOperationException error) {
 			throw new ExceptionInInitializerError(error);
 		}
@@ -67,43 +74,34 @@ final class NativeFreezeVerification {
 			}
 		}
 		for (Biome biome : this.biomes) {
-			var map = cache(biome);
-			for (int i = 0; map.size() < 1022; i++) biome.warmEnoughToRain(new BlockPos(6_000_000 + i, 70, 0), other);
+			for (int i = 0; snapshot(biome).length / 2 < 1022; i++) biome.warmEnoughToRain(new BlockPos(6_000_000 + i, 70, 0), other);
 		}
 	}
 
-	private static Long2FloatLinkedOpenHashMap cache(Biome biome) {
-		try {
-			return (Long2FloatLinkedOpenHashMap)((ThreadLocal<?>)CACHE.get(biome)).get();
-		} catch (ReflectiveOperationException error) {
-			throw new IllegalStateException(error);
-		}
-	}
+	private static Object cache(Biome biome) {
+        try { return ((ThreadLocal<?>)CACHE.get(biome)).get(); }
+        catch (ReflectiveOperationException error) { throw new IllegalStateException(error); }
+    }
+    private static Object invoke(Method method, Object cache, Object... args) {
+        try { return method.invoke(cache, args); }
+        catch (InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            if (cause instanceof Error fatal) throw fatal;
+            throw new IllegalStateException(cause);
+        } catch (ReflectiveOperationException error) { throw new IllegalStateException(error); }
+    }
+    private static long[] snapshot(Biome biome) { return (long[])invoke(SNAPSHOT, cache(biome)); }
 
-	/** Each biome's cache as [key, float bits] pairs in insertion order. */
-	private List<long[]> capture() {
-		List<long[]> out = new ArrayList<>();
-		for (Biome biome : this.biomes) {
-			var map = cache(biome);
-			long[] entries = new long[map.size() * 2];
-			int at = 0;
-			for (var entry : map.long2FloatEntrySet()) {
-				entries[at++] = entry.getLongKey();
-				entries[at++] = Float.floatToRawIntBits(entry.getFloatValue());
-			}
-			out.add(entries);
-		}
-		return out;
-	}
-
-	private void restore(List<long[]> state) {
-		for (int b = 0; b < this.biomes.size(); b++) {
-			var map = cache(this.biomes.get(b));
-			map.clear();
-			long[] entries = state.get(b);
-			for (int at = 0; at < entries.length; at += 2) map.put(entries[at], Float.intBitsToFloat((int)entries[at + 1]));
-		}
-	}
+    /** Each biome's actual cache as [key, float bits] pairs in insertion order. */
+    private List<long[]> capture() {
+        List<long[]> out = new ArrayList<>();
+        for (Biome biome : this.biomes) out.add(snapshot(biome));
+        return out;
+    }
+    private void restore(List<long[]> state) {
+        for (int b = 0; b < this.biomes.size(); b++) invoke(RESTORE, cache(this.biomes.get(b)), state.get(b));
+    }
 
 	/**
 	 * After the native placement: keep its result and restore the history Java's

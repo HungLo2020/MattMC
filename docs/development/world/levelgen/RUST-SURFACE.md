@@ -27,7 +27,7 @@ context update (surface depth), the column biome lookup and the eroded
 badlands and frozen ocean extensions run in Rust
 ([column pass](RUST-SURFACE-STORAGE.md#column-pass)). Java still owns them on
 other chunks, and everywhere owns registry bindings, noise/random objects,
-temperature (see [Temperature](#temperature)), including the frozen ocean's
+temperature caller bindings (see [Temperature](#temperature)), including the frozen ocean's
 melt check, and custom callbacks. The existing
 `SurfaceRules` Java bindings remain available to extensions and provide a test
 oracle. Carvers' `topMaterial` runs entirely in Rust on eligible chunks
@@ -42,20 +42,20 @@ claim for shipped rules on ordinary chunks.
 
 ## Temperature
 
-`SurfaceRules.Temperature` stays a Java answer, on every route. Java's
-`Biome.getTemperature` keeps a per-Biome, per-thread cache (`Long2FloatLinkedOpenHashMap`
-of 1024 entries, first-in eviction) keyed by position alone, although the
-value depends on the sea level passed in. A biome evaluated at one position
-under two sea levels on one thread therefore answers from cache history, and
-every Java caller (surface rules, precipitation, freezing, structures, entities,
-rendering) shares that cache. A native temperature would neither read nor
-update it. The carvers' native top material calls `coldEnoughToSnow` back at
-the point Java's evaluation would; the SURFACE stage asks Java as before.
-`SnowAndFreezeFeature` also uses
-[Java's `warmEnoughToRain` callback](https://github.com/HungLo2020/MattMC/blob/006afac1779e9b5025f1c0cd778e53a16e754a9b/src/main/java/net/minecraft/world/level/levelgen/NativeDecoration.java#L1013-L1021),
-so native `freeze_top_layer` observes and updates that same cache on the calling
-thread. Preserve the [decoration call-order and cache-history contract](feature/RUST-DECORATION.md#what-runs-in-rust);
-a native feature loop does not imply native temperature ownership.
+`SurfaceRules.Temperature` calls the shared `Biome` temperature service at its
+original evaluation point on every route. Rust now owns that service's
+arithmetic, frozen modifier, thresholds and actual per-Biome/per-thread cache.
+The key remains position alone; sea-level history, first-in eviction, NaN
+misses and reentrant insertion are observable across all callers. Java performs
+genuine ordered position observations and binds immutable native noise states.
+See [shared biome temperature](../biome/RUST-TEMPERATURE.md).
+
+The carvers' native top material still calls `coldEnoughToSnow`, and native
+`freeze_top_layer` still invokes `warmEnoughToRain` at its existing ordered
+callback points. Both reach the same native cache as precipitation, structures,
+entities and rendering on that calling thread. Preserve the
+[decoration call-order and cache-history contract](feature/RUST-DECORATION.md#what-runs-in-rust);
+these adapters must not memoize or create an independent stage cache.
 
 ## Ordering and arithmetic
 

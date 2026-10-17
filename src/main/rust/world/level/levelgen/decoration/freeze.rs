@@ -1,9 +1,9 @@
 //! `SnowAndFreezeFeature` (`freeze_top_layer`): per column, ice on cold water
-//! and snow on cold ground. Block light comes from Java's own `getBrightness`
-//! (a pure upcall). The temperature is Java's `warmEnoughToRain`, called at the
-//! points Java's `shouldFreeze`/`shouldSnow` call it: `Biome.getTemperature`
-//! keeps a per-thread cache keyed by position alone, so the call is part of the
-//! result.
+//! and snow on cold ground. Block light comes through Java's `getBrightness`.
+//! The existing `warmEnoughToRain` adapter reaches the shared native biome
+//! temperature/cache service at the original `shouldFreeze`/`shouldSnow` points.
+//! The cache remains per-biome/per-calling-thread and keyed by position alone;
+//! preserving the adapter call order preserves shared sea-level history.
 use super::placement::Placement;
 use super::program::{Predicate, Reader};
 use super::region::{Failure, Result};

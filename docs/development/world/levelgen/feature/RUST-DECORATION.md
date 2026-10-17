@@ -66,16 +66,17 @@ was source-reviewed at `e1c35961991261469c934bf07f724b99a418ba55` on 2026-10-15;
 no generation or performance test was rerun. [Start dispatch][current-start-dispatch] ·
 [Piece dispatch and fallback][current-piece-dispatch]
 
-`freeze_top_layer` reads block light and biome temperature from Java. Java keeps
-a **per-Biome, per-thread cache keyed only by packed position**, although a cache
-miss calculates temperature using the supplied **sea level**, so the cache
-history is part of the result. Rust therefore asks Java's own
+`freeze_top_layer` reads block light through Java and calls the
+[shared native biome temperature service](../../biome/RUST-TEMPERATURE.md) through
+the existing Java adapter. Its **per-Biome, per-thread cache is keyed only by
+packed position**, although a miss uses the supplied **sea level**, so cache
+history is part of the result. The feature calls
 `Biome.warmEnoughToRain(pos, level.getSeaLevel())` (`OP_WARM`) on the calling
 thread, at the points `shouldFreeze` and `shouldSnow` call it (a synchronous callback that updates the cache, never memoized or reordered): the position
 below for ice first in every column, then the surface position for snow only
 when the biome has precipitation. [Current call order][current-freeze-calls] ·
-[Expected per-column count][current-freeze-count]. Java's cache sees the same sequence as Java's feature would make.
-This is retained Java cache ownership, not a native temperature. With
+[Expected per-column count][current-freeze-count]. The shared native cache sees the same sequence as Java's feature would make.
+With
 `-Dmattmc.worldgen.verifyDecoration=true` each native freeze placement checks
 that the caches (entries and FIFO order) and call counts equal Java's replay
 from the same history (`freezeHistoryVerified=`/`freezeHistoryMismatched=`).
@@ -83,7 +84,9 @@ The native count is the placement's own (`Call.warmCalls`), not a delta of the
 global `freezeWarmCalls=` aggregate, which other worker threads also advance;
 `-Dmattmc.worldgen.verifyFreezeSeed=true` additionally seeds conflicting
 sea-level entries and fills each cache to its eviction boundary (not a parity
-run). [Java cache scope][temperature-cache] · [Calculation, lookup and sea-level callers][temperature-lookup] ·
+run). The verifier copies and restores the actual native FIFO without invoking
+temperature policy. Historical Java contract: [cache scope][temperature-cache] ·
+[calculation, lookup and sea-level callers][temperature-lookup] ·
 [Native freeze path][native-temperature]
 
 ## Contracts to preserve

@@ -51,8 +51,9 @@ It evaluates the surface rule as `NativeSurface.tryApply` does on a fresh
 context: surface depth from the surface noise and positional random, then
 every request in Rust (band offset, secondary noise, preliminary surface,
 steep on the storage's heightmap, gradients, noise thresholds and biome
-membership). A temperature condition calls Java's `coldEnoughToSnow` back at
-the point Java's evaluation would ([why](../RUST-SURFACE.md#temperature)). The context's biome is looked up lazily, at most
+membership). A temperature condition calls `coldEnoughToSnow` through Java at
+the original evaluation point. That adapter reaches the [shared native temperature/cache service](../../biome/RUST-TEMPERATURE.md)
+([ordering](../RUST-SURFACE.md#temperature)). The context's biome is looked up lazily, at most
 once per call, as Java's memoized supplier does: the biome manager's zoom, then
 the fixed biome or the climate search from the thread's previous leaf, which
 the lookup moves. A rule needing Java (an extension, a non-native noise or

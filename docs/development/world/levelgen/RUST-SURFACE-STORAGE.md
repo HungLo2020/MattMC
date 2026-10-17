@@ -36,8 +36,9 @@ On eligible chunks the whole X/Z column loop runs in Rust too (the
 [column pass](#column-pass)); otherwise Java drives it, updates the context,
 looks up each column's biome for the extensions and runs the eroded badlands
 and frozen ocean extensions through a block column backed by the Rust storage.
-Java answers only temperature and extension conditions, and any of the above
-whose noise, random factory or noise chunk is not the built-in kind. At the
+Java binds calls into the [shared native temperature service](../biome/RUST-TEMPERATURE.md),
+answers extension conditions, and supplies any of the above whose noise, random
+factory or noise chunk is not the built-in kind. At the
 end Java installs the modified sections through the
 [native handoff](RUST-STAGE-HANDOFF.md), both heightmaps and the fluid
 post-processing marks, in write order.
@@ -61,7 +62,7 @@ borrowed or locked while Java runs:
   would have left after that column's `updateXZ` (block X/Z, surface depth,
   `lastUpdateXZ`, `lastUpdateY`), so lazy conditions see the same counters;
 - status 3: `shouldMeltFrozenOceanIcebergSlightly` at (x, sea level, z), which
-  reads the biome's per-thread temperature cache; the extension's random draws
+  reads and updates the shared native per-biome/per-thread temperature cache; the extension's random draws
   follow the answer.
 
 `NativeSurfaceChunk.createPass` decides before the first write; it returns 0,

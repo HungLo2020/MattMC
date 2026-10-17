@@ -2,9 +2,7 @@ package net.minecraft.world.level.biome;
 
 import com.google.common.collect.ImmutableList;
 import com.mojang.serialization.Codec;
-import it.unimi.dsi.fastutil.longs.Long2FloatLinkedOpenHashMap;
 import java.util.Optional;
-import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
@@ -46,7 +44,6 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		new WorldgenRandom(new LegacyRandomSource(3456L)), ImmutableList.of(-2, -1, 0)
 	);
 	public static final PerlinSimplexNoise BIOME_INFO_NOISE = new PerlinSimplexNoise(new WorldgenRandom(new LegacyRandomSource(2345L)), ImmutableList.of(0));
-	private static final int TEMPERATURE_CACHE_SIZE = 1024;
 	// VoxelMap: Made accessible
 	public final Biome.ClimateSettings climateSettings;
 	private final BiomeGenerationSettings generationSettings;
@@ -61,15 +58,7 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	private int customFoliageColor;
 	private int defaultColorIndex;
 	private BiomeSpecialEffects cachedSpecialEffects;
-	private final ThreadLocal<Long2FloatLinkedOpenHashMap> temperatureCache = ThreadLocal.withInitial(() -> Util.make(() -> {
-		Long2FloatLinkedOpenHashMap long2FloatLinkedOpenHashMap = new Long2FloatLinkedOpenHashMap(1024, 0.25F) {
-			@Override
-			protected void rehash(int i) {
-			}
-		};
-		long2FloatLinkedOpenHashMap.defaultReturnValue(Float.NaN);
-		return long2FloatLinkedOpenHashMap;
-	}));
+	private final ThreadLocal<NativeBiomeTemperature> temperatureCache = ThreadLocal.withInitial(NativeBiomeTemperature::new);
 
 	Biome(
 		Biome.ClimateSettings climateSettings,
@@ -110,33 +99,23 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		}
 	}
 
-	private float getHeightAdjustedTemperature(BlockPos blockPos, int i) {
-		float f = this.climateSettings.temperatureModifier.modifyTemperature(blockPos, this.getBaseTemperature());
-		int j = i + 17;
-		if (blockPos.getY() > j) {
-			float g = (float)(TEMPERATURE_NOISE.getValue(blockPos.getX() / 8.0F, blockPos.getZ() / 8.0F, false) * 8.0);
-			return f - (g + blockPos.getY() - j) * 0.05F / 40.0F;
-		} else {
-			return f;
-		}
+	private boolean temperatureTest(BlockPos blockPos, int seaLevel, int mode) {
+		long key = blockPos.asLong();
+		return this.temperatureCache.get().test(this, blockPos, key, seaLevel, mode);
 	}
 
-	@Deprecated
-	private float getTemperature(BlockPos blockPos, int i) {
-		long l = blockPos.asLong();
-		Long2FloatLinkedOpenHashMap long2FloatLinkedOpenHashMap = (Long2FloatLinkedOpenHashMap)this.temperatureCache.get();
-		float f = long2FloatLinkedOpenHashMap.get(l);
-		if (!Float.isNaN(f)) {
-			return f;
-		} else {
-			float g = this.getHeightAdjustedTemperature(blockPos, i);
-			if (long2FloatLinkedOpenHashMap.size() == 1024) {
-				long2FloatLinkedOpenHashMap.removeFirstFloat();
-			}
+	float invokeTemperatureModifier(BlockPos blockPos, float base) {
+		return this.climateSettings.temperatureModifier.modifyTemperature(blockPos, base);
+	}
 
-			long2FloatLinkedOpenHashMap.put(l, g);
-			return g;
-		}
+	/** Immutable synthesis views are bound only when the native policy requests them. */
+	static net.minecraft.world.level.levelgen.synth.NativeNoiseState temperatureNoise(int kind) {
+		return switch (kind) {
+			case 0 -> FROZEN_TEMPERATURE_NOISE.nativeState();
+			case 1 -> BIOME_INFO_NOISE.nativeState();
+			case 2 -> TEMPERATURE_NOISE.nativeState();
+			default -> throw new IllegalArgumentException("Unknown temperature synthesis binding " + kind);
+		};
 	}
 
 	public boolean shouldFreeze(LevelReader levelReader, BlockPos blockPos) {
@@ -174,11 +153,11 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	}
 
 	public boolean warmEnoughToRain(BlockPos blockPos, int i) {
-		return this.getTemperature(blockPos, i) >= 0.15F;
+		return this.temperatureTest(blockPos, i, 0);
 	}
 
 	public boolean shouldMeltFrozenOceanIcebergSlightly(BlockPos blockPos, int i) {
-		return this.getTemperature(blockPos, i) > 0.1F;
+		return this.temperatureTest(blockPos, i, 1);
 	}
 
 	public boolean shouldSnow(LevelReader levelReader, BlockPos blockPos) {
@@ -415,25 +394,13 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 
 	public static enum TemperatureModifier implements StringRepresentable {
 		NONE("none") {
-			@Override
-			public float modifyTemperature(BlockPos blockPos, float f) {
-				return f;
+			@Override public float modifyTemperature(BlockPos blockPos, float value) {
+				return NativeBiomeTemperature.modifier(0, blockPos, value);
 			}
 		},
 		FROZEN("frozen") {
-			@Override
-			public float modifyTemperature(BlockPos blockPos, float f) {
-				double d = Biome.FROZEN_TEMPERATURE_NOISE.getValue(blockPos.getX() * 0.05, blockPos.getZ() * 0.05, false) * 7.0;
-				double e = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() * 0.2, blockPos.getZ() * 0.2, false);
-				double g = d + e;
-				if (g < 0.3) {
-					double h = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() * 0.09, blockPos.getZ() * 0.09, false);
-					if (h < 0.8) {
-						return 0.2F;
-					}
-				}
-
-				return f;
+			@Override public float modifyTemperature(BlockPos blockPos, float value) {
+				return NativeBiomeTemperature.modifier(1, blockPos, value);
 			}
 		};
 
