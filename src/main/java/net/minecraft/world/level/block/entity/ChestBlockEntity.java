@@ -26,7 +26,7 @@ import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
-public class ChestBlockEntity extends RandomizableContainerBlockEntity implements LidBlockEntity {
+public class ChestBlockEntity extends RandomizableContainerBlockEntity implements LidBlockEntity, NativeStockContainer {
 	private static final int EVENT_SET_OPEN_COUNT = 1;
 	private static final Component DEFAULT_NAME = Component.translatable("container.chest");
 	private static final class LegacyItems {NonNullList<ItemStack> items;LegacyItems(NonNullList<ItemStack> items){this.items=items;}}
@@ -156,6 +156,7 @@ public class ChestBlockEntity extends RandomizableContainerBlockEntity implement
 
 	/** Bounded exact-stock admission; pending loot must execute its original Java effects. */
 	@org.jetbrains.annotations.Nullable
+	@Override
 	public NativeItemSlots nativeSlotsForTransfer() {
 		return this.getClass() == ChestBlockEntity.class && this.lootTable == null && this.currentItems() instanceof NativeItemSlots nativeSlots
 			? nativeSlots : null;
@@ -164,6 +165,13 @@ public class ChestBlockEntity extends RandomizableContainerBlockEntity implement
 	@Override
 	protected NonNullList<ItemStack> getItems() {
 		return this.currentItems();
+	}
+
+	/** Exact loot-free stock chest: emptiness read from the native rows (unpackLootTable has nothing to do). */
+	@Override
+	public boolean isEmpty() {
+		var rows = this.nativeSlotsForTransfer();
+		return rows != null ? rows.allEmpty() : super.isEmpty();
 	}
 
 	/** The inherited setItem chain; an exact native chest discards the previous contents without observing them. */
@@ -181,7 +189,7 @@ public class ChestBlockEntity extends RandomizableContainerBlockEntity implement
 	}
 
 	/** Actual replaceable stock owner; custom chest subclasses retain virtual behavior. */
-	public final net.minecraft.world.item.NativeItemState.ContainerCell nativeContainerForSlots() {return this.nativeContainer;}
+	@Override public final net.minecraft.world.item.NativeItemState.ContainerCell nativeContainerForSlots() {return this.nativeContainer;}
 	private NonNullList<ItemStack> currentItems(){return this.nativeContainer==null?this.legacyItems.items:this.nativeContainer.facade();}
 	private void replaceItems(NonNullList<ItemStack> items){if(this.nativeContainer==null)this.legacyItems.items=items;else this.nativeContainer.replace(items);}
 	@Override

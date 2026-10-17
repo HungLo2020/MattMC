@@ -28,13 +28,13 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
-public class HopperBlockEntity extends RandomizableContainerBlockEntity implements Hopper {
+public class HopperBlockEntity extends RandomizableContainerBlockEntity implements Hopper, NativeRowsContainer {
 	public static final int MOVE_ITEM_SPEED = 8;
 	public static final int HOPPER_CONTAINER_SIZE = 5;
 	private static final int[][] CACHED_SLOTS = new int[54][];
 	private static final int NO_COOLDOWN_TIME = -1;
 	private static final Component DEFAULT_NAME = Component.translatable("container.hopper");
-	private NonNullList<ItemStack> items = NonNullList.withSize(5, ItemStack.EMPTY);
+	private NonNullList<ItemStack> items = this.newItems(5);
 	private int cooldownTime = -1;
 	private long tickedGameTime;
 	private Direction facing;
@@ -47,7 +47,7 @@ public class HopperBlockEntity extends RandomizableContainerBlockEntity implemen
 	@Override
 	protected void loadAdditional(ValueInput valueInput) {
 		super.loadAdditional(valueInput);
-		this.items = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
+		this.items = this.newItems(this.getContainerSize());
 		if (!this.tryLoadLootTable(valueInput)) {
 			ContainerHelper.loadAllItems(valueInput, this.items);
 		}
@@ -131,6 +131,11 @@ public class HopperBlockEntity extends RandomizableContainerBlockEntity implemen
 	}
 
 	private boolean inventoryFull() {
+		var rows = this.nativeRows();
+		if (rows != null) {
+			int full = rows.fullness();
+			if (full >= 0) return full == 1;
+		}
 		for (ItemStack itemStack : this.items) {
 			if (itemStack.isEmpty() || itemStack.getCount() != itemStack.getMaxStackSize()) {
 				return false;
@@ -140,11 +145,123 @@ public class HopperBlockEntity extends RandomizableContainerBlockEntity implemen
 		return true;
 	}
 
+	/** The stock hopper's own slots are native rows (exact class only); subclasses keep their list. */
+	private NonNullList<ItemStack> newItems(int size) {
+		return this.getClass() == HopperBlockEntity.class ? net.minecraft.world.item.NativeItemSlots.withSize(size) : NonNullList.withSize(size, ItemStack.EMPTY);
+	}
+
+	/** Exact loot-free stock hopper: emptiness read from the native rows (unpackLootTable has nothing to do). */
+	@Override
+	public boolean isEmpty() {
+		var rows = this.nativeRows();
+		return rows != null ? rows.allEmpty() : super.isEmpty();
+	}
+
+	/** Native rows of an exact, loot-free stock hopper (consumers such as comparators read them natively). */
+	@Nullable
+	@Override
+	public net.minecraft.world.item.NativeItemSlots nativeSlotsForTransfer() {
+		return this.nativeRows();
+	}
+
+	@Nullable
+	private net.minecraft.world.item.NativeItemSlots nativeRows() {
+		return this.getClass() == HopperBlockEntity.class && this.lootTable == null && this.items instanceof net.minecraft.world.item.NativeItemSlots rows ? rows : null;
+	}
+
+	/**
+	 * ejectItems between exact stock native containers, computed natively: the
+	 * same isFullContainer/slot/target order, a one-item split, and the
+	 * original effects only for the actual move. -1 keeps the original path.
+	 */
+	/** Native rows of a container: one row set, or both halves of a stock double chest (concatenated, compound order). */
+	private record NativeTarget(net.minecraft.world.item.NativeItemSlots first, @Nullable net.minecraft.world.item.NativeItemSlots second, Container firstHalf, @Nullable Container secondHalf) {
+		/** The half holding concatenated slot {@code slot}, its rows and its local slot. */
+		Container half(int slot) { return this.second != null && slot >= this.first.size() ? this.secondHalf : this.firstHalf; }
+		net.minecraft.world.item.NativeItemSlots rows(int slot) { return this.second != null && slot >= this.first.size() ? this.second : this.first; }
+		int local(int slot) { return this.second != null && slot >= this.first.size() ? slot - this.first.size() : slot; }
+	}
+
+	@Nullable
+	private static NativeTarget nativeTarget(Container container) {
+		var rows = nativeContainerRows(container);
+		if (rows != null) return new NativeTarget(rows, null, container, null);
+		if (container.getClass() == net.minecraft.world.CompoundContainer.class) {
+			var compound = (net.minecraft.world.CompoundContainer)container;
+			var first = NativeStockContainer.exact(compound.firstContainer()) ? ((NativeStockContainer)compound.firstContainer()).nativeSlotsForTransfer() : null;
+			var second = NativeStockContainer.exact(compound.secondContainer()) ? ((NativeStockContainer)compound.secondContainer()).nativeSlotsForTransfer() : null;
+			if (first != null && second != null) return new NativeTarget(first, second, compound.firstContainer(), compound.secondContainer());
+		}
+		return null;
+	}
+
+	/** Stock chests, barrels and shulker boxes mark themselves changed in setItem/removeItem; the hopper does not. */
+	private static boolean marksOwnChanges(Container container) {
+		return container.getClass() != HopperBlockEntity.class;
+	}
+
+	private static long withSlot(long plan, int slot) { return (plan & ~0xFF00L) | ((long)slot << 8); }
+	private static long withIndex(long plan, int index) { return (plan & ~0xFFL) | index; }
+
+	private static int ejectNative(HopperBlockEntity hopper, Container container) {
+		var source = hopper.nativeRows();
+		if (source == null) return -1;
+		var target = nativeTarget(container);
+		if (target == null) return -1;
+		long plan = source.hopperPlan(null, target.first(), target.second(), container.getClass() == ShulkerBoxBlockEntity.class ? 2 : 0);
+		if (plan == -2) return -1;
+		if (plan == -1) return 0;
+		int slot = (int)((plan >> 8) & 0xFF);
+		if (!source.hopperCommit(target.rows(slot), withSlot(plan, target.local(slot)))) return -1;
+		boolean placed = ((plan >> 16) & 1) != 0, wasEmpty = ((plan >> 17) & 1) != 0;
+		// Original tryMoveInItem: setItem (whose chest/barrel implementation marks that half changed), cooldown, setChanged; then ejectItems' setChanged.
+		if (placed && marksOwnChanges(target.half(slot))) target.half(slot).setChanged();
+		if (wasEmpty && container instanceof HopperBlockEntity targetHopper && !targetHopper.isOnCustomCooldown()) {
+			targetHopper.setCooldown(8 - (targetHopper.tickedGameTime >= hopper.tickedGameTime ? 1 : 0));
+		}
+		container.setChanged();
+		container.setChanged();
+		return 1;
+	}
+
+	/** Native rows of an exact stock chest or hopper, or null for the original path. */
+	@Nullable
+	private static net.minecraft.world.item.NativeItemSlots nativeContainerRows(Container container) {
+		return container instanceof NativeRowsContainer rows ? rows.nativeSlotsForTransfer() : null;
+	}
+
+	/**
+	 * suckInItems' slot loop for exact stock containers, natively, when the first
+	 * non-empty source slot moves; original effects: the chest's own removeItem
+	 * change mark, the cooldown rule, then setChanged on the hopper and source.
+	 */
+	private static int suckNative(Hopper hopper, Container container) {
+		if (!(hopper instanceof HopperBlockEntity target)) return -1;
+		var into = target.nativeRows(); var from = nativeTarget(container);
+		if (into == null || from == null) return -1;
+		long plan = from.first().hopperPlan(from.second(), into, null, 1);
+		if (plan == -2) return -1;
+		if (plan == -1) return 0;
+		int index = (int)(plan & 0xFF);
+		if (!from.rows(index).hopperCommit(into, withIndex(plan, from.local(index)))) return -1;
+		boolean wasEmpty = ((plan >> 17) & 1) != 0;
+		// The source half's own removeItem change mark (chest/barrel), then the original effects.
+		if (marksOwnChanges(from.half(index))) from.half(index).setChanged();
+		if (wasEmpty && !target.isOnCustomCooldown()) {
+			target.setCooldown(8 - (container instanceof HopperBlockEntity sourceHopper && target.tickedGameTime >= sourceHopper.tickedGameTime ? 1 : 0));
+		}
+		target.setChanged();
+		container.setChanged();
+		return 1;
+	}
+
 	private static boolean ejectItems(Level level, BlockPos blockPos, HopperBlockEntity hopperBlockEntity) {
 		Container container = getAttachedContainer(level, blockPos, hopperBlockEntity);
 		if (container == null) {
 			return false;
 		} else {
+			int moved = ejectNative(hopperBlockEntity, container);
+			if (moved >= 0) return moved == 1;
 			Direction direction = hopperBlockEntity.facing.getOpposite();
 			if (isFullContainer(container, direction)) {
 				return false;
@@ -220,6 +337,8 @@ public class HopperBlockEntity extends RandomizableContainerBlockEntity implemen
 		BlockState blockState = level.getBlockState(blockPos);
 		Container container = getSourceContainer(level, hopper, blockPos, blockState);
 		if (container != null) {
+			int moved = suckNative(hopper, container);
+			if (moved >= 0) return moved == 1;
 			Direction direction = Direction.DOWN;
 
 			for (int i : getSlots(container, direction)) {
@@ -263,6 +382,27 @@ public class HopperBlockEntity extends RandomizableContainerBlockEntity implemen
 	}
 
 	public static boolean addItem(Container container, ItemEntity itemEntity) {
+		if (container.getClass() == HopperBlockEntity.class) {
+			HopperBlockEntity hopper = (HopperBlockEntity)container;
+			var rows = hopper.nativeRows();
+			ItemStack source = itemEntity.getItem();
+			if (rows != null && source.getItem() != null && source.getItem().nativeTransferCopyIsPure()) {
+				long result = rows.hopperTake(source);
+				if (result >= 0) {
+					// Original per-move effects (tryMoveInItem): cooldown on the first move into an empty hopper, setChanged per move.
+					int remaining = (int)(result & 0xFFFFFFFFL), moves = (int)((result >> 32) & 0xFF);
+					if (moves > 0 && ((result >> 40) & 1) != 0 && !hopper.isOnCustomCooldown()) hopper.setCooldown(8);
+					for (int move = 0; move < moves; move++) hopper.setChanged();
+					if (remaining == 0) {
+						itemEntity.setItem(ItemStack.EMPTY);
+						itemEntity.discard();
+						return true;
+					}
+					itemEntity.setItem(source.copyWithCount(remaining));
+					return false;
+				}
+			}
+		}
 		boolean bl = false;
 		ItemStack itemStack = itemEntity.getItem().copy();
 		ItemStack itemStack2 = addItem(null, container, itemStack, null);

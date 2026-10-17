@@ -803,7 +803,8 @@ fn access_overlay(handle: i64) -> Option<Arc<Mutex<super::patch::CanonicalOverla
 #[no_mangle] pub extern "C" fn mattmc_item_transfer_counter(which:i64)->i64 {
     match which {0=>super::slots::TRANSFER_STEPS.load(Ordering::Relaxed) as i64,1=>super::slots::TRANSFER_NATIVE_DEFAULTS.load(Ordering::Relaxed) as i64,2=>super::slots::TRANSFER_NATIVE_SLOTS.load(Ordering::Relaxed) as i64,
         3=>PREPARED_COPIES.load(Ordering::Relaxed) as i64,4=>PREPARED_RETIRED.load(Ordering::Relaxed) as i64,
-        5=>super::slots::PENDING_PUBLISHED.load(Ordering::Relaxed) as i64,6=>super::slots::PENDING_MATERIALIZED.load(Ordering::Relaxed) as i64,7=>super::slots::PENDING_ROLLED_BACK.load(Ordering::Relaxed) as i64,8=>super::slots::PENDING_BROADCAST_COPIES.load(Ordering::Relaxed) as i64,_=>BAD}
+        5=>super::slots::PENDING_PUBLISHED.load(Ordering::Relaxed) as i64,6=>super::slots::PENDING_MATERIALIZED.load(Ordering::Relaxed) as i64,7=>super::slots::PENDING_ROLLED_BACK.load(Ordering::Relaxed) as i64,8=>super::slots::PENDING_BROADCAST_COPIES.load(Ordering::Relaxed) as i64,
+        9=>super::inventory::TICKS_NATIVE.load(Ordering::Relaxed) as i64,_=>BAD}
 }
 
 /// Copy actual scalar/overlay state as one owner. Java's scalar scope pins this
@@ -1266,6 +1267,149 @@ impl super::menu::QuickMoveEffects for MenuEffects {
         if repeated!=0 {return super::menu::repeat_quick_move(&owner,kind,rows,index,air as u64,&mut effects).map_or(BAD,|_|0);}
         super::menu::quick_move(&owner,kind,rows,index,air as u64,&mut effects).map_or(BAD,|result|i64::from(result.is_some()))})
 }
+#[no_mangle] pub extern "C" fn mattmc_item_pure_copy(item:i64)->i64 {
+    guard(||{if item<=0{return BAD;}super::slots::mark_pure_copy(item as u64);0})
+}
+#[no_mangle] pub extern "C" fn mattmc_item_pending_key()->i64 {super::slots::next_pending_key()}
+#[no_mangle] pub extern "C" fn mattmc_item_shulker_item(item:i64)->i64 {
+    guard(||{if item<=0{return BAD;}super::slots::mark_shulker_item(item as u64);0})
+}
+/// Non-empty rows as a bitmask (slots::occupied_mask), or -2 for more than 63 rows.
+#[no_mangle] pub extern "C" fn mattmc_item_slots_occupied(handle:i64,air:i64)->i64 {
+    guard(||{let Some(rows)=slots(handle) else{return BAD};let rows=rows.lock().unwrap();super::slots::occupied_mask(&rows,air as u64).unwrap_or(-2)})
+}
+/// Occupancy bits of stock rows (slots::occupancy), or -2 for Java's original scan.
+#[no_mangle] pub extern "C" fn mattmc_item_slots_occupancy(handle:i64,air:i64)->i64 {
+    guard(||{let Some(rows)=slots(handle) else{return BAD};let rows=rows.lock().unwrap();super::slots::occupancy(&rows,air as u64).unwrap_or(-2)})
+}
+/// Comparator signal of two concatenated stock row sets (a double chest), or -2.
+#[no_mangle] pub extern "C" fn mattmc_item_slots_signal_pair(first:i64,second:i64,air:i64)->i64 {
+    guard(||{let (Some(first),Some(second))=(slots(first),slots(second)) else{return BAD};
+        if std::ptr::eq(&*first as *const _,&*second as *const _){return BAD;}
+        let (a,b)=(first.lock().unwrap(),second.lock().unwrap());super::slots::redstone_signal_parts(&[&*a,&*b],air as u64).map_or(-2,i64::from)})
+}
+/// Comparator signal of stock rows (slots::redstone_signal), or -2 for Java's original computation.
+#[no_mangle] pub extern "C" fn mattmc_item_slots_signal(handle:i64,air:i64)->i64 {
+    guard(||{let Some(rows)=slots(handle) else{return BAD};let rows=rows.lock().unwrap();super::slots::redstone_signal(&rows,air as u64).map_or(-2,i64::from)})
+}
+/// Stock hopper eject, planned without mutation over the exact native rows, in
+/// the original order: isFullContainer(target), then per non-empty hopper slot
+/// its one-item split into the first empty or mergeable target slot. Result:
+/// -1 nothing moves (the original returns false), -2 not provably plain (Java
+/// keeps the original path), else hopper slot | target slot << 8 | empty
+/// placement << 16 | target was empty before (cooldown rule) << 17.
+///
+/// Suck (`suck` != 0, container above -> hopper): no isFullContainer check, and
+/// only the first non-empty source slot may be attempted, because a failed
+/// attempt has observable source effects (removeItem/setItem change marks) that
+/// the original Java path performs (-2).
+///
+/// `source2`/`target2` (0 when absent) are a double chest's second half: the
+/// halves are planned as one concatenated container, in the compound's order.
+#[no_mangle] pub extern "C" fn mattmc_item_hopper_plan(source:i64,source2:i64,target:i64,target2:i64,air:i64,suck:i64)->i64 {
+    guard(||{let (Some(source),Some(target))=(slots(source),slots(target)) else{return BAD};
+        let half=|handle:i64|->Result<Option<SlotsLease>,()>{if handle==0{Ok(None)}else{slots(handle).map(Some).ok_or(())}};
+        let (Ok(source2),Ok(target2))=(half(source2),half(target2)) else{return BAD};
+        let air=air as u64;
+        let all:Vec<&SlotsLease>=[Some(&source),source2.as_ref(),Some(&target),target2.as_ref()].into_iter().flatten().collect();
+        for (i,a) in all.iter().enumerate(){for b in &all[i+1..]{if std::ptr::eq(&***a as *const _,&***b as *const _){return -2;}}}
+        let snapshot=|rows:&SlotsLease|->Vec<Arc<super::stack::Stack>>{let rows=rows.lock().unwrap();(0..rows.len()).filter_map(|index|rows.get(index).map(|entry|entry.stack.clone())).collect()};
+        let mut from=snapshot(&source);if let Some(second)=&source2{from.extend(snapshot(second));}
+        let mut into=snapshot(&target);if let Some(second)=&target2{into.extend(snapshot(second));}
+        let plain=|stack:&super::stack::Stack|->Option<(i64,i32,i32)>{let digest=super::slots::broadcast_digest(stack);if digest<=0{return None;}Some((digest>>21,super::slots::visible_count(stack,air),super::slots::plain_max(stack)?))};
+        let mut full=true;let mut empty=true;
+        for stack in &into {
+            if super::slots::visible_count(stack,air)==0{full=false;continue;}empty=false;
+            let Some((_,count,max))=plain(&**stack) else{return -2};if count<max{full=false;}
+        }
+        let (suck,refuse_shulkers)=(suck&1,suck&2!=0);
+        if full&&suck==0{return -1;}
+        for (index,stack) in from.iter().enumerate() {
+            if super::slots::visible_count(stack,air)==0{continue;}
+            if !super::slots::pure_copy(stack.scalars.item){return -2;}
+            // A shulker box target refuses shulker box items through every face: no target slot accepts it.
+            if refuse_shulkers&&super::slots::shulker_item(stack.scalars.item){if suck!=0{return -2;}continue;}
+            let Some((identity,_,_))=plain(&**stack) else{return -2};
+            for (slot,existing) in into.iter().enumerate() {
+                if super::slots::visible_count(existing,air)==0{return index as i64|(slot as i64)<<8|1<<16|i64::from(empty)<<17;}
+                let Some((other,count,max))=plain(&**existing) else{return -2};
+                // Same item with another prototype object: Java's component-map equality decides.
+                if other!=identity&&other>>21==identity>>21{return -2;}
+                if other==identity&&count<max{return index as i64|(slot as i64)<<8|i64::from(empty)<<17;}
+            }
+            if suck!=0{return -2;}
+        }
+        -1})
+}
+/// Commits a hopper plan after rechecking the rows: the hopper slot shrinks by
+/// one (split(1)), then the target either receives a one-item pending copy
+/// under `key` (expected old token `expected`) or grows by one. 0 when the rows
+/// no longer match; else 1, plus 2 when `expected` is no longer referenced.
+#[no_mangle] pub extern "C" fn mattmc_item_hopper_commit(source:i64,target:i64,index:i64,slot:i64,key:i64,expected:i64,air:i64)->i64 {
+    guard(||{let (Some(source),Some(target),Ok(index),Ok(slot))=(slots(source),slots(target),usize::try_from(index),usize::try_from(slot)) else{return BAD};
+        if std::ptr::eq(&*source as *const _,&*target as *const _){return BAD;}let air=air as u64;
+        let stack={let rows=source.lock().unwrap();match rows.get(index){Some(entry) if super::slots::visible_count(&entry.stack,air)>0=>entry.stack.clone(),_=>return 0}};
+        let mut rows=target.lock().unwrap();let Some(current)=rows.get(slot).cloned() else{return BAD};
+        if current.facade!=expected{return 0;}
+        if key!=0 {
+            if !super::slots::is_pending(key)||super::slots::visible_count(&current.stack,air)!=0{return 0;}
+            let copy=copy_stack(&stack,1);rows.set(slot,super::slots::Entry{facade:key,stack:copy});
+            stack.scalars.count.fetch_sub(1,Ordering::Relaxed);super::slots::PENDING_PUBLISHED.fetch_add(1,Ordering::Relaxed);
+            return 1|(i64::from(rows.entries_facade_index(expected)<0)<<1);
+        }
+        // Merge: still the same unpatched item/prototype with room (canMergeItems).
+        let (into,from)=(super::slots::broadcast_digest(&current.stack),super::slots::broadcast_digest(&stack));
+        if into<=0||from<=0||into>>21!=from>>21{return 0;}
+        let Some(max)=super::slots::plain_max(&current.stack) else{return 0};
+        if super::slots::visible_count(&current.stack,air)>=max{return 0;}
+        current.stack.scalars.count.fetch_add(1,Ordering::Relaxed);stack.scalars.count.fetch_sub(1,Ordering::Relaxed);1})
+}
+/// HopperBlockEntity.addItem(hopper, itemEntity) over the hopper's native rows,
+/// copying (never mutating) the entity's stack `source`: in slot order, merges
+/// of min(remaining, item max - count) into same unpatched stacks, then the whole
+/// remainder, limited to min(99, item max) like setItem's limitSize, placed
+/// as a pending copy under `key` in the first empty slot. A validation pass
+/// precedes any mutation, so -2 (Java's original path) leaves the rows untouched.
+/// Result: remaining | moves << 32 | hopper was empty << 40 | placed << 41;
+/// out[0] receives the replaced token when no row references it any more.
+#[no_mangle] pub unsafe extern "C" fn mattmc_item_hopper_take(rows:i64,source:i64,key:i64,air:i64,out:*mut i64)->i64 {
+    guard(||{let (Some(rows),Some(source))=(slots(rows),stack(source)) else{return BAD};
+        if out.is_null()||!super::slots::is_pending(key){return BAD;}
+        let air=air as u64;let from=super::slots::broadcast_digest(&source);
+        if from<=0||!super::slots::pure_copy(source.scalars.item){return -2;}
+        let Some(item_max)=super::slots::plain_max(&source) else{return -2};
+        let wanted=super::slots::visible_count(&source,air);if wanted==0{return -2;}
+        let mut rows=rows.lock().unwrap();
+        let was_empty=(0..rows.len()).all(|index|rows.get(index).is_some_and(|entry|super::slots::visible_count(&entry.stack,air)==0));
+        let (mut remaining,mut moves,mut placed,mut retired)=(wanted,0i64,false,0i64);
+        for apply in [false,true] {
+            remaining=wanted;moves=0;placed=false;
+            for slot in 0..rows.len() {
+                if remaining==0{break;}
+                let entry=rows.get(slot).unwrap().clone();let count=super::slots::visible_count(&entry.stack,air);
+                if count==0 {
+                    if apply {
+                        let copy=copy_stack(&source,remaining.min(99.min(item_max)));rows.set(slot,super::slots::Entry{facade:key,stack:copy});
+                        if rows.entries_facade_index(entry.facade)<0{retired=entry.facade;}super::slots::PENDING_PUBLISHED.fetch_add(1,Ordering::Relaxed);
+                    }
+                    remaining=0;moves+=1;placed=true;break;
+                }
+                if entry.stack.scalars.item!=source.scalars.item{continue;}
+                let into=super::slots::broadcast_digest(&entry.stack);
+                if into<=0||into>>21!=from>>21{return -2;}
+                let Some(max)=super::slots::plain_max(&entry.stack) else{return -2};
+                if count>max{continue;}
+                let moved=remaining.min(item_max-count);if moved<=0{continue;}
+                if apply{entry.stack.scalars.count.store(count+moved,Ordering::Relaxed);}
+                remaining-=moved;moves+=1;
+            }
+        }
+        *out=retired;
+        i64::from(remaining)|moves<<32|i64::from(was_empty)<<40|i64::from(placed)<<41})
+}
+#[no_mangle] pub extern "C" fn mattmc_item_inventory_tick_noop(item:i64)->i64 {
+    guard(||{if item<=0{return BAD;}super::inventory::mark_tick_noop(item as u64);0})
+}
 /// One broadcast's snapshots for menu rows `from..count`, written to `out[from..count]`.
 #[no_mangle] pub unsafe extern "C" fn mattmc_item_menu_digests(handle:i64,out:i64,from:i64,count:i64)->i64 {
     guard(||{let (Some(owner),Ok(from),Ok(count))=(menu(handle),usize::try_from(from),usize::try_from(count)) else{return BAD};if out<=0||count>65536||from>count{return BAD;}
@@ -1417,9 +1561,53 @@ impl super::menu::QuickMoveEffects for MenuEffects {
 /// the prepared-copy actions (33/34, with a nonzero handle) use the last three.
 type InventoryEffect=unsafe extern "C" fn(i64,i64,i64,i64,i64)->i64;
 #[no_mangle] pub unsafe extern "C" fn mattmc_item_inventory_add_leased(owner:i64,source:i64,index:i64,air:i64,effect:Option<InventoryEffect>)->i64 {
+    inventory_add(owner,source,index,air,effect,false)
+}
+/// Inventory add whose Java caller accepts natively published pending contents
+/// (actions 35/36 record the recipe; see `publish_pending_add`).
+#[no_mangle] pub unsafe extern "C" fn mattmc_item_inventory_add_pending_leased(owner:i64,source:i64,index:i64,air:i64,effect:Option<InventoryEffect>)->i64 {
+    inventory_add(owner,source,index,air,effect,true)
+}
+/// Empty main-slot resource (action 3: the original copyWithCount(0), setItem,
+/// grow by one (an empty stack's max size), pop time 5) and damaged (action 4: copyAndClear,
+/// set, pop time 5) copies published natively under a pending key. Java records
+/// the recipe through 35/36; a failure before recording restores the row and
+/// source. None keeps the prepared-copy path (S30) for anything not computable.
+unsafe fn publish_pending_add(owner:&super::inventory::Inventory,source:&super::stack::Stack,action:i64,index:i32,air:u64,effect:InventoryEffect)->Option<Result<i32,()>> {
+    if !(0..36).contains(&index){return None;}
+    let held=source.scalars.count.load(Ordering::Relaxed);
+    let (count,remaining)=if action==3 {
+        // The original grows the zero-count copy by min(99, max stack) of an
+        // *empty* stack, whose components read as empty: exactly one item.
+        // The add loop then merges the rest into this row on its next pass.
+        let wanted=super::slots::visible_count(source,air);
+        let moved=wanted.min(1);if moved<=0{return None;}(moved,wanted-moved)
+    } else {(held,0)};
+    let copy=copy_stack(source,count);copy.scalars.pop_time.store(5,Ordering::Relaxed);
+    let key=super::slots::next_pending_key();
+    let (old,retired)={
+        let mut rows=owner.slots.lock().unwrap();
+        if !rows.get(index as usize).is_some_and(|entry|super::slots::visible_count(&entry.stack,air)==0){return None;}
+        let old=rows.set(index as usize,super::slots::Entry{facade:key,stack:copy})?;let retired=rows.entries_facade_index(old.facade)<0;(old,retired)
+    };
+    if action==4{source.scalars.count.store(0,Ordering::Relaxed);}
+    super::slots::PENDING_PUBLISHED.fetch_add(1,Ordering::Relaxed);
+    let mut out=[0i64,0];
+    let result=effect(action+32,index as i64,key,if retired{old.facade}else{0},out.as_mut_ptr() as i64);
+    if out[1]==0 {
+        let mut rows=owner.slots.lock().unwrap();
+        if rows.get(index as usize).is_some_and(|entry|entry.facade==key){rows.set(index as usize,old);super::slots::PENDING_ROLLED_BACK.fetch_add(1,Ordering::Relaxed);}
+        if action==4{source.scalars.count.store(held,Ordering::Relaxed);}
+        return Some(Err(()));
+    }
+    if result==i64::MIN{return Some(Err(()));}
+    Some(Ok(if action==3{remaining}else{1}))
+}
+unsafe fn inventory_add(owner:i64,source:i64,index:i64,air:i64,effect:Option<InventoryEffect>,pending:bool)->i64 {
     guard(||{
         let (Some(owner),Some(source),Ok(index),Some(effect))=(retain_vm_arc::<super::inventory::Inventory>(owner),menu_stack(source),i32::try_from(index),effect) else{return BAD};
         match owner.add_run(&source,index,air as u64,|action,index|{
+            if pending&&(action==3||action==4){if let Some(result)=publish_pending_add(&owner,&source,action,index,air as u64,effect){return result;}}
             let result=if action==3||action==4 {
                 // Empty-slot resource (`copyWithCount(0)`) and damaged
                 // (`copyAndClear`) copies are prepared here; Java adopts them
@@ -1559,4 +1747,125 @@ type InventoryEffect=unsafe extern "C" fn(i64,i64,i64,i64,i64)->i64;
         assert!(duplicate>0&&!Arc::ptr_eq(&stack(duplicate).unwrap(),&copy));assert!(super::super::slots::is_pending(rows.lock().unwrap().get(1).unwrap().facade));
         for owner in [facade,other,duplicate,handle]{owners().lock().unwrap().remove(&owner);}
     }
+    static TICK_CALLS:std::sync::Mutex<Vec<(i64,i64)>>=std::sync::Mutex::new(Vec::new());
+    unsafe extern "C" fn tick_effect(action:i64,index:i64,_:i64)->i64 {TICK_CALLS.lock().unwrap().push((action,index));0}
+    // Mode 9 (Java vouches player.level() is a plain getter): an item whose
+    // inventoryTick is Item's empty one ticks natively (pop time only, no call,
+    // no facade); others keep the original ordered call. Mode 2 is unchanged.
+    #[test] fn native_inventory_tick_skips_only_items_with_the_empty_java_tick(){
+        let defaults=defaults();let inventory=Arc::new(Inventory::new(Entry{facade:1,stack:value(0,&defaults)}));
+        let stack=|item:u64,pop:i32|{let mut overlay=Overlay::new(7);overlay.defaults=Some(defaults.clone());let stack=Arc::new(Stack::from_overlay(item,5,overlay));stack.scalars.pop_time.store(pop,Ordering::Relaxed);stack};
+        let (plain,custom)=(stack(424242,3),stack(424243,3));
+        {let mut rows=inventory.slots.lock().unwrap();rows.set(0,Entry{facade:2,stack:plain.clone()});rows.set(1,Entry{facade:3,stack:custom.clone()});}
+        super::super::inventory::mark_tick_noop(424242);
+        TICK_CALLS.lock().unwrap().clear();
+        assert_eq!(unsafe{mattmc_item_inventory_visit_leased(inventory.address() as i64,0,9,36,99,Some(tick_effect))},0);
+        assert_eq!(plain.scalars.pop_time.load(Ordering::Relaxed),2,"native pop-time countdown");
+        assert_eq!(custom.scalars.pop_time.load(Ordering::Relaxed),3,"Java's own ItemStack.inventoryTick owns this one");
+        assert_eq!(*TICK_CALLS.lock().unwrap(),vec![(22,1)]);
+        TICK_CALLS.lock().unwrap().clear();
+        assert_eq!(unsafe{mattmc_item_inventory_visit_leased(inventory.address() as i64,0,2,36,99,Some(tick_effect))},0);
+        assert_eq!(*TICK_CALLS.lock().unwrap(),vec![(22,0),(22,1)],"mode 2 keeps every original call");assert_eq!(plain.scalars.pop_time.load(Ordering::Relaxed),2);
+    }
+    unsafe extern "C" fn add_throw_before_record(action:i64,index:i64,_:i64,_:i64,_:i64)->i64 {if action==35||action==36{i64::MIN}else{add_effect(action,index,0,0,0)}}
+    unsafe extern "C" fn add_record_then_throw(action:i64,index:i64,_:i64,_:i64,out:i64)->i64 {if action==35||action==36{*(out as *mut i64).add(1)=1;i64::MIN}else{add_effect(action,index,0,0,0)}}
+    // Pickup publication (35): a Java failure before the recipe is recorded
+    // restores the empty row and the source count; once recorded the row keeps
+    // the pending copy (count and pop time 5), as an original setItem before a
+    // failing later step would.
+    #[test] fn pending_pickup_rolls_back_only_before_java_records_its_recipe(){
+        let defaults=defaults();
+        for (callback,recorded) in [(add_throw_before_record as InventoryEffect,false),(add_record_then_throw as InventoryEffect,true)] {
+            let empty=value(0,&defaults);let inventory=Arc::new(Inventory::new(Entry{facade:1,stack:empty.clone()}));
+            let source=value(11,&defaults);
+            assert_eq!(unsafe{mattmc_item_inventory_add_pending_leased(inventory.address() as i64,source.address() as i64,-1,99,Some(callback))},i64::MIN);
+            let entry=inventory.slots.lock().unwrap().get(0).unwrap().clone();
+            if recorded {
+                // The original empty-slot pass grows the copy by one; the throw skips setCount.
+                assert!(super::super::slots::is_pending(entry.facade));assert_eq!(entry.stack.scalars.count.load(Ordering::Relaxed),1);
+                assert_eq!(source.scalars.count.load(Ordering::Relaxed),11);
+                assert_eq!(entry.stack.scalars.pop_time.load(Ordering::Relaxed),5);
+            } else {
+                assert_eq!(entry.facade,1);assert!(Arc::ptr_eq(&entry.stack,&empty));assert_eq!(source.scalars.count.load(Ordering::Relaxed),11);
+            }
+        }
+    }
+    // Hopper plan encoding over plain rows: empty placement / merge with the
+    // target-was-empty bit, a full target (-1), suck's first-slot rule (-2) and
+    // impure items (-2); commit applies the split and refuses changed rows.
+    #[test] fn hopper_plan_and_commit_follow_the_original_slot_order(){
+        let defaults=defaults();let empty=value(0,&defaults);
+        let rows=|n:usize|Arc::new(BoundaryOwner::new(Slots::new(n,Entry{facade:1,stack:empty.clone()})));
+        let (source,target)=(rows(5),rows(5));let (sh,th)=(keep(Owner::Slots(source.clone())),keep(Owner::Slots(target.clone())));
+        let item=|count:i32,id:u64|{let mut overlay=Overlay::new(7);overlay.defaults=Some(defaults.clone());Arc::new(Stack::from_overlay(id,count,overlay))};
+        super::super::slots::mark_pure_copy(515151);
+        source.lock().unwrap().set(2,Entry{facade:2,stack:item(3,515151)});
+        assert_eq!(mattmc_item_hopper_plan(sh,0,th,0,99,0),2|1<<16|1<<17,"slot 2 into empty target slot 0, target was empty");
+        target.lock().unwrap().set(1,Entry{facade:3,stack:item(10,515151)});
+        assert_eq!(mattmc_item_hopper_plan(sh,0,th,0,99,0),2|1<<16,"first target slot 0 is still empty");
+        target.lock().unwrap().set(0,Entry{facade:4,stack:item(64,515151)});
+        assert_eq!(mattmc_item_hopper_plan(sh,0,th,0,99,0),2|1<<8,"merge into slot 1");
+        let key=super::super::slots::next_pending_key();
+        assert_eq!(mattmc_item_hopper_commit(sh,th,2,1,key,3,99),0,"a merge plan commits without a key");
+        assert_eq!(mattmc_item_hopper_commit(sh,th,2,1,0,3,99),1);
+        assert_eq!(target.lock().unwrap().get(1).unwrap().stack.scalars.count.load(Ordering::Relaxed),11);
+        assert_eq!(source.lock().unwrap().get(2).unwrap().stack.scalars.count.load(Ordering::Relaxed),2);
+        for slot in 0..5{target.lock().unwrap().set(slot,Entry{facade:10+slot as i64,stack:item(64,515151)});}
+        assert_eq!(mattmc_item_hopper_plan(sh,0,th,0,99,0),-1,"full target: eject moves nothing");
+        assert_eq!(mattmc_item_hopper_plan(sh,0,th,0,99,1),-2,"suck: the first slot cannot move, the original path runs");
+        source.lock().unwrap().set(2,Entry{facade:2,stack:item(3,515152)});
+        target.lock().unwrap().set(4,Entry{facade:1,stack:empty.clone()});
+        assert_eq!(mattmc_item_hopper_plan(sh,0,th,0,99,0),-2,"impure items keep the original path");
+        for owner in [sh,th]{owners().lock().unwrap().remove(&owner);}
+    }
+    // Comparator signal and occupancy over plain rows, against values computed
+    // with the original Java float formula by hand.
+    #[test] fn row_signal_and_occupancy_match_the_original_formulas(){
+        let defaults=defaults();let empty=value(0,&defaults);
+        let rows=Slots::new(27,Entry{facade:1,stack:empty.clone()});
+        assert_eq!(super::super::slots::redstone_signal(&rows,99),Some(0));
+        assert_eq!(super::super::slots::occupancy(&rows,99),Some(1));
+        let mut rows=rows;rows.set(0,Entry{facade:2,stack:value(1,&defaults)});
+        // 1/64/27 > 0: floor(0.00081*14)=0, plus 1.
+        assert_eq!(super::super::slots::redstone_signal(&rows,99),Some(1));
+        for slot in 0..27{rows.set(slot,Entry{facade:3,stack:value(64,&defaults)});}
+        assert_eq!(super::super::slots::redstone_signal(&rows,99),Some(15));
+        assert_eq!(super::super::slots::occupancy(&rows,99),Some(2),"all at max: full, not empty");
+        rows.set(5,Entry{facade:4,stack:value(63,&defaults)});
+        let f=(26.0f32+63.0/64.0)/27.0;assert_eq!(super::super::slots::redstone_signal(&rows,99),Some((f*14.0).floor() as i32+1));
+        assert_eq!(super::super::slots::occupancy(&rows,99),Some(0));
+        rows.set(5,Entry{facade:5,stack:value(70,&defaults)});
+        assert_eq!(super::super::slots::occupancy(&rows,99),Some(0),"over-max counts are not full");
+    }
+    // Hopper item-entity collection: in-order merges, then the remainder (clipped
+    // to min(99, max)) placed pending; the entity's own stack is never mutated;
+    // a fallback leaves every row untouched.
+    #[test] fn hopper_take_merges_then_places_the_remainder_without_touching_the_entity_stack(){
+        let defaults=defaults();let empty=value(0,&defaults);
+        let rows=Arc::new(BoundaryOwner::new(Slots::new(5,Entry{facade:1,stack:empty.clone()})));let handle=keep(Owner::Slots(rows.clone()));
+        let item=|count:i32|{let mut overlay=Overlay::new(7);overlay.defaults=Some(defaults.clone());Arc::new(Stack::from_overlay(616161,count,overlay))};
+        super::super::slots::mark_pure_copy(616161);
+        rows.lock().unwrap().set(0,Entry{facade:2,stack:item(60)});
+        let source=item(20);let source_handle=keep(Owner::Stack(source.clone()));let key=super::super::slots::next_pending_key();
+        let mut out=0i64;
+        let result=unsafe{mattmc_item_hopper_take(handle,source_handle,key,99,&mut out)};
+        assert_eq!(result&0xFFFFFFFF,0,"everything moved");assert_eq!((result>>32)&0xFF,2,"merge into slot 0 then placement in slot 1");
+        assert_eq!((result>>40)&1,0,"hopper was not empty");assert_eq!((result>>41)&1,1);
+        assert_eq!(source.scalars.count.load(Ordering::Relaxed),20,"the entity's stack is copied, not mutated");
+        assert_eq!(rows.lock().unwrap().get(0).unwrap().stack.scalars.count.load(Ordering::Relaxed),64);
+        let placed=rows.lock().unwrap().get(1).unwrap().clone();
+        assert_eq!(placed.facade,key);assert_eq!(placed.stack.scalars.count.load(Ordering::Relaxed),16);
+        let big=item(150);let big_handle=keep(Owner::Stack(big.clone()));let key2=super::super::slots::next_pending_key();
+        let result=unsafe{mattmc_item_hopper_take(handle,big_handle,key2,99,&mut out)};
+        assert_eq!(result&0xFFFFFFFF,0);assert_eq!(rows.lock().unwrap().get(2).unwrap().stack.scalars.count.load(Ordering::Relaxed),64,"limitSize clips the placed remainder");
+        let other=Arc::new({let mut overlay=Overlay::new(8);overlay.defaults=Some(defaults.clone());Stack::from_overlay(616161,5,overlay)});
+        rows.lock().unwrap().set(3,Entry{facade:3,stack:other});
+        let before:Vec<i32>=(0..5).map(|i|rows.lock().unwrap().get(i).unwrap().stack.scalars.count.load(Ordering::Relaxed)).collect();
+        let small=item(3);let small_handle=keep(Owner::Stack(small));
+        assert_eq!(unsafe{mattmc_item_hopper_take(handle,small_handle,super::super::slots::next_pending_key(),99,&mut out)},-2,"same item, other prototype: Java decides");
+        let after:Vec<i32>=(0..5).map(|i|rows.lock().unwrap().get(i).unwrap().stack.scalars.count.load(Ordering::Relaxed)).collect();
+        assert_eq!(before,after,"the fallback mutated nothing");
+        for owner in [handle,source_handle,big_handle,small_handle]{owners().lock().unwrap().remove(&owner);}
+    }
 }
+

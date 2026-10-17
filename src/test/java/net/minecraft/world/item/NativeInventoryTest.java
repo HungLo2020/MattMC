@@ -394,25 +394,27 @@ class NativeInventoryTest {
         }
     }
 
-    // Inventory add's empty-slot resource copy and damaged copyAndClear adopt
-    // the copy the native add prepared: one each, published with the original
-    // count/pop-time results, the damaged source cleared.
-    @Test void inventoryAddAdoptsNativelyPreparedEmptyAndDamagedCopies() {
+    // Inventory add publishes its empty-slot resource copy and damaged
+    // copyAndClear natively (pending, no facade); the first read materializes
+    // them with the original count/pop-time results, the sources cleared.
+    @Test void inventoryAddPublishesPendingEmptyAndDamagedCopies() {
         bootstrap();
         Inventory inv=new Inventory(null,new EntityEquipment());
         ItemStack stick=new ItemStack(Items.STICK,11);stick.setPopTime(3);
-        long before=preparedCopies();
+        long prepared=preparedCopies(),published=pendingPublished(),materialized=pendingMaterialized();
         assertTrue(inv.add(stick));
-        assertEquals(before+1,preparedCopies(),"one prepared copy for the empty-slot resource");
-        ItemStack added=inv.getItem(0);assertNotSame(stick,added);assertSame(Items.STICK,added.getItem());
-        assertEquals(11,added.getCount());assertEquals(5,added.getPopTime());assertEquals(0,stick.getCount());
+        assertEquals(published+1,pendingPublished(),"the empty-slot resource is published natively");
+        assertEquals(prepared,preparedCopies());assertEquals(materialized,pendingMaterialized());assertEquals(0,stick.getCount());
+        ItemStack added=inv.getItem(0);assertEquals(materialized+1,pendingMaterialized());assertNotSame(stick,added);assertSame(Items.STICK,added.getItem());
+        assertEquals(11,added.getCount());assertEquals(5,added.getPopTime());assertSame(added,inv.getItem(0));
         ItemStack sword=new ItemStack(Items.DIAMOND_SWORD);sword.setDamageValue(1);sword.setPopTime(9);
-        before=preparedCopies();
         assertTrue(inv.add(sword));
-        assertEquals(before+1,preparedCopies(),"one prepared copy for the damaged addition");
+        assertEquals(published+2,pendingPublished(),"the damaged copy is published natively");
         ItemStack damaged=inv.getItem(1);assertNotSame(sword,damaged);assertEquals(1,damaged.getDamageValue());
         assertEquals(1,damaged.getCount());assertEquals(5,damaged.getPopTime());assertEquals(0,sword.getCount());
         assertSame(added,inv.getItem(0));assertSame(damaged,inv.getItem(1));
+        ItemStack more=new ItemStack(Items.STICK,70);assertTrue(inv.add(more));
+        assertEquals(81,inv.getItem(0).getCount()+inv.getItem(2).getCount(),"merge then a second pending slot");assertEquals(0,more.getCount());
     }
 
     private record PublishedCopies(WeakReference<ItemStack> returned,WeakReference<ItemStack> inserted,long returnedHandle,long insertedHandle) {}
@@ -505,4 +507,74 @@ class NativeInventoryTest {
         assertEquals(1,inv.nativeMainSlotsForTransfer().pendingForTest());ItemStack dirt=new ItemStack(Items.DIRT,2);materialized=pendingMaterialized();
         inv.setItem(8,dirt);assertEquals(0,inv.nativeMainSlotsForTransfer().pendingForTest());assertSame(dirt,inv.getItem(8));assertEquals(materialized,pendingMaterialized());
     }
+    // Saving reads without retaining: pending chest/inventory contents are saved
+    // from native copies (still pending afterwards) with the same tags as after
+    // materialization.
+    @Test void savingPendingContentsMatchesSavingTheirFacadesWithoutMaterializing() {
+        bootstrap();
+        var registries=net.minecraft.server.RegistryLayer.createRegistryAccess().compositeAccess();
+        Inventory inv=new Inventory(null,new EntityEquipment());
+        var chest=new net.minecraft.world.level.block.entity.ChestBlockEntity(net.minecraft.core.BlockPos.ZERO,net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+        chest.setRemoved();var menu=net.minecraft.world.inventory.ChestMenu.threeRows(1,inv,chest);chest.clearRemoved();
+        ItemStack named=new ItemStack(Items.STICK,11);named.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,net.minecraft.network.chat.Component.literal("kept"));
+        inv.setItem(9,named);menu.quickMoveStack(null,27);inv.add(new ItemStack(Items.DIRT,5));
+        var rows=chest.nativeSlotsForTransfer();assertEquals(1,rows.pendingForTest());assertEquals(1,inv.nativeMainSlotsForTransfer().pendingForTest());
+        java.util.function.Supplier<String> save=()->{
+            var output=net.minecraft.world.level.storage.TagValueOutput.createWithContext(net.minecraft.util.ProblemReporter.DISCARDING,registries);
+            net.minecraft.world.ContainerHelper.saveAllItems(output,rows);
+            inv.save(output.list("Inventory",net.minecraft.world.ItemStackWithSlot.CODEC));
+            return output.buildResult().toString();
+        };
+        long materialized=pendingMaterialized();
+        String pending=save.get();
+        assertEquals(materialized,pendingMaterialized(),"saving does not materialize");assertEquals(1,rows.pendingForTest());
+        chest.getItem(0);inv.getItem(0);
+        assertEquals(pending,save.get(),"same saved tags as the materialized facades");
+        assertTrue(pending.contains("kept"),pending);
+    }
+    // Pending rows across bulk and structural operations: clearing drops them
+    // with their recipes; replacing the chest's list (setItems) leaves the old
+    // rows behind.
+    @Test void pendingRowsSurviveOrRetireWithBulkAndStructuralOperations() throws Exception {
+        bootstrap();
+        Inventory inv=new Inventory(null,new EntityEquipment());
+        var chest=new net.minecraft.world.level.block.entity.ChestBlockEntity(net.minecraft.core.BlockPos.ZERO,net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+        chest.setRemoved();var menu=net.minecraft.world.inventory.ChestMenu.threeRows(1,inv,chest);chest.clearRemoved();
+        inv.setItem(9,new ItemStack(Items.STICK,11));menu.quickMoveStack(null,27);
+        var rows=chest.nativeSlotsForTransfer();assertEquals(1,rows.pendingForTest());
+        long materialized=pendingMaterialized();
+        chest.clearContent();
+        assertEquals(0,rows.pendingForTest());assertEquals(materialized,pendingMaterialized());assertSame(ItemStack.EMPTY,chest.getItem(0));
+        var getter=net.minecraft.world.level.block.entity.ChestBlockEntity.class.getDeclaredMethod("getItems");getter.setAccessible(true);
+        var setter=net.minecraft.world.level.block.entity.ChestBlockEntity.class.getDeclaredMethod("setItems",net.minecraft.core.NonNullList.class);setter.setAccessible(true);
+        inv.setItem(11,new ItemStack(Items.STICK,3));menu.quickMoveStack(null,29);
+        var old=(NativeItemSlots)getter.invoke(chest);assertEquals(1,old.pendingForTest());
+        setter.invoke(chest,net.minecraft.core.NonNullList.withSize(27,ItemStack.EMPTY));
+        for(int i=0;i<27;i++)assertTrue(chest.getItem(i).isEmpty(),"the replaced list owns the contents now");
+    }
+    // Selected-slot swaps (pickSlot) over pending rows produce the original path's
+    // contents, counts and selection (an Inventory subclass keeps the Java path);
+    // getSuitableHotbarSlot genuinely reads hotbar slots, so materializing them is
+    // expected here, but no item is lost, duplicated or reordered.
+    private static String inventoryState(Inventory inv) {
+        var line=new StringBuilder("selected="+inv.getSelectedSlot());
+        for(int i=0;i<36;i++){ItemStack stack=inv.getItem(i);line.append(' ').append(stack.getItem()).append('x').append(stack.getCount());}
+        return line.toString();
+    }
+    private static String swapScenario(boolean exact) {
+        Inventory inv=exact?new Inventory(null,new EntityEquipment()):new Inventory(null,new EntityEquipment()){};
+        var chest=new net.minecraft.world.level.block.entity.ChestBlockEntity(net.minecraft.core.BlockPos.ZERO,net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+        chest.setRemoved();var menu=net.minecraft.world.inventory.ChestMenu.threeRows(1,inv,chest);chest.clearRemoved();
+        chest.setItem(0,new ItemStack(Items.STICK,9));chest.setItem(1,new ItemStack(Items.DIRT,4));
+        menu.quickMoveStack(null,0);menu.quickMoveStack(null,1);
+        inv.setSelectedSlot(3);
+        var log=new StringBuilder(inventoryState(inv));
+        for(int slot:new int[]{20,8,7,30}){inv.pickSlot(slot);log.append(" | pick ").append(slot).append(' ').append(inventoryState(inv));}
+        return log.toString();
+    }
+    @Test void selectedSlotSwapsOverPendingRowsMatchTheOriginalPath() {
+        bootstrap();
+        assertEquals(swapScenario(false),swapScenario(true));
+    }
 }
+

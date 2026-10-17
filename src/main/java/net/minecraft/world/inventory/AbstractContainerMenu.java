@@ -818,21 +818,21 @@ public abstract class AbstractContainerMenu {
 		return this.moveItemStackToRemaining(itemStack, i, j, bl, false, 0, bl ? j - 1 : i);
 	}
 
-	protected final net.minecraft.world.item.NativeItemState.TransferEffects prepareStockChestTransfer(ItemStack source,net.minecraft.world.level.block.entity.ChestBlockEntity chest){
+	protected final net.minecraft.world.item.NativeItemState.TransferEffects prepareStockChestTransfer(ItemStack source,net.minecraft.world.level.block.entity.NativeStockContainer chest){
 		var effects=new StockTransferEffects(source,chest);return effects.admit()?effects:null;
 	}
-	protected final net.minecraft.world.item.NativeItemState.TransferEffects prepareStockInventoryTransfer(ItemStack source,net.minecraft.world.level.block.entity.ChestBlockEntity chest,Inventory inventory){
+	protected final net.minecraft.world.item.NativeItemState.TransferEffects prepareStockInventoryTransfer(ItemStack source,net.minecraft.world.level.block.entity.NativeStockContainer chest,Inventory inventory){
 		var effects=new StockInventoryTransferEffects(source,chest,inventory);return effects.admit()?effects:null;
 	}
 	/** One native operation owns the scan and continuation across external Java effects. */
-	protected final boolean moveItemStackToStockChest(ItemStack source, net.minecraft.world.level.block.entity.ChestBlockEntity chest) {
+	protected final boolean moveItemStackToStockChest(ItemStack source, net.minecraft.world.level.block.entity.NativeStockContainer chest) {
 		StockTransferEffects effects = new StockTransferEffects(source, chest);
 		if (!effects.admit()) return this.moveItemStackToRemaining(source, 0, 27, false, false, 0, 0);
 		return effects.backend.runTransfer(source, effects);
 	}
 
 	/** Reverse stock transfer owns pure destination mutations and their native change counter. */
-	protected final boolean moveItemStackToStockInventory(ItemStack source, net.minecraft.world.level.block.entity.ChestBlockEntity chest, Inventory inventory) {
+	protected final boolean moveItemStackToStockInventory(ItemStack source, net.minecraft.world.level.block.entity.NativeStockContainer chest, Inventory inventory) {
 		int end = this.slots.size();
 		StockInventoryTransferEffects effects = new StockInventoryTransferEffects(source,chest,inventory);
 		if (!effects.admit()) return this.moveItemStackToRemaining(source,27,end,true,false,0,end-1);
@@ -841,10 +841,10 @@ public abstract class AbstractContainerMenu {
 
 	private final class StockInventoryTransferEffects extends net.minecraft.world.item.NativeItemState.TransferEffects {
 		private final ItemStack source;
-		private final net.minecraft.world.level.block.entity.ChestBlockEntity chest;
+		private final net.minecraft.world.level.block.entity.NativeStockContainer chest;
 		private final Inventory inventory;
 		private net.minecraft.world.item.NativeItemSlots backend;
-		StockInventoryTransferEffects(ItemStack source,net.minecraft.world.level.block.entity.ChestBlockEntity chest,Inventory inventory) {
+		StockInventoryTransferEffects(ItemStack source,net.minecraft.world.level.block.entity.NativeStockContainer chest,Inventory inventory) {
 			this.source=source;this.chest=chest;this.inventory=inventory;
 		}
 		boolean admit() {
@@ -884,11 +884,11 @@ public abstract class AbstractContainerMenu {
 
 	private final class StockTransferEffects extends net.minecraft.world.item.NativeItemState.TransferEffects {
 		private final ItemStack source;
-		private final net.minecraft.world.level.block.entity.ChestBlockEntity chest;
+		private final net.minecraft.world.level.block.entity.NativeStockContainer chest;
 		private net.minecraft.world.item.NativeItemSlots backend;
 		private long admittedVersion = -1;
 		private final boolean pureCopy;
-		StockTransferEffects(ItemStack source, net.minecraft.world.level.block.entity.ChestBlockEntity chest) {
+		StockTransferEffects(ItemStack source, net.minecraft.world.level.block.entity.NativeStockContainer chest) {
 			this.source = source; this.chest = chest;
 			var item = source.getItem(); this.pureCopy = item != null && item.nativeTransferCopyIsPure();
 		}
@@ -1042,6 +1042,23 @@ public abstract class AbstractContainerMenu {
 		if (container == null) {
 			return 0;
 		} else {
+			// Exact stock chests/hoppers: the same sum over native rows, without reading each slot's facade.
+			var rows = container instanceof net.minecraft.world.level.block.entity.NativeRowsContainer nativeRows ? nativeRows.nativeSlotsForTransfer() : null;
+			if (rows != null) {
+				int signal = rows.redstoneSignal();
+				if (signal >= 0) return signal;
+			} else if (container.getClass() == net.minecraft.world.CompoundContainer.class) {
+				// A stock double chest: both halves' native rows, in the compound's slot order.
+				var compound = (net.minecraft.world.CompoundContainer)container;
+				var first = net.minecraft.world.level.block.entity.NativeStockContainer.exact(compound.firstContainer())
+					? ((net.minecraft.world.level.block.entity.NativeStockContainer)compound.firstContainer()).nativeSlotsForTransfer() : null;
+				var second = net.minecraft.world.level.block.entity.NativeStockContainer.exact(compound.secondContainer())
+					? ((net.minecraft.world.level.block.entity.NativeStockContainer)compound.secondContainer()).nativeSlotsForTransfer() : null;
+				if (first != null && second != null) {
+					int signal = first.redstoneSignalWith(second);
+					if (signal >= 0) return signal;
+				}
+			}
 			float f = 0.0F;
 
 			for (int i = 0; i < container.getContainerSize(); i++) {

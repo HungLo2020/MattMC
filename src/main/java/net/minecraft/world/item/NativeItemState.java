@@ -54,6 +54,8 @@ public final class NativeItemState {
         INVENTORY_QUERY = call("inventory_query", 3), INVENTORY_SWAP = call("inventory_swap", 2), INVENTORY_RETAIN = call("inventory_retain", 1), INVENTORY_TRANSFER = call("inventory_transfer", 4);
     private static final MethodHandle INVENTORY_ADD = NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_inventory_add_leased",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
+    private static final MethodHandle INVENTORY_ADD_PENDING = NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_inventory_add_pending_leased",
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle INVENTORY_SCAN = NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_inventory_scan_leased",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle INVENTORY_VISIT = NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_inventory_visit_leased",
@@ -116,11 +118,17 @@ public final class NativeItemState {
         private Slots owner;
         private Throwable failure;
         public abstract long effect(long action,int index,ItemStack captured);
+        /** A visitor that keeps no reference to the stacks it receives (saving) is given copies of pending contents. */
+        public boolean retainsNothing() { return false; }
     }
     private static final ThreadLocal<InventoryVisitEffects> INVENTORY_VISIT_EFFECTS = new ThreadLocal<>();
+    private static ItemStack visitStack(InventoryVisitEffects effects,int index,long facade){
+        if(effects.retainsNothing()&&isPending(facade)){ItemStack snapshot=effects.owner.pendingSnapshot(index);if(snapshot!=null)return snapshot;}
+        return effects.owner.resolveFacade(index,facade);
+    }
     private static long inventoryVisitEffect(long action,long index,long facade) {
         var effects=INVENTORY_VISIT_EFFECTS.get();if(effects==null)return Long.MIN_VALUE;
-        try {return effects.effect(action,Math.toIntExact(index),facade==0?null:effects.owner.resolveFacade(Math.toIntExact(index),facade));}
+        try {return effects.effect(action,Math.toIntExact(index),facade==0?null:visitStack(effects,Math.toIntExact(index),facade));}
         catch(Throwable failure){effects.failure=failure;return Long.MIN_VALUE;}
     }
     private static final class InventoryVisitCallback {
@@ -146,6 +154,8 @@ public final class NativeItemState {
          * prepared ({@code handle}, scalar {@code address}); adopt it with
          * {@link ItemStack#adoptPreparedCopy} or keep the original copy.
          */
+        /** Whether the native add may publish empty-slot/damaged copies without a facade (actions 35/36). */
+        public boolean pendingInsertions() { return false; }
         public long prepared(long action,int index,long handle,long address,long adopted) {
             throw new IllegalStateException("Unknown inventory add effect: "+action);
         }
@@ -153,7 +163,7 @@ public final class NativeItemState {
     private static final ThreadLocal<InventoryAddEffects> INVENTORY_ADD_EFFECTS = new ThreadLocal<>();
     private static long inventoryAddEffect(long action,long index,long handle,long address,long out) {
         InventoryAddEffects effects=INVENTORY_ADD_EFFECTS.get();if(effects==null)return Long.MIN_VALUE;
-        try {return handle!=0&&(action==33||action==34)?effects.prepared(action,Math.toIntExact(index),handle,address,out+8):effects.effect(action,Math.toIntExact(index));}
+        try {return handle!=0&&(action==33||action==34||action==35||action==36)?effects.prepared(action,Math.toIntExact(index),handle,address,out+8):effects.effect(action,Math.toIntExact(index));}
         catch(Throwable failure){effects.failure=failure;return Long.MIN_VALUE;}
     }
     private static final class InventoryAddCallback {
@@ -171,6 +181,29 @@ public final class NativeItemState {
     private static final MethodHandle SLOTS_BIND = call("slots_bind", 4);
     private static final MethodHandle SLOTS_PENDING_COPY = call("slots_pending_copy", 4);
     private static final MethodHandle MENU_DIGESTS = call("menu_digests", 4);
+    private static final MethodHandle INVENTORY_TICK_NOOP = call("inventory_tick_noop", 1);
+    private static final MethodHandle PURE_COPY = call("pure_copy", 1);
+    private static final MethodHandle SHULKER_ITEM = call("shulker_item", 1);
+    /** The item places a shulker box block; stock shulker boxes refuse it through their faces. */
+    static void markShulkerItem(Item item) { c1(SHULKER_ITEM, Identities.of(item)); }
+    private static final MethodHandle PENDING_KEY = call("pending_key", 0);
+    private static final MethodHandle SLOTS_SIGNAL = call("slots_signal", 2);
+    private static final MethodHandle SLOTS_SIGNAL_PAIR = call("slots_signal_pair", 3);
+    private static final MethodHandle SLOTS_OCCUPANCY = call("slots_occupancy", 2);
+    private static final MethodHandle SLOTS_OCCUPIED = call("slots_occupied", 2);
+    private static final MethodHandle HOPPER_PLAN = call("hopper_plan", 6);
+    private static final MethodHandle HOPPER_COMMIT = call("hopper_commit", 7);
+    private static final MethodHandle HOPPER_TAKE = NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_hopper_take",
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
+    /** The item's ItemStack copy is pure (inherited asItem): native transfers may copy it without Java. */
+    static void markPureCopy(Item item) { c1(PURE_COPY, Identities.of(item)); }
+    /** A fresh pending key (at or below PENDING_BASE, so never through checked()). */
+    private static long pendingKey() {
+        try { long key = (long)PENDING_KEY.invokeExact(); if (!isPending(key)) throw new IllegalStateException("Native pending key out of range: " + key); return key; }
+        catch (Throwable failure) { throw failed(failure); }
+    }
+    /** The item's inventoryTick is Item's empty one: the native inventory tick only counts down pop time. */
+    static void markInventoryTickNoop(Item item) { c1(INVENTORY_TICK_NOOP, Identities.of(item)); }
     /** Natively published contents not yet observed by Java carry a pending key (slots.rs PENDING_BASE). */
     static final long PENDING_BASE = -(1L << 40);
     static boolean isPending(long token) { return token <= PENDING_BASE; }
@@ -1078,20 +1111,20 @@ public final class NativeItemState {
             return nativeSlots.actualOwner().readCellStack(link);
         }
         synchronized int presence(SlotLink link){var facade=facade();return facade instanceof NativeItemSlots nativeSlots?nativeSlots.actualOwner().cellPresence(link):-1;}
-        SlotLink slot(net.minecraft.world.level.block.entity.ChestBlockEntity chest,int index){return SlotLink.create(this,chest,index);}
+        SlotLink slot(net.minecraft.world.level.block.entity.NativeStockContainer chest,int index){return SlotLink.create(this,chest,index);}
     }
 
     public static final class SlotLink {
         private final long handle,address;
         private final Slots source;
         private final ContainerCell cell;
-        private final net.minecraft.world.level.block.entity.ChestBlockEntity chest;
+        private final net.minecraft.world.level.block.entity.NativeStockContainer chest;
         private final Cleaner.Cleanable cleanup;
         private SlotLink(long handle,Release ownership,Slots source){this(handle,ownership,source,null,null);}
-        private SlotLink(long handle,Release ownership,Slots source,ContainerCell cell,net.minecraft.world.level.block.entity.ChestBlockEntity chest){
+        private SlotLink(long handle,Release ownership,Slots source,ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest){
             this.handle=handle;this.source=source;this.cell=cell;this.chest=chest;this.address=c1(SLOT_ADDRESS,handle);this.cleanup=CLEANER.register(this,ownership);
         }
-        static SlotLink create(ContainerCell cell,net.minecraft.world.level.block.entity.ChestBlockEntity chest,int index){return adopt(SLOT_CONTAINER_NEW,(handle,ownership)->new SlotLink(handle,ownership,null,cell,chest),cell.handle,index);}
+        static SlotLink create(ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest,int index){return adopt(SLOT_CONTAINER_NEW,(handle,ownership)->new SlotLink(handle,ownership,null,cell,chest),cell.handle,index);}
         static SlotLink create(Slots source,int index){return adopt(SLOT_NEW,(handle,ownership)->new SlotLink(handle,ownership,source),source.handle,index);}
         public int index(){try{return (int)COUNT.getOpaque(SCALAR_RAW,address);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
         public ItemStack stack(){return cell==null?source.readLinkedStack(this):chest.nativeSlotsForTransfer()==null?chest.getItem(index()):cell.stack(this);}
@@ -1118,8 +1151,8 @@ public final class NativeItemState {
         if(container!=null&&container.getClass()==net.minecraft.world.entity.player.Inventory.class&&index>=0&&index<36){
             var source=((net.minecraft.world.entity.player.Inventory)container).nativeMainSlotsForTransfer();
             if(source!=null)return source.bindMainSlot(index);
-        }else if(container!=null&&container.getClass()==net.minecraft.world.level.block.entity.ChestBlockEntity.class&&index>=0&&index<27){
-            var chest=(net.minecraft.world.level.block.entity.ChestBlockEntity)container;return chest.nativeContainerForSlots().slot(chest,index);
+        }else if(net.minecraft.world.level.block.entity.NativeStockContainer.exact(container)&&index>=0&&index<27){
+            var chest=(net.minecraft.world.level.block.entity.NativeStockContainer)container;return chest.nativeContainerForSlots().slot(chest,index);
         }
         return null;
     }
@@ -1194,7 +1227,9 @@ public final class NativeItemState {
             InventoryAddEffects previous=INVENTORY_ADD_EFFECTS.get();long result;
             try {
                 INVENTORY_ADD_EFFECTS.set(effects);
-                result=(long)INVENTORY_ADD.invokeExact(this.inventoryAddress,stackOwner(source.state).checkBound(),(long)index,TransferIds.AIR,InventoryAddCallback.STUB);
+                result=effects.pendingInsertions()
+                    ?(long)INVENTORY_ADD_PENDING.invokeExact(this.inventoryAddress,stackOwner(source.state).checkBound(),(long)index,TransferIds.AIR,InventoryAddCallback.STUB)
+                    :(long)INVENTORY_ADD.invokeExact(this.inventoryAddress,stackOwner(source.state).checkBound(),(long)index,TransferIds.AIR,InventoryAddCallback.STUB);
             } catch(Throwable failure){throw failed(failure);}
             finally {
                 if(previous==null)INVENTORY_ADD_EFFECTS.remove();else INVENTORY_ADD_EFFECTS.set(previous);
@@ -1229,6 +1264,98 @@ public final class NativeItemState {
         }
         private void retire(long token){if(isPending(token))this.pending.remove(token);else this.roots.remove(token);}
         int pendingForTest(){synchronized(this){return this.pending.size();}}
+        /** The materialization recipe for copies of slot {@code index}'s contents, pending or exposed. */
+        private Pending recipeFor(int index){
+            long token=this.facade(index);
+            if(isPending(token))return Objects.requireNonNull(this.pending.get(token),"Native slot lost its pending contents");
+            return new Pending(stackOwner(Objects.requireNonNull(this.roots.get(token),"Native slot lost its facade root").state));
+        }
+        /** Bitmask of non-empty rows, or -2 (more than 63 rows). */
+        long occupiedMask(){
+            try{long value=(long)SLOTS_OCCUPIED.invokeExact(this.handle,TransferIds.AIR);return value==-2?-2:checked(value);}
+            catch(Throwable failure){throw failed(failure);}
+            finally{java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        /** Occupancy bits (1 all empty, 2 all full at max) computed natively, or -2 for the original scan. */
+        long occupancy(){
+            try{long value=(long)SLOTS_OCCUPANCY.invokeExact(this.handle,TransferIds.AIR);return value==-2?-2:checked(value);}
+            catch(Throwable failure){throw failed(failure);}
+            finally{java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        /**
+         * HopperBlockEntity.addItem(hopper, itemEntity) into these rows from a copy
+         * of {@code source} (see mattmc_item_hopper_take); the placed remainder's
+         * recipe is recorded first and dropped when nothing was placed.
+         */
+        synchronized long hopperTake(ItemStack source){
+            Pending recipe=new Pending(stackOwner(source.state));long key=pendingKey();this.pending.put(key,recipe);
+            MemorySegment out=RESULT.get();long result;
+            try{result=(long)HOPPER_TAKE.invokeExact(this.handle,stackOwner(source.state).handle,key,TransferIds.AIR,out);}
+            catch(Throwable failure){this.pending.remove(key);throw failed(failure);}
+            finally{java.lang.ref.Reference.reachabilityFence(source);java.lang.ref.Reference.reachabilityFence(this);}
+            if(result<0||((result>>41)&1)==0)this.pending.remove(key);
+            if(result==-2)return -2;
+            checked(result);long retired=out.get(ValueLayout.JAVA_LONG,0);if(retired!=0)this.retire(retired);
+            return result;
+        }
+        /** Comparator signal of these rows followed by {@code second}'s (a double chest), or -2. */
+        int redstoneSignalWith(Slots second){
+            try{long value=(long)SLOTS_SIGNAL_PAIR.invokeExact(this.handle,second.handle,TransferIds.AIR);if(value==-2)return -2;return Math.toIntExact(checked(value));}
+            catch(Throwable failure){throw failed(failure);}
+            finally{java.lang.ref.Reference.reachabilityFence(second);java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        /** Comparator signal computed natively from the rows, or -2 for the original computation. */
+        int redstoneSignal(){
+            try{long value=(long)SLOTS_SIGNAL.invokeExact(this.handle,TransferIds.AIR);if(value==-2)return -2;return Math.toIntExact(checked(value));}
+            catch(Throwable failure){throw failed(failure);}
+            finally{java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        /** Native stock hopper eject (or, {@code suck}, pull) plan into {@code target} (see mattmc_item_hopper_plan). */
+        long hopperPlan(Slots target,boolean suck){return this.hopperPlan(null,target,null,suck?1:0);}
+        /**
+         * With a double chest's second half on either side ({@code null} when absent), planned as one
+         * container. Flags: 1 suck, 2 the target refuses shulker box items through its faces.
+         */
+        long hopperPlan(@Nullable Slots second,Slots target,@Nullable Slots targetSecond,int flags){
+            try{return (long)HOPPER_PLAN.invokeExact(this.handle,second==null?0L:second.handle,target.handle,targetSecond==null?0L:targetSecond.handle,TransferIds.AIR,(long)flags);}
+            catch(Throwable failure){throw failed(failure);}
+            finally{java.lang.ref.Reference.reachabilityFence(second);java.lang.ref.Reference.reachabilityFence(target);java.lang.ref.Reference.reachabilityFence(targetSecond);java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        /**
+         * Commits a plan: an empty placement publishes a one-item pending copy
+         * whose recipe is recorded before the native commit (and removed if the
+         * rows changed). False when the rows no longer match the plan.
+         */
+        boolean hopperCommit(Slots target,long plan){
+            int index=(int)(plan&0xFF),slot=(int)((plan>>8)&0xFF);boolean empty=((plan>>16)&1)!=0;
+            synchronized(this){synchronized(target){
+                long expected=target.facade(slot),key=0;
+                if(empty){Pending recipe=this.recipeFor(index);key=pendingKey();target.pending.put(key,recipe);}
+                long result;
+                try{result=checked((long)HOPPER_COMMIT.invokeExact(this.handle,target.handle,(long)index,(long)slot,key,expected,TransferIds.AIR));}
+                catch(Throwable failure){if(empty)target.pending.remove(key);throw failed(failure);}
+                finally{java.lang.ref.Reference.reachabilityFence(target);java.lang.ref.Reference.reachabilityFence(this);}
+                if(result==0){if(empty)target.pending.remove(key);return false;}
+                if((result&2)!=0)target.retire(expected);
+                return true;
+            }}
+        }
+        /**
+         * For reading pending contents without exposing them: a native copy,
+         * ItemStack.EMPTY when native reports them empty (-4), or null when the
+         * row is not pending (or changed) and the caller reads it normally.
+         */
+        synchronized ItemStack pendingSnapshot(int index){
+            if(index<0||index>=this.capacity)return null;
+            long key=this.facade(index);if(!isPending(key))return null;
+            Pending recipe=Objects.requireNonNull(this.pending.get(key),"Native slot lost its pending contents");
+            long handle=raw4(SLOTS_PENDING_COPY,this.handle,index,key,recipe.roots.version);
+            if(handle==-3)throw new IllegalStateException("Native pending contents no longer match their component roots");
+            if(handle==-4)return ItemStack.EMPTY;
+            if(handle<=0)return null;
+            try{return ItemStack.materializeNative(net.minecraft.core.component.PatchedDataComponentMap.adoptPendingStack(recipe,handle,c1(STACK_ADDRESS,handle)));}
+            catch(Throwable failure){c1(RELEASE,handle);throw failure;}
+        }
         synchronized ItemStack pendingCopy(int index){
             if(index<0||index>=this.capacity)return null;
             long key=this.facade(index);if(!isPending(key))return null;

@@ -13,6 +13,16 @@ public class CompoundContainer implements Container {
 		this.container2 = container2;
 	}
 
+	/** The first half (native consumers of stock double chests read both halves' rows). */
+	public Container firstContainer() {
+		return this.container1;
+	}
+
+	/** The second half. */
+	public Container secondContainer() {
+		return this.container2;
+	}
+
 	@Override
 	public int getContainerSize() {
 		return this.container1.getContainerSize() + this.container2.getContainerSize();

@@ -60,6 +60,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--pre", type=Path, required=True, help="sealed Java-family/JNI fixture with manifest.json")
+    parser.add_argument("--complete-pre", action="store_true", help="--pre is a complete compiled image: skip the automatic historical menu/inventory/r5 overlays")
     parser.add_argument("--pre-overlay", type=Path, action="append", default=[], help="immutable original upstream-family overlay; repeat as needed, last takes precedence")
     parser.add_argument("--frozen-classpath", type=Path, default=ROOT / "build/item-state-frozen-classpath.txt")
     parser.add_argument("--current-classpath", type=Path, default=ROOT / "build/item-state-current-classpath.txt")
@@ -68,6 +69,8 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=180)
     parser.add_argument("--reference-results", type=Path, help="reuse exact unchanged Frozen/pre rows from a passing receipt; candidate always reruns")
     args = parser.parse_args()
+    if args.complete_pre and args.pre_overlay:
+        parser.error("--complete-pre takes no --pre-overlay")
     if "stock_effects" in args.observers and "stock_transfer" not in args.observers:
         args.observers.append("stock_transfer")
     out = args.output.resolve()
@@ -94,13 +97,13 @@ def main() -> None:
         cp = {side: value + ":" + ":".join(extra_libraries) for side, value in cp.items()}
     menu_pre = ROOT / "build/item-state-pre-stock-menu"
     menu_manifest = None
-    if menu_pre.exists():
+    if not args.complete_pre and menu_pre.exists():
         menu_manifest = json.loads((menu_pre / "manifest.json").read_text())
         assert sha(menu_pre / "classes.jar") == menu_manifest["jar_sha256"]
         cp["pre"] = str(menu_pre / "classes.jar") + ":" + cp["pre"]
     inventory_pre = ROOT / "build/item-state-pre-inventory"
     inventory_manifest = None
-    if inventory_pre.exists():
+    if not args.complete_pre and inventory_pre.exists():
         inventory_manifest = json.loads((inventory_pre / "manifest.json").read_text())
         assert sha(inventory_pre / "classes.jar") == inventory_manifest["jar_sha256"]
         with zipfile.ZipFile(inventory_pre / "classes.jar") as jar:
@@ -109,7 +112,7 @@ def main() -> None:
         cp["pre"] = str(inventory_pre / "classes.jar") + ":" + cp["pre"]
     r5_pre = ROOT / "build/item-state-pre-r5"
     r5_manifest = None
-    if r5_pre.exists():
+    if not args.complete_pre and r5_pre.exists():
         r5_manifest = json.loads((r5_pre / "manifest.json").read_text())
         assert sha(r5_pre / "classes.jar") == r5_manifest["jar_sha256"]
         with zipfile.ZipFile(r5_pre / "classes.jar") as jar:
@@ -129,7 +132,7 @@ def main() -> None:
                "current_status": subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True),
                "pre_base": manifest["base"], "pre_manifest": manifest, "pre_jar_sha256": sha(pre / "classes.jar"), "reference_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=FROZEN, text=True).strip(),
                "compiled_classes": before, "observer_sources": source_hashes, "native_files": libs,
-               "menu_pre_manifest": menu_manifest, "inventory_pre_manifest": inventory_manifest, "r5_pre_manifest": r5_manifest, "extra_pre_manifests": extra_pre_manifests, "driver_sha256": sha(Path(__file__)), "runs": [], "comparisons": {}, "passed": False}
+               "complete_pre": args.complete_pre, "menu_pre_manifest": menu_manifest, "inventory_pre_manifest": inventory_manifest, "r5_pre_manifest": r5_manifest, "extra_pre_manifests": extra_pre_manifests, "driver_sha256": sha(Path(__file__)), "runs": [], "comparisons": {}, "passed": False}
     def save():
         (out / "receipt.json").write_text(json.dumps(receipt, indent=2))
     save()

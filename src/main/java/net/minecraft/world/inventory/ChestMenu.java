@@ -87,20 +87,20 @@ public class ChestMenu extends AbstractContainerMenu {
 	private int containerRows(){var owner=this.nativeMenuForAction();return owner==null?this.legacyRows.value:owner.chestRows();}
 	@Override
 	protected boolean emptyOwnedSource(int index){
-		var clear=this.container.getClass()==net.minecraft.world.level.block.entity.ChestBlockEntity.class
-			&&((net.minecraft.world.level.block.entity.ChestBlockEntity)this.container).nativeSlotsForTransfer()!=null
-			?((net.minecraft.world.level.block.entity.ChestBlockEntity)this.container).nativeContainerForSlots():null;
+		var clear=net.minecraft.world.level.block.entity.NativeStockContainer.exact(this.container)
+			&&((net.minecraft.world.level.block.entity.NativeStockContainer)this.container).nativeSlotsForTransfer()!=null
+			?((net.minecraft.world.level.block.entity.NativeStockContainer)this.container).nativeContainerForSlots():null;
 		return this.nativeMenuForAction().emptySource(index,clear);
 	}
 	@Override
 	protected net.minecraft.world.item.NativeItemState.TransferEffects prepareOwnedTransfer(Slot slot,ItemStack source,int index){
 		if(!this.isNativeTransferSource(slot,index))return null;
-		var chest=(net.minecraft.world.level.block.entity.ChestBlockEntity)this.container;
+		var chest=(net.minecraft.world.level.block.entity.NativeStockContainer)this.container;
 		return index<27?this.prepareStockInventoryTransfer(source,chest,this.playerInventory):this.prepareStockChestTransfer(source,chest);
 	}
 	private boolean isNativeTransferSource(Slot slot, int i) {
 		if (this.getClass() != ChestMenu.class || this.containerRows() != 3 || slot.getClass() != Slot.class
-			|| this.container.getClass() != net.minecraft.world.level.block.entity.ChestBlockEntity.class) return false;
+			|| !net.minecraft.world.level.block.entity.NativeStockContainer.exact(this.container)) return false;
 		if (i >= 0 && i < 27) return slot.container == this.container && slot.getContainerSlot() == i
 			&& this.playerInventory.nativeMainSlotsForTransfer() != null;
 		return i >= 27 && i < 63 && slot.container.getClass() == Inventory.class
@@ -109,7 +109,7 @@ public class ChestMenu extends AbstractContainerMenu {
 
 	private ItemStack quickMoveNative(ItemStack source, Slot slot, int index) {
 		ItemStack snapshot = source.copyForNativeTransfer();
-		var chest = (net.minecraft.world.level.block.entity.ChestBlockEntity)this.container;
+		var chest = (net.minecraft.world.level.block.entity.NativeStockContainer)this.container;
 		boolean changed = index < 27 ? this.moveItemStackToStockInventory(source,chest,this.playerInventory)
 			: this.moveItemStackToStockChest(source,chest);
 		if (!changed) return ItemStack.EMPTY;

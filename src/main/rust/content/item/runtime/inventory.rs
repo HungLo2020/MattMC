@@ -102,6 +102,13 @@ impl Inventory {
     }
 }
 
+/// Items whose inventoryTick is Item's empty implementation (registered by Java at component binding).
+static TICK_NOOP:std::sync::RwLock<Option<std::collections::HashSet<u64>>>=std::sync::RwLock::new(None);
+/// Inventory ticks completed natively without a Java call (`mattmc_item_transfer_counter` 9).
+pub static TICKS_NATIVE:std::sync::atomic::AtomicU64=std::sync::atomic::AtomicU64::new(0);
+pub fn mark_tick_noop(item:u64){TICK_NOOP.write().unwrap().get_or_insert_with(Default::default).insert(item);}
+fn tick_noop(item:u64)->bool{TICK_NOOP.read().unwrap().as_ref().is_some_and(|items|items.contains(&item))}
+
 impl Inventory {
     pub fn remaining_slot(&self,source:Option<&super::stack::Stack>,air:u64,effect:&mut impl FnMut(i64,i32)->Result<i32,()>)->Result<i32,()> {
         let selected=self.scalars.selected.load(Ordering::Relaxed);
@@ -201,6 +208,8 @@ impl Inventory {
     /// Complete live visitor; a Java effect receives the captured original
     /// facade token, while only actual Arc leases survive across that effect.
     pub fn visit_run(&self,source:Option<&super::stack::Stack>,mode:i32,limit:i32,air:u64,mut effect:impl FnMut(i64,i32,i64)->Result<i32,()>)->Result<bool,()> {
+        // Mode 9 is the tick (2) whose Java caller allows native no-op ticks.
+        let (mode,native_tick)=if mode==9{(2,true)}else{(mode,false)};
         if mode==7 {
             let mut index=0;
             while index<effect(27,index,0)? {effect(28,index,0)?;index=index.wrapping_add(1);}
@@ -221,6 +230,13 @@ impl Inventory {
                     }
                 }
             }
+            // Tick (mode 2): ItemStack.inventoryTick only counts down pop time before
+            // Item.inventoryTick; for an item whose inventoryTick is Item's empty
+            // one, that is the whole effect, so no Java call (or facade) is needed.
+            if native_tick { if let Some(entry)=&entry { if tick_noop(entry.stack.scalars.item) {
+                let pop=entry.stack.scalars.pop_time.load(Ordering::Relaxed);if pop>0{entry.stack.scalars.pop_time.store(pop-1,Ordering::Relaxed);}
+                TICKS_NATIVE.fetch_add(1,Ordering::Relaxed);continue;
+            }}}
             let facade=entry.as_ref().map_or(0,|entry|entry.facade);
             let matched=effect(20+mode as i64,index,facade)?!=0;
             if mode>=4 && matched{return Ok(true);}

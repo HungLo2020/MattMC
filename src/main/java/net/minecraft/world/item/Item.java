@@ -136,6 +136,14 @@ public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.Iris
 		this.components = components;
 		try { this.nativeTransferCopyPure = this.getClass().getMethod("asItem").getDeclaringClass() == Item.class; }
 		catch (ReflectiveOperationException | SecurityException unavailable) { this.nativeTransferCopyPure = false; }
+		if (this.nativeTransferCopyPure) NativeItemState.markPureCopy(this);
+		// Shulker boxes refuse these through every face (canPlaceItemThroughFace); native hopper plans need the set.
+		if (this instanceof BlockItem blockItem && blockItem.getBlock() instanceof net.minecraft.world.level.block.ShulkerBoxBlock) NativeItemState.markShulkerItem(this);
+		// An inherited (empty) inventoryTick lets the native inventory tick run without a Java call.
+		boolean tickNoop;
+		try { tickNoop = this.getClass().getMethod("inventoryTick", ItemStack.class, ServerLevel.class, Entity.class, EquipmentSlot.class).getDeclaringClass() == Item.class; }
+		catch (ReflectiveOperationException | SecurityException unavailable) { tickNoop = false; }
+		if (tickNoop) NativeItemState.markInventoryTickNoop(this);
 	}
 
 	public int getDefaultMaxStackSize() {

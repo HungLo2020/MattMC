@@ -18,7 +18,7 @@ public class Slot {
 
 	public Slot(Container container, int i, int j, int k) {
 		this.container = container;
-		this.nativeLink = container!=null&&(container.getClass()==net.minecraft.world.entity.player.Inventory.class||container.getClass()==net.minecraft.world.level.block.entity.ChestBlockEntity.class)
+		this.nativeLink = container!=null&&(container.getClass()==net.minecraft.world.entity.player.Inventory.class||net.minecraft.world.level.block.entity.NativeStockContainer.exact(container))
 			?net.minecraft.world.item.NativeItemState.bindStockSlot(container,i):null;
 		this.legacyIndex = this.nativeLink==null?new LegacyIndex(i):null;
 		this.x = j;

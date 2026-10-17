@@ -233,8 +233,9 @@ pending; later r6 results and disposition supersede that status.
 
 ## Pending slot contents and menu broadcast
 
-S0034 (in progress): an admitted stock quick move into an empty slot publishes
-its copy natively, and the per-tick menu broadcast consumes native contents.
+S0034 (in progress): admitted stock quick moves and inventory adds into an
+empty slot publish their copies natively, and the per-tick menu broadcast
+consumes native contents.
 A Java facade is built only when Java genuinely observes the slot.
 
 **Publication.** When the stock transfer adapters opt in (op 7 returns 6),
@@ -264,6 +265,10 @@ previous contents) all materialize pending contents:
 Repeated reads return that one facade. `Inventory.setItem` and the exact
 `ChestBlockEntity.setItem` discard the previous contents, so they use
 `NativeItemSlots.replace`, which retires pending contents without observing them.
+Saving reads without retaining: `ContainerHelper.saveAllItems` over native rows
+(`NativeItemSlots.getForSave`) and `Inventory.save` (a `retainsNothing`
+visitor) encode pending contents from a native copy, so an autosave does not
+materialize them.
 
 **Native consumers.** Later transfers merge into pending rows natively. The
 quick-move source is still observed (op 1 reads `slot.getItem()`).
@@ -287,8 +292,90 @@ state-transfer change bumps the sync epoch, which invalidates all records. A
 changed slot still needs its listener/packet copy, and `RemoteSlot.force` still
 copies it.
 
-Inventory add (pickups) still adopts prepared copies (S0030). Its Java
-`grow`/`setPopTime` steps run on the adopted facade.
+**Barrels.** The exact stock `BarrelBlockEntity` keeps its 27 slots in the same
+replaceable native container cell as the chest. Both implement
+`NativeStockContainer` (exact class, no loot table), so every native path above
+covers barrels:
+
+- stock quick moves through `ChestMenu`, menu slot links and broadcast;
+- hoppers, comparators and occupancy;
+- saving.
+
+Subclasses keep the original Java behavior. The exact stock
+`ShulkerBoxBlockEntity` also keeps native rows, without a container cell (its
+menu uses a `Slot` subclass). Hoppers, comparators, occupancy and saving cover
+it. A hopper plan into a shulker box treats shulker box items as unplaceable,
+as `canPlaceItemThroughFace` does; Java registers those items at binding.
+Exact stock dispensers and droppers keep native rows the same way. Every
+native-row container implements `NativeRowsContainer` (`nativeSlotsForTransfer`
+is null for subclasses and loot containers), which is what hoppers, comparators
+and occupancy consume.
+
+**Hoppers.** An exact stock `HopperBlockEntity` keeps its five slots in native
+rows. Ejecting into an exact stock chest or hopper is planned natively
+(`mattmc_item_hopper_plan`) in the original order: `isFullContainer`, then per
+non-empty hopper slot its one-item split into the first empty or mergeable
+target slot. The plan is then committed (`mattmc_item_hopper_commit`): the source
+shrinks by one, and an empty target receives a pending one-item copy whose
+recipe Java records first. Java replays only the move's original effects: the
+chest's own `setItem` change mark, the hopper cooldown rule, and two
+`setChanged` calls.
+
+Pulling from an exact stock chest or hopper above (`suckInItems`) uses the same
+plan in suck mode. A failed source-slot attempt has observable effects (the
+chest's `removeItem` and restoring `setItem` change marks), so the native path
+is taken only when the first non-empty source slot moves. On success Java
+replays the chest's `removeItem` change mark, the cooldown rule, then the
+hopper's and the source's `setChanged`.
+
+Collecting an item entity (`addItem(Container, ItemEntity)`) into an exact stock
+hopper runs natively over a copy of the entity's stack
+(`mattmc_item_hopper_take`), in slot order. It merges into same unpatched
+stacks, then places the whole remainder, limited to `min(99, max)`, as a pending
+copy in the first empty slot. A validation pass runs before any mutation. Java
+replays the original effects:
+
+- the cooldown on the first move into an empty hopper;
+- `setChanged` per move;
+- `ItemEntity.setItem`, with an empty stack plus `discard` when everything
+  moved, otherwise a remainder copy. The copy is set even when nothing moved,
+  as in the original. A stock double chest (`CompoundContainer` of two exact chests) is planned as
+one concatenated container in the compound's slot order. The commit applies to
+the half that owns the slot. Java replays that half's own change mark, then the
+compound's `setChanged`, which marks both halves. The following keep the
+original Java path:
+
+- custom or loot containers and replaced lists;
+- patched or impure stacks;
+- same-item stacks whose prototype objects differ.
+
+**Comparators.** `getRedstoneSignalFromContainer` computes the signal of an exact
+stock chest or hopper natively over its rows (`slots.rs` `redstone_signal`). It
+uses the same float sum of `count / min(99, max stack size)` in slot order and
+the same `lerpDiscrete` rounding. Comparators beside hoppers therefore do not
+materialize pending contents. A stock double chest (`CompoundContainer` of two
+exact chests) uses both halves' rows in the compound's slot order
+(`mattmc_item_slots_signal_pair`). Patched stacks return -2, and Java computes
+the original sum. In the same way, `isEmpty` on exact loot-free chests and hoppers,
+and the hopper's `inventoryFull` check before pulling, read occupancy from the
+rows (`slots.rs` `occupancy`). Fullness falls back to the Java scan only when a
+patched stack decides it.
+
+Inventory add (pickups) for a pure item also publishes its copies natively
+(`mattmc_item_inventory_add_pending_leased`).
+
+- **Empty main slot (action 35):** the copy holds one item with pop time 5,
+  and the remainder returns to the native loop. The original grows a
+  `copyWithCount(0)` stack, whose components read as empty, so its max size
+  is 1. The loop's next pass merges the rest and repeats the
+  destination search, including the offhand read (`inventory_add`
+  `selected-merge` row).
+- **Damaged copy (action 36):** the copy holds the whole count with pop time 5,
+  and the source is cleared.
+
+Java's callback only records the recipe. A failure before recording restores
+the row, and the source for action 36. The offhand slot and anything not
+computable natively keep the S0030 adoption path.
 
 - Counters: `mattmc_item_transfer_counter` 5 counts pending publications, 6
   materializations, 7 rollbacks and 8 broadcast copies.
@@ -328,6 +415,14 @@ After the lighting sync, also supply the immutable original lighting overlay
 `build/item-state-pre-upstream-3f1d` and original enchantment overlay
 `build/item-state-pre-r6`. These preserve reference behavior when current classes
 are rebuilt; they do not advance the pinned reference sources.
+
+That partial fixture falls through to current classes for everything it does
+not contain. Once upstream changes a shared native family, the pre side loads
+current classes against the old native and fails (for example
+`UnsatisfiedLinkError: mattmc_noise_seed_builder` after the noise-leaf change).
+For S0034 onward, pass a complete pre image with `--complete-pre`, which skips
+the automatic historical overlays and takes no `--pre-overlay`:
+`--pre build/item-state-pre-s34-11346 --complete-pre`.
 
 ```bash
 python3 DevUtils/tests/content/item-state/VerifyItemState.py \

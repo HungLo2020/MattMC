@@ -57,6 +57,7 @@ impl Slots {
     pub fn entries_facade_index(&self,facade:i64)->i32 {self.entries.iter().position(|entry|entry.facade==facade).map_or(-1,|index|index as i32)}
     pub fn new(size: usize, empty: Entry) -> Self { Self { entries: vec![empty; size] } }
     pub fn get(&self, index: usize) -> Option<&Entry> { self.entries.get(index) }
+    pub fn len(&self) -> usize { self.entries.len() }
     pub fn set(&mut self, index: usize, value: Entry) -> Option<Entry> {
         Some(std::mem::replace(self.entries.get_mut(index)?, value))
     }
@@ -100,6 +101,50 @@ pub fn broadcast_digest(stack:&Stack)->i64 {
         let Ok(overlay)=stack.components.try_lock() else{return -1};if overlay.patch_len()!=0{return -1;}overlay.prototype};
     if item==0||item>=LIMIT||prototype>=LIMIT||count<0||count as u64>=LIMIT {return -1;}
     ((item<<42)|(prototype<<21)|count as u64) as i64
+}
+/// Items whose ItemStack copy is pure (inherited asItem); registered by Java at component binding.
+static PURE_COPY:std::sync::RwLock<Option<std::collections::HashSet<u64>>>=std::sync::RwLock::new(None);
+pub fn mark_pure_copy(item:u64){PURE_COPY.write().unwrap().get_or_insert_with(Default::default).insert(item);}
+pub fn pure_copy(item:u64)->bool{PURE_COPY.read().unwrap().as_ref().is_some_and(|items|items.contains(&item))}
+/// Shulker box block items (ShulkerBoxBlockEntity.canPlaceItemThroughFace refuses them).
+static SHULKER_ITEM:std::sync::RwLock<Option<std::collections::HashSet<u64>>>=std::sync::RwLock::new(None);
+pub fn mark_shulker_item(item:u64){SHULKER_ITEM.write().unwrap().get_or_insert_with(Default::default).insert(item);}
+pub fn shulker_item(item:u64)->bool{SHULKER_ITEM.read().unwrap().as_ref().is_some_and(|items|items.contains(&item))}
+/// ItemStack.getMaxStackSize of unpatched contents: the prototype's max stack size.
+pub fn plain_max(stack:&Stack)->Option<i32>{let defaults=stack.admission.defaults.as_ref()?;let store=defaults.lock().ok()?;max_size(&store)}
+/// AbstractContainerMenu.getRedstoneSignalFromContainer over stock rows (container
+/// max stack size 99), in the original float order; None when a non-empty stack
+/// is not unpatched (its max stack size needs Java's component map).
+pub fn redstone_signal(rows:&Slots,air:u64)->Option<i32> {redstone_signal_parts(&[rows],air)}
+/// The same signal over concatenated containers (CompoundContainer: first then
+/// second half, total size), in the original slot order.
+pub fn redstone_signal_parts(parts:&[&Slots],air:u64)->Option<i32> {
+    let size:usize=parts.iter().map(|rows|rows.len()).sum();let mut sum=0.0f32;
+    for rows in parts { for index in 0..rows.len() {
+        let stack=&rows.get(index)?.stack;let count=visible_count(stack,air);if count==0{continue;}
+        if broadcast_digest(stack)<=0{return None;}
+        sum+=count as f32/99.min(plain_max(stack)?) as f32;
+    }}
+    sum/=size as f32;
+    Some((sum*14.0f32).floor() as i32+i32::from(sum>0.0))
+}
+/// Container.isEmpty (bit 1) and HopperBlockEntity.inventoryFull (bit 2: every
+/// slot non-empty at exactly its max stack size) over stock rows; bit 4 when
+/// fullness depends on a patched stack's component map (emptiness never does).
+pub fn occupancy(rows:&Slots,air:u64)->Option<i64> {
+    let (mut empty,mut full,mut unknown)=(true,true,false);
+    for index in 0..rows.len() {
+        let stack=&rows.get(index)?.stack;let count=visible_count(stack,air);
+        if count==0{full=false;continue;}empty=false;
+        if broadcast_digest(stack)<=0{unknown=true;continue;}
+        match plain_max(stack){Some(max)=>if count!=max{full=false;},None=>unknown=true}
+    }
+    Some(i64::from(empty)|i64::from(full&&!unknown)<<1|i64::from(full&&unknown)<<2)
+}
+/// Bit i set when row i is non-empty (ItemStack.isEmpty false), for rows 0..63.
+pub fn occupied_mask(rows:&Slots,air:u64)->Option<i64> {
+    if rows.len()>63{return None;}
+    let mut mask=0i64;for index in 0..rows.len(){if visible_count(&rows.get(index)?.stack,air)!=0{mask|=1<<index;}}Some(mask)
 }
 pub fn visible_count(stack:&Stack,air:u64)->i32 {
     if stack.empty_identity || stack.scalars.item==air {0} else {stack.scalars.count.load(std::sync::atomic::Ordering::Relaxed).max(0)}

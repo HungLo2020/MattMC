@@ -35,6 +35,14 @@ public class Inventory implements Container, Nameable {
 	public static final int SLOT_BODY_ARMOR = 41;
 	public static final int SLOT_SADDLE = 42;
 	public static final int NOT_FOUND_INDEX = -1;
+	private static final ClassValue<Boolean> PLAIN_LEVEL = new ClassValue<>() {
+		@Override protected Boolean computeValue(Class<?> type) {
+			try {
+				Class<?> owner = type.getMethod("level").getDeclaringClass();
+				return owner == net.minecraft.world.entity.Entity.class || owner == net.minecraft.server.level.ServerPlayer.class;
+			} catch (ReflectiveOperationException | SecurityException unavailable) { return false; }
+		}
+	};
 	public static final Int2ObjectMap<EquipmentSlot> EQUIPMENT_SLOT_MAPPING = new Int2ObjectArrayMap<>(
 		Map.of(
 			EquipmentSlot.FEET.getIndex(36),
@@ -326,7 +334,10 @@ public class Inventory implements Container, Nameable {
 
 	public void tick() {
 		if (this.nativeItems != null) {
-			this.nativeItems.visitInventory(null,2,36,new net.minecraft.world.item.NativeItemState.InventoryVisitEffects() {
+			// Mode 9: items with Item's empty inventoryTick tick natively (pop time only), which is
+			// unobservable only when this.player.level() is a plain getter that cannot throw.
+			int mode = this.player != null && PLAIN_LEVEL.get(this.player.getClass()) ? 9 : 2;
+			this.nativeItems.visitInventory(null,mode,36,new net.minecraft.world.item.NativeItemState.InventoryVisitEffects() {
 				@Override public long effect(long action,int index,ItemStack itemStack) {
 					Inventory.this.tickStack(index,itemStack);return 0;
 				}
@@ -361,7 +372,11 @@ public class Inventory implements Container, Nameable {
 							default -> throw new IllegalStateException("Unknown inventory add effect: "+action);
 						};
 					}
+					@Override public boolean pendingInsertions(){return itemStack.getItem()!=null&&itemStack.getItem().nativeTransferCopyIsPure();}
 					@Override public long prepared(long action,int index,long handle,long address,long adopted) {
+						// 35/36: the native add already published the resource/damaged copy (key in handle,
+						// retired token in address); record its recipe. No other original step observes it.
+						if(action==35||action==36){Inventory.this.nativeItems.recordPending(handle,itemStack,address,adopted);return 1;}
 						if(action==33)return Inventory.this.addResourcePrepared(index,itemStack,handle,address,adopted);
 						// Original copyAndClear order: the items field, the copy, clearing the source, set, pop time.
 						var items=Inventory.this.items;ItemStack copy;
@@ -507,6 +522,7 @@ public class Inventory implements Container, Nameable {
 		if (this.nativeItems != null) {
 			this.nativeItems.visitInventory(null,0,36,new net.minecraft.world.item.NativeItemState.InventoryVisitEffects() {
 				@Override public long effect(long action,int index,ItemStack itemStack) {saveStack(typedOutputList,index,itemStack);return 0;}
+				@Override public boolean retainsNothing() {return true;}
 			});return;
 		}
 		for (int i = 0; i < this.items.size(); i++) {

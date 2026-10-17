@@ -60,8 +60,15 @@ class NativeBroadcastTest {
     }
     static final class MarkedRecorder extends Recorder implements AbstractContainerMenu.ReadOnlyBroadcastObserver {}
 
-    record World(Inventory inventory, ChestBlockEntity chest, ChestMenu menu, Recorder recorder) {
+    record World(Inventory inventory, net.minecraft.world.Container chest, ChestMenu menu, Recorder recorder) {
         void tick() { this.menu.broadcastChanges(); this.recorder.events.add("tick"); }
+    }
+    /** The same world over a stock barrel (a ChestMenu over native barrel rows). */
+    static World barrelWorld(boolean admitted) {
+        Inventory inventory = new Inventory(null, new EntityEquipment());
+        var barrel = new net.minecraft.world.level.block.entity.BarrelBlockEntity(BlockPos.ZERO, Blocks.BARREL.defaultBlockState());
+        barrel.setRemoved(); var menu = ChestMenu.threeRows(1, inventory, barrel); barrel.clearRemoved();
+        return new World(inventory, barrel, menu, admitted ? new MarkedRecorder() : new Recorder());
     }
     static World world(boolean admitted) {
         Inventory inventory = new Inventory(null, new EntityEquipment());
@@ -111,4 +118,34 @@ class NativeBroadcastTest {
             "a facade mutation of skipped contents is still detected and sent");
         assertTrue(afterSequence >= 0);
     }
+
+    // Comparator signal: the native sum over exact chest rows equals the
+    // original per-slot computation (anonymous subclass) for random contents,
+    // and reading it leaves pending contents unmaterialized.
+    @Test void nativeComparatorSignalMatchesTheOriginalComputation() {
+        var random = new java.util.Random(34);
+        var items = List.of(Items.STICK, Items.DIRT, Items.ENDER_PEARL, Items.DIAMOND_SWORD, Items.SNOWBALL);
+        for (int round = 0; round < 200; round++) {
+            var exact = new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState());
+            var original = new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()) {};
+            for (int i = 0; i < 27; i++) {
+                if (random.nextInt(3) == 0) continue;
+                var item = items.get(random.nextInt(items.size()));
+                int count = 1 + random.nextInt(new ItemStack(item).getMaxStackSize());
+                exact.setItem(i, new ItemStack(item, count)); original.setItem(i, new ItemStack(item, count));
+            }
+            assertEquals(AbstractContainerMenu.getRedstoneSignalFromContainer(original), AbstractContainerMenu.getRedstoneSignalFromContainer(exact), "round " + round);
+        }
+        World w = world(true); w.inventory.setItem(9, new ItemStack(Items.STICK, 11)); w.menu.quickMoveStack(null, 27);
+        long before = materialized();
+        assertEquals(1, AbstractContainerMenu.getRedstoneSignalFromContainer(w.chest));
+        assertEquals(before, materialized(), "the native signal reads pending contents without a facade");
+    }
+
+    @Test void barrelBroadcastMatchesTheOriginalLoop() {
+        World original = barrelWorld(false); sequence(original);
+        World admitted = barrelWorld(true); sequence(admitted);
+        assertEquals(original.recorder.events, admitted.recorder.events);
+    }
 }
+

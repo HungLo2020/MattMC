@@ -61,6 +61,40 @@ outside the timer, so it excludes materialization.
 Debt: every row remains above Frozen (idle broadcast 3.25×, changed tick
 5.73×). Native allocation and process memory are not measured.
 
+### Second S34 checkpoint: hoppers, containers, pickups
+
+**October 17, 2026.** The candidate adds native hoppers, barrels, shulker boxes,
+dispensers and droppers. It also adds comparator signals, saves without
+materializing, native no-op inventory ticks and pending pickups. Same fixtures
+and flags as above, one JVM per side, five samples. Medians use all samples
+because some rows had fewer than three quiet samples.
+
+| Broadcast (`build/s34-v3/broadcast`) | Frozen ns | Pre ns | Current ns | C/pre |
+|---|---:|---:|---:|---:|
+| tick_idle | 1456 | 6672 | 3433 | 0.51 |
+| tick_quick_move_empty | 1579 | 10473 | 8042 | 0.77 |
+| tick_quick_move_one | 9650 | 88087 | 10394 | 0.12 |
+
+In the inventory workload (`build/s34-v3/inventory`), pre itself moved by up to
+±30% per row between this run and `build/s34-cost1`. Only one row changed
+consistently: **`add_damaged`**, with pre at 828/829 ns and Current going from 881 to
+1076 ns (1.30× pre, Java bytes unchanged at 228). Its timer covers only
+`Inventory.add`, so the cost belongs to the pending damaged-copy publication
+(action 36), not to materialization. `add_empty` went from 1126 to 718 ns
+(0.71× pre, Java bytes 228→88).
+
+Debt: `add_damaged` +30% versus pre (19× Frozen) is attributed to action 36 but
+not yet broken down. The broadcast rows remain 2.4×/5.1×/1.08× Frozen.
+
+Correctness for this checkpoint:
+
+- All 14 contracts are exact against the complete pre image
+  (`build/s34-v3/contracts`). This run caught an `inventory_add` regression
+  first (see the empty main slot note in [ITEM-STATE](ITEM-STATE.md)).
+- `VerifyHopperRuntime.py` passes all 16 checks on Current (native mapped)
+  and on Frozen. That includes a real item entity collected by a hopper and
+  a save/reload.
+
 ## S0030 natively prepared copies
 
 **S0030/r2, October 16, 2026: temporary cost exception accepted for publication.**
