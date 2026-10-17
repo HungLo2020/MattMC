@@ -29,6 +29,8 @@ final class NativeSkySourceOwner {
  static final MethodHandle STEP=h("cursor_step",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
  static final MethodHandle BULK_NEW=h("bulk_new",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
  static final MethodHandle BULK_SECTION=h("bulk_section",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
+ static final MethodHandle BULK_LIVE=h("bulk_live_section",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+ static final MethodHandle BULK_AIR=h("bulk_air_section",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
  static final MethodHandle BULK_DROP=h("bulk_release",FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
  static final MethodHandle DROP=h("cursor_release",FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
  static final class Scratch {final MemorySegment words=Arena.ofAuto().allocate(128L*Long.BYTES,Long.BYTES);}
@@ -82,15 +84,27 @@ final class NativeSkySourceOwner {
    importEscaped();var frame=arena.allocate(128,8);
    bulk=(long)BULK_NEW.invokeExact(id,resources.minY(),resources.height(),resources.sections().length,resources.highest(),frame);
    if(bulk==0){if(read(frame,0)!=0)return false;exportEscaped();return true;}
-   var words=arena.allocate(2048L*8,8);var ids=arena.allocate(257L*4,4);var header=arena.allocate(16,4);
-   while(read(frame,0)!=0){
-    int index=(int)read(frame,1);
-    var section=net.minecraft.world.level.chunk.NativeSkySourceSections.export(resources.sections()[index],words,ids,header);
-    if(section==null)return false;
-    MemorySegment palette=section.global()?MemorySegment.NULL:ids;
-    int status=(int)BULK_SECTION.invokeExact(bulk,words,section.words(),palette,section.count(),section.bits(),frame);
-    if(status!=0)return false;
-   }
+   MemorySegment words=null,ids=null,header=null;
+   var lease=new net.minecraft.world.level.chunk.NativeSkySourceSections.Lease();
+   try {
+    while(read(frame,0)!=0){
+     int index=(int)read(frame,1),status;
+     var input=resources.sections()[index];
+     int kind=lease.acquire(input);
+     if(kind==0)status=(int)BULK_AIR.invokeExact(bulk,frame);
+     else if(kind==1){
+      try{status=(int)BULK_LIVE.invokeExact(bulk,lease.pointer(),frame);}
+      finally{lease.clear();}
+     }else{
+      if(words==null){words=arena.allocate(2048L*8,8);ids=arena.allocate(257L*4,4);header=arena.allocate(16,4);}
+      var section=net.minecraft.world.level.chunk.NativeSkySourceSections.export(input,words,ids,header);
+      if(section==null)return false;
+      MemorySegment palette=section.global()?MemorySegment.NULL:ids;
+      status=(int)BULK_SECTION.invokeExact(bulk,words,section.words(),palette,section.count(),section.bits(),frame);
+     }
+     if(status!=0)return false;
+    }
+   }finally{lease.clear();}
    if(read(frame,1)!=0){int lastY=(int)read(frame,2);first.set(15,lastY,15);second.set(15,lastY-1,15);}
    exportEscaped();return true;
   }catch(Throwable e){primary=e;throw fail(e);}

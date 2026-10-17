@@ -19,7 +19,10 @@ array is a derived compatibility transport. See [light propagation](RUST-LIGHT-P
 - Canonical reconstruction uses the existing
   [scan kernel](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/lighting/skylight_sources/scan.rs)
   and registry-derived face table. Java supplies the known pure chunk's highest
-  section and packed resources. Rust clears empty sources without a cursor or
+  section and a synchronous lease on each primary live section owner. Rust reads
+  that owner's actual state under its existing lock, without a VM word/palette
+  export. Air sections need no word buffer; compatibility sections still export
+  packed resources only when needed. Rust clears empty sources without a cursor or
   section scratch and otherwise begins at that highest section. Unsupported
   resources decline before publication and use the native virtual-effect cursor.
 - Preserve face continuity across nonempty sections and reset it at air gaps.
@@ -34,10 +37,12 @@ array is a derived compatibility transport. See [light propagation](RUST-LIGHT-P
   perform the literal original operation through its actual virtual `nativeRaw()`
   exactly once, including inherited overrides, without another `nativeBits()`
   effect. A short restore preserves the suffix; snapshots are independent.
-- Section ownership still belongs to the chunk subsystem. Current resource
-  extraction exports live words/palette IDs into temporary native scratch;
-  compatibility sections use their original accessors. Keep those accessors
-  package-private. S33 owns `NativeDecorationRegion` and `DecorationTransaction`;
+- Section ownership still belongs to the chunk subsystem. Keep its existing
+  `stageOwner` / `with_state_reader` APIs unchanged. A typed bridge lease pins the
+  primary owner only through its synchronous scan; no lock, borrow or section
+  reference survives into a VM effect or pending source publication. Preserve
+  local/global palette admission and the zero-width single-value capture.
+  Compatibility sections use their original accessors; keep them package-private. S33 owns `NativeDecorationRegion` and `DecorationTransaction`;
   their legacy word-array consumers are not migrated by this checkpoint.
 
 The former Java reconstruction bridge is now
@@ -58,7 +63,13 @@ The portable driver requires Linux `/proc` to verify the mapped native library.
 It builds matching release inputs and compares public effects with checked-in
 original Frozen traces. MattMC word-transport extensions use the complete
 published `5e933129855fd5b82198204a1f093cb541127e04` literal-operation reference.
-It also requires the real native bulk route, exercises actual lighting consumers,
+It also requires the real native bulk route. A second overlay makes VM section
+word export and cursor fallback fail, requiring the primary-owner/air route on
+the same 50 original Frozen fixtures. A Current-only scope observer compares the
+actual direct scan with the independent Java oracle, closes the real section
+arena, checks that source words remain valid, and requires closed-section reuse
+to fail without changing the source. This uses no synthetic release counter.
+The driver exercises actual lighting consumers,
 and checks pending native ownership after collection within five seconds. A
 test-only facade that omits the actual base release must fail that same observer
 on its retained-owner assertion; neither overlay changes production files.
@@ -74,6 +85,23 @@ use the supported escaped-array view rather than a private Java heightmap field.
 The older `DevUtils/tests/lighting/VerifyRustSkyLightSources.py` checks the pinned
 Java oracle and can run its strict reconstruction timing campaign. Its historical
 results below do not certify current owner costs or complete lighting.
+
+The direct-section handoff was verified on base `542dfd165`. Its matching
+release `66ff7a5d327285c9dc68c3c5ff8465fcadc9c33c25e8bb0ecb6296efe3cd6355`
+passed 378 focused JVM tests and 248 portable checks. These include 50 original
+Frozen fixtures with both VM section export and cursor fallback made fatal,
+and two Current-only actual section-arena close/reuse checks. The real omitted
+base-release negative control still fails on its retained-owner assertion.
+Eleven source tests and all 134 native lighting tests passed. The actual full
+serial native result was **3,157 passed, 57 failed, nine ignored**; the same
+historical names and bodies matched exactly, normalizing only printed OS thread
+IDs. This is a raw failed suite with its existing exact host qualification.
+Earlier broad Java receipts keep their earlier runtime identities; recorded
+source/class/resource/dependency impacts accompany latest affected execution.
+Fresh saved-light ordering and custody checks also passed. All four initial
+selected save-byte comparisons matched, and 125 fresh chunks plus their own-save
+reopen passed. The original 25 Primordial differences remain, so full Frozen
+dimension parity is still false.
 
 ## Current ownership evidence and open costs
 
@@ -134,6 +162,12 @@ measured 231.16 µs/3,040 Java bytes with eight quiet samples, matching work/out
 verified class/native origins and no swap. Against the unchanged original Frozen
 and published-build samples above, its ratios were 0.921 and 0.842. Those baseline
 samples keep their original runtime identities; neither was retimed or relabeled.
+The direct-section `542dfd165` candidate with release `66ff` separately measured
+236.24 µs/2,696 Java bytes with eight quiet samples and the same complete workload
+and output. Against the unchanged original Frozen and published-build samples,
+its ratios were 0.941 and 0.860. No baseline was retimed; the earlier integrated
+231.16 µs/3,040-byte row retains its earlier identity. These observations do not
+isolate a latency improvement or close the standalone empty/solid cost debt.
 These are intermediate workload observations, not FPS, native allocator/retirement
 plateau, final performance or whole-lighting acceptance.
 

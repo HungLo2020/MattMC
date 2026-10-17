@@ -186,6 +186,24 @@ impl CanonicalFill {
             }
         }
     }
+    /// Reads the actual section payload under its existing owner lock. No
+    /// section pointer, lock, or borrow survives this call or publication.
+    fn live_section(
+        &mut self,
+        reader: crate::world::level::chunk::live::StateReader<'_>,
+        descriptors: &[u32],
+        edges: &[u8],
+        base: i32,
+        faces: usize,
+    ) -> Result<i32, Error> {
+        if self.failed { return Err(Error::Scan); }
+        let header = [0, self.bits as i32, self.working.len() as i32,
+            base, self.min, 0, faces as i32, 0];
+        let result = scan::section_states(false, |index| {
+            descriptors.get(reader.get(index) as usize).copied().ok_or(())
+        }, edges, &header, &mut self.pending, &mut self.above, &mut self.working);
+        result.map_err(|()| { self.failed = true; Error::Scan })
+    }
     pub fn finish(self) -> Result<(), Error> {
         if self.failed {
             return Err(Error::Scan);
@@ -199,6 +217,85 @@ impl CanonicalFill {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn direct_live_section_matches_packed_scan_in_every_owner_format() {
+        use crate::world::level::chunk::live::Owner;
+        let descriptors = [0, 1, 2, 65536, 65538, 4, 131072, 131076];
+        let edges = [0, 0, 0, 0, 0, 1, 0, 1, 0];
+        for bits in [0usize, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] {
+            let global = bits >= 9;
+            let palette: Vec<i32> = if global { vec![] } else if bits == 0 { vec![3] }
+                else { (0..8).rev().collect() };
+            let mut words = vec![0u64; if bits == 0 { 0 } else { 4096usize.div_ceil(64 / bits) }];
+            if bits != 0 {
+                let per = 64 / bits;
+                for index in 0..4096 {
+                    let value = (index * 71 + index / 256 * 13) % 8;
+                    words[index / per] |= (value as u64) << (index % per * bits);
+                }
+            }
+            let owner = Owner::load(bits, bits, &palette, &words, 512,
+                if global { bits } else { 9 }).unwrap();
+            let packed_flags: Vec<u32> = if global { descriptors.to_vec() } else {
+                palette.iter().map(|&id| descriptors[id as usize]).collect()
+            };
+            let actual = Source::new(-1, 6).unwrap();
+            let reference = Source::new(-1, 6).unwrap();
+            actual.replace(&[u64::MAX; 26]).unwrap();
+            reference.replace(&[u64::MAX; 26]).unwrap();
+            let mut live = actual.canonical_fill().unwrap();
+            let mut packed = reference.canonical_fill().unwrap();
+            for base in [16, 0] {
+                let remaining = owner.with_state_reader(|reader|
+                    live.live_section(reader, &descriptors, &edges, base, 3));
+                assert_eq!(remaining, packed.section(&words, &packed_flags, &edges, bits as i32, base, 3));
+                assert_eq!(live.working, packed.working);
+                assert_eq!(live.pending, packed.pending);
+                assert_eq!(live.above, packed.above);
+            }
+            live.finish().unwrap(); packed.finish().unwrap();
+            assert_eq!(actual.words(), reference.words());
+            // The reader guard must be gone; mutation cannot deadlock here.
+            assert!(owner.write(0, 4).is_some());
+            assert_eq!(actual.words(), reference.words());
+        }
+    }
+    #[test]
+    fn direct_scan_failure_keeps_source_unpublished_and_releases_section_guard() {
+        use crate::world::level::chunk::live::Owner;
+        let source = Source::new(-1, 6).unwrap();
+        source.set(0, 5).unwrap();
+        let before = source.words().unwrap();
+        let mut words = vec![0u64; 256];
+        words[3840 / 16] = 1 << 4; // Last Y, column1 refers to missing descriptor1.
+        let owner = Owner::load(4, 4, &[0, 1], &words, 512, 9).unwrap();
+        let mut fill = source.canonical_fill().unwrap();
+        assert_eq!(owner.with_state_reader(|reader|
+            fill.live_section(reader, &[1], &[0], 16, 1)), Err(Error::Scan));
+        assert_ne!(fill.working, before);
+        assert_eq!(source.words().unwrap(), before);
+        assert!(owner.write(1, 0).is_some());
+        assert_eq!(fill.finish(), Err(Error::Scan));
+        assert_eq!(source.words().unwrap(), before);
+    }
+    #[test]
+    fn direct_scan_pending_result_retains_source_but_no_section_reference() {
+        use crate::world::level::chunk::live::Owner;
+        let source = Source::new(-1, 6).unwrap();
+        let weak = Arc::downgrade(&source.0);
+        let mut fill = source.canonical_fill().unwrap();
+        let owner = Owner::load(0, 0, &[0], &[], 512, 9).unwrap();
+        drop(source);
+        assert_eq!(owner.with_state_reader(|reader|
+            fill.live_section(reader, &[1], &[0], 16, 1)), Ok(0));
+        // Actual read is complete; the pending source can publish after the
+        // section's native owner is destroyed, with no dangling borrowed state.
+        drop(owner);
+        assert!(weak.upgrade().is_some());
+        assert!(fill.working.iter().any(|&word| word != 0));
+        fill.finish().unwrap();
+        assert!(weak.upgrade().is_none());
+    }
     #[test]
     fn escaped_words_preserve_padding_and_signed_java_consumption() {
         let source = Source::new(-65, 5).unwrap();

@@ -77,6 +77,27 @@ def main():
     command(['javac', '--release', '25', '-proc:none', '-cp', cp, '-d', str(required), str(overlay)], out / 'required-compile.log')
     inputs[str(overlay)] = digest(overlay)
     inputs.update({str(path): digest(path) for path in required.rglob('*.class')})
+    # Require the actual primary-owner/air consumer: exporting compatibility
+    # words or falling back to the effect cursor must fail this same Frozen probe.
+    resource_source = ROOT / 'src/main/java/net/minecraft/world/level/chunk/NativeSkySourceSections.java'
+    resource_text = resource_source.read_text()
+    signature = ' public static SectionData export('
+    start = resource_text.index('{', resource_text.index(signature))
+    end, depth = start + 1, 1
+    while depth:
+        depth += (resource_text[end] == '{') - (resource_text[end] == '}')
+        end += 1
+    direct_source = out / 'direct-required-source/net/minecraft/world/level/chunk/NativeSkySourceSections.java'
+    direct_source.parent.mkdir(parents=True)
+    direct_source.write_text(resource_text[:start + 1]
+        + '\n  throw new AssertionError("Primary source reconstruction exported VM section words");\n '
+        + resource_text[end - 1:])
+    direct_required = out / 'direct-required-classes'
+    direct_required.mkdir()
+    command(['javac', '--release', '25', '-proc:none', '-cp', cp, '-d', str(direct_required),
+             str(overlay), str(direct_source)], out / 'direct-required-compile.log')
+    inputs[str(direct_source)] = digest(direct_source)
+    inputs.update({str(path): digest(path) for path in direct_required.rglob('*.class')})
     release = 'try{RELEASE.invokeExact(actual);}catch(Throwable e){throw fail(e);}'
     if owner_text.count(release) != 1:
         raise RuntimeError('Update the actual-release leak control for the current source facade.')
@@ -89,7 +110,7 @@ def main():
     inputs[str(leak_source)] = digest(leak_source)
     inputs.update({str(path): digest(path) for path in leak_classes.rglob('*.class')})
     origins = json.loads((HERE / 'references/origins.json').read_text())
-    jobs = {**origins['cases'], 'bulk-required': {**origins['cases']['bulk'], 'reference': 'bulk'}, **origins['extensions'], 'lifetime': {'main': 'VerifySkySourceNativeLifetime', 'rows': 2, 'prefix': 'SKY_SOURCE_LIFETIME '}, 'engine-consumer': {'main': origins['engine_consumer']['main'], 'rows': 9, 'prefix': ''}, 'release-leak-control': {'main': 'VerifySkySourceNativeLifetime', 'rows': 0, 'prefix': 'SKY_SOURCE_LIFETIME '}}
+    jobs = {**origins['cases'], 'bulk-required': {**origins['cases']['bulk'], 'reference': 'bulk'}, 'bulk-direct-required': {**origins['cases']['bulk'], 'reference': 'bulk'}, 'section-lease': {'main': 'VerifySkySourceSectionLease', 'rows': 2, 'prefix': 'SOURCE_SECTION_LEASE '}, **origins['extensions'], 'lifetime': {'main': 'VerifySkySourceNativeLifetime', 'rows': 2, 'prefix': 'SKY_SOURCE_LIFETIME '}, 'engine-consumer': {'main': origins['engine_consumer']['main'], 'rows': 9, 'prefix': ''}, 'release-leak-control': {'main': 'VerifySkySourceNativeLifetime', 'rows': 0, 'prefix': 'SKY_SOURCE_LIFETIME '}}
     result = {'scope': 'Focused correctness only; reference identities in origins.json. No timing/FPS/whole-lighting acceptance.',
               'head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'inputs': inputs, 'native_sha256': digest(library), 'runs': {}, 'passed': False}
@@ -102,9 +123,9 @@ def main():
             cmd = ['java', '-Xms256m', '-Xmx3g', '--enable-native-access=ALL-UNNAMED',
                    '-Xlog:class+load=info:file=' + str(classlog), '-Dmattmc.rust.natives.dir=' + str(native),
                    '-cp', str(classes) + os.pathsep + cp, 'net.minecraft.world.level.lighting.' + job['main']]
-            if mode in ['bulk-required', 'release-leak-control']:
+            if mode in ['bulk-required', 'bulk-direct-required', 'section-lease', 'release-leak-control']:
                 position = cmd.index('-cp') + 1
-                cmd[position] = str(required if mode == 'bulk-required' else leak_classes) + os.pathsep + cmd[position]
+                cmd[position] = str(required if mode == 'bulk-required' else direct_required if mode in ['bulk-direct-required', 'section-lease'] else leak_classes) + os.pathsep + cmd[position]
             if mode == 'engine-consumer':
                 cmd.insert(cmd.index('-cp'), '-Dcoordinator.expectSkyProducer=true')
                 cmd += [str(out / 'consumer-dumps'), 'all']
@@ -139,17 +160,20 @@ def main():
                 reference_matches = len(dumps) == 9 and all(path.read_bytes() == (HERE / 'references/consumer' / path.name).read_bytes() for path in dumps)
                 lines = [path.name for path in dumps]
             else:
-                reference_matches = mode in ['lifetime', 'release-leak-control'] or trace == reference.read_bytes()
+                reference_matches = mode in ['lifetime', 'section-lease', 'release-leak-control'] or trace == reference.read_bytes()
             row = {'command': cmd, 'exit': process.returncode, 'seconds': time.monotonic() - start,
                    'rows': len(lines), 'trace_sha256': hashlib.sha256(trace).hexdigest(),
                    'reference_matches': reference_matches,
                    'actual_additive_api': mode != 'transport' or 'TRANSPORT_API additive=true' in text,
                    'mapped_native': sorted(mapped), 'native_origin': mapped == {str(library)},
                    'source_class_origin': 'net.minecraft.world.level.lighting.ChunkSkyLightSources source: file:' + str(ROOT / 'build/classes/java/main') + '/' in classlog.read_text()}
-            row['native_owner_class_origin'] = 'net.minecraft.world.level.lighting.NativeSkySourceOwner source: file:' + str(required if mode == 'bulk-required' else leak_classes if mode == 'release-leak-control' else ROOT / 'build/classes/java/main') + '/' in classlog.read_text()
+            row['native_owner_class_origin'] = 'net.minecraft.world.level.lighting.NativeSkySourceOwner source: file:' + str(required if mode == 'bulk-required' else direct_required if mode in ['bulk-direct-required', 'section-lease'] else leak_classes if mode == 'release-leak-control' else ROOT / 'build/classes/java/main') + '/' in classlog.read_text()
+            row['required_direct_resource_origin'] = mode not in ['bulk-direct-required', 'section-lease'] or (
+                'net.minecraft.world.level.chunk.NativeSkySourceSections source: file:'
+                + str(direct_required) + '/' in classlog.read_text())
             row['expected_native_leak_rejection'] = mode == 'release-leak-control' and process.returncode != 0 and 'actual base handle did not retire while pending cursor remains' in text
             expected_exit = row['expected_native_leak_rejection'] if mode == 'release-leak-control' else process.returncode == 0
-            row['passed'] = expected_exit and len(lines) == job['rows'] and row['reference_matches'] and row['native_origin'] and row['source_class_origin'] and row['actual_additive_api'] and row['native_owner_class_origin']
+            row['passed'] = expected_exit and len(lines) == job['rows'] and row['reference_matches'] and row['native_origin'] and row['source_class_origin'] and row['actual_additive_api'] and row['native_owner_class_origin'] and row['required_direct_resource_origin']
             result['runs'][mode] = row
             save()
             print(mode, 'PASS' if row['passed'] else 'FAIL', flush=True)

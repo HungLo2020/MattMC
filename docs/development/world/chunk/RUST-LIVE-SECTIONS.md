@@ -47,9 +47,13 @@ uses IDs directly. Zero-width capture still reads its shared single value once.
 This changes capture preparation, not immutable snapshot ownership or the live
 CPU-view contract. Light propagation now [captures directly into its native pass snapshot](../lighting/RUST-LIGHT-SECTION-INPUTS.md)
 under the owner lock, without an intermediate packed callback payload. Heightmap
-and skylight scans export a coherent native word/ID pair into reusable native
-scratch; they avoid constructing Java palettes/arrays for the handoff. Their
-existing Rust kernels and publication rules remain unchanged.
+scans still export a coherent native word/ID pair into reusable native scratch.
+The [skylight-source owner](../lighting/RUST-SKYLIGHT-SOURCES.md) consumes sections
+directly: its bridge pins the existing CPU owner
+for one synchronous native scan, with no exported word/palette buffer on that
+route. The existing section APIs and physical occlusion kernel remain shared;
+compatibility sections retain packed export. See that guide for current proof
+and remaining cost limits.
 
 Rust also counts live storage into the existing ordered callback records.
 Canonical [generation-stage handoffs](../levelgen/RUST-STAGE-HANDOFF.md) now

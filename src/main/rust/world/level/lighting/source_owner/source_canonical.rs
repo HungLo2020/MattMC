@@ -45,6 +45,27 @@ impl Bulk {
         let fill = self.fill.as_mut().ok_or(())?;
         let remaining = fill.section(words, flags, &tables.edges, bits,
             self.min_y + self.section * 16, tables.faces).map_err(|_| ())?;
+        self.complete_section(remaining, frame)
+    }
+    fn feed_live(&mut self, owner: &crate::world::level::chunk::live::Owner,
+        frame: &mut [i64; 16]) -> Result<(), ()> {
+        let tables = installed_tables().ok_or(())?;
+        // Preserve the old resource admission: all local palette entries must
+        // be supported, and any custom global registry state declines globally.
+        let remaining = owner.with_state_reader(|reader| {
+            let admitted = if reader.global_palette() { !tables.custom } else {
+                reader.palette_states().all(|id| tables.descriptors.get(id as usize)
+                    .is_some_and(|&descriptor| descriptor != CUSTOM))
+            };
+            if !admitted { return Err(()); }
+            self.fill.as_mut().ok_or(())?.live_section(reader,
+                &tables.descriptors, &tables.edges, self.min_y + self.section * 16,
+                tables.faces).map_err(|_| ())
+        })?;
+        self.any_non_air = true;
+        self.complete_section(remaining, frame)
+    }
+    fn complete_section(&mut self, remaining: i32, frame: &mut [i64; 16]) -> Result<(), ()> {
         if remaining != 0 {
             if self.section == 0 { return Err(()); }
             self.section -= 1; self.request(frame); return Ok(());
@@ -92,6 +113,25 @@ pub unsafe extern "C" fn mattmc_sky_source_bulk_section(id: u64, words: *const u
     };
     (&mut *(id as usize as *mut Bulk)).feed(words, ids, bits, count as usize, &mut *frame)
         .map_or(-1, |_| 0)
+}
+/// The exact air-counter shortcut needs no packed-word or palette buffer.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sky_source_bulk_air_section(id: u64,
+    frame: *mut [i64; 16]) -> i32 {
+    if id == 0 || frame.is_null() || frame as usize % 8 != 0 { return -1; }
+    (&mut *(id as usize as *mut Bulk)).feed(&[], Some(&[0]), -1, 1, &mut *frame)
+        .map_or(-1, |_| 0)
+}
+/// Both the bulk cursor and exact section owner are pinned synchronously by
+/// the VM resource bridge. No retained section borrow or VM address is stored.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_sky_source_bulk_live_section(id: u64,
+    owner: *const crate::world::level::chunk::live::Owner,
+    frame: *mut [i64; 16]) -> i32 {
+    if id == 0 || owner.is_null() || frame.is_null()
+        || owner as usize % std::mem::align_of::<crate::world::level::chunk::live::Owner>() != 0
+        || frame as usize % 8 != 0 { return -1; }
+    (&mut *(id as usize as *mut Bulk)).feed_live(&*owner, &mut *frame).map_or(-1, |_| 0)
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_sky_source_bulk_release(id: u64) {

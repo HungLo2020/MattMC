@@ -20,6 +20,21 @@ public final class NativeSkySourceSections {
   catch(ReflectiveOperationException e){throw new ExceptionInInitializerError(e);}}
  public record ChunkData(LevelChunkSection[] sections,int minY,int height,int highest) {}
  public record SectionData(int words,int bits,int count,boolean global) {}
+ /** A synchronous CPU-owner pin, cleared before any compatibility effect. */
+ public static final class Lease {
+  private NativeLiveBlockSection owner;
+  /** 0 is air, 1 is the existing primary owner, 2 requests compatibility export. */
+  public int acquire(LevelChunkSection section) {
+   clear();
+   if(section.hasOnlyAir())return 0;
+   var container=section.getStates();
+   if(container.getClass()!=PalettedContainer.class)return 2;
+   owner=container.nativeLiveBlocks();
+   return owner==null?2:1;
+  }
+  public MemorySegment pointer(){return owner.stageOwner();}
+  public void clear(){java.lang.ref.Reference.reachabilityFence(owner);owner=null;}
+ }
  public static ChunkData prepare(ChunkAccess chunk) throws Throwable {
   if(chunk==null || (chunk.getClass()!=ProtoChunk.class && chunk.getClass()!=LevelChunk.class)
     || !NativeBlockRegistry.ready())return null;
