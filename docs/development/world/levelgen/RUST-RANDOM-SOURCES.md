@@ -30,7 +30,8 @@ before conversion to double when porting random doubles.
 
 The source also owns single-seed construction, default bounded draws,
 float/double generation and count-based skipping. Seeding shares the existing
-decoration seed mixer; Gaussian reset remains the real VM effect. Source and
+decoration seed mixer. The later Gaussian ownership described below keeps custom
+reset dispatch as a genuine VM effect. Source and
 generator subclasses retain original dispatch. The integrated `5e933129` image
 passed 194 focused Java checks and 36 actual native checks. Three safe fault
 controls detect raw-state normalization, escaped-state mutation and a leaked
@@ -46,8 +47,9 @@ and [leaf builder](https://github.com/HungLo2020/MattMC/blob/master/src/main/rus
 
 ## Remaining ownership and verification
 
-This is a working slice, not a completed random subsystem. Gaussian state,
-Legacy sources, positional/fork orchestration and decoration state handoffs still need connected ownership work. The thin
+This is a working slice, not a completed random subsystem. Legacy sources,
+positional/fork orchestration and decoration state handoffs still need connected
+ownership work. The thin
 Java facade and final Rust caller must share the same runtime.
 
 Original Frozen state/codec/sequence and leaf-data baselines are preserved.
@@ -75,8 +77,7 @@ eight regions; the three standard dimensions match Frozen, with the original
 162 Primordial differences retained. Failure rollback, cancellation, stock
 binding fresh/reopen and player pending-shutdown/own-save/reopen also pass.
 Cancellation retains its permitted data differences. Receipts remain under
-`build/worldgen/rng-ownership/`; build-only Gaussian preparation is separate
-and does not change the production boundary above.
+`build/worldgen/rng-ownership/`; the later Gaussian receipts below retain their own image identities.
 
 With JDK25, run the state, subclass, raw-import and actual lifetime contracts
 alongside the existing noise suites:
@@ -124,3 +125,75 @@ checks pass. Current/Frozen medians remain 1.37–2.21× across the four rows.
 Raw samples and assessment are under
 `build/worldgen/rng-ownership/source-owner-producer-screen`; these are
 intermediate measurements, not final performance acceptance.
+
+## Gaussian ownership
+
+The default Gaussian cache is embedded in the existing native Xoroshiro source,
+with no additional per-source arena or cache owner. Standalone and other-source
+instances materialize a separate native cache only when needed. Native atomic
+cells preserve cached raw bits across pops and resets; they do not promise an
+atomic pair or a linearized concurrent stream. Fixed cache operations use
+critical downcalls; allocating and variable draw operations use ordinary calls.
+Rust owns rejection, draw order and result/cache commits. Java performs genuine
+custom `nextDouble` dispatch and `Math.log` effects. No native borrow crosses a
+VM callback. The Java cache fields and rejection algorithm are removed.
+
+The actual cache backend remains independent of the public draw target and a
+replaced private Gaussian field. Reseeding resets the embedded cache only when
+it is still the actual source field; replacement/null/custom fields perform
+their original VM reset after seed commit. An independent draw source retires
+after its last draw; an embedded cache retains its source through result commit.
+Real pending-frame tests observe native weak ownership after facade collection,
+continue the actual operation and verify final data retirement.
+
+Use a coherent JDK25 release image and run the Gaussian contracts alongside
+source/noise tests. `VerifyGaussians.py` compares original Frozen, a complete
+published pre-runtime and Current; four raw bridge contracts are absent from
+Frozen and explicitly not run there:
+
+```sh
+python3 DevUtils/tests/worldgen/random_source/VerifyGaussians.py \
+  --pre-runtime build/worldgen/random-gaussian/pre-f5b8-runtime \
+  --output build/worldgen/<new-gaussian-contract-directory>
+python3 DevUtils/tests/worldgen/random_source/VerifyGaussianScreen.py \
+  --pre-runtime build/worldgen/random-gaussian/pre-f5b8-runtime \
+  --current-runtime build/worldgen/random-gaussian/screen-atomic-runtime \
+  --output build/worldgen/<new-gaussian-screen-directory>
+```
+
+The combined `cf7c0009` working release (`5c25f65a` native library) passed219
+focused Java checks,56 actual native module checks and three safe Gaussian fault
+controls. Portable Gaussian checks passed15 Frozen/19 pre/19 Current; RNG
+sequence/state/codec, raw leaves,46 noise contracts per runtime and50,368 corpus
+observations match. Incoming15 item contract groups also pass on all runtimes.
+Receipts are under `build/worldgen/random-gaussian/leaf364-*`,
+`atomic-safe-controls` and `cf7-item15`. The uncached Java tiers passed2,701 ordinary tests plus six skips,193 parity
+and11 slow tests. The full Rust tier passed3,181 tests with nine ignored;
+fresh FULL and CARVERS-resume checks each generated and saved648 chunks per
+runtime. All eight regions match published pre exactly; standard dimensions
+match Frozen, retaining162 original Primordial differences. Injected failure
+keeps nine chunks exactly rolled back, the failed chunk at CARVERS in memory
+and absent on disk. Cancellation releases660 holders to zero and matches169
+statuses, retaining its permitted data differences. Stock binding fresh/reopen
+and player pending-shutdown/own-save/reopen pass on all three runtimes.
+Receipts remain under `build/worldgen/random-gaussian/stable-{tiers,worlds}`
+and their linked workload directories. These gates certify this checkpoint,
+not completion of world generation or lighting. The separately owned
+[canonical skylight callback defect](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18997323)
+and lighting lifecycle correction remain tracked by the lighting worker.
+
+Preserve the original failures: `field-current-negative` contains three actual
+private-field replacement failures, and `draw-target-baseline` contains two
+public target/cache alias failures. Original resource receipts under `screen`
+retain the earlier cache mutex/retention cost (cached65–69ns). The corrected
+`screen-atomic` run measured cached28–32ns, pre22–25ns and Frozen5.3–6.4ns,
+with zero Java bytes or pending frames for that row. This is an intermediate
+screen, not final performance acceptance. Default32-Gaussian-plus-word groups
+measured1.61–2.75µs versus pre0.73–1.19µs; standalone and Legacy rows retain
+substantial latency and264–268 Java bytes for first native-cache materialization.
+Source creation plus three Gaussian draws remains variable and slower. Outputs,
+actual owner/frame creation and retirement match; sampled RSS was136/271/263MB
+Frozen/pre/Current with no swap. Process RSS is not native allocator attribution.
+The owner retains this debt. Connected Legacy source ownership and native
+producer/consumer fusion remove remaining bridge/frame and lazy-cache costs;
+repeated scalar getter tuning is not the system exit.

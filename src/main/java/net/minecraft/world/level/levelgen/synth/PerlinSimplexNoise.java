@@ -8,6 +8,7 @@ import net.minecraft.util.RandomSource;
 public class PerlinSimplexNoise {
     private final NativeSimplexOctaves nativePlan;
     public PerlinSimplexNoise(RandomSource randomSource,List<Integer> list){this(randomSource,new IntRBTreeSet(list));}
+    PerlinSimplexNoise(RandomSource source,List<Integer> octaves,long observation){nativePlan=new NativeSimplexOctaves(source,new IntRBTreeSet(octaves),observation);}
     private PerlinSimplexNoise(RandomSource randomSource,IntSortedSet octaves){nativePlan=new NativeSimplexOctaves(randomSource,octaves);}
 
 	public double getValue(double d, double e, boolean bl) {

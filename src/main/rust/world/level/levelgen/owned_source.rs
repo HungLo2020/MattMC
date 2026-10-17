@@ -47,6 +47,7 @@ impl Data {
 }
 pub(crate) struct Source {
     data: Mutex<Data>,
+    pub(crate) gaussian: super::owned_gaussian::Gaussian,
 }
 impl Source {
     fn new(data: Data) -> Arc<Self> {
@@ -54,6 +55,7 @@ impl Source {
         CREATED.fetch_add(1, Ordering::Relaxed);
         Arc::new(Self {
             data: Mutex::new(data),
+            gaussian: Default::default(),
         })
     }
     pub(crate) fn seeded(seed: i64) -> Arc<Self> {
@@ -64,8 +66,14 @@ impl Source {
         effect(&mut self.data.lock().unwrap())
     }
     pub(crate) fn reseed(&self, seed: i64) {
+        self.reseed_current(seed, true);
+    }
+    pub(crate) fn reseed_current(&self, seed: i64, reset_default_cache: bool) {
         let (lo, hi) = upgrade_seed(seed);
         *self.data.lock().unwrap() = Data::Inline(Xoroshiro::new(lo, hi));
+        if reset_default_cache {
+            self.gaussian.reset();
+        }
     }
     fn bind(&self, root: Arc<OwnedXoroshiro>) {
         *self.data.lock().unwrap() = Data::Shared(root);
@@ -132,6 +140,14 @@ pub(crate) mod ffi {
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_random_source_xoroshiro_seed(id: u64, seed: i64) {
         source(id).reseed(seed);
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn mattmc_random_source_xoroshiro_seed_current(
+        id: u64,
+        seed: i64,
+        reset_default_cache: i32,
+    ) {
+        source(id).reseed_current(seed, reset_default_cache != 0);
     }
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_random_source_xoroshiro_next(id: u64) -> i64 {

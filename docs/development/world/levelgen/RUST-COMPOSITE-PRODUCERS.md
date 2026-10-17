@@ -148,3 +148,26 @@ The connected [random-source owner](RUST-RANDOM-SOURCES.md) consumes canonical
 Xoroshiro state directly in the existing native leaf producer. Its guide records
 the later integrated RNG checks and resource screen. The measurements above
 remain the original published `0f2b4976` checkpoint evidence.
+
+## Construction lifetime observations
+
+`NativeNoiseSeed.statistics()[3]` is a process-wide live-leaf count, not a
+constructor identity. Exact before/after equality can reject correct retirement
+when unrelated automatic-arena owners finish during a test. Original server
+1541→1539 and local deterministic two-unrelated-leaf failures are retained; the
+control does not establish the cause of that historical aggregate failure.
+The Simplex tests instead observe the actual constructor's leaves and
+graph through scoped native weak references, plus its actual vector-allocation
+and graph-drop events. The observation owns no leaf, graph or VM facade; normal
+constructors have no observation. The original real VM array failure,259-draw
+prefix and GC deadlines remain. The combined `5c25f65a` image passes the corrected test with the same two
+unrelated leaves retiring concurrently. Safe actual-native builder leaks and
+early vector allocation both compile and fail the targeted assertions. Receipts
+are under `build/worldgen/random-gaussian/leaf364-{original-control,scoped-control,safe-controls}`;
+219 focused checks and56 native checks pass. Both corrected tests also pass
+inside the full2,701-pass ordinary tier;193 parity and11 slow checks pass.
+The full native tier also passes3,181 tests with nine ignored. Fresh FULL and
+CARVERS-resume, failure/cancellation and stock/player save-reopen gates pass on
+this same image; their exact scope is recorded in the random-source guide.
+No global-counter relaxation replaces the ownership proof, and the controlled
+reproduction does not retroactively attribute the historical aggregate failure.

@@ -2,18 +2,32 @@
 use super::construction::Leaf;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc,
+    Arc, Mutex, Weak,
 };
 static LIVE: AtomicU64 = AtomicU64::new(0);
 static CREATED: AtomicU64 = AtomicU64::new(0);
 static RETIRED: AtomicU64 = AtomicU64::new(0);
+#[derive(Default)]
+struct Observation {
+    leaves: Vec<Weak<Leaf>>,
+    graph: Weak<Graph>,
+    graph_seen: bool,
+    vectors: u64,
+    graph_retired: u64,
+}
+#[derive(Default)]
+struct Probe(Mutex<Observation>);
 struct Graph {
     leaves: Vec<Option<Arc<Leaf>>>,
     input: f64,
     value: f64,
+    probe: Option<Weak<Probe>>,
 }
 impl Drop for Graph {
     fn drop(&mut self) {
+        if let Some(probe) = self.probe.as_ref().and_then(Weak::upgrade) {
+            probe.0.lock().unwrap().graph_retired += 1;
+        }
         LIVE.fetch_sub(1, Ordering::Relaxed);
         RETIRED.fetch_add(1, Ordering::Relaxed);
     }
@@ -31,6 +45,7 @@ struct Builder {
     index: i32,
     ready: bool,
     terminal: bool,
+    probe: Option<Arc<Probe>>,
 }
 // Effects: empty1,first2,last3,leaf4,contains5,consume6,derivedSource7,throw8.
 impl Builder {
@@ -47,6 +62,7 @@ impl Builder {
             index: 0,
             ready: false,
             terminal: false,
+            probe: None,
         }
     }
     fn effect(&mut self, phase: u8, command: u64, arg: i32, source: u64) -> i32 {
@@ -57,6 +73,9 @@ impl Builder {
     fn bind(&mut self, leaf: Arc<Leaf>) -> i32 {
         if self.header[0] != 4 || self.pending.is_some() {
             return -1;
+        }
+        if let Some(probe) = &self.probe {
+            probe.0.lock().unwrap().leaves.push(Arc::downgrade(&leaf));
         }
         self.pending = Some(leaf);
         0
@@ -170,10 +189,14 @@ impl Builder {
             16 => {
                 LIVE.fetch_add(1, Ordering::Relaxed);
                 CREATED.fetch_add(1, Ordering::Relaxed);
+                if let Some(probe) = &self.probe {
+                    probe.0.lock().unwrap().vectors += 1;
+                }
                 self.graph = Some(Graph {
                     leaves: vec![None; self.count as usize],
                     input: 0.,
                     value: 0.,
+                    probe: self.probe.as_ref().map(Arc::downgrade),
                 });
                 if self.last >= 0 && self.last < self.count {
                     self.effect(5, 5, 0, 0)
@@ -248,7 +271,15 @@ impl Builder {
     }
     fn take(&mut self) -> Option<Arc<Graph>> {
         if self.ready {
-            self.graph.take().map(Arc::new)
+            self.graph.take().map(|graph| {
+                let graph = Arc::new(graph);
+                if let Some(probe) = &self.probe {
+                    let mut observation = probe.0.lock().unwrap();
+                    observation.graph = Arc::downgrade(&graph);
+                    observation.graph_seen = true;
+                }
+                graph
+            })
         } else {
             None
         }
@@ -259,6 +290,48 @@ mod ffi {
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_noise_simplex_octaves_builder() -> u64 {
         Box::into_raw(Box::new(Builder::new())).expose_provenance() as u64
+    }
+    #[no_mangle]
+    pub extern "C" fn mattmc_noise_simplex_octaves_probe_new() -> u64 {
+        Arc::into_raw(Arc::new(Probe::default())).expose_provenance() as u64
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn mattmc_noise_simplex_octaves_builder_probed(probe: u64) -> u64 {
+        let pointer = std::ptr::with_exposed_provenance::<Probe>(probe as usize);
+        Arc::increment_strong_count(pointer);
+        let mut builder = Builder::new();
+        builder.probe = Some(Arc::from_raw(pointer));
+        Box::into_raw(Box::new(builder)).expose_provenance() as u64
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn mattmc_noise_simplex_octaves_probe_read(probe: u64, out: *mut u64) {
+        let probe = &*std::ptr::with_exposed_provenance::<Probe>(probe as usize);
+        let observation = probe.0.lock().unwrap();
+        for (i, value) in [
+            observation.leaves.len() as u64,
+            observation
+                .leaves
+                .iter()
+                .filter(|leaf| leaf.strong_count() != 0)
+                .count() as u64,
+            u64::from(observation.graph_seen),
+            observation.graph.strong_count() as u64,
+            observation.vectors,
+            observation.graph_retired,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            out.add(i).write(value);
+        }
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn mattmc_noise_simplex_octaves_probe_release(probe: u64) {
+        if probe != 0 {
+            drop(Arc::from_raw(std::ptr::with_exposed_provenance::<Probe>(
+                probe as usize,
+            )));
+        }
     }
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_noise_simplex_octaves_next(id: u64, response: u64) -> i32 {
@@ -334,7 +407,14 @@ mod tests {
         }
     }
     fn complete(octaves: &[i32]) -> (Arc<Graph>, Vec<[u64; 4]>) {
+        complete_observed(octaves, None)
+    }
+    fn complete_observed(
+        octaves: &[i32],
+        probe: Option<Arc<Probe>>,
+    ) -> (Arc<Graph>, Vec<[u64; 4]>) {
         let mut b = Builder::new();
+        b.probe = probe;
         let mut response = 0;
         let mut trace = Vec::new();
         loop {
@@ -500,6 +580,50 @@ mod tests {
         }
         assert!(weak.upgrade().is_none());
         assert_eq!(LIVE.load(Ordering::Relaxed), before);
+    }
+    #[test]
+    fn scoped_observation_does_not_retain_actual_completed_graph_or_leaves() {
+        let _lock = SERIAL.lock().unwrap();
+        let probe = Arc::new(Probe::default());
+        let (graph, _) = complete_observed(&[-3, -1, 0], Some(probe.clone()));
+        {
+            let view = probe.0.lock().unwrap();
+            assert_eq!(view.leaves.len(), 3);
+            assert!(view.leaves.iter().all(|leaf| leaf.strong_count() != 0));
+            assert!(view.graph_seen);
+            assert_eq!(view.graph.strong_count(), 1);
+            assert_eq!(view.vectors, 1);
+            assert_eq!(view.graph_retired, 0);
+        }
+        drop(graph);
+        let view = probe.0.lock().unwrap();
+        assert!(view.leaves.iter().all(|leaf| leaf.strong_count() == 0));
+        assert_eq!(view.graph.strong_count(), 0);
+        assert_eq!(view.graph_retired, 1);
+    }
+    #[test]
+    fn observed_real_builder_release_retires_only_its_initial_leaf_before_vm_array() {
+        let _lock = SERIAL.lock().unwrap();
+        unsafe {
+            let probe = ffi::mattmc_noise_simplex_octaves_probe_new();
+            let builder = ffi::mattmc_noise_simplex_octaves_builder_probed(probe);
+            for response in [0, 0, 0, (i32::MAX - 1) as u64] {
+                assert_eq!(ffi::mattmc_noise_simplex_octaves_next(builder, response), 1);
+            }
+            let initial = leaf();
+            let raw = Arc::into_raw(initial).expose_provenance() as u64;
+            assert_eq!(ffi::mattmc_noise_simplex_octaves_bind(builder, raw), 0);
+            super::super::construction::ffi::mattmc_noise_seed_release(raw);
+            assert_eq!(ffi::mattmc_noise_simplex_octaves_next(builder, 0), 1);
+            let mut before = [0; 6];
+            ffi::mattmc_noise_simplex_octaves_probe_read(probe, before.as_mut_ptr());
+            assert_eq!(before, [1, 1, 0, 0, 0, 0]);
+            ffi::mattmc_noise_simplex_octaves_builder_release(builder);
+            let mut after = [0; 6];
+            ffi::mattmc_noise_simplex_octaves_probe_read(probe, after.as_mut_ptr());
+            assert_eq!(after, [1, 0, 0, 0, 0, 0]);
+            ffi::mattmc_noise_simplex_octaves_probe_release(probe);
+        }
     }
     #[test]
     fn positive_octaves_keep_the_existing_lazy_initial_validation_boundary() {

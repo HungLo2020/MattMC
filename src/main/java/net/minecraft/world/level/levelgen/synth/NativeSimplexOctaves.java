@@ -12,6 +12,7 @@ import net.minecraft.world.level.levelgen.WorldgenRandom;
 final class NativeSimplexOctaves {
  private static MethodHandle handle(String suffix,FunctionDescriptor descriptor){return NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_noise_simplex_octaves_"+suffix,descriptor);}
  private static final MethodHandle BUILDER=handle("builder",FunctionDescriptor.of(ValueLayout.JAVA_LONG));
+ private static final MethodHandle PROBED=handle("builder_probed",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG));
  private static final MethodHandle NEXT=handle("next",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG));
  private static final MethodHandle BIND=handle("bind",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG));
  private static final MethodHandle TAKE=handle("take",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG));
@@ -28,10 +29,11 @@ final class NativeSimplexOctaves {
   @Override public void accept(MemorySegment ignored){long old=(long)HANDLE.getAndSet(this,0L);if(old!=0)release(RELEASE,old);}
  }
  static void bind(long driver,long leaf){try{int status=(int)BIND.invokeExact(driver,leaf);if(status!=0)throw new IllegalStateException("Invalid native Simplex octave binding");}catch(Throwable failure){throw propagate(failure);}}
- NativeSimplexOctaves(RandomSource randomSource,IntSortedSet octaves){
+ NativeSimplexOctaves(RandomSource randomSource,IntSortedSet octaves){this(randomSource,octaves,0);}
+ NativeSimplexOctaves(RandomSource randomSource,IntSortedSet octaves,long observation){
   Arena arena=Arena.ofAuto();long driver=0;
   try{
-   driver=(long)BUILDER.invokeExact();if(driver==0)throw new OutOfMemoryError("Native Simplex octave allocation failed");MemorySegment words=MemorySegment.ofAddress(driver).reinterpret(32).asReadOnly();long response=0;RandomSource derived=null;SimplexNoise leaf=null;SimplexNoise[] actualProjections=null;
+   driver=observation==0?(long)BUILDER.invokeExact():(long)PROBED.invokeExact(observation);if(driver==0)throw new OutOfMemoryError("Native Simplex octave allocation failed");MemorySegment words=MemorySegment.ofAddress(driver).reinterpret(32).asReadOnly();long response=0;RandomSource derived=null;SimplexNoise leaf=null;SimplexNoise[] actualProjections=null;
    for(;;){int status=(int)NEXT.invokeExact(driver,response);if(status==0)break;if(status!=1)throw new IllegalStateException("Invalid native Simplex octave continuation");int command=(int)words.get(ValueLayout.JAVA_LONG,0),argument=(int)words.get(ValueLayout.JAVA_LONG,8);response=0;
     switch(command){
      case 1:response=octaves.isEmpty()?1:0;break;

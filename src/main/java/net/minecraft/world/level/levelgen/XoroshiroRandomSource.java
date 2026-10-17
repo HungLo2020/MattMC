@@ -9,22 +9,23 @@ public class XoroshiroRandomSource implements RandomSource {
  private Xoroshiro128PlusPlus randomNumberGenerator;
  private Xoroshiro128PlusPlus attached;
  private final NativeXoroshiroSource nativeSource;
- private final MarsagliaPolarGaussian gaussianSource=new MarsagliaPolarGaussian(this);
- public XoroshiroRandomSource(long seed){nativeSource=new NativeXoroshiroSource(seed);}
- public XoroshiroRandomSource(RandomSupport.Seed128bit seed){nativeSource=new NativeXoroshiroSource(seed.seedLo(),seed.seedHi());}
- public XoroshiroRandomSource(long lo,long hi){nativeSource=new NativeXoroshiroSource(lo,hi);}
- private XoroshiroRandomSource(Xoroshiro128PlusPlus root){nativeSource=root.sourceOwner();randomNumberGenerator=root;attached=root;}
+ private final MarsagliaPolarGaussian gaussianSource;
+ public XoroshiroRandomSource(long seed){nativeSource=new NativeXoroshiroSource(seed);gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);}
+ public XoroshiroRandomSource(RandomSupport.Seed128bit seed){nativeSource=new NativeXoroshiroSource(seed.seedLo(),seed.seedHi());gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);}
+ public XoroshiroRandomSource(long lo,long hi){nativeSource=new NativeXoroshiroSource(lo,hi);gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);}
+ private XoroshiroRandomSource(Xoroshiro128PlusPlus root){nativeSource=root.sourceOwner();gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);randomNumberGenerator=root;attached=root;}
  // The identities are real VM facts. Reflection/custom supplied generators keep dispatch.
  private Xoroshiro128PlusPlus observed(){var root=randomNumberGenerator;if(root!=null&&root!=attached){Xoroshiro128PlusPlus.attach(nativeSource,root);attached=root;}return root;}
  private Xoroshiro128PlusPlus generator(){var root=observed();if(root==null){root=Xoroshiro128PlusPlus.fromSource(nativeSource);randomNumberGenerator=root;attached=root;}return root;}
  private long word(){var root=observed();return root==null?nativeSource.next():root.nextLong();}
  private boolean nativeWords(){var root=observed();return getClass()==XoroshiroRandomSource.class&&(root==null||root.getClass()==Xoroshiro128PlusPlus.class);}
+ static NativeXoroshiroSource nativeGaussianProducer(RandomSource source){if(source==null||source.getClass()!=XoroshiroRandomSource.class)return null;var actual=(XoroshiroRandomSource)source;return actual.nativeWords()?actual.nativeSource:null;}
  public MarsagliaPolarGaussian nativeGaussian(){return gaussianSource;}
  public Xoroshiro128PlusPlus nativeGenerator(){return generator();}
  public static long nativeNoiseLeaf(RandomSource source,boolean simplex){if(source==null||source.getClass()!=XoroshiroRandomSource.class)return 0;var actual=(XoroshiroRandomSource)source;var root=actual.observed();if(root!=null&&root.getClass()!=Xoroshiro128PlusPlus.class)return 0;return actual.nativeSource.leaf(simplex);}
  @Override public RandomSource fork(){return new XoroshiroRandomSource(word(),word());}
  @Override public PositionalRandomFactory forkPositional(){return new XoroshiroPositionalRandomFactory(word(),word());}
- @Override public void setSeed(long seed){nativeSource.seed(seed);randomNumberGenerator=null;attached=null;gaussianSource.reset();}
+ @Override public void setSeed(long seed){boolean embedded=gaussianSource!=null&&gaussianSource.nativeUsesSourceCache(nativeSource);nativeSource.seed(seed,embedded);randomNumberGenerator=null;attached=null;if(!embedded)gaussianSource.reset();}
  @Override public int nextInt(){return(int)word();}
  @Override public int nextInt(int bound){if(bound<=0)throw new IllegalArgumentException("Bound must be positive");if(nativeWords()){var root=randomNumberGenerator;return root==null?nativeSource.bounded(bound):root.nativeBounded(bound);}long l=Integer.toUnsignedLong(this.nextInt()),m=l*bound,n=m&4294967295L;if(n<bound){for(int limit=Integer.remainderUnsigned(~bound+1,bound);n<limit;n=m&4294967295L){l=Integer.toUnsignedLong(this.nextInt());m=l*bound;}}return(int)(m>>32);}
  @Override public long nextLong(){return word();}

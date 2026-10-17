@@ -11,7 +11,7 @@ final class NativeXoroshiroSource {
  private static final MethodHandle RELEASE=handle("release",FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
  private static final MethodHandle ROOT=handle("root",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG));
  private static final MethodHandle BIND=handle("bind",FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG));
- private static final MethodHandle SEED=handle("seed",FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG));
+ private static final MethodHandle SEED=handle("seed_current",FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_INT));
  private static final MethodHandle NEXT=handle("next",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG));
  private static final MethodHandle BOUNDED=handle("bounded",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.JAVA_INT));
  private static final MethodHandle DOUBLE=handle("double",FunctionDescriptor.of(ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_LONG));
@@ -25,9 +25,10 @@ final class NativeXoroshiroSource {
  NativeXoroshiroSource(long lo,long hi){this(lo,hi,0,null);}
  NativeXoroshiroSource(NativeRandomBits bits){this(bits.handle(),0,2,bits);}
  private NativeXoroshiroSource(long a,long b,int kind,Object keepAlive){Arena arena=Arena.ofAuto();try{id=(long)NEW.invokeExact(a,b,kind);if(id==0)throw new OutOfMemoryError("Native source allocation failed");Release cleanup;try{cleanup=new Release(id);}catch(Throwable failure){release(id);throw failure;}try{owner=MemorySegment.ofAddress(id).reinterpret(1,arena,cleanup);}catch(Throwable failure){cleanup.accept(MemorySegment.NULL);throw failure;}}catch(Throwable failure){throw propagate(failure);}finally{Reference.reachabilityFence(keepAlive);}}
+ long handle(){return id;}
  long root(){try{return(long)ROOT.invokeExact(id);}catch(Throwable failure){throw propagate(failure);}finally{Reference.reachabilityFence(this);}}
  void bind(long root){try{BIND.invokeExact(id,root);}catch(Throwable failure){throw propagate(failure);}finally{Reference.reachabilityFence(this);}}
- void seed(long seed){try{SEED.invokeExact(id,seed);}catch(Throwable failure){throw propagate(failure);}finally{Reference.reachabilityFence(this);}}
+ void seed(long seed,boolean resetDefaultCache){try{SEED.invokeExact(id,seed,resetDefaultCache?1:0);}catch(Throwable failure){throw propagate(failure);}finally{Reference.reachabilityFence(this);}}
  long next(){try{return(long)NEXT.invokeExact(id);}catch(Throwable failure){throw propagate(failure);}finally{Reference.reachabilityFence(this);}}
  int bounded(int bound){try{int value=(int)BOUNDED.invokeExact(id,bound);if(value<0)throw new IllegalArgumentException("Bound must be positive");return value;}catch(Throwable failure){throw propagate(failure);}finally{Reference.reachabilityFence(this);}}
  double nextDouble(){try{return(double)DOUBLE.invokeExact(id);}catch(Throwable failure){throw propagate(failure);}finally{Reference.reachabilityFence(this);}}
