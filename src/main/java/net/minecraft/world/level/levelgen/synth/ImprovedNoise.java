@@ -51,6 +51,8 @@ public final class ImprovedNoise {
 		return value;
 	}
 
+    void bindPerlin(long driver) { seed.bindPerlin(driver); }
+
 	void writeNative(java.lang.foreign.MemorySegment state, int index, double amplitude) {
 		seed.write(state, index, amplitude);
 	}

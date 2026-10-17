@@ -1,7 +1,10 @@
 //! Native leaf seed construction. RNG effects use the original VM source;
 //! no source, borrowed pointer or callback is stored in a builder.
 use super::state::Octave;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 static FRAMES: AtomicU64 = AtomicU64::new(0);
 static FRAME_CREATED: AtomicU64 = AtomicU64::new(0);
 static FRAME_RETIRED: AtomicU64 = AtomicU64::new(0);
@@ -9,7 +12,7 @@ static LEAVES: AtomicU64 = AtomicU64::new(0);
 static LEAF_CREATED: AtomicU64 = AtomicU64::new(0);
 static LEAF_RETIRED: AtomicU64 = AtomicU64::new(0);
 #[repr(C)]
-struct Leaf {
+pub(super) struct Leaf {
     offsets: [f64; 3],
     permutation: [u8; 256],
 }
@@ -78,7 +81,7 @@ impl Builder {
         self.step += 1;
         1
     }
-    fn take(&mut self) -> Option<Box<Leaf>> {
+    fn take(&mut self) -> Option<Arc<Leaf>> {
         if !self.finished || self.step != 260 || self.taken {
             return None;
         }
@@ -87,7 +90,7 @@ impl Builder {
         permutation.copy_from_slice(&self.scratch[..256]);
         LEAVES.fetch_add(1, Ordering::Relaxed);
         LEAF_CREATED.fetch_add(1, Ordering::Relaxed);
-        Some(Box::new(Leaf {
+        Some(Arc::new(Leaf {
             offsets: self.offsets,
             permutation,
         }))
@@ -100,7 +103,7 @@ impl Drop for Builder {
     }
 }
 impl Leaf {
-    fn octave(&self, amplitude: f64) -> Octave {
+    pub(super) fn octave(&self, amplitude: f64) -> Octave {
         let mut p32 = [0; 256];
         for (i, value) in self.permutation.iter().enumerate() {
             let p = *value as i32;
@@ -117,8 +120,13 @@ impl Leaf {
         }
     }
 }
-mod ffi {
+pub(super) mod ffi {
     use super::*;
+    pub(in crate::world::level::levelgen::synth) unsafe fn retain(id: u64) -> Arc<Leaf> {
+        let pointer = std::ptr::with_exposed_provenance::<Leaf>(id as usize);
+        Arc::increment_strong_count(pointer);
+        Arc::from_raw(pointer)
+    }
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_noise_seed_builder(simplex: i32) -> u64 {
         Box::into_raw(Box::new(Builder::new(simplex != 0))).expose_provenance() as u64
@@ -131,7 +139,7 @@ mod ffi {
     pub unsafe extern "C" fn mattmc_noise_seed_take(id: u64) -> u64 {
         (&mut *std::ptr::with_exposed_provenance_mut::<Builder>(id as usize))
             .take()
-            .map_or(0, |leaf| Box::into_raw(leaf).expose_provenance() as u64)
+            .map_or(0, |leaf| Arc::into_raw(leaf).expose_provenance() as u64)
     }
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_noise_seed_builder_release(id: u64) {
@@ -144,9 +152,9 @@ mod ffi {
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_noise_seed_release(id: u64) {
         if id != 0 {
-            drop(Box::from_raw(
-                std::ptr::with_exposed_provenance_mut::<Leaf>(id as usize),
-            ));
+            drop(Arc::from_raw(std::ptr::with_exposed_provenance::<Leaf>(
+                id as usize,
+            )));
         }
     }
     #[no_mangle]
@@ -173,11 +181,11 @@ mod ffi {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use std::sync::Mutex;
-    static SERIAL: Mutex<()> = Mutex::new(());
-    fn complete(simplex: bool) -> Box<Leaf> {
+    pub(in crate::world::level::levelgen::synth) static SERIAL: Mutex<()> = Mutex::new(());
+    fn complete(simplex: bool) -> Arc<Leaf> {
         let mut b = Builder::new(simplex);
         assert_eq!(b.next(0), 1);
         for value in [0.25_f64, 0.5, 0.75] {

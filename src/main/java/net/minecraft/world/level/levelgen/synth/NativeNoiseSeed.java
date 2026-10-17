@@ -77,6 +77,10 @@ final class NativeNoiseSeed {
         catch(Throwable failure) { throw propagate(failure); }
         finally { Reference.reachabilityFence(this); }
     }
+    void bindPerlin(long driver) {
+        try { NativePerlin.bind(driver,id); }
+        finally { Reference.reachabilityFence(this); }
+    }
     static long[] statistics() {
         try(Arena arena=Arena.ofConfined()) {
             var words=arena.allocate(6L*Long.BYTES,Long.BYTES);

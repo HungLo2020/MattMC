@@ -11,6 +11,8 @@ Preserve seed compatibility, evaluation order, and Java/native ownership rules.
   in-progress task/holder ownership through stage execution and FULL publication.
 - [Heightmaps](heightmap/index.md): packed chunk-column reconstruction and parity checks.
 - [Noise Evaluation](RUST-NOISE.md): sampler behavior and parity checks.
+- [Perlin Graph Construction](RUST-PERLIN.md): native octave policy, actual VM identities, mutable amplitude readers and verification.
+- [Normal Noise Production](RUST-NORMAL.md): actual child ownership, iterator boundaries and mutable-tail cache correction.
 - [Density Evaluation](RUST-DENSITY.md): expression evaluation, batching, and verification.
 - [Terrain Splines](RUST-SPLINE.md): native curve plans, coordinate bindings, and focused parity/performance checks.
 - [Structure Generation](structure/index.md): native structure-template placement, processors and verification.

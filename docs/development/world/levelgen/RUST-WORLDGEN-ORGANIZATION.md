@@ -114,9 +114,11 @@ a top-material upcall. Java retains registry/chunk facades and genuine VM lifecy
 request/holder/task progression, stage admission/completion and native invocation,
 pending-consumer and callback binding leases. This is an intermediate connected
 checkpoint, not completion of world generation: Java compatibility algorithms,
-composite noise construction, random-source state and other documented generation
+other composite noise construction, random-source state and other documented generation
 dependencies remain. The [leaf noise constructors](RUST-NOISE.md) now produce
-and store permutations in Rust while preserving actual VM RNG effects. The [shared biome weather policy](../biome/RUST-WEATHER.md)
+and store permutations in Rust while preserving actual VM RNG effects. The
+subsequent [Perlin graph/factory](RUST-PERLIN.md) and metadata readers also run in Rust, with
+genuine VM list/RNG effects and public octave facade identity projections. The [shared biome weather policy](../biome/RUST-WEATHER.md)
 now owns precipitation, freezing and snow decisions with an embedded temperature child. The [shared biome temperature/cache](../biome/RUST-TEMPERATURE.md)
 now lives in Rust behind the existing public callers. Each guide defines its actual ownership and gates.
 

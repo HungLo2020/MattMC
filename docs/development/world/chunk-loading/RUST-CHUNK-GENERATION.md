@@ -528,7 +528,10 @@ producer/state/consumer migrations, including remaining Java compatibility and n
 construction. The subsequent [biome weather migration](../biome/RUST-WEATHER.md)
 removes the higher-level Java precipitation/freezing/snow decisions. The subsequent
 [shared temperature/cache migration](../biome/RUST-TEMPERATURE.md) removes that
-Java implementation; neither increment completes world generation. Server-owned region/effect and lighting reservations remain fenced.
+Java implementation; neither increment completes world generation. At that checkpoint, region/effect and lighting reservations remained with S31.
+The later published43f FEATURES handoff transfers generation metadata/adoption
+and pending effects to S33/r3; lighting and its narrow save-selection interface
+remain S31-owned.
 Original failed controls, source snapshots, full runtime receipts, screen and
 bounded diagnostic data remain under `build/chunk-generation/s33-*` and
 `build/full-generation/s33-*`; superseded images are not relabeled.

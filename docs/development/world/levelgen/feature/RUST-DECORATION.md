@@ -178,7 +178,18 @@ Unprimed WG heightmaps (chunks restored from disk at CARVERS) are primed by
 Rust at the first read, exactly as `ChunkAccess.getHeight` primes them,
 unless a custom `BlockState` subclass is registered.
 
-### Retained region ownership
+### Current ownership boundary
+
+Published `43f3c309…` and its verified FEATURES-only handoff transfer native
+region metadata, section adoption and pending effects to the whole-worldgen
+owner S33/r3. The published source/CI identities and receiving ACK are
+[recorded in the swarm handoff](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18987892).
+Lighting, its coordinator/layers and the narrow `SerializableChunkData`
+light-save selection remain S31-owned. Preserve the following region contracts
+when continuing native producers and consumers; this transfer does not imply
+whole-worldgen or final performance completion.
+
+## Retained region ownership
 
 [`NativeDecorationRegion`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDecorationRegion.java)
 holds a confined handle to Rust-owned WG/final heightmaps, sky sources, dirty

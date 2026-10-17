@@ -58,7 +58,8 @@ post-state even if the Java replay fails. These copies exist only for explicit
 verification, not as a second production cache.
 
 The shared noise evaluator and [leaf permutation construction](../levelgen/RUST-NOISE.md)
-are native. Composite noise construction and random-source state remain Java-owned. Higher-level precipitation, freezing and snow
+and [Perlin graph/factory policy](../levelgen/RUST-PERLIN.md) are native. Other
+composite construction and random-source state remain Java-owned. Higher-level precipitation, freezing and snow
 now use the [native weather policy](RUST-WEATHER.md) with an embedded actual
 temperature child and ordered world observations. Remaining world-generation
 work includes noise construction, compatibility paths and the separately

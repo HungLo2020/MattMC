@@ -15,11 +15,15 @@ VM effects on the actual source, preserving custom dispatch, reentry and
 exception prefixes. Rust owns the shuffle and compact immutable leaf state;
 Java retains the public offset fields and an arena-managed native owner.
 
-Composite octave construction, random-source state/consumption algorithms,
-octave parameters, metadata bounds, codecs and public integration remain
-Java-owned. This leaf increment does not complete noise construction or world
-generation. The unused Java Simplex gradient table and dot-product helper
-have been removed.
+The subsequent [Perlin graph/factory increment](RUST-PERLIN.md) moves its
+modern/legacy decisions, frequency factors, bounds and ordered amplitude readers
+into Rust. Its verification is separate from the published leaf evidence below.
+The [Normal producer and paired readers](RUST-NORMAL.md) are the next connected
+implementation under focused verification. Blended and Perlin-Simplex
+construction, random-source state/consumption algorithms, codecs and public
+integration remain Java-owned. Neither increment completes
+noise construction or world generation. The unused Java Simplex gradient
+table and dot-product helper have been removed.
 
 `world/level/levelgen/synth/` contains separate Improved, Perlin, Normal,
 Blended, Simplex and Perlin-Simplex modules. Family-specific optimized kernels
@@ -181,7 +185,7 @@ observer; its failed receipt is retained under `portable-first/`. An additional
 null-source check reproduced and corrected the helpful NPE parameter name;
 all three runtime contracts now preserve it.
 
-## Leaf checkpoint verification
+## Leaf checkpoint verification — published `c5a9de42…`
 
 The same `929fb693…` plus leaf candidate, release `31a21620…`, passed
 2,586 ordinary Java tests with six expected skips,193 parity tests,11 slow
