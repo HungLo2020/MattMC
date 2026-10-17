@@ -1,0 +1,50 @@
+{
+  "vanilla_reference": "7a4d181717dc0c7da9086f1a17687dfd522ce417",
+  "extension_reference": "5e933129855fd5b82198204a1f093cb541127e04",
+  "scope": "ActualoncecompiledoriginalFrozen publictraces andliteralsharedoperations extensiontraces. Notcurrent/FPS/performance baseline. Independent frozenJavaalgorithm testoracle lives separately.",
+  "cases": {
+    "update": {
+      "main": "VerifySkySourcePublicUpdateContracts",
+      "rows": 13,
+      "prefix": "SKY_UPDATE "
+    },
+    "fill": {
+      "main": "VerifySkySourcePublicFillContracts",
+      "rows": 10,
+      "prefix": "SKY_FILL "
+    },
+    "canonical": {
+      "main": "VerifySkyCanonicalEffects",
+      "rows": 4,
+      "prefix": "SKY_CANONICAL "
+    },
+    "bounds": {
+      "main": "VerifySkySourceBounds",
+      "rows": 20,
+      "prefix": "SKY_BOUNDS "
+    },
+    "bulk": {
+      "main": "VerifySkyBulkPublic",
+      "rows": 50,
+      "prefix": "SKY_BULK "
+    }
+  },
+  "extensions": {
+    "transport": {
+      "main": "VerifySkySourceTransportContracts",
+      "rows": 34,
+      "prefix": "SKY_TRANSPORT "
+    },
+    "escaped": {
+      "main": "VerifySourceColumnsEscaped",
+      "rows": 4,
+      "prefix": "SOURCE_COLUMNS_ESCAPED "
+    }
+  },
+  "engine_consumer": {
+    "main": "VerifyOwnedSkySeedContracts",
+    "cases": 9,
+    "reference": "consumer/*.txt",
+    "scope": "OriginalFrozen publicproducersetup actualrealengine/maps/queues; originalprivatefill setup removed beforeFrozenbaseline2."
+  }
+}

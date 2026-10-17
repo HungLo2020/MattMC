@@ -18,7 +18,7 @@ public final class NativeSkyLightSourcesVerification {
             .filter(r->r.get("dimension").getAsString().equals(pattern.substring(9))).toList():List.<com.google.gson.JsonObject>of();
         for(int i=0;i<chunks.length;i++) {
             chunks[i]=records.isEmpty()?SkyLightSourcesFixtures.chunk(pattern,-64,384,1977+i*137):SkyLightSourcesFixtures.recorded(records.get(i%records.size()));
-            sources[i]=new ChunkSkyLightSources(chunks[i]);raw[i]=SkyLightSourcesFixtures.storage(sources[i]).getRaw();
+            sources[i]=nativeMode?new ChunkSkyLightSources(chunks[i]):new JavaSkyLightSources(chunks[i]);raw[i]=SkyLightSourcesFixtures.storage(sources[i]).getRaw();
             if(nativeMode && !net.minecraft.world.level.chunk.NativeSkyLightSources.fill(chunks[i],chunks[i].getMinY()-1,SkyLightSourcesFixtures.storage(sources[i])))
                 throw new AssertionError("Benchmark fixture bypasses Rust: "+pattern);
         }

@@ -1,4 +1,4 @@
-pub(super) fn clear(maps: &mut [u64], bits: usize) {
+pub(in crate::world::level::lighting) fn clear(maps: &mut [u64], bits: usize) {
     let per_word = 64 / bits;
     let full_words = 256 / per_word;
     // Each complete word can also have padding above its packed fields.
@@ -17,14 +17,14 @@ pub(super) fn clear(maps: &mut [u64], bits: usize) {
     }
 }
 
-fn set_height(maps: &mut [u64], column: usize, bits: usize, value: u64) {
+pub(in crate::world::level::lighting) fn set_height(maps: &mut [u64], column: usize, bits: usize, value: u64) {
     let per_word = 64 / bits;
     let shift = column % per_word * bits;
     let field = ((1u64 << bits) - 1) << shift;
     maps[column / per_word] = (maps[column / per_word] & !field) | ((value << shift) & field);
 }
 
-pub(super) fn section(
+pub(in crate::world::level::lighting) fn section(
     words: &[u64],
     flags: &[u32],
     edges: &[u8],

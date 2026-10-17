@@ -1,80 +1,141 @@
-# Rust skylight-source reconstruction
+# Rust skylight-source ownership
 
-`ChunkSkyLightSources.fillFrom()` now uses `world/level/lighting/skylight_sources/`
-for normal packed chunks. This reconstructs the lowest unblocked skylight entry
-in each column. Incremental `update()` stays Java; propagation itself is described in
-[Rust light propagation](RUST-LIGHT-PROPAGATION.md).
-The bridge lives beside the transitional Java chunk API. Ordinary canonical
-sections export words and state IDs directly from their
-[Rust live owner](../chunk/RUST-LIVE-SECTIONS.md) into reusable native scratch.
-Compatibility storage still uses the Java palette accessors.
+`ChunkSkyLightSources` is a VM facade over the packed source payload in
+[`source_owner/`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/lighting/source_owner/mod.rs).
+Rust owns construction bounds, packed values, incremental updates, reconstruction,
+scan cursors and the five-source snapshot consumed by lighting. Java supplies
+chunk resources and performs original virtual reader, shape and position effects.
+The stock lighting consumer reads the actual native source owners; its Java
+array is a derived compatibility transport. See [light propagation](RUST-LIGHT-PROPAGATION.md).
 
-## Constraints when changing this code
+## Working on this subsystem
 
-- Preserve `getLightBlock() != 0` and the original downward/upward face-union
-  decision. Rust derives each state's descriptor (light block, up and down light
-  faces) and the edge table from the [block registry](../../game-model/RUST-BLOCK-REGISTRY.md).
-  Its faces share IDs by exact box list, and its truth table comes from the
-  original Java shape operation. Coordinates are never quantized; Rust uses the
-  table, not approximate geometry.
-- Carry the previous block's downward face across nonempty section boundaries.
-  An all-air section resets that face without testing an edge, matching the
-  original shortcut. A fully open column resets to the below-world sentinel;
-  unlike heightmap priming, it does not keep its old value.
-- Preserve every packed padding bit, including padding in complete words.
-  Java publishes ordinary scan results only after successful evaluation.
-- Use ordinary FFM calls for section scans, with copied words and thread-owned
-  scratch. Java passes local palette entries as state IDs, which Rust maps to
-  descriptors; a global palette passes none. Rust borrows buffers, allocates
-  nothing and retains no pointers.
-- Empty chunks use a separate Rust bulk clear through critical heap access.
-  This call validates at most 128 words and performs no allocations, blocking
-  operations or callbacks. Do not extend it with unbounded work.
-- Follow existing chunk ownership: sections/destination must not be mutated
-  concurrently with a reconstruction. Independent readers have separate scratch.
-- Standard `ProtoChunk` and `LevelChunk` sections use Rust. Custom readers,
-  palettes, storage/state subclasses, unsupported dimensions, late registry
-  additions and invalid packed IDs retain the original compatibility path.
-  Fallback precedes publication, preserving exceptions and partial writes.
+- Preserve constructor accessor order, sentinel values, packed padding, error
+  identity, committed prefixes and escaped mutable-position effects. Custom height
+  accessors and readers must keep their original conditional calls and reentry.
+- Use ordinary FFM for owner operations. Source locks and native borrows must end
+  before Java effects. A pending fill/update cursor owns the actual source `Arc`,
+  so it can outlive collection of the facade and its base handle.
+- Canonical reconstruction uses the existing
+  [scan kernel](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/lighting/skylight_sources/scan.rs)
+  and registry-derived face table. Java supplies the known pure chunk's highest
+  section and packed resources. Rust clears empty sources without a cursor or
+  section scratch and otherwise begins at that highest section. Unsupported
+  resources decline before publication and use the native virtual-effect cursor.
+- Preserve face continuity across nonempty sections and reset it at air gaps.
+  An open column gets the below-world sentinel. Do not publish an abandoned
+  canonical scan or retain a borrowed VM address.
+- Keep the `nativeRaw()` array's identity and outside writes. It is an escaped
+  compatibility view: import writes before source operations and export commits
+  before returning or invoking another Java effect. The Rust payload remains
+  authoritative between these required synchronization points.
+- The six additive methods are `nativeWordCount`, `nativeCopyTo`, `nativeCopyFrom`,
+  `nativeSnapshot`, `nativeRestore` and `nativeMatches`. For every subclass they
+  perform the literal original operation through its actual virtual `nativeRaw()`
+  exactly once, including inherited overrides, without another `nativeBits()`
+  effect. A short restore preserves the suffix; snapshots are independent.
+- Section ownership still belongs to the chunk subsystem. Current resource
+  extraction exports live words/palette IDs into temporary native scratch;
+  compatibility sections use their original accessors. Keep those accessors
+  package-private. S33 owns `NativeDecorationRegion` and `DecorationTransaction`;
+  their legacy word-array consumers are not migrated by this checkpoint.
 
-Keep owner access and compatibility accessors (`dataForNativeScan()` and
-`registryForNativeScan()`) package-private. A native container's
-`dataForNativeScan()` result is a temporary projection, not mutable live storage.
+The former Java reconstruction bridge is now
+[test-only](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/minecraft/world/level/chunk/NativeSkyLightSources.java).
+The independent [Java test oracle](https://github.com/HungLo2020/MattMC/blob/master/src/test/java/net/minecraft/world/level/lighting/JavaSkyLightSources.java)
+contains the original Frozen `7a4d181717dc0c7da9086f1a17687dfd522ce417` algorithm.
+Its unused constant-bounds base owner is only a test wrapper; constructor effects
+are checked separately against the actual Frozen runtime.
 
 ## Verify a change
 
-For current ownership, use the Gradle checks in the
-[live-section guide](../chunk/RUST-LIVE-SECTIONS.md#verification), including
-`--tests '*NativeSkyLight*'`. The following pinned-source drivers describe the
-earlier helper milestone and need integration updates for the new owner.
-
 ```sh
-python3 DevUtils/tests/lighting/VerifyRustSkyLightSources.py --parity-only
-python3 DevUtils/tests/lighting/VerifyRustSkyLightSources.py --forks 3
+./gradlew test --tests '*NativeSkyLightSourcesTest'
+python3 DevUtils/tests/lighting/sources/VerifyNativeSkySources.py
 ```
 
-The driver pins the original `fillFrom()` and every shared helper to Git
-`3b709a204`. Tests compare raw packed outputs, all visible columns and their
-maximum, then check incremental updates after priming. Coverage includes every
-registered state and distinct vertical shape pair, fluids, slabs/stairs, air
-variants, section edges/gaps, sentinel behavior, padding, dimension limits,
-malformed IDs, custom callback traces, real/debug LevelChunks, parallel readers
-and GC during critical clears. The saved-terrain corpus reuses the unchanged
-16 FULL chunks from two seeds and four dimensions in the heightmap fixtures.
-No server or renderer is required.
+The portable driver requires Linux `/proc` to verify the mapped native library.
+It builds matching release inputs and compares public effects with checked-in
+original Frozen traces. MattMC word-transport extensions use the complete
+published `5e933129855fd5b82198204a1f093cb541127e04` literal-operation reference.
+It also requires the real native bulk route, exercises actual lighting consumers,
+and checks pending native ownership after collection within five seconds. A
+test-only facade that omits the actual base release must fail that same observer
+on its retained-owner assertion; neither overlay changes production files.
+Use a fresh `--output build/...` directory for each run. `--skip-build` requires
+an already matching release library; it does not skip Java compilation or guards.
 
-Benchmarks time the complete `fillFrom()` caller: eligibility, palette mapping,
-input transfers, downcalls, publication and consuming packed output. Source
-construction, registry/immutable-table initialization and fixture loading occur
-before timing on both sides. The native route is asserted; there is no output
-cache or silent Java fallback in timings.
+The ten reconstruction JUnit cases retain the registered-state/shape catalog,
+256 seeded fixtures, 125 all-state fixtures, 16 saved chunks, padding, incremental
+updates, custom effects, malformed IDs, parallel readers and GC coverage. Their
+expected producer uses the independent frozen Java implementation. Storage tests
+use the supported escaped-array view rather than a private Java heightmap field.
 
-Three independent JVM pairs alternate order, use the same CPU and warm until
-compilation stops and recent timings stabilize. Measured rounds require zero
-JIT-compilation time. Every workload must use at least 5% less time in every pair
-and at its upper 95% bootstrap ratio bound. Raw samples, checksums, source/library
-hashes and a report live under `build/skylight-sources-migration/acceptance/`.
-Results measure this reconstruction slice, not full lighting or chunk generation.
+The older `DevUtils/tests/lighting/VerifyRustSkyLightSources.py` checks the pinned
+Java oracle and can run its strict reconstruction timing campaign. Its historical
+results below do not certify current owner costs or complete lighting.
+
+## Current ownership evidence and open costs
+
+The isolated Source6 checkpoint used base `7619d2db`, paired Main7 Java and native
+`48af78ca87f29ad5ae18be923f19c3642d9034d897664c1ffa875f45f4531508`:
+196 focused JVM cases, eight native ownership tests and the ten independent-oracle
+JUnit cases passed. Omitting the actual base release in a test overlay made the
+same lifetime observer reject the retained native owner. These receipts certify
+that prototype, rather than a later library.
+
+The integrated `c298904f` plus source-owner candidate was separately verified with
+release `e7508174bb4aab8fe48f03b14da0faee7c8be2a555b1fa84e34368e35f6d460c`:
+365 focused tests and all 196 portable contracts passed, including the actual
+release-leak control. Ordinary Java passed 2,738 tests with ten skips; parity
+passed 193 and slow passed 11, with fresh reports and final input guards.
+The full serial native run was **3,150 passed, 57 failed, nine ignored**; all
+57 names and bodies matched the historical host failures exactly, normalizing
+only printed OS thread IDs. Its eight source, seven worldgen and three critical
+admission controls passed. That raw native run remains a failure, with its exact
+historical qualification recorded separately.
+
+Fresh item contracts, both 16-check hopper/save-reload runs, saved-light ordering,
+save custody and 125 fresh chunks plus own-save reopen also passed on that
+candidate. The original 25 Primordial differences remain; full Frozen dimension
+parity is false. The equipment-digest reconciliation was separately rebuilt on `a438a03c` with
+matching Main/native: 368 focused tests, the 196 source contracts, original public
+null-equipment/remap/remove traces, item contracts and hopper/save-reload passed.
+The later `58c31979` Gaussian reconciliation was again rebuilt with release
+`b437739d9b9926376d4bf59ef3337774c787546fdb68bfed5d2921d8d5b50a2b`:
+378 focused tests, the 196 source contracts, the same equipment observer, and seven
+Gaussian contracts plus 36,504 state observations against Frozen/pre passed.
+Its actual full serial native result was **3,154 passed, 57 failed, nine ignored**;
+the same 57 historical names and bodies were unchanged, with only printed OS
+thread IDs normalized. Eight source, seven worldgen, four new Gaussian and three
+critical-admission controls passed. This remains a raw failed suite with an exact
+historical qualification. Fresh item contracts, both hopper/save-reload runs,
+saved-light ordering/custody and 125 fresh chunks plus own-save reopen passed on
+this later pair too. The original 25 Primordial differences still prevent full
+Frozen parity. Earlier broad Java scopes are not renamed as testing later images;
+source/class/configuration/fixture impact records accompany the affected checks.
+
+Resource debt remains. A short complete fill plus 256 public reads and a maximum
+read measured empty **6.70×** and solid **6.96×** original Frozen, shapes **0.410×**,
+and saved Overworld **1.030×**. Outputs, quiet samples and origins matched; this
+screen failed performance acceptance. Java allocation per call was respectively
+200, 496, 496 and 528 bytes. Earlier Source4 regressions remain in their original
+receipts rather than becoming passing results.
+
+A separate short real fill → engine source consumption → queue-drain screen
+measured Source6 at 226.21 µs/3,040 Java bytes per cycle versus original Frozen
+251.06 µs/210,064 bytes, with eight quiet samples each and matching work/output.
+The first published-build control had only five quiet samples and is inconclusive.
+One fresh control, with seven quiet samples, measured 274.70 µs/3,264 bytes;
+Source6's unchanged sample was 0.823× that control. The initial log-prefix parser
+failure is retained; its corrected assessment reads the same raw samples.
+A fresh integrated `c298904f`/`e750` row, using the same observer and workload,
+measured 231.16 µs/3,040 Java bytes with eight quiet samples, matching work/output,
+verified class/native origins and no swap. Against the unchanged original Frozen
+and published-build samples above, its ratios were 0.921 and 0.842. Those baseline
+samples keep their original runtime identities; neither was retimed or relabeled.
+These are intermediate workload observations, not FPS, native allocator/retirement
+plateau, final performance or whole-lighting acceptance.
 
 ## Status
 

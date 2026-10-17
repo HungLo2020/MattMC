@@ -15,7 +15,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.NativeBlockRegistry;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** Packed section bridge for server-side skylight sources. */
+/** Historical section-kernel bridge for tests; runtime source ownership lives in lighting/source_owner. */
 public final class NativeSkyLightSources {
     private static final int PENDING_OFFSET = 32;
     private static final int UPPER_FACES_OFFSET = 288;

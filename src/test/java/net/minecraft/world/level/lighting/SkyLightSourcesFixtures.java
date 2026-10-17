@@ -62,8 +62,7 @@ final class SkyLightSourcesFixtures {
         return withSections(sections,minY,height);
     }
     static net.minecraft.util.BitStorage storage(ChunkSkyLightSources sources) {
-        try { var field=ChunkSkyLightSources.class.getDeclaredField("heightmap");field.setAccessible(true);return (net.minecraft.util.BitStorage)field.get(sources); }
-        catch(ReflectiveOperationException e){throw new IllegalStateException(e);}
+        return new net.minecraft.util.SimpleBitStorage(sources.nativeBits(),256,sources.nativeRaw());
     }
     static void randomize(ChunkSkyLightSources sources,long seed) {
         var random=new Random(seed);var words=storage(sources).getRaw();for(int i=0;i<words.length;i++)words[i]=random.nextLong();

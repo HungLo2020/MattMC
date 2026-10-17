@@ -67,8 +67,12 @@ handles the connected stock section and publication policy.
 
 The S0026 stock source producer captures bounded source inputs in an owned native
 frame. Rust admits the actual typed layers before mutation, then owns the whole
-descending section/COW/seed/increase-queue operation. Java still obtains the five
-chunk source objects and performs contextual input extraction. Every completed
+descending section/COW/seed/increase-queue operation. Java obtains the five chunk-source facades and synchronously borrows their
+native owners. Rust reads the actual packed payload once per source lock and
+derives the seed columns. The old Java array is only a derived compatibility
+transport, captured at the same point to preserve reentry. No source lock crosses
+a Java effect. Source state, updates and reconstruction are described in
+[skylight-source ownership](RUST-SKYLIGHT-SOURCES.md). Every completed
 section publishes its queue prefix before later fallible work.
 
 Custom readers, custom storage and mixed or escaped layers use the

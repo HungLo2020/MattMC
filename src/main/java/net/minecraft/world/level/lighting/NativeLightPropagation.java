@@ -106,6 +106,13 @@ final class NativeLightPropagation {
         private final MemorySegment nativeColumns = arena.allocate(1280 * 4L, 4);
         private final MemorySegment nativeOut = arena.allocate(3 * 4L, 4);
 
+        private boolean compatibilityProjected;
+        private void projectCompatibilityColumns(){
+            if(!compatibilityProjected){
+                MemorySegment.copy(this.nativeColumns,ValueLayout.JAVA_INT,0,this.columns,0,this.columns.length);
+                compatibilityProjected=true;
+            }
+        }
         MemorySegment columnsForCoordinator(){return this.nativeColumns;}
 
         /** One section: writes the layer like the original's {@code set} calls
@@ -116,6 +123,7 @@ final class NativeLightPropagation {
                     && layer.seedNativeSkyLightQueued(this.nativeColumns, bottom, minX, minZ, engine.lightWork, this.nativeOut)) {
                 return this.nativeOut.getAtIndex(ValueLayout.JAVA_INT, 2) != 0;
             }
+            projectCompatibilityColumns();
             if (layer.getClass() == DataLayer.class
                     && layer.seedNativeSkyLight(this.columns, bottom, minX, minZ, this.entries, this.out)) {
                 for (int i = 0; i < this.out[0]; i++) engine.enqueueIncrease(this.entries[2 * i], this.entries[2 * i + 1]);
@@ -143,6 +151,11 @@ final class NativeLightPropagation {
     /** This thread's seed for a chunk's sources (center, north, south, west,
      * east), or null to keep the Java loop. */
     @Nullable
+    private static final MethodHandle SOURCE_COLUMNS = NativeLibraryLoader.downcallHandle("mattmc_rust",
+        "mattmc_sky_source_seed_columns", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+
     static SkySeed skySeed(ChunkSkyLightSources center, ChunkSkyLightSources north, ChunkSkyLightSources south, ChunkSkyLightSources west,
                            ChunkSkyLightSources east) {
         // Custom readers have observable conditional calls in the original
@@ -151,18 +164,24 @@ final class NativeLightPropagation {
                 || north.getClass() != ChunkSkyLightSources.class || south.getClass() != ChunkSkyLightSources.class
                 || west.getClass() != ChunkSkyLightSources.class || east.getClass() != ChunkSkyLightSources.class) return null;
         SkySeed seed = SEEDS.get();
-        int[] columns = seed.columns;
-        for (int r = 0; r < 16; r++) {
-            for (int s = 0; s < 16; s++) {
-                int i = r * 16 + s;
-                columns[i] = center.getLowestSourceY(s, r);
-                columns[256 + i] = r == 0 ? north.getLowestSourceY(s, 15) : center.getLowestSourceY(s, r - 1);
-                columns[512 + i] = r == 15 ? south.getLowestSourceY(s, 0) : center.getLowestSourceY(s, r + 1);
-                columns[768 + i] = s == 0 ? west.getLowestSourceY(15, r) : center.getLowestSourceY(s - 1, r);
-                columns[1024 + i] = s == 15 ? east.getLowestSourceY(0, r) : center.getLowestSourceY(s + 1, r);
-            }
+        try {
+            long c=center.nativeOwnerForLighting(),n=north.nativeOwnerForLighting(),s=south.nativeOwnerForLighting(),
+                w=west.nativeOwnerForLighting(),e=east.nativeOwnerForLighting();
+            int status=(int)SOURCE_COLUMNS.invokeExact(c,n,s,w,e,seed.nativeColumns);
+            if(status!=0)throw new IllegalStateException("Native source columns rejected: "+status);
+            // Keep the existing compatibility array's reentrant update timing.
+            // Rust produced the snapshot; this array is a derived legacy transport.
+            seed.compatibilityProjected=false;
+            seed.projectCompatibilityColumns();
+        } catch(Throwable error) {
+            throw NativeSkySourceOwner.fail(error);
+        } finally {
+            java.lang.ref.Reference.reachabilityFence(center);
+            java.lang.ref.Reference.reachabilityFence(north);
+            java.lang.ref.Reference.reachabilityFence(south);
+            java.lang.ref.Reference.reachabilityFence(west);
+            java.lang.ref.Reference.reachabilityFence(east);
         }
-        MemorySegment.copy(columns, 0, seed.nativeColumns, ValueLayout.JAVA_INT, 0, columns.length);
         SEEDED.incrementAndGet();
         return seed;
     }

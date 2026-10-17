@@ -1,6 +1,6 @@
 //! Chunk skylight-source reconstruction from packed sections.
 mod ffi;
-mod scan;
+pub(super) mod scan;
 #[cfg(test)]
 mod tests;
 
