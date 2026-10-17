@@ -29,17 +29,7 @@ pub unsafe extern "C" fn mattmc_light_work_enqueue(
     let Some(q) = owner.cast::<Queues>().as_ref() else {
         return -1;
     };
-    if !(0..2).contains(&side) {
-        return -1;
-    }
-    let mut queues = q.data.lock().unwrap();
-    let queue = &mut queues[side as usize];
-    if queue.len() > i32::MAX as usize - 2 {
-        return -1;
-    }
-    queue.extend([position, entry]);
-    q.publish(&queues);
-    0
+    q.enqueue(side, position, entry)
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_light_work_pop(

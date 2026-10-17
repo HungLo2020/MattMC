@@ -324,53 +324,13 @@ public final class SkyLightEngine extends LightEngine<SkyLightSectionStorage.Sky
 		);
 		int i = this.storage.getTopSectionY(l);
 		int j = this.storage.getBottomSectionY();
-		int k = SectionPos.sectionToBlockCoord(chunkX);
-		int m = SectionPos.sectionToBlockCoord(chunkZ);
         if(this.lightCoordinator!=null){
             NativeLightPropagation.SkySeed seed=NativeLightPropagation.skySeed(
                 chunkSkyLightSources,chunkSkyLightSources2,chunkSkyLightSources3,chunkSkyLightSources4,chunkSkyLightSources5);
             if(seed!=null && this.lightCoordinator.seedSky(chunkX,chunkZ,i,j,seed))return;
         }
 
-		for (int n = i - 1; n >= j; n--) {
-			long o = SectionPos.asLong(chunkX, n, chunkZ);
-			DataLayer dataLayer = this.storage.getDataLayerToWrite(o);
-            // Original conditional reads and virtual effects for custom storage,
-            // custom readers and mixed/escaped layers; no earlier matrix replay.
-			if (dataLayer != null) {
-				int p = SectionPos.sectionToBlockCoord(n);
-				int q = p + 15;
-				boolean bl = false;
-
-				for (int r = 0; r < 16; r++) {
-					for (int s = 0; s < 16; s++) {
-						int t = chunkSkyLightSources.getLowestSourceY(s, r);
-						if (t <= q) {
-							int u = r == 0 ? chunkSkyLightSources2.getLowestSourceY(s, 15) : chunkSkyLightSources.getLowestSourceY(s, r - 1);
-							int v = r == 15 ? chunkSkyLightSources3.getLowestSourceY(s, 0) : chunkSkyLightSources.getLowestSourceY(s, r + 1);
-							int w = s == 0 ? chunkSkyLightSources4.getLowestSourceY(15, r) : chunkSkyLightSources.getLowestSourceY(s - 1, r);
-							int x = s == 15 ? chunkSkyLightSources5.getLowestSourceY(0, r) : chunkSkyLightSources.getLowestSourceY(s + 1, r);
-							int y = Math.max(Math.max(u, v), Math.max(w, x));
-
-							for (int z = q; z >= Math.max(p, t); z--) {
-								dataLayer.set(s, SectionPos.sectionRelative(z), r, 15);
-								if (z == t || z < y) {
-									long aa = BlockPos.asLong(k + s, z, m + r);
-									this.enqueueIncrease(aa, LightEngine.QueueEntry.increaseSkySourceInDirections(z == t, z < u, z < v, z < w, z < x));
-								}
-							}
-
-							if (t < p) {
-								bl = true;
-							}
-						}
-					}
-				}
-
-				if (!bl) {
-					break;
-				}
-			}
-		}
+        NativeLiveSkySources.run(this, this.storage, this.lightWork, chunkX, chunkZ, i, j,
+            chunkSkyLightSources, chunkSkyLightSources2, chunkSkyLightSources3, chunkSkyLightSources4, chunkSkyLightSources5);
     }
 }

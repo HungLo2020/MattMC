@@ -8,7 +8,7 @@ use super::{block_pos, with_level, LAYER};
 pub(crate) const COLUMNS: usize = 5 * 256;
 
 /// `increaseSkySourceInDirections(down, north, south, west, east)`.
-fn sky_source(down: bool, north: bool, south: bool, west: bool, east: bool) -> u64 {
+pub(in crate::world::level::lighting) fn sky_source(down: bool, north: bool, south: bool, west: bool, east: bool) -> u64 {
     let mut entry = with_level(0, 15);
     for (on, direction) in [(down, 0), (north, 2), (south, 3), (west, 4), (east, 5)] {
         if on {

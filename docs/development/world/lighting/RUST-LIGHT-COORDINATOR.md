@@ -121,8 +121,11 @@ borrow survives a return to a Java effect.
 Stock sky seeding copies bounded immutable source input into its frame and
 consumes the complete descending section/COW/increase-queue operation. Java still
 obtains the five chunk source objects. Custom readers, custom storage and mixed
-or escaped layers use the original conditional Java loop. The old Java
-per-section matrix replay is not the production fallback.
+or escaped layers use the [native live-source cursor](RUST-LIGHT-PROPAGATION.md),
+which preserves conditional source/layer effects and their committed queue
+prefixes. Java performs the original virtual effects; Rust retains the actual
+queue and chooses their live order. The old Java conditional loop and
+per-section matrix replay are no longer production fallbacks.
 
 ## Lighting and save continuation under development
 
@@ -144,7 +147,8 @@ See [`State`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/wor
 [the CPU handoff](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/lighting/coordinator/ffi.rs)
 and [the save adapter](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/lighting/LevelLightEngine.java).
 
-**Current unpublished evidence:** base `c5a9de42` plus the owned patch, native
+**Published save-custody checkpoint (`43f3c309`):** the original validation used
+base `c5a9de42` plus the owned patch, native
 `5f56832a` and 13,907 sealed Main classes. All 87 focused Java checks pass,
 including seven custody contracts and the incoming item/broadcast and
 weather/temperature and noise-constructor boundaries. Fresh Rust checks pass

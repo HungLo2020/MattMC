@@ -71,15 +71,32 @@ descending section/COW/seed/increase-queue operation. Java still obtains the fiv
 chunk source objects and performs contextual input extraction. Every completed
 section publishes its queue prefix before later fallible work.
 
-Custom readers, custom storage and mixed or escaped layers use the original
-conditional Java loop. Do not replay a source matrix gathered before a custom
-`DataLayer.copy()` callback: that callback can change the live source heights.
-The native section kernels remain independently tested, but the old Java
-per-section adapter is no longer the production fallback. See the coordinator
-page for actual reader/copy witnesses, owned-input lifetime controls and costs.
+Custom readers, custom storage and mixed or escaped layers use the
+[live-source cursor](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/lighting/sky_source_policy/mod.rs).
+Rust retains the actual work queue and chooses the descending section/cell order,
+conditional neighbor reads and writes. Java performs the original virtual
+source, storage and layer effects. Each successful write that qualifies as a source appends its
+entry directly to the native queue. No native borrow or queue lock crosses a
+Java effect, including a reentrant call on the same engine. A failed effect
+preserves the committed prefix and releases the invocation's queue lease.
+
+Do not gather and replay a source matrix before a custom `DataLayer.copy()` or
+`set()` callback: callbacks can change live source heights. The stock producer
+above keeps its separate canonical admission path. The former conditional Java
+loop has been removed; the native section kernels remain independently tested.
+
+The portable observers cover nine stock/source-copy/escaped/custom-storage
+cases, four additional exception/reentry/queue contracts, and checked exception
+identity. Native tests exercise the actual retained queue allocation, abandoned
+writes and committed prefixes. Focused correctness evidence does not establish
+complete lighting or final performance acceptance; retain each tested image's
+receipts separately.
 
 ## Constraints when changing this code
 
+- Preserve the original Throwable object from virtual effects, including checked
+  exceptions thrown through an unchecked custom signature. Keep the committed
+  write/queue prefix when an effect fails.
 - Keep FIFO order, the returned work count, entry bits
   (`LightEngine.QueueEntry`) and every `setStoredLevel`, including writes of an
   unchanged value. A lazy layer must allocate exactly when the original would.
@@ -103,6 +120,41 @@ page for actual reader/copy witnesses, owned-input lifetime controls and costs.
   `NativeLightPropagation.setEnabled` toggles this in tests.
 
 ## Verify a change
+
+For contextual source changes, compile `VerifyLightCoordinator.java`,
+`VerifyCoordinatorSkySources.java`, `VerifyLiveSkySourceContracts.java`,
+`VerifyLiveSkyCheckedFailure.java` and `BenchmarkLiveSkySources.java` from `DevUtils/tests/lighting/coordinator/`
+once against the original Frozen classpath. Run those same observer classes
+before each tested image on the classpath. `VerifyCoordinatorSkySources` takes
+an output directory and `all`; `VerifyLiveSkySourceContracts` takes a trace
+file; `VerifyLiveSkyCheckedFailure` takes no arguments. Compare the complete
+outputs, and verify the loaded native image.
+
+`BenchmarkLiveSkySources write 4` and `BenchmarkLiveSkySources skip 4` exercise
+custom storage, five custom source readers and a custom layer. Each sample
+checks source reads, writes, FIFO hash and all 4,096 pixels. Only the complete
+producer call is timed; actual queue draining and checks are outside that
+window. Retain raw work, JIT/GC, allocation, RSS and swap rows under matched
+conditions. This focused screen does not establish whole-lighting performance.
+
+The intermediate custom-source screen on base `3eeb5f02d` plus this cursor
+recorded the following medians (microseconds per complete producer call):
+
+| Custom workload | Original Frozen | Published pre-cursor | Cursor candidate |
+|---|---:|---:|---:|
+| 1,280 source reads, 4,096 writes, 512 FIFO words | 23.336 | 19.809 | 113.833 |
+| 256 source reads, no writes or FIFO words | 4.226 | 7.700 | 18.587 |
+
+Work, FIFO hashes and pixels matched; each row had at least 11 JIT/GC-quiet
+samples, with no swap. Candidate Java allocation was 240 bytes per call,
+versus 72 bytes for the published pre-cursor image. A single write-workload
+control restored only the old `SkyLightEngine.class` over the candidate's other
+classes and same native library: 20.568 microseconds, 72 Java bytes per call.
+This implicates the new cursor path; it does not attribute individual functions
+or establish an unavoidable cost. The material latency regression remains open.
+The canonical stock producer is unchanged and was not timed by this fixture.
+This is intermediate evidence, not complete lighting or final performance
+acceptance; retain the separate request-lifecycle latency debt as well.
 
 Start with the [live-layer production tests and Frozen oracle](RUST-LIVE-LAYERS.md#verification)
 for current ownership changes. The older driver below also embeds a source-shape

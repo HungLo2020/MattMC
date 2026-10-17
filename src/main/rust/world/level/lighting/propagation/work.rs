@@ -62,6 +62,15 @@ impl Default for Queues {
     }
 }
 impl Queues {
+    pub(in crate::world::level::lighting) fn enqueue(&self, side:i32, position:i64, entry:i64)->i32 {
+        if !(0..2).contains(&side) { return -1; }
+        let mut queues=self.data.lock().unwrap();
+        let queue=&mut queues[side as usize];
+        if queue.len()>i32::MAX as usize-2 { return -1; }
+        queue.extend([position,entry]);
+        self.publish(&queues);
+        0
+    }
     pub(in crate::world::level::lighting) fn bind_projection(&self, projection:&Arc<CoordinatorProjection>)->Arc<LevelFollowers>{
         let queues=self.data.lock().unwrap();let mut projections=self.projections.lock().unwrap();
         projections.retain(|p|p.projection.strong_count()!=0);
