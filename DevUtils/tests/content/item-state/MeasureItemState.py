@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--origin-guard', action='store_true', help='after timing, rerun each side once untimed with class-load logging and record class/native origins')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--timeout', type=float, default=240)
-    parser.add_argument('--workload', choices=['stock', 'generic-debt', 'stock-transfer', 'inventory', 'atomic-lower-bound', 'owner-access', 'broadcast'], default='stock')
+    parser.add_argument('--workload', choices=['stock', 'generic-debt', 'stock-transfer', 'inventory', 'atomic-lower-bound', 'owner-access', 'broadcast', 'equality'], default='stock')
     parser.add_argument('--owner-shape', choices=['full', 'small'], default='full', help='32 or 1 active overrides; applies to owner-access only')
     args = parser.parse_args()
     out = args.output.resolve(); pre = args.pre.resolve()
@@ -42,6 +42,24 @@ def main():
             assert (sha(pre / name) if name.startswith('native/') else hashlib.sha256(jar.read(name)).hexdigest()) == digest
     native = {'frozen': FROZEN / 'build/rust/native', 'pre': pre / 'native', 'current': ROOT / 'build/rust/native'}
     libraries = {side: {p.name: {'sha256': sha(p), 'inode': p.stat().st_ino} for p in directory.glob('*mattmc*')} for side, directory in native.items()}
+    # Timing a dev-profile (opt-level 0) library is meaningless: Gradle test runs rebuild
+    # build/rust/native in that profile. Release builds strip debug sections.
+    def section_names(path):
+        # ELF64 little-endian section header names (a string search would match literals in the data).
+        import struct
+        data = path.read_bytes()
+        if data[:4] != b'\x7fELF' or data[4] != 2: return set()
+        shoff, = struct.unpack_from('<Q', data, 0x28); shentsize, shnum, shstrndx = struct.unpack_from('<HHH', data, 0x3A)
+        strtab_offset, = struct.unpack_from('<Q', data, shoff + shstrndx * shentsize + 0x18)
+        names = set()
+        for index in range(shnum):
+            name, = struct.unpack_from('<I', data, shoff + index * shentsize)
+            end = data.index(b'\0', strtab_offset + name); names.add(data[strtab_offset + name:end].decode())
+        return names
+    for side, directory in native.items():
+        for library in directory.glob('*mattmc*'):
+            if '.debug_info' in section_names(library):
+                parser.error(f'{side} native {library} is a debug build; rebuild with ./gradlew -PmattmcRustProfile=release classes')
     cp = {'frozen': (ROOT / 'build/item-state-frozen-classpath.txt').read_text().strip(),
           'pre': (pre / 'classpath.txt').read_text().strip(),
           'current': (ROOT / 'build/item-state-current-classpath.txt').read_text().strip()}
@@ -83,9 +101,9 @@ def main():
     atomic = args.workload == 'atomic-lower-bound'
     owner = args.workload == 'owner-access'
     isolated = atomic or owner
-    source = Path(__file__).with_name('BroadcastTimingReference.java' if args.workload == 'broadcast' else 'OwnerAccessTimingReference.java' if owner else 'AtomicAccessTimingReference.java' if atomic else 'InventoryTimingReference.java' if inventory else 'StockChestTransferTimingReference.java' if transfer else 'ItemStateGenericDebtReference.java' if args.workload == 'generic-debt' else 'ItemStateTimingReference.java')
+    source = Path(__file__).with_name('BroadcastTimingReference.java' if args.workload == 'broadcast' else 'EqualityTimingReference.java' if args.workload == 'equality' else 'OwnerAccessTimingReference.java' if owner else 'AtomicAccessTimingReference.java' if atomic else 'InventoryTimingReference.java' if inventory else 'StockChestTransferTimingReference.java' if transfer else 'ItemStateGenericDebtReference.java' if args.workload == 'generic-debt' else 'ItemStateTimingReference.java')
     adapter = Path(__file__).with_name('OwnerAccessTimingCurrent.java' if owner else 'AtomicAccessTimingCurrent.java') if isolated else None
-    dependencies = [Path(__file__).with_name('StockChestTransferTimingReference.java')] if inventory or args.workload == 'broadcast' else []
+    dependencies = [Path(__file__).with_name('StockChestTransferTimingReference.java')] if inventory or args.workload in ('broadcast', 'equality') else []
     before = class_seal()
     out.mkdir(); classes = out / 'observer'; classes.mkdir(); (out / source.name).write_bytes(source.read_bytes())
     receipt = {'kind': 'EARLY DIAGNOSTIC ONLY; one JVM per side, five dependent samples',

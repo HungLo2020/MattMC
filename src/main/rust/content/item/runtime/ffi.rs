@@ -1145,6 +1145,15 @@ fn menu(handle:i64)->Option<Arc<super::slots::BoundaryOwner<super::menu::Menu>>>
     guard(||{let (Some(a),Some(b))=(menu_stack(left),menu_stack(right)) else{return BAD};
         match super::slots::inventory_same(&a,&b,air as u64){Some(true)=>1,Some(false)=>0,None=>-1}})
 }
+/// Bounded critical form of `mattmc_item_stack_same_components` over the
+/// caller-fenced stacks (scalar addresses are the repr(C) Stack addresses): no
+/// blocking lock, allocation, handle lookup or upcall. -1 sends the caller to
+/// the regular entry; -2 means the original Java equals must decide.
+#[no_mangle] pub unsafe extern "C" fn mattmc_item_stack_same_bounded(left:i64,right:i64,air:i64)->i64 {
+    if left<=0||right<=0{return -1;}
+    let (a,b)=(&*(left as *const super::stack::Stack),&*(right as *const super::stack::Stack));
+    match super::slots::inventory_same_bounded(a,b,air as u64){Ok(Some(true))=>1,Ok(Some(false))=>0,Ok(None)=>-2,Err(())=>-1}
+}
 #[no_mangle] pub extern "C" fn mattmc_item_menu_double_match(handle:i64,first_handle:i64,second_handle:i64,inventory_handle:i64)->i64 {
     guard(||{let (Some(owner),Some(first),Some(second),Some(inventory))=(menu(handle),container(first_handle),container(second_handle),inventory(inventory_handle)) else{return BAD};
         let result=owner.lock().unwrap().matches_double(&first,&second,&inventory);i64::from(result)})
@@ -1830,6 +1839,19 @@ unsafe fn inventory_add(owner:i64,source:i64,index:i64,air:i64,effect:Option<Inv
         let step=super::super::slots::transfer_step_pair(&first,&second,&source,99,((step>>9)&3) as u64,31,&mut stats);
         assert_eq!(step&7,2,"then the first empty row");assert_eq!((step>>3)&63,0);assert_eq!(step>>32,7);
         assert_eq!(super::super::slots::transfer_step_pair(&first,&half(),&source,99,0,0,&mut stats)&7,2,"no merge target: first empty row");
+    }
+    // The bounded comparison decides copies and empties without locks held across,
+    // and declines (None) under contention instead of waiting.
+    #[test] fn bounded_component_comparison_declines_under_contention(){
+        let defaults=defaults();let a=value(5,&defaults);let b=value(5,&defaults);let empty=value(0,&defaults);
+        assert_eq!(super::super::slots::inventory_same_bounded(&empty,&value(0,&defaults),99),Ok(Some(true)));
+        assert_eq!(super::super::slots::inventory_same_bounded(&empty,&a,99),Ok(Some(false)));
+        let held=b.components.lock().unwrap();
+        assert_eq!(super::super::slots::inventory_same_bounded(&a,&b,99),Err(()),"contended: decline, never wait");
+        drop(held);
+        // Without installed roles (process-global, set by Java at bootstrap) the bounded
+        // form declines; whenever it decides, it must agree with the regular form.
+        if let Ok(Some(decided))=super::super::slots::inventory_same_bounded(&a,&b,99){assert_eq!(Some(decided),super::super::slots::inventory_same(&a,&b,99));}
     }
     #[test] fn pending_pickup_rolls_back_only_before_java_records_its_recipe(){
         let defaults=defaults();

@@ -372,6 +372,25 @@ fn inventory_same_with_roles(left:&Stack,right:&Stack,air:u64,roles:Option<&supe
     if a==b && Arc::ptr_eq(ad,bd){Some(true)}else{None}
 }
 
+/// `inventory_same` for a bounded critical entry: no blocking lock, Arc clone of
+/// a borrowed owner, allocation or upcall. Decides empties, item mismatches and
+/// same-prototype controlled patches only. Err (contention, uncontrolled owners)
+/// sends the caller to the regular entry; Ok(None) means a value needs the
+/// original Java equals, which the regular entry would also decline.
+pub fn inventory_same_bounded(left:&Stack,right:&Stack,air:u64)->Result<Option<bool>,()> {
+    let left_empty=visible_count(left,air)==0;let right_empty=visible_count(right,air)==0;
+    if left_empty || right_empty {return Ok(Some(left_empty && right_empty));}
+    if left.scalars.item!=right.scalars.item{return Ok(Some(false));}
+    let roles=super::components::roles().ok_or(())?;
+    let a=left.components.try_lock().map_err(|_|())?;let b=right.components.try_lock().map_err(|_|())?;
+    let controlled=match (&a.defaults,&b.defaults) {
+        (Some(x),Some(y))=>Arc::ptr_eq(x,y),
+        (None,None)=>a.prototype==roles.empty_prototype,_=>false,
+    };
+    if !controlled || a.prototype!=b.prototype {return Err(());}
+    a.patch_ref().pure_equal_bounded(b.patch_ref())
+}
+
 pub enum InventorySpaceScan {Found(i32),Effect(i32),Done}
 /// One pure main-inventory segment. Borrow canonical rows and their actual
 /// default owner once; a foreign predicate returns BEFORE any Java effect.

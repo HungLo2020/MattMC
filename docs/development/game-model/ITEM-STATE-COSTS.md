@@ -152,20 +152,38 @@ fits run-to-run variance. That row stays on watch.
 
 ### Component comparison
 
-`ItemStack.matches` on a stack and its copy (iron sword with damage 3, diamond
-helmet, 7 sticks and shield, in rotation) was timed with a scratch loop. This
-is diagnostic only, not the acceptance driver: one JVM per side, warmed, the
-last five rounds of two million calls.
+`ItemStack.matches` over pools of stack pairs (`--workload equality`,
+`EqualityTimingReference.java`, `build/s34-v14/equality`). The screen ran on
+`ce394a9a` plus the native comparison, with complete pre, origin guard and
+five samples. Pools are built outside the timer, and RSS is sampled untimed
+after a forced GC per mode. The release library `d471d350…` (`./gradlew
+-PmattmcRustProfile=release classes`, Cargo release profile) is sealed in
+`build/s34-v14/native-sealed`. The 15 contracts, this screen and the hopper witness
+all recorded that SHA. The library's SHA after the run was unchanged.
 
-| Image | ns per call |
-|---|---:|
-| Frozen | 7.9–12.2 |
-| Current before | 1230–2146 |
-| Current with native comparison | 117–119 |
+| Mode | Frozen ns | Pre ns | Current ns | C/pre | C/Frozen |
+|---|---:|---:|---:|---:|---:|
+| native_damage_copy | 3.4 | 1577 | 42.3 | 0.03 | 12.4 |
+| native_damage_equal | 22.6 | 907 | 102 | 0.11 | 4.5 |
+| native_default | 20.2 | 612 | 62.6 | 0.10 | 3.1 |
+| fallback_custom_name | 26.9 | 827 | 929 | 1.12 | 34.6 |
+| equipment_tick | 3.2 | 1389 | 40.4 | 0.03 | 12.6 |
 
-Debt: about 15× Frozen remains. The cost is the FFI crossing, the Arc retains
-and the two component locks per call. Equipment change detection pays it per
-equipped slot, per entity, per tick.
+No Java allocation on any side. The native-decided modes use a bounded,
+lock-free critical entry first (`mattmc_item_stack_same_bounded`). If a lock is
+contended, the regular entry runs. If any value needs Java, the original `equals`
+runs directly, so the fallback mode differs from pre only by that declined
+bounded call (+12%).
+
+Debt: the decided modes are 3–13× Frozen, and the fallback mode is 35× Frozen,
+because the original `equals` still builds two native patch views. RSS on
+Current rises from 409 to 537 MiB during the fallback mode, while patch-view
+owners await Cleaner retirement. Pre rises across modes too. These are process
+samples, not allocator attribution, and no plateau is claimed.
+
+Retained negatives: `build/s34-v12-equality` timed a dev-profile library and is
+invalid. `build/s34-v13` (screen NOTRUN) was refused by a byte-search guard
+that matched a string literal. The guard now reads ELF section headers.
 
 ### Pending-content resources
 
@@ -489,6 +507,11 @@ measured operations take observer tags, because the observer has 16,384.
 ## Reproduce the cost diagnostics
 
 Compile and verify the selected image first; use new output directories.
+Build the native library last with `./gradlew -PmattmcRustProfile=release classes`.
+Any Gradle `test` run rebuilds `build/rust/native` in the dev profile (opt-level 0),
+and `MeasureItemState.py` refuses a library that still has debug sections. A
+dev-profile run on October 17 (`build/s34-v12-equality`) made native calls look
+several times slower and is invalid.
 
 ```sh
 python3 DevUtils/tests/content/item-state/MeasureItemState.py \

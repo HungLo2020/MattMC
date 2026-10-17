@@ -423,7 +423,10 @@ the two map views over FFI. That cost about 1.8 µs per call, against about
 The native comparison returns equal or different only when Rust can decide.
 That covers the same prototype and default owner, and patches whose values
 are native integers, empty or identical enchantments, or removals. Anything
-else returns "needs Java", and the original `equals` runs. Per-tick consumers
+else returns "needs Java", and the original `equals` runs. A bounded critical
+entry (`mattmc_item_stack_same_bounded`, `try_lock` only) is tried first. Contention
+returns -1 and sends the comparison to the regular entry. A value that needs Java
+returns -2 and goes straight to the original `equals`. Per-tick consumers
 include `LivingEntity.collectEquipmentChanges` (every equipment slot of every
 equipped entity), merges and recipe matching.
 `NativeInventoryTest.nativeComponentComparisonMatchesTheOriginalEquals` compares

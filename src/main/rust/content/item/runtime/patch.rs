@@ -70,10 +70,17 @@ impl Patch {
     pub fn shares_backing(&self, other: &Self) -> bool { Arc::ptr_eq(&self.0, &other.0) }
     /// Return a result only if the original Optional/value comparisons cannot
     /// invoke user code. Never compare opaque leaf numbers across backings.
-    pub fn pure_equal(&self, other: &Self) -> Option<bool> {
-        if self.shares_backing(other) { return Some(true); }
+    pub fn pure_equal(&self, other: &Self) -> Option<bool> { self.pure_equal_with(other, false).ok().flatten() }
+    /// The same comparison taking no blocking lock: Err on contention, Ok(None)
+    /// when a value needs the original Java equals (a definite answer).
+    pub fn pure_equal_bounded(&self, other: &Self) -> Result<Option<bool>,()> { self.pure_equal_with(other, true) }
+    fn pure_equal_with(&self, other: &Self, bounded: bool) -> Result<Option<bool>,()> {
+        if self.shares_backing(other) { return Ok(Some(true)); }
         let (a,b,swapped)=if Arc::as_ptr(&self.0) < Arc::as_ptr(&other.0) {(&self.0,&other.0,false)} else {(&other.0,&self.0,true)};
-        let a=a.contents.lock().unwrap();let b=b.contents.lock().unwrap();
+        let (a,b)=if bounded {(a.contents.try_lock().map_err(|_|())?,b.contents.try_lock().map_err(|_|())?)} else {(a.contents.lock().unwrap(),b.contents.lock().unwrap())};
+        Ok(Self::compare_contents(&a,&b,swapped))
+    }
+    fn compare_contents(a:&Contents,b:&Contents,swapped:bool) -> Option<bool> {
         let (left,right)=if swapped {(&*b,&*a)} else {(&*a,&*b)};
         if left.entries.len()!=right.entries.len(){return Some(false);}
         let mut equal=true;
@@ -169,6 +176,8 @@ impl Overlay {
     pub fn shares_patch(&self, other: &Self) -> bool { self.patch.shares_backing(&other.patch) }
     /// Retain a live iterator backing without changing the explicit Java COW flag.
     pub fn view_patch(&self) -> Patch { self.patch.clone().with_control(self.pristine.clone()) }
+    /// The live patch, borrowed (comparison only; no control marker or clone).
+    pub fn patch_ref(&self) -> &Patch { &self.patch }
     pub fn backing_marker(&self)->Arc<AtomicBool> {self.patch.pristine_marker()}
     pub fn patch_len(&self) -> usize { self.patch.len() }
     pub fn patch_version(&self) -> u64 { self.patch.version() }

@@ -850,8 +850,16 @@ public final class NativeItemState {
      * non-empty stacks, computed natively: 1 equal, 0 different, or -1 when a
      * component value needs the original Java {@code equals}.
      */
+    private static final MethodHandle STACK_SAME_BOUNDED=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_stack_same_bounded",
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG),java.lang.foreign.Linker.Option.critical(false));
     static int sameComponents(Stack left,Stack right){
-        try{long value=(long)STACK_SAME.invokeExact(stackOwner(left).checkBound(),stackOwner(right).checkBound(),TransferIds.AIR);return value<0?-1:(int)value;}
+        try{
+            long l=stackOwner(left).checkBound(),r=stackOwner(right).checkBound();
+            // Bounded first (no locks held across): -1 retries through the regular entry,
+            // -2 means a value needs the original Java equals.
+            long value=(long)STACK_SAME_BOUNDED.invokeExact(l,r,TransferIds.AIR);
+            if(value==-1)value=(long)STACK_SAME.invokeExact(l,r,TransferIds.AIR);
+            return value<0?-1:(int)value;}
         catch(Throwable failure){throw failed(failure);}
         finally{java.lang.ref.Reference.reachabilityFence(left);java.lang.ref.Reference.reachabilityFence(right);}
     }
