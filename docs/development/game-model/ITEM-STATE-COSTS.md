@@ -134,6 +134,22 @@ while Frozen read 1579, 2187 and 2108 ns. As a ratio to Frozen it reads
 5.1×, 4.0× and 5.0×, so it does not rise steadily, but it has not been attributed
 and stays on watch.
 
+Quick moves from the inventory into the double chest then became native too
+(`build/s34-v8/broadcast`, on `b9935c8a` plus the diff):
+
+| Broadcast | Frozen ns | Pre ns | Current ns | C/pre |
+|---|---:|---:|---:|---:|
+| tick_idle | 1584 | 6139 | 3682 | 0.60 |
+| tick_quick_move_empty | 1322 | 12162 | 8287 | 0.68 |
+| tick_quick_move_one | 2262 | 100867 | 9807 | 0.10 |
+| double_idle | 1741 | 9139 | 5821 | 0.64 |
+| double_quick_move_one | 2506 | 18890 | 13527 | 0.72 |
+| double_reverse_one | 3564 | 181953 | 11677 | 0.06 |
+
+`double_quick_move_one` went from 18,246 to 13,527 ns (0.92× to 0.72× pre). It remains
+5.4× Frozen. `tick_quick_move_empty` (unchanged code) is back to 8287 ns, which
+fits run-to-run variance. That row stays on watch.
+
 ### Pending-content resources
 
 `VerifyItemResources.py --workload pending` (`build/s34-v5/resource-pending2`)

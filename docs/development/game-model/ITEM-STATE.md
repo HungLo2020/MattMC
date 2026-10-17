@@ -372,11 +372,18 @@ before. A quick move from a double-chest slot into the inventory runs the
 native inventory transfer (`prepareDoubleInventoryTransfer`). The menu layout is
 checked by `matchesDouble`, `menu.rs` `matches_double`: rows 0–26 linked to the
 first half, 27–53 to the second, and 54–89 to the inventory. A quick move
-into the double chest still uses the original `moveItemStackTo`, because the
-original merges across both halves before filling empty slots. A subclass half
-keeps every slot of that compound unlinked.
+from the inventory into the double chest treats both halves as one 54-row
+destination (`slots.rs` `PairRows` and `transfer_step_pair`; op 7 kind 2, and
+op 19 supplies the second half). The original merges across both halves before
+filling empty slots, so the halves cannot be transferred separately. Each
+insertion goes to the owning half's rows at its local index. Java then replays
+that half's own change mark, followed by the compound's `setChanged` twice,
+which marks both halves. The halves lock in order, and the transfer refuses
+one owner used twice. A subclass half keeps every slot of that compound
+unlinked.
 `NativeBarrelTest.doubleChestMenusMatchTheOriginalPath` compares 400 random
-quick moves, clicks and broadcasts with subclass halves.
+quick moves, clicks and broadcasts with subclass halves, including both
+halves' `blockEntityChanged` order on a recording level.
 
 Inventory add (pickups) for a pure item also publishes its copies natively
 (`mattmc_item_inventory_add_pending_leased`).

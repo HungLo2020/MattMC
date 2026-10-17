@@ -141,8 +141,11 @@ class NativeBarrelTest {
         var player = mock(net.minecraft.world.entity.player.Player.class); var level = mock(Level.class);
         doReturn(inventory).when(player).getInventory(); doReturn(level).when(player).level();
         doReturn(net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS).when(level).enabledFeatures();
-        ChestBlockEntity a = exact ? new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()) : new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()) {};
-        ChestBlockEntity b = exact ? new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()) : new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()) {};
+        // Distinct positions and a recording level, so each half's change marks are traced in order.
+        BlockPos left = new BlockPos(0, 64, 0), right = left.east();
+        ChestBlockEntity a = exact ? new ChestBlockEntity(left, Blocks.CHEST.defaultBlockState()) : new ChestBlockEntity(left, Blocks.CHEST.defaultBlockState()) {};
+        ChestBlockEntity b = exact ? new ChestBlockEntity(right, Blocks.CHEST.defaultBlockState()) : new ChestBlockEntity(right, Blocks.CHEST.defaultBlockState()) {};
+        a.setLevel(level); b.setLevel(level);
         var compound = new net.minecraft.world.CompoundContainer(a, b);
         a.setRemoved(); b.setRemoved(); ChestMenu menu = ChestMenu.sixRows(1, inventory, compound); a.clearRemoved(); b.clearRemoved();
         var results = new ArrayList<String>();
@@ -164,6 +167,11 @@ class NativeBarrelTest {
                 default -> { menu.clicked(slot, random.nextInt(9), net.minecraft.world.inventory.ClickType.SWAP, player); results.add(step + " swap " + slot); }
             }
             menu.broadcastChanges();
+            for (var invocation : mockingDetails(level).getInvocations()) {
+                String name = invocation.getMethod().getName();
+                if (name.equals("blockEntityChanged") || name.equals("updateNeighbourForOutputSignal")) results.add(step + " " + name + " " + invocation.getArgument(0));
+            }
+            clearInvocations(level);
             results.add(step + " carried " + menu.getCarried().getItem() + "x" + menu.getCarried().getCount() + " item " + menu.getSlot(slot).getItem().getCount() + " has " + menu.getSlot(slot).hasItem());
         }
         results.add("first " + contents(a)); results.add("second " + contents(b)); results.add("inventory " + contents(inventory));
@@ -171,7 +179,10 @@ class NativeBarrelTest {
     }
 
     @Test void doubleChestMenusMatchTheOriginalPath() {
-        assertEquals(doubleChestMenu(false), doubleChestMenu(true));
+        var trace = doubleChestMenu(true);
+        assertEquals(doubleChestMenu(false), trace);
+        assertTrue(trace.stream().anyMatch(line -> line.contains("blockEntityChanged") && line.contains("x=0")), "first half change marks are traced");
+        assertTrue(trace.stream().anyMatch(line -> line.contains("blockEntityChanged") && line.contains("x=1")), "second half change marks are traced");
         Inventory inventory = new Inventory(null, new EntityEquipment());
         var a = new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()); var b = new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState());
         a.setRemoved(); b.setRemoved(); ChestMenu menu = ChestMenu.sixRows(1, inventory, new net.minecraft.world.CompoundContainer(a, b)); a.clearRemoved(); b.clearRemoved();
@@ -185,6 +196,11 @@ class NativeBarrelTest {
         assertEquals(9, menu.quickMoveStack(null, 31).getCount());
         assertEquals(published + 1, counter(5), "a double-chest source moves natively into a pending inventory row");
         assertTrue(b.getItem(4).isEmpty()); assertEquals(9, inventory.getItem(8).getCount());
+        for (int i = 0; i < 27; i++) a.setItem(i, new ItemStack(Items.DIRT, 64));
+        inventory.setItem(9, new ItemStack(Items.STICK, 5)); published = counter(5);
+        assertEquals(5, menu.quickMoveStack(null, 54).getCount());
+        assertEquals(published + 1, counter(5), "an inventory source moves natively into a pending row of the second half");
+        assertEquals(5, b.getItem(0).getCount()); assertTrue(inventory.getItem(9).isEmpty());
     }
 
     // A hopper ejecting into, and another sucking from, a stock double chest

@@ -104,6 +104,15 @@ public class ChestMenu extends AbstractContainerMenu {
 			return this.prepareDoubleInventoryTransfer(source,(net.minecraft.world.level.block.entity.NativeStockContainer)compound.firstContainer(),
 				(net.minecraft.world.level.block.entity.NativeStockContainer)compound.secondContainer(),this.playerInventory);
 		}
+		if(this.getClass()==ChestMenu.class&&this.containerRows()==6&&index>=54&&index<90&&slot.getClass()==Slot.class&&slot.container==this.playerInventory
+			&&slot.getContainerSlot()==(index<81?index-45:index-81)&&this.container.getClass()==net.minecraft.world.CompoundContainer.class){
+			// Inventory to a double chest: both halves are one native destination.
+			var compound=(net.minecraft.world.CompoundContainer)this.container;
+			if(!net.minecraft.world.level.block.entity.NativeStockContainer.exact(compound.firstContainer())
+				||!net.minecraft.world.level.block.entity.NativeStockContainer.exact(compound.secondContainer()))return null;
+			return this.prepareDoubleChestTransfer(source,compound,(net.minecraft.world.level.block.entity.NativeStockContainer)compound.firstContainer(),
+				(net.minecraft.world.level.block.entity.NativeStockContainer)compound.secondContainer(),this.playerInventory);
+		}
 		if(!this.isNativeTransferSource(slot,index))return null;
 		var chest=(net.minecraft.world.level.block.entity.NativeStockContainer)this.container;
 		return index<27?this.prepareStockInventoryTransfer(source,chest,this.playerInventory):this.prepareStockChestTransfer(source,chest);

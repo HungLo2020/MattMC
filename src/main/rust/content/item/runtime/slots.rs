@@ -52,6 +52,18 @@ pub static PENDING_ROLLED_BACK:std::sync::atomic::AtomicU64=std::sync::atomic::A
 /// Broadcast copies built from pending contents without materializing them (counter 8).
 pub static PENDING_BROADCAST_COPIES:std::sync::atomic::AtomicU64=std::sync::atomic::AtomicU64::new(0);
 pub struct Slots { entries: Vec<Entry> }
+/// Rows a transfer step scans: one owner, or a double chest's two halves in
+/// the compound's slot order.
+pub trait TransferRows { fn row_count(&self)->usize; fn row(&self,index:usize)->&Entry; }
+impl TransferRows for Slots {
+    fn row_count(&self)->usize{self.entries.len()}
+    fn row(&self,index:usize)->&Entry{&self.entries[index]}
+}
+pub struct PairRows<'a>(pub &'a Slots,pub &'a Slots);
+impl TransferRows for PairRows<'_> {
+    fn row_count(&self)->usize{self.0.entries.len()+self.1.entries.len()}
+    fn row(&self,index:usize)->&Entry{let split=self.0.entries.len();if index<split{&self.0.entries[index]}else{&self.1.entries[index-split]}}
+}
 impl Slots {
     pub fn fill(&mut self,empty:Entry) {self.entries.fill(empty);}
     pub fn entries_facade_index(&self,facade:i64)->i32 {self.entries.iter().position(|entry|entry.facade==facade).map_or(-1,|index|index as i32)}
@@ -187,6 +199,10 @@ pub fn transfer_step_counted(slots:&Slots,source:&Stack,air:u64,phase:u64,index:
 pub unsafe fn transfer_step_admitted(slots:&Slots,source:&Stack,defaults:&BoundaryOwner<super::patch::defaults::Store>,air:u64,phase:u64,index:usize)->i64 {
     transfer_step_inner(slots,source,air,phase,index,&mut TransferStats::default(),Some((defaults,defaults.admitted())),false)
 }
+/// A double chest's two halves as one 54-row forward destination.
+pub fn transfer_step_pair(first:&Slots,second:&Slots,source:&Stack,air:u64,phase:u64,index:usize,stats:&mut TransferStats)->i64 {
+    transfer_step_inner(&PairRows(first,second),source,air,phase,index,stats,None,false)
+}
 pub fn transfer_step_inventory(slots:&Slots,source:&Stack,air:u64,phase:u64,index:usize,stats:&mut TransferStats)->i64 {
     transfer_step_inner(slots,source,air,phase,index,stats,None,true)
 }
@@ -194,10 +210,10 @@ pub fn transfer_step_inventory(slots:&Slots,source:&Stack,air:u64,phase:u64,inde
 pub fn target_index(index:usize,inventory_reverse:bool)->usize {
     if !inventory_reverse {index}else if index<9 {8-index}else{44-index}
 }
-pub(super) fn transfer_payload_step(slots:&Slots,source:&Stack,air:u64,mut phase:u64,mut index:usize,stats:&mut TransferStats,inventory_reverse:bool,roles:&super::components::Roles)->i64 {
+pub(super) fn transfer_payload_step<R:TransferRows+?Sized>(slots:&R,source:&Stack,air:u64,mut phase:u64,mut index:usize,stats:&mut TransferStats,inventory_reverse:bool,roles:&super::components::Roles)->i64 {
     use std::sync::atomic::Ordering;
-    let limit=if inventory_reverse {36}else{27};
-    if slots.entries.len()!=limit || index>limit || phase>2{return 7;}
+    let limit=if inventory_reverse {36}else if slots.row_count()==54 {54}else{27};
+    if slots.row_count()!=limit || index>limit || phase>2{return 7;}
     if visible_count(source,air)==0{return transfer_result(0,index,phase,0);}
     let Some(max)=super::components::max_size_with(source,roles) else{return transfer_result(3,index,phase,0)};
     stats.defaults+=1;
@@ -207,7 +223,7 @@ pub(super) fn transfer_payload_step(slots:&Slots,source:&Stack,air:u64,mut phase
     }
     if phase==1 {
         while visible_count(source,air)!=0 && index<limit {
-            let target=&slots.entries[target_index(index,inventory_reverse)].stack;stats.slots+=1;
+            let target=&slots.row(target_index(index,inventory_reverse)).stack;stats.slots+=1;
             if visible_count(target,air)!=0 && target.scalars.item==source.scalars.item {
                 let Some(equal)=inventory_same_with_roles(source,target,air,Some(roles)) else{return transfer_result(3,index,1,0)};
                 if equal {
@@ -229,18 +245,18 @@ pub(super) fn transfer_payload_step(slots:&Slots,source:&Stack,air:u64,mut phase
     }
     while index<limit {
         stats.slots+=1;
-        if visible_count(&slots.entries[target_index(index,inventory_reverse)].stack,air)==0 {
+        if visible_count(&slots.row(target_index(index,inventory_reverse)).stack,air)==0 {
             return transfer_result(2,index,phase,visible_count(source,air).min(99.min(max)));
         }
         index+=1;
     }
     transfer_result(0,index,phase,0)
 }
-fn transfer_step_inner(slots:&Slots,source:&Stack,air:u64,mut phase:u64,mut index:usize,stats:&mut TransferStats,admitted:Option<(&BoundaryOwner<super::patch::defaults::Store>,&super::patch::defaults::Store)>,inventory_reverse:bool)->i64 {
+fn transfer_step_inner<R:TransferRows+?Sized>(slots:&R,source:&Stack,air:u64,mut phase:u64,mut index:usize,stats:&mut TransferStats,admitted:Option<(&BoundaryOwner<super::patch::defaults::Store>,&super::patch::defaults::Store)>,inventory_reverse:bool)->i64 {
     use std::sync::atomic::Ordering;
     stats.steps+=1;
-    let limit=if inventory_reverse {36}else{27};
-    if slots.entries.len()!=limit || index>limit || phase>2 {return 7;}
+    let limit=if inventory_reverse {36}else if slots.row_count()==54 {54}else{27};
+    if slots.row_count()!=limit || index>limit || phase>2 {return 7;}
     if visible_count(source,air)==0 {return transfer_result(0,index,phase,0);}
     let Some((prototype,defaults))=pristine(source,admitted.is_some()) else{
         if admitted.is_none(){if let Some(roles)=super::components::roles(){return transfer_payload_step(slots,source,air,phase,index,stats,inventory_reverse,roles);}}
@@ -266,7 +282,7 @@ fn transfer_step_inner(slots:&Slots,source:&Stack,air:u64,mut phase:u64,mut inde
     }
     if phase==1 {
         while visible_count(source,air)!=0 && index<limit {
-            let target=&slots.entries[target_index(index,inventory_reverse)].stack;stats.slots+=1;
+            let target=&slots.row(target_index(index,inventory_reverse)).stack;stats.slots+=1;
             if visible_count(target,air)!=0 && target.scalars.item==source.scalars.item {
                 let Some((target_proto,target_defaults))=pristine(target,admitted.is_some()) else{
                     if admitted.is_none(){if let Some(roles)=super::components::roles(){return transfer_payload_step(slots,source,air,1,index,stats,inventory_reverse,roles);}}
@@ -291,7 +307,7 @@ fn transfer_step_inner(slots:&Slots,source:&Stack,air:u64,mut phase:u64,mut inde
     }
     while index<limit {
         stats.slots+=1;
-        if visible_count(&slots.entries[target_index(index,inventory_reverse)].stack,air)==0 {
+        if visible_count(&slots.row(target_index(index,inventory_reverse)).stack,air)==0 {
             return transfer_result(2,index,phase,visible_count(source,air).min(99.min(max)));
         }
         index+=1;

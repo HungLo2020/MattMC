@@ -93,8 +93,14 @@ public final class NativeItemState {
             try{
                 boolean inventory=destination.inventoryAddress!=0;
                 VIEW_LONG.set(SCALAR_RAW,out,inventory?destination.inventoryAddress:destination.ownerAddress);
-                VIEW_LONG.set(SCALAR_RAW,out+8,inventory?1L:0L);
+                VIEW_LONG.set(SCALAR_RAW,out+8,effects.second!=null?2L:inventory?1L:0L);
             }finally{java.lang.ref.Reference.reachabilityFence(destination);java.lang.ref.Reference.reachabilityFence(effects);}
+        }
+        /** Op 19: the second half of a double-chest destination (kind 2). */
+        protected static void secondDestination(long out,TransferEffects effects){
+            Slots second=Objects.requireNonNull(effects.second,"Missing double-chest second half");
+            try{VIEW_LONG.set(SCALAR_RAW,out,second.ownerAddress);}
+            finally{java.lang.ref.Reference.reachabilityFence(second);java.lang.ref.Reference.reachabilityFence(effects);}
         }
         protected static void route(long out,int kind,int index){VIEW_LONG.set(SCALAR_RAW,out,kind);VIEW_LONG.set(SCALAR_RAW,out+8,index);}
         /** The prepared copy's scalar address Rust wrote to {@code out}. */
@@ -229,8 +235,10 @@ public final class NativeItemState {
     /** Call-local Java effects only. Native owns the running transfer and releases locks before each call. */
     public abstract static class TransferEffects {
         private Throwable failure;
-        private Slots destination;
-        protected final void destination(NativeItemSlots facade){this.destination=facade.actualOwner();}
+        private Slots destination,second;
+        protected final void destination(NativeItemSlots facade){this.destination=facade.actualOwner();this.second=null;}
+        /** A double chest's two halves as one destination, in the compound's slot order. */
+        protected final void destination(NativeItemSlots first,NativeItemSlots second){this.destination=first.actualOwner();this.second=second.actualOwner();}
         public abstract long effect(long action, long index, long phase, long amount, long changed);
         /**
          * An empty-destination insertion whose copy the native transfer already

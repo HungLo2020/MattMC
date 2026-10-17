@@ -822,13 +822,23 @@ fn access_overlay(handle: i64) -> Option<Arc<Mutex<super::patch::CanonicalOverla
 
 /// Shared complete consumer: actual leases remain in this native operation,
 /// while every owner/row/default guard ends before an external effect.
-fn transfer_run_owned<F:FnMut(i64,i64,i64,i64,i64)->i64>(slots:&SlotsLease,source:&super::stack::Stack,air:u64,mut effect:F)->i64 {
+fn transfer_run_owned<F:FnMut(i64,i64,i64,i64,i64)->i64>(slots:&SlotsLease,source:&super::stack::Stack,air:u64,effect:F)->i64 {
+    transfer_run_steps(|phase,index,previous,stats|match slots {
+        SlotsLease::Inventory(owner)=>owner.transfer_step(source,air,previous),
+        SlotsLease::Separate(owner)=>{let rows=owner.lock().unwrap();super::slots::transfer_step_counted(&rows,source,air,phase,index,stats)}
+    },effect)
+}
+/// The same consumer over a double chest's two halves (one 54-row forward
+/// destination). Both guards end before each effect; first half locks first.
+fn transfer_run_pair<F:FnMut(i64,i64,i64,i64,i64)->i64>(first:&super::slots::BoundaryOwner<super::slots::Slots>,second:&super::slots::BoundaryOwner<super::slots::Slots>,source:&super::stack::Stack,air:u64,effect:F)->i64 {
+    transfer_run_steps(|phase,index,_,stats|{
+        let a=first.lock().unwrap();let b=second.lock().unwrap();super::slots::transfer_step_pair(&a,&b,source,air,phase,index,stats)
+    },effect)
+}
+fn transfer_run_steps<S:FnMut(u64,usize,i64,&mut super::slots::TransferStats)->i64,F:FnMut(i64,i64,i64,i64,i64)->i64>(mut step:S,mut effect:F)->i64 {
     let mut phase=0u64;let mut index=0usize;let mut previous=0i64;let mut changed=false;let mut stats=super::slots::TransferStats::default();
     loop {
-        let result=match slots {
-            SlotsLease::Inventory(owner)=>owner.transfer_step(source,air,previous),
-            SlotsLease::Separate(owner)=>{let rows=owner.lock().unwrap();super::slots::transfer_step_counted(&rows,source,air,phase,index,&mut stats)}
-        };
+        let result=step(phase,index,previous,&mut stats);
         let bits=result as u64;let action=bits&7;let selected=(bits>>3)&63;phase=(bits>>9)&3;let amount=(result>>32) as i32;
         changed|=bits&2048!=0;
         if action==0{return i64::from(changed);}if action==7{return BAD;}
@@ -1153,6 +1163,9 @@ fn menu_destination(address:i64,kind:i64)->Option<SlotsLease>{unsafe{match kind 
     1=>retain_vm_arc(address).map(SlotsLease::Inventory),_=>None,
 }}}
 type MenuCallback=unsafe extern "C" fn(i64,i64,i64,i64,i64)->i64;
+/// A menu transfer's destination: one row owner, or a double chest's two
+/// halves (kind 2 from op 7; op 19 supplies the second half's owner).
+enum TransferDestination {Rows(SlotsLease),Pair(Arc<super::slots::BoundaryOwner<super::slots::Slots>>,Arc<super::slots::BoundaryOwner<super::slots::Slots>>)}
 struct MenuEffects {callback:MenuCallback,source:Option<Arc<super::stack::Stack>>,prepared:Option<(Arc<super::stack::Stack>,Arc<super::stack::Stack>)>,known_has:Option<bool>,air:u64,pending:bool}
 impl MenuEffects {
     fn call(&mut self,action:i64,a:i64,b:i64,c:i64)->Result<(i64,[i64;2]),()> {self.call_with(action,a,b,c,[0;2])}
@@ -1179,9 +1192,13 @@ impl MenuEffects {
     /// Java record the materialization recipe (adoption flag in out[1]) and run
     /// the original post-publication effects. If Java fails before recording,
     /// nothing ran in between, so the publication and source shrink are undone.
-    fn publish_pending(&mut self,destination:&SlotsLease,source:&Arc<super::stack::Stack>,selected:i64,amount:i64,reverse:bool)->i64 {
+    fn publish_pending(&mut self,destination:&TransferDestination,source:&Arc<super::stack::Stack>,selected:i64,amount:i64,reverse:bool)->i64 {
         let (Ok(amount32),Ok(position))=(i32::try_from(amount),usize::try_from(selected)) else{return i64::MIN};
-        let index=super::slots::target_index(position,reverse&&matches!(destination,SlotsLease::Inventory(_)));
+        // The owner and its row: a double chest's position selects the half.
+        let (destination,index):(&super::slots::BoundaryOwner<super::slots::Slots>,usize)=match destination {
+            TransferDestination::Rows(rows)=>(rows,super::slots::target_index(position,reverse&&matches!(rows,SlotsLease::Inventory(_)))),
+            TransferDestination::Pair(first,second)=>{let split=first.lock().unwrap().len();if position<split{(first,position)}else{(second,position-split)}}
+        };
         let copy=copy_stack(source,amount32);let key=super::slots::next_pending_key();
         let (old,retired)={
             let mut rows=destination.lock().unwrap();
@@ -1250,12 +1267,23 @@ impl super::menu::QuickMoveEffects for MenuEffects {
     fn transfer(&mut self,start:i32,end:i32,reverse:bool)->Result<bool,()>{
         let (result,out)=self.call(7,start as i64,end as i64,i64::from(reverse))?;if result!=2&&result!=6{return Ok(result!=0);}
         self.pending=result==6;
-        let destination=menu_destination(out[0],out[1]).ok_or(())?;let source=self.source.clone().ok_or(())?;
-        let result=transfer_run_owned(&destination,&source,self.air,|action,index,phase,amount,changed|{
+        let destination=if out[1]==2 {
+            let first:Arc<super::slots::BoundaryOwner<super::slots::Slots>>=unsafe{retain_vm_arc(out[0])}.ok_or(())?;
+            let (_,second)=self.call(19,0,0,0)?;let second:Arc<super::slots::BoundaryOwner<super::slots::Slots>>=unsafe{retain_vm_arc(second[0])}.ok_or(())?;
+            // The halves lock in order; one owner twice would never release its gate.
+            if Arc::ptr_eq(&first,&second){return Err(());}
+            TransferDestination::Pair(first,second)
+        }else{TransferDestination::Rows(menu_destination(out[0],out[1]).ok_or(())?)};
+        let source=self.source.clone().ok_or(())?;let air=self.air;
+        let mut effect=|action:i64,index:i64,phase:i64,amount:i64,changed:i64|{
             if action==2{return if self.pending{self.publish_pending(&destination,&source,index,amount,reverse)}else{self.insert_prepared(&source,index,amount)};}
             let packed=(((amount as u32 as u64)<<32)|((phase as u64)<<1)|changed as u64) as i64;
             self.call(15,action,index,packed).map_or(i64::MIN,|result|result.0)
-        });if result<0{Err(())}else{Ok(result!=0)}
+        };
+        let result=match &destination {
+            TransferDestination::Rows(rows)=>transfer_run_owned(rows,&source,air,&mut effect),
+            TransferDestination::Pair(first,second)=>transfer_run_pair(first,second,&source,air,&mut effect),
+        };if result<0{Err(())}else{Ok(result!=0)}
     }
     fn quick_craft(&mut self)->Result<(),()>{self.call(8,0,0,0).map(|_|())}
     fn cleanup(&mut self,empty:bool,inventory:bool)->Result<(),()>{self.call(9,i64::from(empty),i64::from(inventory),0).map(|_|())}
@@ -1720,7 +1748,7 @@ unsafe fn inventory_add(owner:i64,source:i64,index:i64,air:i64,effect:Option<Inv
     #[test] fn pending_publication_rolls_back_only_before_java_records_its_recipe(){
         let defaults=defaults();let empty=value(0,&defaults);
         for (callback,recorded) in [(throw_before_record as MenuCallback,false),(record_then_throw as MenuCallback,true)] {
-            let rows=Arc::new(BoundaryOwner::new(Slots::new(27,Entry{facade:1,stack:empty.clone()})));let destination=SlotsLease::Separate(rows.clone());
+            let rows=Arc::new(BoundaryOwner::new(Slots::new(27,Entry{facade:1,stack:empty.clone()})));let destination=TransferDestination::Rows(SlotsLease::Separate(rows.clone()));
             let source=value(11,&defaults);let mut effects=MenuEffects{callback,source:None,prepared:None,known_has:None,air:0,pending:true};
             assert_eq!(effects.publish_pending(&destination,&source,4,11,false),i64::MIN);
             let entry=rows.lock().unwrap().get(4).unwrap().clone();
@@ -1781,6 +1809,21 @@ unsafe fn inventory_add(owner:i64,source:i64,index:i64,air:i64,effect:Option<Inv
     // restores the empty row and the source count; once recorded the row keeps
     // the pending copy (count and pop time 5), as an original setItem before a
     // failing later step would.
+    // A double chest's halves are one 54-row destination: the merge pass spans
+    // both halves before any empty row is used, as the original moveItemStackTo(0,54).
+    #[test] fn double_chest_transfer_merges_across_both_halves_before_any_empty_row(){
+        let defaults=defaults();let empty=value(0,&defaults);
+        let half=||Slots::new(27,Entry{facade:1,stack:empty.clone()});
+        let (first,mut second)=(half(),half());
+        let target=value(60,&defaults);second.set(3,Entry{facade:2,stack:target.clone()});
+        let source=value(11,&defaults);let mut stats=super::super::slots::TransferStats::default();
+        let step=super::super::slots::transfer_step_pair(&first,&second,&source,99,0,0,&mut stats);
+        assert_eq!(step&7,1,"merge first");assert_eq!((step>>3)&63,30,"compound slot 30 is the second half's row 3");
+        assert_eq!(target.scalars.count.load(Ordering::Relaxed),64);assert_eq!(source.scalars.count.load(Ordering::Relaxed),7);
+        let step=super::super::slots::transfer_step_pair(&first,&second,&source,99,((step>>9)&3) as u64,31,&mut stats);
+        assert_eq!(step&7,2,"then the first empty row");assert_eq!((step>>3)&63,0);assert_eq!(step>>32,7);
+        assert_eq!(super::super::slots::transfer_step_pair(&first,&half(),&source,99,0,0,&mut stats)&7,2,"no merge target: first empty row");
+    }
     #[test] fn pending_pickup_rolls_back_only_before_java_records_its_recipe(){
         let defaults=defaults();
         for (callback,recorded) in [(add_throw_before_record as InventoryEffect,false),(add_record_then_throw as InventoryEffect,true)] {
