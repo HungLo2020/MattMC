@@ -38,6 +38,12 @@ final class NativeLegacySource {
     // WorldgenRandom overrides the constructor seed hook and delegates draws;
     // materialize its separate raw-zero/cache owner only on a genuine use.
     NativeLegacySource() {}
+    /** Adopt the same pending lease; caller closes it if any projection step fails. */
+    NativeLegacySource(long actual,Consumer<MemorySegment> cleanup) {
+        Arena arena=Arena.ofAuto();
+        owner=MemorySegment.ofAddress(actual).reinterpret(1,arena,cleanup);
+        id=actual;
+    }
     long handle() {
         long value = id;
         return value != 0 ? value : initialize();

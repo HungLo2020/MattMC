@@ -13,6 +13,9 @@ impl Source {
         LIVE.fetch_add(1, Ordering::Relaxed); CREATED.fetch_add(1, Ordering::Relaxed);
         Arc::new(Self { seed: AtomicU64::new(0), gaussian: Gaussian::default() })
     }
+    pub(crate) fn seeded(seed: i64) -> Arc<Self> {
+        let value=Self::raw_initial(); value.raw_set(Legacy::new(seed).state()); value
+    }
     pub(crate) fn state(&self) -> i64 { self.seed.load(Ordering::SeqCst) as i64 }
     pub(crate) fn raw_set(&self, seed: i64) { self.seed.store(Legacy::from_raw(seed).state() as u64, Ordering::SeqCst); }
     fn commit(&self, old: i64, new: i64) -> Result<(), ()> {

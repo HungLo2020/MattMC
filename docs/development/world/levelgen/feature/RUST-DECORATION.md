@@ -516,3 +516,50 @@ See [recorded results](RUST-DECORATION-RESULTS.md).
 [native-temperature]: https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/levelgen/decoration/freeze.rs
 [current-freeze-calls]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/rust/world/level/levelgen/decoration/freeze.rs#L54-L72
 [current-freeze-count]: https://github.com/HungLo2020/MattMC/blob/729f781906b5545735eee043ae2a4d085f637f18/src/main/java/net/minecraft/world/level/levelgen/NativeFreezeVerification.java#L125-L130
+
+
+## Sky-source transport
+
+The source producer published in
+[`542dfd165`](https://github.com/HungLo2020/MattMC/commit/542dfd165888793e68a304d7185afba8f6a73800)
+provides bulk word count/copy/snapshot/restore/match operations.
+`NativeDecorationRegion` uses those operations at its existing synchronization
+boundaries; `DecorationTransaction` uses snapshot/restore for rollback.
+Normal sources keep canonical native storage without exposing a Java raw array.
+Already escaped arrays still retain their identity and outside-write visibility.
+The producer's subclass compatibility paths invoke the actual virtual
+`nativeRaw()` once and do not add a `nativeBits()` call.
+
+One verification restore path intentionally keeps its original custom-source
+arraycopy expression: a raw callback can replace the public `Maps.sky[index]`
+entry, and the original caller rereads that entry's length after the callback.
+Passing only the old snapshot to a bulk restore loses that behavior. The
+canonical source uses bulk restore; custom sources retain original argument
+and callback order. A real naive substitution fails the regression test and
+its receipt is retained at
+`build/worldgen/positional-factories/sky-consumer-naive-negative`.
+
+Use `NativeDecorationSkyTransportTest` for escaped identity, short restore,
+custom callback entry replacement, copy/projection/comparison and original
+throwable/prefix checks. The fixture uses real source storage, native region
+owners/buffers and chunk transactions; only the world's height is mocked for
+isolated region metadata. Before consumer edits all five cases passed on
+the actual combined producer. Integration, saved-world and publication gates
+for the current consumer changes remain pending.
+
+
+The combined `29c205f35` plus positional-factory/consumer working image passes
+358 focused checks on matched native/Main `e460e66b`. The earlier actual
+consumer screen and its performance debt are documented in the
+[random-source guide](../RUST-RANDOM-SOURCES.md#positional-factory-ownership-in-progress).
+Run its bounded observer with the complete immutable reference:
+
+```bash
+python3 DevUtils/tests/worldgen/random_source/VerifySkyConsumerScreen.py \
+  --pre-runtime build/worldgen/positional-factories/pre-58-runtime \
+  --output build/worldgen/<new-sky-consumer-screen>
+```
+
+This measures the real region copy/projection and escaped snapshot/restore paths,
+with setup outside the timer and scoped actual Source-store retirement. It is an
+intermediate screen, with no original-Frozen equivalent or final hardware claim.

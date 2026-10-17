@@ -21,6 +21,8 @@ final class NativeXoroshiroSource {
  private static final MethodHandle LEAF=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_noise_seed_from_xoroshiro_source",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_INT));
  private final long id;private final MemorySegment owner;
  private static final class Release implements Consumer<MemorySegment>{private static final VarHandle HANDLE;static{try{HANDLE=MethodHandles.lookup().findVarHandle(Release.class,"id",long.class);}catch(ReflectiveOperationException failure){throw new ExceptionInInitializerError(failure);}}private volatile long id;Release(long id){this.id=id;}@Override public void accept(MemorySegment ignored){long value=(long)HANDLE.getAndSet(this,0L);if(value!=0)release(value);}}
+ static NativeXoroshiroSource adoptSource(long actual,Consumer<MemorySegment> cleanup){return new NativeXoroshiroSource(actual,cleanup);}
+ private NativeXoroshiroSource(long actual,Consumer<MemorySegment> cleanup){Arena arena=Arena.ofAuto();id=actual;owner=MemorySegment.ofAddress(actual).reinterpret(1,arena,cleanup);}
  NativeXoroshiroSource(long seed){this(seed,0,1,null);}
  NativeXoroshiroSource(long lo,long hi){this(lo,hi,0,null);}
  NativeXoroshiroSource(NativeRandomBits bits){this(bits.handle(),0,2,bits);}

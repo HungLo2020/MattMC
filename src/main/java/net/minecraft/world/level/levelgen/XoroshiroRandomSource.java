@@ -1,7 +1,6 @@
 package net.minecraft.world.level.levelgen;
 import com.google.common.annotations.VisibleForTesting;
 import com.mojang.serialization.Codec;
-import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 /** Native source/current-generator ownership; VM projection preserves actual escapes. */
 public class XoroshiroRandomSource implements RandomSource {
@@ -13,6 +12,7 @@ public class XoroshiroRandomSource implements RandomSource {
  public XoroshiroRandomSource(long seed){nativeSource=new NativeXoroshiroSource(seed);gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);}
  public XoroshiroRandomSource(RandomSupport.Seed128bit seed){nativeSource=new NativeXoroshiroSource(seed.seedLo(),seed.seedHi());gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);}
  public XoroshiroRandomSource(long lo,long hi){nativeSource=new NativeXoroshiroSource(lo,hi);gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);}
+ XoroshiroRandomSource(NativeXoroshiroSource actual,boolean retained){nativeSource=actual;gaussianSource=MarsagliaPolarGaussian.nativeSource(this,actual);}
  private XoroshiroRandomSource(Xoroshiro128PlusPlus root){nativeSource=root.sourceOwner();gaussianSource=MarsagliaPolarGaussian.nativeSource(this,nativeSource);randomNumberGenerator=root;attached=root;}
  // The identities are real VM facts. Reflection/custom supplied generators keep dispatch.
  private Xoroshiro128PlusPlus observed(){var root=randomNumberGenerator;if(root!=null&&root!=attached){Xoroshiro128PlusPlus.attach(nativeSource,root);attached=root;}return root;}
@@ -37,40 +37,25 @@ public class XoroshiroRandomSource implements RandomSource {
  @Override public void consumeCount(int count){if(count<=0)return;if(nativeWords()){var root=randomNumberGenerator;if(root==null)nativeSource.consume(count);else root.nativeConsume(count);return;}for(int i=0;i<count;i++)word();}
  private long nextBits(int count){return word()>>>64-count;}
 	public static class XoroshiroPositionalRandomFactory implements PositionalRandomFactory {
-		private final long seedLo;
-		private final long seedHi;
+		private final NativePositionalFactory nativeFactory;
 
 		public XoroshiroPositionalRandomFactory(long l, long m) {
-			this.seedLo = l;
-			this.seedHi = m;
+			this.nativeFactory = new NativePositionalFactory(1,l,m);
 		}
 
-		long seedLo() { return this.seedLo; }
+		long seedLo() { return this.nativeFactory.seed(0); }
 
-		long seedHi() { return this.seedHi; }
+		long seedHi() { return this.nativeFactory.seed(1); }
+        final NativePositionalFactory nativeFactory() { return this.nativeFactory; }
 
-		@Override
-		public RandomSource at(int i, int j, int k) {
-			long l = Mth.getSeed(i, j, k);
-			long m = l ^ this.seedLo;
-			return new XoroshiroRandomSource(m, this.seedHi);
-		}
-
-		@Override
-		public RandomSource fromHashOf(String string) {
-			RandomSupport.Seed128bit seed128bit = RandomSupport.seedFromHashOf(string);
-			return new XoroshiroRandomSource(seed128bit.xor(this.seedLo, this.seedHi));
-		}
-
-		@Override
-		public RandomSource fromSeed(long l) {
-			return new XoroshiroRandomSource(l ^ this.seedLo, l ^ this.seedHi);
-		}
+        @Override public RandomSource at(int x,int y,int z) { return this.nativeFactory.at(x,y,z); }
+        @Override public RandomSource fromHashOf(String string) { return this.nativeFactory.fromHashOf(string); }
+        @Override public RandomSource fromSeed(long seed) { return this.nativeFactory.fromSeed(seed); }
 
 		@VisibleForTesting
 		@Override
 		public void parityConfigString(StringBuilder stringBuilder) {
-			stringBuilder.append("seedLo: ").append(this.seedLo).append(", seedHi: ").append(this.seedHi);
+			stringBuilder.append("seedLo: ").append(this.seedLo()).append(", seedHi: ").append(this.seedHi());
 		}
 	}
 }

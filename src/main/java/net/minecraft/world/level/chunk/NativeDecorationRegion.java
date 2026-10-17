@@ -232,7 +232,7 @@ public final class NativeDecorationRegion implements AutoCloseable {
 			if (status.isOrAfter(net.minecraft.world.level.chunk.status.ChunkStatus.INITIALIZE_LIGHT)) {
 				this.lightChunks |= 1L << index;
 				var sky = chunk.getSkyLightSources();
-				if (chunk.nativeLightEngine() == null || sky == null || sky.nativeBits() != this.skyBits || sky.nativeRaw().length != this.skyWords) this.writeReady = false;
+				if (chunk.nativeLightEngine() == null || sky == null || sky.nativeBits() != this.skyBits || sky.nativeWordCount() != this.skyWords) this.writeReady = false;
 			}
 		}
 		this.words.setAtIndex(ValueLayout.JAVA_LONG, 14, this.lightChunks);
@@ -372,8 +372,8 @@ public final class NativeDecorationRegion implements AutoCloseable {
 				present |= 1L << (index * FINAL.length + type);
 			}
 			if ((this.lightChunks >>> index & 1) != 0) {
-				long[] raw = chunk.getSkyLightSources().nativeRaw();
-				MemorySegment.copy(raw, 0, this.out, ValueLayout.JAVA_LONG, (this.outSky() + 2 + (long)index * this.skyWords) * 8L, raw.length);
+				chunk.getSkyLightSources().nativeCopyTo(this.out,
+					(this.outSky() + 2 + (long)index * this.skyWords) * 8L);
 				sky |= 1L << index;
 			}
 		}
@@ -427,8 +427,8 @@ public final class NativeDecorationRegion implements AutoCloseable {
 		long skyDirty = installPrimed ? this.out.getAtIndex(ValueLayout.JAVA_LONG, this.outSky() + 1) : 0;
 		for (int index = 0; skyDirty != 0 && index < CHUNKS; index++) {
 			if ((skyDirty >>> index & 1) == 0) continue;
-			long[] raw = this.chunks[index].getSkyLightSources().nativeRaw();
-			MemorySegment.copy(this.out, ValueLayout.JAVA_LONG, (this.outSky() + 2 + (long)index * this.skyWords) * 8L, raw, 0, raw.length);
+			this.chunks[index].getSkyLightSources().nativeCopyFrom(this.out,
+				(this.outSky() + 2 + (long)index * this.skyWords) * 8L);
 		}
 		long primedAt = OUT_RESIZED + (long)CHUNKS * this.sectionCount;
 		long primed = this.out.getAtIndex(ValueLayout.JAVA_LONG, primedAt);
@@ -517,7 +517,7 @@ public final class NativeDecorationRegion implements AutoCloseable {
 			for (int type = 0; type < ALL_MAPS.length; type++) {
 				if (chunk.hasPrimedHeightmap(ALL_MAPS[type])) maps[index * ALL_MAPS.length + type] = chunk.getOrCreateHeightmapUnprimed(ALL_MAPS[type]).getRawData().clone();
 			}
-			if ((this.lightChunks >>> index & 1) != 0) sky[index] = chunk.getSkyLightSources().nativeRaw().clone();
+			if ((this.lightChunks >>> index & 1) != 0) sky[index] = chunk.getSkyLightSources().nativeSnapshot();
 		}
 		return new Maps(maps, sky);
 	}
@@ -531,7 +531,16 @@ public final class NativeDecorationRegion implements AutoCloseable {
 				if (raw != null) chunk.setHeightmap(ALL_MAPS[type], raw.clone());
 				else chunk.nativeDropHeightmap(ALL_MAPS[type]);
 			}
-			if (maps.sky[index] != null) System.arraycopy(maps.sky[index], 0, chunk.getSkyLightSources().nativeRaw(), 0, maps.sky[index].length);
+			if (maps.sky[index] != null) {
+                var source=chunk.getSkyLightSources();
+                if(source.getClass()==net.minecraft.world.level.lighting.ChunkSkyLightSources.class) {
+                    source.nativeRestore(maps.sky[index]);
+                } else {
+                    // A real raw callback may replace this public snapshot entry.
+                    // Keep the original source-before-callback/length-after-callback order.
+                    System.arraycopy(maps.sky[index],0,source.nativeRaw(),0,maps.sky[index].length);
+                }
+            }
 		}
 	}
 
@@ -646,7 +655,7 @@ public final class NativeDecorationRegion implements AutoCloseable {
 			if (!java.util.Arrays.equals(before.heightmaps[bit], javaRaw)) return "heightmap " + type + " of " + chunk.getPos();
 		}
 		for (int index = 0; setBlock && index < CHUNKS; index++) {
-			if (before.sky[index] != null && !java.util.Arrays.equals(before.sky[index], this.chunks[index].getSkyLightSources().nativeRaw())) {
+			if (before.sky[index] != null && !this.chunks[index].getSkyLightSources().nativeMatches(before.sky[index])) {
 				return "sky sources of " + this.chunks[index].getPos();
 			}
 		}

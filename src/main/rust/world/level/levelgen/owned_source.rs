@@ -58,6 +58,9 @@ impl Source {
             gaussian: Default::default(),
         })
     }
+    pub(crate) fn from_pair(lo: i64, hi: i64) -> Arc<Self> {
+        Self::new(Data::Inline(Xoroshiro::new(lo, hi)))
+    }
     pub(crate) fn seeded(seed: i64) -> Arc<Self> {
         let (lo, hi) = upgrade_seed(seed);
         Self::new(Data::Inline(Xoroshiro::new(lo, hi)))

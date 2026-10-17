@@ -442,7 +442,7 @@ public final class DecorationTransaction {
 			}
 			chunk.heightmaps.forEach((type, heightmap) -> this.heightmaps.put(type, heightmap.getRawData().clone()));
 			var sky = chunk.getSkyLightSources();
-			this.skySources = sky == null ? null : sky.nativeRaw().clone();
+			this.skySources = sky == null ? null : sky.nativeSnapshot();
 			this.postProcessing = new int[chunk.postProcessing.length];
 			for (int i = 0; i < chunk.postProcessing.length; i++) {
 				this.postProcessing[i] = chunk.postProcessing[i] == null ? -1 : chunk.postProcessing[i].size();
@@ -515,8 +515,7 @@ public final class DecorationTransaction {
 				System.arraycopy(data, 0, raw, 0, data.length);
 			});
 			if (this.skySources != null) {
-				long[] raw = this.chunk.getSkyLightSources().nativeRaw();
-				System.arraycopy(this.skySources, 0, raw, 0, this.skySources.length);
+				this.chunk.getSkyLightSources().nativeRestore(this.skySources);
 			}
 			for (int i = 0; i < this.postProcessing.length; i++) {
 				if (this.postProcessing[i] < 0) this.chunk.postProcessing[i] = null;

@@ -455,3 +455,172 @@ references. See `a438-{focused,impact,observers,native,full-*,saves}` and
 `a438-stock-binding/original-reference-comparison.json`. Earlier full Java and
 resource receipts retain their actual `f8e3bf2b` scope; affected item/runtime
 checks above verify integration, without relabeling those aggregates.
+
+
+## Positional factory ownership in progress
+
+Before changing production, seven public factory contracts and 10,073 actual
+source/cache/successor observations match original Frozen, complete published
+`58c319791` and Current at SHA256
+`51c4cb5484cf39f8de8400f86e7a6ae7034ed569de3846efa4565102544a7712`.
+Run `VerifyPositionalFactories.py` with
+`build/worldgen/positional-factories/pre-58-runtime`. This complete fixture
+shares only the individually guarded immutable resources from pre-c298; Main
+and native are the actual matched published58 pair. Two observer preparation
+failures are retained separately; neither is acceptance evidence.
+
+Preserve the original distinction: Legacy `fromSeed` ignores the factory seed,
+while Xoroshiro XORs both stored words. Legacy hashes Java UTF-16 code units;
+Xoroshiro hashes UTF-8 through MD5, including the JVM's question-mark replacement
+of malformed surrogate units. Position arithmetic keeps original integer
+overflow and new Xoroshiro sources keep the original zero-pair fallback.
+Default interface calls must still reach real subclass overrides; fork calls
+must preserve virtual callbacks, target identity, source prefix and failure
+ordering.
+
+The native factory/source producer remains an unpublished working slice.
+Its facade validation and physical lifetime proofs are now complete below.
+Enclosing aquifer and noise-fill consumers still copy factory seeds through VM
+getters; retaining the actual factory in those native kernels remains open.
+
+
+The first actual shared release passes 335 focused Java checks, and all seven
+contracts plus the 10,073-observation corpus still match all three runtimes.
+The native modules pass 79 checks, including hash vectors, malformed UTF-16,
+coordinate overflow and actual child-source independence after factory retirement.
+These are initial integration receipts, not completed ownership or resource gates.
+Those initial results preceded the physical JVM facade/anchor proofs below;
+the source return lease uses the already-initialized factory
+bridge for cleanup if source projection or class initialization fails.
+
+
+The first resource screen is retained at `positional-factories/resource-screen`.
+Prepared factory/source groups overlap the pre-change ranges and are inconclusive.
+Factory construction plus hashing regresses, especially Xoroshiro: 1.76–1.83 µs
+versus pre-change 0.55–1.17 µs for construction, hash, three Gaussians and a
+successor word. Java allocation is 628 versus 752 bytes for that row; Legacy
+hash construction increases to 628 from 296 bytes. All actual owners/frames
+retire and no swap occurs; process RSS is not native allocator attribution.
+The regression is not accepted as a final performance result.
+
+Review identified an avoidable source handoff: retaining a second native source
+reference then releasing the pending return required two extra downcalls.
+The working replacement transfers the same reference to its genuine VM anchor
+through one idempotent cleanup action, including projection/class-init failure.
+The paired lifetime proofs and Current-only resource continuation below assess
+it against unchanged original rows. Further enclosing native
+consumer work must remove repeated VM source projections and hash-buffer bridges;
+factory/source resource traffic remains explicit migration debt.
+
+
+The direct-transfer release passes 337 focused checks, including both real
+JVM facade/arena collection proofs. Its anchor-release leak control makes
+both unchanged proofs reject a retained real SourceArc at the original
+five-second deadline; the in-process mapped-library hash is recorded.
+The Current-only resource continuation keeps exact original outputs and
+owner retirement, with the same observer and preserved reference rows.
+Legacy prepared groups improve to 0.36–0.37 µs from 0.90–1.24; several other
+spreads overlap and remain inconclusive. Xoroshiro hash construction still
+costs 1.59–1.76 µs versus pre-change 0.55–1.17. Java hash allocations remain
+628 versus 296/752 bytes (Legacy/Xoroshiro). Two source downcalls were removed;
+the remaining hash/projection regression stays explicit, with no final pass.
+See `adopt-screen/original-reference-comparison.json` and
+`vm-anchor-lease-control`. Earlier screens and controls retain their original
+runtime identities.
+
+The published source producer `542dfd165` was reconciled after these guards
+closed, preserving all 16 pending files. The actual rebuilt combined pair
+passes 353 focused cases before worldgen consumer changes. The five added
+sky-transport caller contracts then pass on the original callers; a naive
+bulk restore fails the public snapshot-entry callback case. Consumer adoption
+and the required compatibility branch are described in the
+[decoration guide](feature/RUST-DECORATION.md#sky-source-transport).
+
+
+The next reconciliation includes published direct-section Source consumption and
+original reference-fixture repair at `29c205f35`. All 22 pending files, their
+modes and staging, the protected prototype and existing stashes are preserved.
+The rebuilt matched native/Main pair (`e460e66b`) passes 358 focused checks,
+including the five actual decoration caller contracts and physical factory/source
+retirement. This does not relabel earlier native or resource receipts.
+
+The actual two-consumer screen is retained at
+`positional-factories/sky-consumer-screen`, with source review and limits in
+`resource-assessment.json`. On its earlier `542dfd165`/`190d8831` combined image,
+copy/projection takes 316–401 ns versus published58 239–317 ns, at 40 Java bytes
+on both. Escaped snapshot/restore takes 242–326 ns versus 103–137 ns, at 536
+bytes on both. Outputs agree, actual nine native Source stores and their VM
+facades/anchors retire each batch, independent snapshots survive, and swap is
+zero. Both slowdowns remain intermediate debt; process RSS is not native
+allocator measurement, and original Frozen has no equivalent native-region API.
+The direct-section update leaves these transport implementations unchanged;
+reuse is limited to that recorded impact, without claiming a new timing run.
+
+Published Source transport currently reads metadata, transfers native words and
+copies through VM scratch memory. Escaped arrays additionally import/export their
+real live aliases around snapshots and restores. These are inspected operations,
+not measured individual causal contributions. Enclosing native consumers should
+retain actual owners and avoid repeated VM projection; genuine escaped aliases
+must retain compatibility. S33 owns the worldgen consumers, while changes to the
+Source producer API remain coordinated with its lighting owner. Neither this
+screen nor the factory screen establishes final performance or FPS acceptance.
+
+
+Mandatory checks closed on the matched `29c205f35` plus working factory/consumer
+image (`e460e66b`): 2,769 ordinary Java passes with six skips, 193 parity, 11 slow,
+and 3,219 full native passes with nine explicit ignores. Actual test-executable
+and mapped-library identities are recorded in `stable-tiers/verified-totals.json`.
+The published Source driver passes 248 rows plus its expected real base-release
+leak rejection. All seven now-tracked original reference traces match published
+Git bytes and provenance hashes; the earlier missing-fixture failure is retained.
+Fresh Current factory and Gaussian observers again match their original references.
+
+Fresh Frozen, published58 and Current each save 648 chunks in straight FULL
+and CARVERS-resume runs. All eight pre-change regions match; the standard Frozen
+dimensions match and the historical 162 Primordial chunk differences remain
+explicit. Injected failure rollback and cancellation pass, including 660 holders
+retiring to zero and 169 matching statuses under the existing data-difference
+rules. Stock and player shutdown, own-save and reopen checks pass on all three.
+See `positional-factories/{gate-chain,saves,full-straight,full-resume,failure-cancel}`.
+These are correctness receipts, without a timing or final hardware claim.
+
+The subsequent Java-only result-container checkpoint `a9e2ae14` was reconciled
+with all 22 pending files and protected state preserved. Its affected integration
+checks pass: 359 focused, unchanged original factory/Gaussian corpora, all three
+runtimes item 15 and hopper 16, plus fresh Current stock/player save and reopen.
+All 1,309 Rust sources, the native library and 843 worldgen classes remain exact;
+only 16 classes within its three item file families change. See `a9e2-impact.json`
+and `a9e2-affected`. Earlier broad aggregates retain their actual `29c205f35`
+image identities.
+
+
+Published lighting Source-frame checkpoint `172ef018` is now reconciled, preserving
+all 22 pending files and protected state. It leaves the agreed six Source methods
+and both S33 consumers unchanged but changes private native frame exports. Build
+the complete matched Root/native and Main pair before running its producer driver
+(now 252 rows plus two expected actual base-release leak rejections). The matched
+working release `5cfa73bd` passes 359 focused checks, all 252 producer rows and
+both expected negatives. The same 53 effect cases, compiled once against Frozen,
+match original Frozen, published58 and Current exactly. The first observer
+launcher omitted its real Objenesis test dependency; that compilation failure and
+a refused existing-output-directory continuation are retained. The fresh launcher
+adds only the guarded dependency jar; observer code and expectations are unchanged.
+
+Fresh Current factory/Gaussian corpora still match the original references.
+The full native tier passes 3,224 checks with nine explicit ignores; its actual
+executable hash and matched native mapping are recorded. Fresh Current FULL and
+CARVERS-resume each save 648 chunks matching the preserved reference rows, with
+byte-exact audit observers and the same Primordial qualification. Fresh rollback,
+cancellation and stock/player shutdown, own-save and reopen checks pass. See
+`172-{consumer-focused,source-producer,source-effects-2,observers,native,saves}`
+and `172-gates-3/result.json`. The integration changes 29 lighting classes and
+eight lighting Rust files; all 843 worldgen classes remain exact. Earlier broad
+Java tiers and resource screens retain their original image identities with
+these impact and affected-check records, rather than being relabeled.
+
+The checkpoint still leaves actual factory retention in native aquifer and
+noise-fill kernels open. Those consumers currently copy seeds through Java;
+connect their real pending owners to the native factory allocation next, preserving
+custom factory callbacks, checked failure order, reentry and last-use lifetime.
+Final performance, rendered-client/FPS and whole native worldgen acceptance remain
+open; the measured factory-hash and Source transport slowdowns are not waived.

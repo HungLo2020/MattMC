@@ -1,16 +1,22 @@
 package net.minecraft.world.level.levelgen;
 
 import com.google.common.annotations.VisibleForTesting;
-import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
 public class LegacyRandomSource implements BitRandomSource {
-	private final NativeLegacySource nativeSource = new NativeLegacySource();
-	private final MarsagliaPolarGaussian gaussianSource = MarsagliaPolarGaussian.nativeSource(this, this.nativeSource);
+	private final NativeLegacySource nativeSource;
+	private final MarsagliaPolarGaussian gaussianSource;
 
 	public LegacyRandomSource(long l) {
+		this.nativeSource=new NativeLegacySource();
+		this.gaussianSource=MarsagliaPolarGaussian.nativeSource(this,this.nativeSource);
 		this.setSeed(l);
 	}
+
+	LegacyRandomSource(NativeLegacySource actual) {
+        this.nativeSource=actual;
+        this.gaussianSource=MarsagliaPolarGaussian.nativeSource(this,actual);
+    }
 
 	@Override
 	public RandomSource fork() {
@@ -62,36 +68,23 @@ public class LegacyRandomSource implements BitRandomSource {
 	}
 
 	public static class LegacyPositionalRandomFactory implements PositionalRandomFactory {
-		private final long seed;
+		private final NativePositionalFactory nativeFactory;
 
 		public LegacyPositionalRandomFactory(long l) {
-			this.seed = l;
+			this.nativeFactory = new NativePositionalFactory(2,l,0);
 		}
 
-		long seed() { return this.seed; }
+		long seed() { return this.nativeFactory.seed(0); }
+        final NativePositionalFactory nativeFactory() { return this.nativeFactory; }
 
-		@Override
-		public RandomSource at(int i, int j, int k) {
-			long l = Mth.getSeed(i, j, k);
-			long m = l ^ this.seed;
-			return new LegacyRandomSource(m);
-		}
-
-		@Override
-		public RandomSource fromHashOf(String string) {
-			int i = string.hashCode();
-			return new LegacyRandomSource(i ^ this.seed);
-		}
-
-		@Override
-		public RandomSource fromSeed(long l) {
-			return new LegacyRandomSource(l);
-		}
+        @Override public RandomSource at(int x,int y,int z) { return this.nativeFactory.at(x,y,z); }
+        @Override public RandomSource fromHashOf(String string) { return this.nativeFactory.fromHashOf(string); }
+        @Override public RandomSource fromSeed(long seed) { return this.nativeFactory.fromSeed(seed); }
 
 		@VisibleForTesting
 		@Override
 		public void parityConfigString(StringBuilder stringBuilder) {
-			stringBuilder.append("LegacyPositionalRandomFactory{").append(this.seed).append("}");
+			stringBuilder.append("LegacyPositionalRandomFactory{").append(this.seed()).append("}");
 		}
 	}
 }
