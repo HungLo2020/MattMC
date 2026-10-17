@@ -92,6 +92,22 @@ impl Menu {
             }
         }
     }
+    /// Six-row stock layout over a double chest: rows 0..27 linked to the first
+    /// half, 27..54 to the second, and 54..90 to the inventory in stock order.
+    pub fn matches_double(&self,first:&Arc<BoundaryOwner<Container>>,second:&Arc<BoundaryOwner<Container>>,inventory:&Arc<Inventory>)->bool {
+        if self.rows.len()!=90{return false;}
+        for index in 0..90usize {
+            let Some(link)=&self.rows[index].link else{return false};
+            let (expected,ok)=match &link.container {
+                SlotContainer::Container(actual) if index<27=>(index,Arc::ptr_eq(actual,first)),
+                SlotContainer::Container(actual) if index<54=>(index-27,Arc::ptr_eq(actual,second)),
+                SlotContainer::Inventory(actual) if index>=54=>(if index<81{index-45}else{index-81},Arc::ptr_eq(actual,inventory)),
+                _=>return false,
+            };
+            if !ok||link.index!=expected as i32{return false;}
+        }
+        true
+    }
     pub fn matches_stock(&self,chest:&Arc<BoundaryOwner<Container>>,inventory:Option<&Arc<Inventory>>,reverse:bool)->bool {
         if (reverse&&self.rows.len()!=63)||(!reverse&&self.rows.len()<27){return false;}
         for index in 0..if reverse{63}else{27} {

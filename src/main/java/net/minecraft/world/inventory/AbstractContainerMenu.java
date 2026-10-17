@@ -822,7 +822,11 @@ public abstract class AbstractContainerMenu {
 		var effects=new StockTransferEffects(source,chest);return effects.admit()?effects:null;
 	}
 	protected final net.minecraft.world.item.NativeItemState.TransferEffects prepareStockInventoryTransfer(ItemStack source,net.minecraft.world.level.block.entity.NativeStockContainer chest,Inventory inventory){
-		var effects=new StockInventoryTransferEffects(source,chest,inventory);return effects.admit()?effects:null;
+		var effects=new StockInventoryTransferEffects(source,chest,null,inventory);return effects.admit()?effects:null;
+	}
+	/** Double chest (two exact halves) to inventory in a six-row menu; the inventory rows are the destination. */
+	protected final net.minecraft.world.item.NativeItemState.TransferEffects prepareDoubleInventoryTransfer(ItemStack source,net.minecraft.world.level.block.entity.NativeStockContainer first,net.minecraft.world.level.block.entity.NativeStockContainer second,Inventory inventory){
+		var effects=new StockInventoryTransferEffects(source,first,second,inventory);return effects.admit()?effects:null;
 	}
 	/** One native operation owns the scan and continuation across external Java effects. */
 	protected final boolean moveItemStackToStockChest(ItemStack source, net.minecraft.world.level.block.entity.NativeStockContainer chest) {
@@ -834,7 +838,7 @@ public abstract class AbstractContainerMenu {
 	/** Reverse stock transfer owns pure destination mutations and their native change counter. */
 	protected final boolean moveItemStackToStockInventory(ItemStack source, net.minecraft.world.level.block.entity.NativeStockContainer chest, Inventory inventory) {
 		int end = this.slots.size();
-		StockInventoryTransferEffects effects = new StockInventoryTransferEffects(source,chest,inventory);
+		StockInventoryTransferEffects effects = new StockInventoryTransferEffects(source,chest,null,inventory);
 		if (!effects.admit()) return this.moveItemStackToRemaining(source,27,end,true,false,0,end-1);
 		return effects.backend.runTransfer(source,effects);
 	}
@@ -842,21 +846,26 @@ public abstract class AbstractContainerMenu {
 	private final class StockInventoryTransferEffects extends net.minecraft.world.item.NativeItemState.TransferEffects {
 		private final ItemStack source;
 		private final net.minecraft.world.level.block.entity.NativeStockContainer chest;
+		/** The double chest's second half, or null for a three-row stock chest. */
+		private final net.minecraft.world.level.block.entity.NativeStockContainer second;
 		private final Inventory inventory;
+		/** First inventory menu index and the menu size: 27/63, or 54/90 for a double chest. */
+		private final int start,end;
 		private net.minecraft.world.item.NativeItemSlots backend;
-		StockInventoryTransferEffects(ItemStack source,net.minecraft.world.level.block.entity.NativeStockContainer chest,Inventory inventory) {
-			this.source=source;this.chest=chest;this.inventory=inventory;
+		StockInventoryTransferEffects(ItemStack source,net.minecraft.world.level.block.entity.NativeStockContainer chest,net.minecraft.world.level.block.entity.NativeStockContainer second,Inventory inventory) {
+			this.source=source;this.chest=chest;this.second=second;this.inventory=inventory;this.start=second==null?27:54;this.end=this.start+36;
 		}
 		boolean admit() {
 			this.backend=this.inventory.nativeMainSlotsForTransfer();
-			if (this.backend==null || this.chest.nativeSlotsForTransfer()==null || this.source.getItem()==null || !this.source.getItem().nativeTransferCopyIsPure()
-				|| !(AbstractContainerMenu.this.slots instanceof TransferSlots metadata) || metadata.size()!=63) return false;
-			if(!metadata.owner.matchesStock(this.chest.nativeContainerForSlots(),this.backend,true))return false;
+			if (this.backend==null || this.chest.nativeSlotsForTransfer()==null || (this.second!=null&&this.second.nativeSlotsForTransfer()==null) || this.source.getItem()==null || !this.source.getItem().nativeTransferCopyIsPure()
+				|| !(AbstractContainerMenu.this.slots instanceof TransferSlots metadata) || metadata.size()!=this.end) return false;
+			if(this.second==null?!metadata.owner.matchesStock(this.chest.nativeContainerForSlots(),this.backend,true)
+				:!metadata.owner.matchesDouble(this.chest.nativeContainerForSlots(),this.second.nativeContainerForSlots(),this.backend))return false;
 			this.destination(this.backend);return true;
 		}
 		@Override public long effect(long action,long selected,long phase,long amount,long changed) {
-			int menuIndex=62-Math.toIntExact(selected);
-			if(action==3) return AbstractContainerMenu.this.moveItemStackToRemaining(this.source,27,63,true,changed!=0,(int)phase,menuIndex)?1:0;
+			int menuIndex=this.end-1-Math.toIntExact(selected);
+			if(action==3) return AbstractContainerMenu.this.moveItemStackToRemaining(this.source,this.start,this.end,true,changed!=0,(int)phase,menuIndex)?1:0;
 			if(action!=2)throw new IllegalStateException("Unknown native inventory transfer effect: "+action);
 			Slot slot=AbstractContainerMenu.this.slots.get(menuIndex);int index=slot.getContainerSlot();
 			ItemStack inserted=this.source.copyForNativeTransferWithCount((int)amount);
@@ -865,7 +874,7 @@ public abstract class AbstractContainerMenu {
 			slot.setChanged();slot.setChanged();return 1;
 		}
 		@Override public long insertPrepared(long selected,long amount,long handle,long address,long adopted) {
-			int menuIndex=62-Math.toIntExact(selected);
+			int menuIndex=this.end-1-Math.toIntExact(selected);
 			Slot slot=AbstractContainerMenu.this.slots.get(menuIndex);int index=slot.getContainerSlot();
 			ItemStack inserted=this.source.adoptPreparedCopy(handle,address,adopted);
 			this.backend.commitTransferInsert(this.source,index,inserted,(int)amount);
@@ -874,7 +883,7 @@ public abstract class AbstractContainerMenu {
 		}
 		@Override public boolean pendingInsertions(){return true;}
 		@Override public long publishedPending(long selected,long amount,long key,long retired,long adopted) {
-			int menuIndex=62-Math.toIntExact(selected);
+			int menuIndex=this.end-1-Math.toIntExact(selected);
 			Slot slot=AbstractContainerMenu.this.slots.get(menuIndex);int index=slot.getContainerSlot();
 			this.backend.recordPending(key,this.source,retired,adopted);
 			this.inventory.nativeMainSetEffectsPending(index);

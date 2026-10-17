@@ -116,6 +116,24 @@ is the next ownership gap. `tick_quick_move_empty` is an unchanged single-chest
 path. Its Frozen and pre values also moved between runs (Frozen 1579→2187 ns),
 so treat it as noise until it repeats.
 
+Double-chest to inventory quick moves then became native too (`build/s34-v7/broadcast`):
+
+| Broadcast | Frozen ns | Pre ns | Current ns | C/pre |
+|---|---:|---:|---:|---:|
+| tick_idle | 1053 | 6398 | 3298 | 0.52 |
+| tick_quick_move_empty | 2108 | 7770 | 10563 | 1.36 |
+| tick_quick_move_one | 2745 | 93764 | 14988 | 0.16 |
+| double_idle | 1718 | 9331 | 5064 | 0.54 |
+| double_quick_move_one | 2485 | 19885 | 18246 | 0.92 |
+| double_reverse_one | 4213 | 180697 | 11830 | 0.07 |
+
+`double_reverse_one` moves a stack from the second half (menu 31) into an empty
+inventory. Unattributed variance: `tick_quick_move_empty` takes an unchanged
+single-chest path. Across three screens Current read 8042, 8822 and 10563 ns,
+while Frozen read 1579, 2187 and 2108 ns. As a ratio to Frozen it reads
+5.1×, 4.0× and 5.0×, so it does not rise steadily, but it has not been attributed
+and stays on watch.
+
 ### Pending-content resources
 
 `VerifyItemResources.py --workload pending` (`build/s34-v5/resource-pending2`)

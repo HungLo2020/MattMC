@@ -1128,6 +1128,10 @@ fn menu(handle:i64)->Option<Arc<super::slots::BoundaryOwner<super::menu::Menu>>>
         owner.lock().unwrap().set_carried(next);0})
 }
 #[no_mangle] pub extern "C" fn mattmc_item_menu_retain(handle:i64)->i64 {guard(||menu(handle).map_or(BAD,|owner|keep(Owner::Menu(owner))))}
+#[no_mangle] pub extern "C" fn mattmc_item_menu_double_match(handle:i64,first_handle:i64,second_handle:i64,inventory_handle:i64)->i64 {
+    guard(||{let (Some(owner),Some(first),Some(second),Some(inventory))=(menu(handle),container(first_handle),container(second_handle),inventory(inventory_handle)) else{return BAD};
+        let result=owner.lock().unwrap().matches_double(&first,&second,&inventory);i64::from(result)})
+}
 #[no_mangle] pub extern "C" fn mattmc_item_menu_stock_match(handle:i64,chest_handle:i64,inventory_handle:i64,reverse:i64)->i64 {
     guard(||{let (Some(owner),Some(chest))=(menu(handle),container(chest_handle)) else{return BAD};if !(0..=1).contains(&reverse){return BAD;}
         let inventory=inventory(inventory_handle);let result=owner.lock().unwrap().matches_stock(&chest,inventory.as_ref(),reverse!=0);i64::from(result)})

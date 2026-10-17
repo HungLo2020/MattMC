@@ -368,8 +368,13 @@ so `getContainerSlot` still returns the compound index. Slot reads, `hasItem`,
 the quick-move source selection and the per-tick broadcast use the link, so
 unchanged rows are skipped without materializing them. Writes, `remove` and
 `setChanged` still go through the compound, so both halves are marked as
-before. Transfers in a six-row menu still use the original `moveItemStackTo`.
-A subclass half keeps every slot of that compound unlinked.
+before. A quick move from a double-chest slot into the inventory runs the
+native inventory transfer (`prepareDoubleInventoryTransfer`). The menu layout is
+checked by `matchesDouble`, `menu.rs` `matches_double`: rows 0–26 linked to the
+first half, 27–53 to the second, and 54–89 to the inventory. A quick move
+into the double chest still uses the original `moveItemStackTo`, because the
+original merges across both halves before filling empty slots. A subclass half
+keeps every slot of that compound unlinked.
 `NativeBarrelTest.doubleChestMenusMatchTheOriginalPath` compares 400 random
 quick moves, clicks and broadcasts with subclass halves.
 

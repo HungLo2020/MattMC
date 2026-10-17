@@ -22,7 +22,8 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
  * carries the S34 read-only marker where that type exists, identically on every
  * side). Timed: one broadcastChanges (tick_idle), or a quick move followed by the
  * broadcastChanges that ships it (tick_quick_move_*). The double_* modes use a
- * six-row menu over a CompoundContainer of two chests. Reset and a settling
+ * six-row menu over a CompoundContainer of two chests (double_reverse_one moves
+ * from the second half into an empty inventory). Reset and a settling
  * broadcast run outside the timer. The original 25 workloads are unchanged.
  * Arguments: output CSV, then true on the Current side.
  */
@@ -67,12 +68,14 @@ public final class BroadcastTimingReference {
             // The double_* modes start each run from empty halves, so overflow from earlier runs
             // cannot make the workload depend on how many warmup rounds ran.
             if (mode.startsWith("double")) for (int i = 0; i < 27; i++) { chest.setItem(i, ItemStack.EMPTY); other.setItem(i, ItemStack.EMPTY); }
+            // double_reverse_one: the source sits in the second half's row 4 (menu 31), the inventory is empty.
+            if (mode.equals("double_reverse_one")) { inventory.setItem(9, ItemStack.EMPTY); other.setItem(4, source); }
             chest.setItem(0, mode.endsWith("one") ? new ItemStack(Items.STICK, 60) : ItemStack.EMPTY);
             menu.broadcastChanges();
         }
         long run() {
             long before = sends;
-            if (!mode.endsWith("idle")) menu.quickMoveStack(null, mode.startsWith("double") ? 54 : 27);
+            if (!mode.endsWith("idle")) menu.quickMoveStack(null, mode.equals("double_reverse_one") ? 31 : mode.startsWith("double") ? 54 : 27);
             menu.broadcastChanges(); return sends - before;
         }
     }
@@ -105,7 +108,7 @@ public final class BroadcastTimingReference {
         long boot = System.nanoTime(); net.minecraft.SharedConstants.tryDetectVersion(); net.minecraft.server.Bootstrap.bootStrap();
         rows.add("# boot_ns=" + (System.nanoTime() - boot) + " broadcast_marker=" + (MARKER != null) + " reset_and_settling_broadcast=outside_timer native_allocated_bytes=not_measured");
         rows.add("workload,sample,operations,elapsed_ns,checksum,compiler_ms,gc_count,allocated_bytes");
-        for (String mode : List.of("tick_idle", "tick_quick_move_empty", "tick_quick_move_one", "double_idle", "double_quick_move_one")) measure(mode);
+        for (String mode : List.of("tick_idle", "tick_quick_move_empty", "tick_quick_move_one", "double_idle", "double_quick_move_one", "double_reverse_one")) measure(mode);
         Files.write(Path.of(args[0]), rows); System.out.println("BROADCAST_TIMING sink=" + sink + " pid=" + ManagementFactory.getRuntimeMXBean().getPid());
     }
 }

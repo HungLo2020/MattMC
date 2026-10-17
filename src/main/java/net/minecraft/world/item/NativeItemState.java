@@ -40,7 +40,7 @@ public final class NativeItemState {
     private static final MethodHandle TRANSFER_CONTINUE = call("transfer_continue", 4);
     private static final MethodHandle TRANSFER_BOUNDED = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_item_transfer_bounded",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG), java.lang.foreign.Linker.Option.critical(false));
-    private static final MethodHandle MENU_STOCK=call("menu_stock_match",4),MENU_RETAIN=call("menu_retain",1),MENU_NEW=call("menu_create",2),MENU_ADDRESS=call("menu_address",1),MENU_GET=call("menu_get",2),MENU_CARRIED=call("menu_carried",2);
+    private static final MethodHandle MENU_STOCK=call("menu_stock_match",4),MENU_DOUBLE=call("menu_double_match",4),MENU_RETAIN=call("menu_retain",1),MENU_NEW=call("menu_create",2),MENU_ADDRESS=call("menu_address",1),MENU_GET=call("menu_get",2),MENU_CARRIED=call("menu_carried",2);
     private static final MethodHandle MENU_EDIT=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_menu_edit",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle EQUIPMENT_NEW=call("equipment_create",1);
     private static final MethodHandle CONTAINER_NEW=call("container_create",2),CONTAINER_ADDRESS=call("container_address",1),CONTAINER_SET=call("container_replace",3);
@@ -1028,6 +1028,11 @@ public final class NativeItemState {
         public boolean matchesStock(ContainerCell chest,NativeItemSlots inventory,boolean reverse){
             try{return c4(MENU_STOCK,this.handle,chest.handle,inventory==null?0:inventory.actualOwner().handle,reverse?1:0)!=0;}
             finally{java.lang.ref.Reference.reachabilityFence(chest);java.lang.ref.Reference.reachabilityFence(inventory);java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        /** Six-row layout over a double chest's two cells and the inventory (menu.rs matches_double). */
+        public boolean matchesDouble(ContainerCell first,ContainerCell second,NativeItemSlots inventory){
+            try{return c4(MENU_DOUBLE,this.handle,first.handle,second.handle,inventory.actualOwner().handle)!=0;}
+            finally{java.lang.ref.Reference.reachabilityFence(first);java.lang.ref.Reference.reachabilityFence(second);java.lang.ref.Reference.reachabilityFence(inventory);java.lang.ref.Reference.reachabilityFence(this);}
         }
         public long version(){try{return (long)VIEW_LONG.getOpaque(SCALAR_RAW,this.address);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
         public synchronized void changed(){

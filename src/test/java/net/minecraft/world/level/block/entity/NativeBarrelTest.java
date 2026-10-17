@@ -181,6 +181,10 @@ class NativeBarrelTest {
         assertNull(mixed.getSlot(0).nativeLinkForMenu(), "a subclass half keeps the whole compound unlinked");
         b.setItem(4, new ItemStack(Items.STICK, 9));
         assertEquals(9, menu.getSlot(31).getItem().getCount(), "the second half's row 4 is compound slot 31");
+        long published = counter(5);
+        assertEquals(9, menu.quickMoveStack(null, 31).getCount());
+        assertEquals(published + 1, counter(5), "a double-chest source moves natively into a pending inventory row");
+        assertTrue(b.getItem(4).isEmpty()); assertEquals(9, inventory.getItem(8).getCount());
     }
 
     // A hopper ejecting into, and another sucking from, a stock double chest
