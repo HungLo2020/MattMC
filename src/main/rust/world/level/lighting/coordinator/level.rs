@@ -100,6 +100,13 @@ unsafe extern "C" fn frame_step(token:*mut FrameToken,scalar:i64,entry:*const c_
     if frame.action>0{frame.action=catch_unwind(AssertUnwindSafe(||frame.drive(scalar,entry))).unwrap_or(-99);}
     frame_read(token,out)
 }
+unsafe extern "C" fn frame_source(token:*mut FrameToken,source:*const super::super::source_owner::Source)->i32 {
+    if source.is_null() { return -27; }
+    let frame=&mut *token.cast::<LevelFrame>();
+    if !matches!(frame.action,8|17) || frame.child==0 { return -27; }
+    let input=match frame.which {0=>frame.owner.block.as_ref(),1=>frame.owner.sky.as_ref(),_=>None};
+    input.map_or(-27,|input|input.bind_source(frame.child,&*source))
+}
 unsafe extern "C" fn frame_resource(token:*mut FrameToken)->*const c_void{
     let frame=&mut *token.cast::<LevelFrame>();
     if frame.action!=5{return std::ptr::null();}
@@ -108,7 +115,7 @@ unsafe extern "C" fn frame_resource(token:*mut FrameToken)->*const c_void{
 unsafe extern "C" fn frame_release(token:*mut FrameToken){drop(Box::from_raw(token.cast::<LevelFrame>()));}
 unsafe extern "C" fn start(token:*const LevelToken,kind:i32,key:i64,value:bool)->*mut FrameToken{
     Arc::increment_strong_count(token.cast::<Level>());
-    let mut frame=LevelFrame{token:FrameToken{read:frame_read,step:frame_step,release:frame_release,resource:frame_resource},
+    let mut frame=LevelFrame{token:FrameToken{read:frame_read,step:frame_step,release:frame_release,resource:frame_resource,bind_source:frame_source},
         owner:Arc::from_raw(token.cast::<Level>()),key,value,kind,which:0,child:0,action:0,reply:[0;7],finishing:0,total:0,snapshot:None};
     frame.action=catch_unwind(AssertUnwindSafe(||frame.drive(0,std::ptr::null()))).unwrap_or(-99);
     if frame.action==0&&(kind!=3||frame.total==0){std::ptr::null_mut()}else{Box::into_raw(Box::new(frame)).cast()}
@@ -131,6 +138,12 @@ pub unsafe extern "C" fn mattmc_light_level_frame_read(frame:u64,out:*mut i64)->
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_light_level_frame_step(frame:u64,scalar:i64,entry:*const c_void,out:*mut i64)->i32{
     if frame==0||out.is_null(){-27}else{frame_step(frame as *mut FrameToken,scalar,entry,out)}
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_level_frame_bind_source(frame:u64,
+    source:*const super::super::source_owner::Source)->i32 {
+    if frame==0 || source.is_null() { return -27; }
+    catch_unwind(AssertUnwindSafe(||frame_source(frame as *mut FrameToken,source))).unwrap_or(-99)
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_light_level_frame_resource(frame:u64)->*const c_void{

@@ -37,12 +37,18 @@ array is a derived compatibility transport. See [light propagation](RUST-LIGHT-P
   perform the literal original operation through its actual virtual `nativeRaw()`
   exactly once, including inherited overrides, without another `nativeBits()`
   effect. A short restore preserves the suffix; snapshots are independent.
+- The [coordinator Source-input continuation](RUST-LIGHT-COORDINATOR.md#ownership-and-entry-points)
+  retains the actual Source owner in its pending frame through
+  the column/highest read, then drops it before the next VM effect. Preserve
+  contextual lookup order, subclass getters and escaped-write synchronization;
+  do not replace those effects with an eager Java height snapshot.
 - Section ownership still belongs to the chunk subsystem. Keep its existing
   `stageOwner` / `with_state_reader` APIs unchanged. A typed bridge lease pins the
   primary owner only through its synchronous scan; no lock, borrow or section
   reference survives into a VM effect or pending source publication. Preserve
   local/global palette admission and the zero-width single-value capture.
-  Compatibility sections use their original accessors; keep them package-private. S33 owns `NativeDecorationRegion` and `DecorationTransaction`;
+  Compatibility sections use their original accessors; keep them package-private.
+  S33 owns `NativeDecorationRegion` and `DecorationTransaction`;
   their legacy word-array consumers are not migrated by this checkpoint.
 
 The former Java reconstruction bridge is now
@@ -76,8 +82,12 @@ the same 50 original Frozen fixtures. A Current-only scope observer compares the
 actual direct scan with the independent Java oracle, closes the real section
 arena, checks that source words remain valid, and requires closed-section reuse
 to fail without changing the source. This uses no synthetic release counter.
-The driver exercises actual lighting consumers,
-and checks pending native ownership after collection within five seconds. A
+The driver exercises actual lighting consumers, and checks pending native
+ownership after collection within five seconds. Four additional Current-only
+level-frame cases collect the facade, owner and AutoArena anchor, then consume
+the actual highest value or abandon the query. Source ownership must reach zero
+before any later VM effect. This observer also rejects a test overlay omitting
+the real base release. A
 test-only facade that omits the actual base release must fail that same observer
 on its retained-owner assertion; neither overlay changes production files.
 Use a fresh `--output build/...` directory for each run. `--skip-build` requires

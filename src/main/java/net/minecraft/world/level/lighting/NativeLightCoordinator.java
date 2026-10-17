@@ -23,6 +23,7 @@ final class NativeLightCoordinator {
     private static final MethodHandle SAVED_ACQUIRE=handle("saved_acquire",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle SAVED_RELEASE=handle("saved_release",FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
     private static final MethodHandle RELEASE=handle("release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    private static final MethodHandle SOURCE_INPUT=handle("bind_source",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle HEADER=handle("header",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle LIVE=handle("live",FunctionDescriptor.of(ValueLayout.JAVA_LONG));
     private static final MethodHandle ENGINES=handle("engines",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS));
@@ -229,7 +230,15 @@ final class NativeLightCoordinator {
                     case 5 -> storage.publishNativeMap(map.adoptSnapshot(MemorySegment.ofAddress(x)));
                     case 6 -> storage.chunkSource.onLightUpdate(layer,SectionPos.of(x));
                     case 7 -> {nodeState=((BlockLightEngine)engine).stateForNativeNode(x);scalar=Block.BLOCK_STATE_REGISTRY.getId(nodeState);}
-                    case 8 -> scalar=((SkyLightEngine)engine).sourceForNativeNode((int)x,(int)y,(int)z);
+                    case 8 -> {
+                        ChunkSkyLightSources source=((SkyLightEngine)engine).sourceInputForNative((int)x,(int)y,false);
+                        if(source==null)scalar=z;
+                        else if(source.getClass()!=ChunkSkyLightSources.class)scalar=source.getLowestSourceY((int)x&15,(int)y&15);
+                        else try {
+                            int status=(int)SOURCE_INPUT.invokeExact(owner,frame,MemorySegment.ofAddress(source.nativeOwnerForLighting()));
+                            if(status!=0)throw new IllegalStateException("Native source input rejected: "+status);
+                        }finally{Reference.reachabilityFence(source);}
+                    }
                     case 9 -> scalar=engine.propagateForNativeCoordinator();
                     case 10 -> engine.clearChunkCacheForNativeCoordinator();
                     case 11 -> scalar=nodeState.getLightEmission();

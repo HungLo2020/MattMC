@@ -45,6 +45,13 @@ public final class SkyLightEngine extends LightEngine<SkyLightSectionStorage.Sky
 
     int sourceForNativeNode(int x,int z,int missing) { return this.getLowestSourceY(x,z,missing); }
 
+    /** Original contextual lookup only; the native query owns canonical consumption. */
+    @Nullable ChunkSkyLightSources sourceInputForNative(int x,int z,boolean highest) {
+        if(highest)return Objects.requireNonNullElse(this.getChunkSources(x,z),this.emptyChunkSources);
+        return this.getChunkSources(SectionPos.blockToSectionCoord(x),SectionPos.blockToSectionCoord(z));
+    }
+
+
 	@Nullable
 	private ChunkSkyLightSources getChunkSources(int i, int j) {
 		LightChunk lightChunk = this.chunkSource.getChunkForLighting(i, j);

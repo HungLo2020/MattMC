@@ -113,6 +113,48 @@ Facade collections address the same native state; they are not Java membership
 mirrors. Object value arrays retain typed entries directly, including captured
 old array generations.
 
+Canonical source queries capture the actual native Source owner into their
+waiting coordinator frame, then consume it at the original column/highest read.
+Java performs the original contextual chunk/source lookup. Custom source objects
+retain their actual virtual getter; escaped arrays synchronize before capture.
+Direct, level, threaded-task and request entry points forward to the same pending
+frame, without a Java height snapshot or a global Source registry. The frame
+drops its Source before any later VM effect, including a neighbour lookup;
+abandonment drops an unconsumed input.
+
+This continuation was verified on `a9e2ae14` plus the owned change, release
+`ef6452ec4a7b9044cd335021b269d8b9224f9cb8e39a03aab79eaf94d8e73674`:
+379 focused JVM tests, 252 portable checks and 139 native lighting tests passed.
+The same once-Frozen-compiled 24 level-consumer, 20 source-effect and nine
+inherited-getter/checked-exception/reentry traces match Frozen and the retained
+pre-change image. Four actual level-frame tests collect the source facade,
+owner and AutoArena anchor within five seconds, then consume the real highest
+value or abandon the query; native Source ownership reaches zero at last use.
+A highest value in column 255 differs from column zero, and a real layer detects
+using the wrong value. Omitting the actual base release makes that same observer
+fail; no manual release, deadline change or synthetic counter is used.
+
+The full serial native run was **3,162 passed, 57 failed, nine ignored**. Every
+failure name and body matched the historical host record, normalizing only
+printed OS thread IDs. Five actual source-frame, eleven source-owner, seven
+worldgen, four Gaussian and three critical-admission controls passed. The raw
+suite remains failed with its exact historical qualification. Fresh saved-light
+ordering/custody and 125 fresh chunks plus their own-save reopen passed. All four
+initial selected save-byte comparisons matched with no added loss fields. The
+original 25 Primordial differences remain; full Frozen dimension parity is false.
+Fresh item contracts and both 16-check hopper/save-reload runs also passed after
+the Java-only crafting-result integration. Earlier broad Java tiers keep their
+original runtime identities with source/class/configuration/fixture impact reuse.
+
+One short complete initialize → light → unload screen recorded 465.59 µs and
+8,472 Java bytes per cycle across twelve quiet samples. Work, actual origins,
+final request-owner/frame release and zero swap match the retained original
+observer/configuration. Unchanged Frozen/pre-change rows were 248.80/316.64 µs
+and 213,896/8,352 Java bytes; the earlier Current row was 467.08 µs/8,464 bytes.
+Current is 1.871× Frozen and 1.470× pre-change: **request latency debt remains**.
+This does not establish final performance, native allocation/retirement bounds,
+FPS or whole-lighting acceptance; no reference was retimed.
+
 Storage may serve several engines. Each binding keeps its own node/work queues
 and callback context. Native frames retain their originating binding and actual
 storage allocation; retiring a binding waits for its frames. No native guard or
@@ -393,6 +435,14 @@ threaded propagation retry. Its callbacks must be asserted to run.
 `VerifyCoordinatorNativeLevelConsumers.java` separately checks actual native
 projection and task consumption with the old Java propagation runnable replaced
 by a failure marker. This is current-only admission evidence.
+
+`VerifySourceInputEffects.java`, compiled with `VerifyThreadedLighting.java`
+once against original Frozen, adds nine inherited source-getter, checked
+Throwable-identity and same-engine reentry cases across direct engine, level
+and threaded callers. Compare those same observer bytes on each runtime.
+`VerifySkySourceFrameLifetime.java` is Current-only and runs in the
+[portable source driver](RUST-SKYLIGHT-SOURCES.md#verify-a-change), including the
+actual omitted-base-release negative control.
 
 `VerifyCoordinatorSourceEffects.java` compares deferred enable/source effects,
 custom highest-source and layer callbacks, failure/retry, nested PRE execution,

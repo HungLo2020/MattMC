@@ -110,7 +110,7 @@ def main():
     inputs[str(leak_source)] = digest(leak_source)
     inputs.update({str(path): digest(path) for path in leak_classes.rglob('*.class')})
     origins = json.loads((HERE / 'references/origins.json').read_text())
-    jobs = {**origins['cases'], 'bulk-required': {**origins['cases']['bulk'], 'reference': 'bulk'}, 'bulk-direct-required': {**origins['cases']['bulk'], 'reference': 'bulk'}, 'section-lease': {'main': 'VerifySkySourceSectionLease', 'rows': 2, 'prefix': 'SOURCE_SECTION_LEASE '}, **origins['extensions'], 'lifetime': {'main': 'VerifySkySourceNativeLifetime', 'rows': 2, 'prefix': 'SKY_SOURCE_LIFETIME '}, 'engine-consumer': {'main': origins['engine_consumer']['main'], 'rows': 9, 'prefix': ''}, 'release-leak-control': {'main': 'VerifySkySourceNativeLifetime', 'rows': 0, 'prefix': 'SKY_SOURCE_LIFETIME '}}
+    jobs = {**origins['cases'], 'bulk-required': {**origins['cases']['bulk'], 'reference': 'bulk'}, 'bulk-direct-required': {**origins['cases']['bulk'], 'reference': 'bulk'}, 'section-lease': {'main': 'VerifySkySourceSectionLease', 'rows': 2, 'prefix': 'SOURCE_SECTION_LEASE '}, 'frame-lifetime': {'main': 'VerifySkySourceFrameLifetime', 'rows': 4, 'prefix': 'SOURCE_FRAME_LIFETIME '}, **origins['extensions'], 'lifetime': {'main': 'VerifySkySourceNativeLifetime', 'rows': 2, 'prefix': 'SKY_SOURCE_LIFETIME '}, 'engine-consumer': {'main': origins['engine_consumer']['main'], 'rows': 9, 'prefix': ''}, 'release-leak-control': {'main': 'VerifySkySourceNativeLifetime', 'rows': 0, 'prefix': 'SKY_SOURCE_LIFETIME '}, 'frame-release-leak-control': {'main': 'VerifySkySourceFrameLifetime', 'rows': 0, 'prefix': 'SOURCE_FRAME_LIFETIME '}}
     result = {'scope': 'Focused correctness only; reference identities in origins.json. No timing/FPS/whole-lighting acceptance.',
               'head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'inputs': inputs, 'native_sha256': digest(library), 'runs': {}, 'passed': False}
@@ -123,7 +123,7 @@ def main():
             cmd = ['java', '-Xms256m', '-Xmx3g', '--enable-native-access=ALL-UNNAMED',
                    '-Xlog:class+load=info:file=' + str(classlog), '-Dmattmc.rust.natives.dir=' + str(native),
                    '-cp', str(classes) + os.pathsep + cp, 'net.minecraft.world.level.lighting.' + job['main']]
-            if mode in ['bulk-required', 'bulk-direct-required', 'section-lease', 'release-leak-control']:
+            if mode in ['bulk-required', 'bulk-direct-required', 'section-lease', 'release-leak-control', 'frame-release-leak-control']:
                 position = cmd.index('-cp') + 1
                 cmd[position] = str(required if mode == 'bulk-required' else direct_required if mode in ['bulk-direct-required', 'section-lease'] else leak_classes) + os.pathsep + cmd[position]
             if mode == 'engine-consumer':
@@ -160,19 +160,19 @@ def main():
                 reference_matches = len(dumps) == 9 and all(path.read_bytes() == (HERE / 'references/consumer' / path.name).read_bytes() for path in dumps)
                 lines = [path.name for path in dumps]
             else:
-                reference_matches = mode in ['lifetime', 'section-lease', 'release-leak-control'] or trace == reference.read_bytes()
+                reference_matches = mode in ['lifetime', 'section-lease', 'frame-lifetime', 'release-leak-control', 'frame-release-leak-control'] or trace == reference.read_bytes()
             row = {'command': cmd, 'exit': process.returncode, 'seconds': time.monotonic() - start,
                    'rows': len(lines), 'trace_sha256': hashlib.sha256(trace).hexdigest(),
                    'reference_matches': reference_matches,
                    'actual_additive_api': mode != 'transport' or 'TRANSPORT_API additive=true' in text,
                    'mapped_native': sorted(mapped), 'native_origin': mapped == {str(library)},
                    'source_class_origin': 'net.minecraft.world.level.lighting.ChunkSkyLightSources source: file:' + str(ROOT / 'build/classes/java/main') + '/' in classlog.read_text()}
-            row['native_owner_class_origin'] = 'net.minecraft.world.level.lighting.NativeSkySourceOwner source: file:' + str(required if mode == 'bulk-required' else direct_required if mode in ['bulk-direct-required', 'section-lease'] else leak_classes if mode == 'release-leak-control' else ROOT / 'build/classes/java/main') + '/' in classlog.read_text()
+            row['native_owner_class_origin'] = 'net.minecraft.world.level.lighting.NativeSkySourceOwner source: file:' + str(required if mode == 'bulk-required' else direct_required if mode in ['bulk-direct-required', 'section-lease'] else leak_classes if mode in ['release-leak-control', 'frame-release-leak-control'] else ROOT / 'build/classes/java/main') + '/' in classlog.read_text()
             row['required_direct_resource_origin'] = mode not in ['bulk-direct-required', 'section-lease'] or (
                 'net.minecraft.world.level.chunk.NativeSkySourceSections source: file:'
                 + str(direct_required) + '/' in classlog.read_text())
-            row['expected_native_leak_rejection'] = mode == 'release-leak-control' and process.returncode != 0 and 'actual base handle did not retire while pending cursor remains' in text
-            expected_exit = row['expected_native_leak_rejection'] if mode == 'release-leak-control' else process.returncode == 0
+            row['expected_native_leak_rejection'] = mode in ['release-leak-control', 'frame-release-leak-control'] and process.returncode != 0 and ('actual base handle did not retire while pending frame remains' if mode == 'frame-release-leak-control' else 'actual base handle did not retire while pending cursor remains') in text
+            expected_exit = row['expected_native_leak_rejection'] if mode in ['release-leak-control', 'frame-release-leak-control'] else process.returncode == 0
             row['passed'] = expected_exit and len(lines) == job['rows'] and row['reference_matches'] and row['native_origin'] and row['source_class_origin'] and row['actual_additive_api'] and row['native_owner_class_origin'] and row['required_direct_resource_origin']
             result['runs'][mode] = row
             save()

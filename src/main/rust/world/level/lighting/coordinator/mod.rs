@@ -137,6 +137,9 @@ enum Op {
     AffectSection(i64),
 }
 
+#[derive(Clone, Copy)]
+enum SourceQuery { Column(i32, i32), Highest }
+
 struct Frame {
     ops: Vec<Op>,
     scalar: i64,
@@ -144,9 +147,19 @@ struct Frame {
     result: i64,
     sky_floor: i32,
     engine: u64,
+    source_query: Option<SourceQuery>,
+    source_input: Option<super::source_owner::Source>,
 }
 impl Frame {
-    fn new(op: Op, engine: u64) -> Self { Self { ops: vec![op], scalar: 0, entry: None, result: 0, sky_floor: 0, engine } }
+    fn new(op: Op, engine: u64) -> Self { Self { ops: vec![op], scalar: 0, entry: None, result: 0, sky_floor: 0, engine, source_query: None, source_input: None } }
+    fn await_source(&mut self, effect: Effect) -> Effect {
+        self.source_query = match effect {
+            Effect::SkySource(x,z,_) => Some(SourceQuery::Column(x & 15,z & 15)),
+            Effect::HighestSource(..) => Some(SourceQuery::Highest),
+            _ => unreachable!(),
+        };
+        effect
+    }
 }
 
 struct Engine {
@@ -392,9 +405,29 @@ impl State {
     fn step(&mut self, id: u64, scalar: i64, entry: Option<Arc<Entry>>) -> Result<Effect, Error> {
         let i = id.checked_sub(1).ok_or(Error::MissingOwner)? as usize;
         let mut frame = self.frames.get_mut(i).ok_or(Error::MissingOwner)?.take().ok_or(Error::MissingOwner)?;
-        frame.scalar = scalar; frame.entry = entry; self.refreshed.clear();
-        let result = self.advance(&mut frame);
+        // Consume the actual primary Source only at this query's last use.
+        // The owned input drops before advancing into any later VM effect.
+        let query = frame.source_query.take();
+        let scalar = if let Some(source) = frame.source_input.take() {
+            match query {
+                Some(SourceQuery::Column(x,z)) => source.get(x | z << 4),
+                Some(SourceQuery::Highest) => source.highest(),
+                None => Err(super::source_owner::Error::Scan),
+            }.map(i64::from).map_err(|_| Error::Unsupported)
+        } else { Ok(scalar) };
+        frame.entry = entry; self.refreshed.clear();
+        let result = match scalar {
+            Ok(value) => { frame.scalar = value; self.advance(&mut frame) },
+            Err(error) => Err(error),
+        };
         self.frames[i] = Some(frame); result
+    }
+    fn bind_source(&mut self, id: u64, source: &super::source_owner::Source) -> Result<(), Error> {
+        let frame = id.checked_sub(1).and_then(|id| self.frames.get_mut(id as usize))
+            .and_then(Option::as_mut).ok_or(Error::MissingOwner)?;
+        if frame.source_query.is_none() || frame.source_input.is_some() { return Err(Error::MissingOwner); }
+        frame.source_input = Some(source.clone());
+        Ok(())
     }
     /// Complete stock sky-source producer/COW/queue consumer. Admission has
     /// no observable mutation; every accepted section has no Java leaf effect.
@@ -441,7 +474,7 @@ impl State {
                     if enabled{self.tables[ENABLED].put(key,1)?;}else{self.tables[ENABLED].remove(key)?;self.retire_save_column(key);}
                     let kind=self.engines.get(&f.engine).ok_or(Error::MissingOwner)?.kind;
                     if enabled&&kind==1{
-                        f.ops.push(Op::EnableHighest(chunk));return Ok(Effect::HighestSource(chunk as i32,(chunk>>32) as i32));
+                        f.ops.push(Op::EnableHighest(chunk));return Ok(f.await_source(Effect::HighestSource(chunk as i32,(chunk>>32) as i32)));
                     }
                 }
                 Op::EnableHighest(chunk)=>{
@@ -741,7 +774,7 @@ impl State {
                     if kind == 2 { return Ok(Effect::CustomNode(pos)); }
                     if kind == 1 {
                         f.ops.push(Op::SkySourceReady(pos));
-                        if self.enabled(section(pos)) { return Ok(Effect::SkySource(propagation::block_x(pos), propagation::block_z(pos), i32::MAX)); }
+                        if self.enabled(section(pos)) { return Ok(f.await_source(Effect::SkySource(propagation::block_x(pos), propagation::block_z(pos), i32::MAX))); }
                         f.scalar = i64::from(i32::MAX);
                     } else if self.updating.get(section(pos)).is_some() {
                         f.ops.push(Op::BlockChecked(pos)); return Ok(Effect::BlockState(pos));
@@ -813,7 +846,7 @@ impl State {
                         let (x, z) = (propagation::block_x(pos), propagation::block_z(pos));
                         let (x, z) = match at { 0 => (x.wrapping_sub(1), z), 1 => (x.wrapping_add(1), z), 2 => (x, z.wrapping_sub(1)), _ => (x, z.wrapping_add(1)) };
                         f.ops.push(Op::SkyNeighbours(pos, lowest, bottom, at + 1, maximum));
-                        return Ok(Effect::SkySource(x, z, i32::MIN));
+                        return Ok(f.await_source(Effect::SkySource(x, z, i32::MIN)));
                     }
                     f.ops.push(Op::SkyAdd(pos, lowest, maximum, lowest.max(bottom) >> 4, None));
                     // Capture p=max(source,bottom) once, as the Java method does.

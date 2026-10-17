@@ -35,12 +35,13 @@ mod typed {
     unsafe extern "C" fn frame_release(token:*mut FrameToken){
         let frame=Box::from_raw(token.cast::<ActualFrame>());frame.owner.dropped_frames.fetch_add(1,Ordering::Relaxed);
     }
+    unsafe extern "C" fn frame_source(_token:*mut FrameToken,_source:*const crate::world::level::lighting::source_owner::Source)->i32{-27}
     unsafe extern "C" fn frame_resource(_token:*mut FrameToken)->*const c_void{std::ptr::null()}
     unsafe extern "C" fn start(token:*const LevelToken,_kind:i32,_key:i64,_empty:bool)->*mut FrameToken{
         let owner=&*token.cast::<ActualLevel>();let mode=owner.failure.swap(0,Ordering::Relaxed);
         if mode==0{return std::ptr::null_mut();}
         Arc::increment_strong_count(token.cast::<ActualLevel>());
-        Box::into_raw(Box::new(ActualFrame{token:FrameToken{read:frame_read,step:frame_step,release:frame_release,resource:frame_resource},owner:Arc::from_raw(token.cast::<ActualLevel>()),action:if mode<0{mode}else{1}})).cast()
+        Box::into_raw(Box::new(ActualFrame{token:FrameToken{read:frame_read,step:frame_step,release:frame_release,resource:frame_resource,bind_source:frame_source},owner:Arc::from_raw(token.cast::<ActualLevel>()),action:if mode<0{mode}else{1}})).cast()
     }
     fn level() -> Arc<ActualLevel> {
         Arc::new(ActualLevel { token: LevelToken { retain, release, check,operation,channel,start }, calls: AtomicUsize::new(0), failure: AtomicI32::new(0),observed:AtomicUsize::new(0),dropped_frames:AtomicUsize::new(0) })

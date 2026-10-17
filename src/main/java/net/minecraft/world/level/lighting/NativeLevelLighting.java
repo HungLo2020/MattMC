@@ -37,6 +37,10 @@ final class NativeLevelLighting {
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle TASK_ABORT = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_tasks_context_abort",
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS,ValueLayout.JAVA_LONG));
+    private static final MethodHandle FRAME_SOURCE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_level_frame_bind_source",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
+    private static final MethodHandle TASK_SOURCE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_tasks_context_bind_source",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private final MemorySegment owner,projection;
     private final LightEngine<?, ?> block, sky;
     private final NativeLightingMap resources;
@@ -181,14 +185,24 @@ final class NativeLevelLighting {
                         net.minecraft.core.SectionPos.of(output.getAtIndex(ValueLayout.JAVA_LONG,0)));
                     case 7->{nodeState=((BlockLightEngine)engine).stateForNativeNode(output.getAtIndex(ValueLayout.JAVA_LONG,0));
                         scalar=net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.getId(nodeState);}
-                    case 8->scalar=((SkyLightEngine)engine).sourceForNativeNode(slot,(int)output.getAtIndex(ValueLayout.JAVA_LONG,1),(int)output.getAtIndex(ValueLayout.JAVA_LONG,2));
+                    case 8->{
+                        int z=(int)output.getAtIndex(ValueLayout.JAVA_LONG,1);
+                        ChunkSkyLightSources source=((SkyLightEngine)engine).sourceInputForNative(slot,z,false);
+                        if(source==null)scalar=output.getAtIndex(ValueLayout.JAVA_LONG,2);
+                        else if(source.getClass()!=ChunkSkyLightSources.class)scalar=source.getLowestSourceY(slot&15,z&15);
+                        else bindSourceInput(frame,tasks,cursor,request,source);
+                    }
                     case 9->scalar=engine.propagateForNativeCoordinator();
                     case 10->engine.clearChunkCacheForNativeCoordinator();
                     case 11->scalar=nodeState.getLightEmission();
                     case 12->scalar=LightEngine.isEmptyShape(nodeState)?1:0;
                     case 14->engine.checkNode(output.getAtIndex(ValueLayout.JAVA_LONG,0));
                     case 16->map.drainForCoordinator();
-                    case 17->scalar=((SkyLightEngine)engine).highestForNativeEnable(slot,(int)output.getAtIndex(ValueLayout.JAVA_LONG,1));
+                    case 17->{
+                        ChunkSkyLightSources source=((SkyLightEngine)engine).sourceInputForNative(slot,(int)output.getAtIndex(ValueLayout.JAVA_LONG,1),true);
+                        if(source.getClass()!=ChunkSkyLightSources.class)scalar=source.getHighestLowestSourceY();
+                        else bindSourceInput(frame,tasks,cursor,request,source);
+                    }
                     case 18->scalar=map.resolveForCoordinator(slot).isEmpty()?1:0;
                     case 19->map.resolveForCoordinator(slot).fill((int)output.getAtIndex(ValueLayout.JAVA_LONG,1));
                     case 20->((BlockLightEngine)engine).propagateSourcesForNativeLevel(slot,(int)output.getAtIndex(ValueLayout.JAVA_LONG,1));
@@ -200,6 +214,16 @@ final class NativeLevelLighting {
                 finally{map.releaseCoordinatorEntry(result);result=MemorySegment.NULL;}
             }
         }finally{if(result.address()!=0)resultMap.releaseCoordinatorEntry(result);}
+    }
+
+    private void bindSourceInput(long frame,MemorySegment tasks,long cursor,NativeLightRequests request,
+                                 ChunkSkyLightSources source)throws Throwable {
+        try {
+            MemorySegment input=MemorySegment.ofAddress(source.nativeOwnerForLighting());
+            int status=request!=null?NativeLightRequests.bindSource(frame,input):frame==0?
+                (int)TASK_SOURCE.invokeExact(tasks,cursor,input):(int)FRAME_SOURCE.invokeExact(frame,input);
+            if(status!=0)throw new IllegalStateException("Native source input rejected: "+status);
+        } finally {Reference.reachabilityFence(source);}
     }
 
     /** The native command selects the physical VM resource; no native borrow

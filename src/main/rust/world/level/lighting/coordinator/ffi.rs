@@ -283,6 +283,19 @@ pub unsafe extern "C" fn mattmc_light_coordinator_end(owner: *const Owner, id: u
     match result { Ok(()) => 0, Err(_) => -27 }
 }
 
+/// Capture the actual Source allocation in this already-waiting query frame.
+/// Caller pins the facade through this synchronous borrow; no VM pointer stays.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_coordinator_bind_source(owner:*const Owner,
+    id:u64,source:*const super::super::source_owner::Source)->i32 {
+    if owner.is_null() || id==0 || source.is_null()
+        || source as usize % std::mem::align_of::<super::super::source_owner::Source>() != 0 { return -27; }
+    let lease=&*(id as *const FrameLease);
+    if Arc::as_ptr(&lease.owner)!=owner { return -27; }
+    catch_unwind(AssertUnwindSafe(|| (*owner).state.lock().unwrap()
+        .bind_source(lease.id,&*source).map_or(-27,|()|0))).unwrap_or(-99)
+}
+
 /// Output [a,b,c,unused,changed-slot-address,changed-slot-count]. Consume the
 /// bounded projection before another coordinator call or any Java effect.
 #[no_mangle]
@@ -527,6 +540,9 @@ impl PropagationInput {
         let mut state=self.owner.state.lock().unwrap();
         let op=match kind{0=>Op::Status(key,value),1=>Op::Enable(key,value),2=>Op::Sources(key),3=>Op::Run,_=>return Err(-28)};
         state.begin_retained(op,self.engine).map_err(|error|failure(error,&mut[0;2]))
+    }
+    pub(super) fn bind_source(&self,id:u64,source:&super::super::source_owner::Source)->i32 {
+        self.owner.state.lock().unwrap().bind_source(id,source).map_or(-27,|()|0)
     }
     pub(super) unsafe fn level_step(&self,id:u64,scalar:i64,entry:*const Entry,output:&mut[i64],snapshot:&mut Option<Arc<LightMap>>)->i32{
         let mut state=self.owner.state.lock().unwrap();

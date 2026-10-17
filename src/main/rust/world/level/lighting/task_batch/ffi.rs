@@ -207,6 +207,12 @@ pub unsafe extern "C" fn mattmc_light_tasks_begin_level(owner:*const Owner,level
     })).unwrap_or(-99)
 }
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_context_bind_source(owner:*const Owner,cursor:u64,
+    source:*const super::super::source_owner::Source)->i32 {
+    if owner.is_null() || source.is_null() { return -27; }
+    catch_unwind(AssertUnwindSafe(||(&mut *(*owner).queue.get()).context_source(cursor,source))).unwrap_or(-99)
+}
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_light_tasks_context_resource(owner:*const Owner,cursor:u64)->*const c_void{
     owner.as_ref().map_or(std::ptr::null(),|owner|(&mut *owner.queue.get()).context_resource(cursor))
 }

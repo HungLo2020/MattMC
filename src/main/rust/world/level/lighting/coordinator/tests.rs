@@ -924,3 +924,152 @@ mod save_custody {
         }
     }
 }
+
+mod owned_source_inputs {
+    use super::super::*;
+    use crate::world::level::lighting::source_owner::Source;
+    unsafe extern "C" {
+        fn mattmc_sky_source_probe_new(id:u64)->u64;
+        fn mattmc_sky_source_probe_owners(id:u64)->u64;
+        fn mattmc_sky_source_probe_release(id:u64);
+    }
+    unsafe fn state()->(State,u64) {
+        let registry=super::super::super::maps::ffi::mattmc_light_map_registry_create();
+        let map=super::super::super::maps::ffi::mattmc_light_map_create(registry);
+        super::super::super::maps::ffi::mattmc_light_map_registry_release(registry);
+        let mut state=State::new(true,Arc::from_raw(map)).unwrap();
+        let (engine,_)=state.attach(Arc::new(Queues::default()),1).unwrap();
+        (state,engine)
+    }
+    #[test]
+    fn actual_highest_query_consumes_source_after_base_drop_and_retires_before_next_effect() {
+        unsafe {
+            let (mut state,engine)=state();
+            let id=state.begin(Op::Enable(0,true),engine).unwrap();
+            assert!(matches!(state.step(id,0,None).unwrap(),Effect::HighestSource(0,0)));
+            let source=Source::new(-1,6).unwrap();source.set(0,17).unwrap();
+            let probe=mattmc_sky_source_probe_new(&source as *const Source as u64);
+            state.bind_source(id,&source).unwrap();
+            assert_eq!(mattmc_sky_source_probe_owners(probe),2);
+            drop(source);assert_eq!(mattmc_sky_source_probe_owners(probe),1);
+            assert!(matches!(state.step(id,999,None).unwrap(),Effect::Done(0)));
+            assert_eq!(mattmc_sky_source_probe_owners(probe),0,"real Source retires after actual highest read");
+            state.end(id).unwrap();mattmc_sky_source_probe_release(probe);
+        }
+    }
+    #[test]
+    fn actual_column_input_retires_before_later_neighbour_lookup_and_preserves_wrapped_coordinates() {
+        unsafe {
+            let (mut state,engine)=state();let pos=propagation::block_pos(-16,24,32);
+            state.tables[ENABLED].put(column(section(pos)),1).unwrap();
+            let id=state.begin(Op::Node(pos),engine).unwrap();
+            assert!(matches!(state.step(id,0,None).unwrap(),Effect::SkySource(-16,32,i32::MAX)));
+            let source=Source::new(-1,6).unwrap();source.set(0,17).unwrap();
+            let probe=mattmc_sky_source_probe_new(&source as *const Source as u64);
+            state.bind_source(id,&source).unwrap();drop(source);
+            assert!(matches!(state.step(id,i64::from(i32::MAX),None).unwrap(),Effect::SkySource(-17,32,i32::MIN)));
+            assert_eq!(mattmc_sky_source_probe_owners(probe),0,"no source lease crosses next contextual lookup");
+            state.end(id).unwrap();mattmc_sky_source_probe_release(probe);
+        }
+    }
+    #[test]
+    fn abandoned_real_query_releases_source_and_duplicate_or_nonquery_capture_has_no_effect() {
+        unsafe {
+            let (mut state,engine)=state();let id=state.begin(Op::Enable(0,true),engine).unwrap();
+            let source=Source::new(-1,6).unwrap();let probe=mattmc_sky_source_probe_new(&source as *const Source as u64);
+            assert!(state.bind_source(id,&source).is_err());
+            assert!(matches!(state.step(id,0,None).unwrap(),Effect::HighestSource(..)));
+            state.bind_source(id,&source).unwrap();assert!(state.bind_source(id,&source).is_err());
+            assert_eq!(mattmc_sky_source_probe_owners(probe),2);
+            drop(source);state.end(id).unwrap();assert_eq!(mattmc_sky_source_probe_owners(probe),0);
+            mattmc_sky_source_probe_release(probe);
+        }
+    }
+    #[test]
+    fn independent_nested_frames_capture_live_source_without_a_word_snapshot() {
+        unsafe {
+            let (mut state,engine)=state();
+            let first=state.begin(Op::Enable(0,true),engine).unwrap();
+            let second=state.begin(Op::Enable(1,true),engine).unwrap();
+            assert!(matches!(state.step(first,0,None).unwrap(),Effect::HighestSource(..)));
+            assert!(matches!(state.step(second,0,None).unwrap(),Effect::HighestSource(..)));
+            let source=Source::new(-1,6).unwrap();let probe=mattmc_sky_source_probe_new(&source as *const Source as u64);
+            state.bind_source(first,&source).unwrap();state.bind_source(second,&source).unwrap();
+            assert_eq!(mattmc_sky_source_probe_owners(probe),3);
+            source.set(0,17).unwrap();
+            // A negative fake scalar would enter a different EnableWalk. Both
+            // actual frames instead read this newly changed primary Source.
+            assert!(matches!(state.step(second,i64::from(i32::MIN),None).unwrap(),Effect::Done(0)));
+            assert_eq!(mattmc_sky_source_probe_owners(probe),2);
+            drop(source);assert_eq!(mattmc_sky_source_probe_owners(probe),1);
+            assert!(matches!(state.step(first,i64::from(i32::MIN),None).unwrap(),Effect::Done(0)));
+            assert_eq!(mattmc_sky_source_probe_owners(probe),0);
+            state.end(first).unwrap();state.end(second).unwrap();mattmc_sky_source_probe_release(probe);
+        }
+    }
+}
+
+mod source_input_forwarding {
+    use super::super::*;
+    use crate::world::level::lighting::{source_owner::Source,task_batch::LevelToken,requests};
+    use std::ffi::c_void;
+    unsafe extern "C" {
+        fn mattmc_sky_source_probe_new(id:u64)->u64;
+        fn mattmc_sky_source_probe_owners(id:u64)->u64;
+        fn mattmc_sky_source_probe_release(id:u64);
+        fn mattmc_light_tasks_create()->*mut c_void;
+        fn mattmc_light_tasks_destroy(owner:*mut c_void);
+        fn mattmc_light_tasks_append_level(owner:*const c_void,level:*const LevelToken,kind:i32,key:i64,value:i32,row:u64)->i64;
+        fn mattmc_light_tasks_change(owner:*const c_void,op:i32,a:u64,b:u64,out:*mut u64)->i64;
+        fn mattmc_light_tasks_context(owner:*const c_void,cursor:u64,advance:i32,scalar:i64,entry:*const c_void,out:*mut i64)->i32;
+        fn mattmc_light_tasks_context_bind_source(owner:*const c_void,cursor:u64,source:*const Source)->i32;
+    }
+    #[test]
+    fn real_level_task_and_request_frames_forward_actual_source_ownership_to_one_leaf() {
+        unsafe {
+            for path in 0..3 {
+                let registry=super::super::super::maps::ffi::mattmc_light_map_registry_create();
+                let map=super::super::super::maps::ffi::mattmc_light_map_create(registry);
+                super::super::super::maps::ffi::mattmc_light_map_registry_release(registry);
+                let map=Arc::from_raw(map);let owner=ffi::mattmc_light_coordinator_create(Arc::as_ptr(&map),1);
+                let queues=Arc::new(Queues::default());let binding=ffi::mattmc_light_coordinator_bind(owner,Arc::as_ptr(&queues),1);
+                let level=super::super::level::mattmc_light_level_create(std::ptr::null(),binding.cast());assert!(!level.is_null());
+                let source=Source::new(-1,6).unwrap();source.set(0,17).unwrap();
+                let probe=mattmc_sky_source_probe_new(&source as *const Source as u64);let mut out=[0i64;7];
+                if path==0 {
+                    let frame=super::super::level::mattmc_light_level_command(level,1,0,1);assert_ne!(frame,0);
+                    assert_eq!(super::super::level::mattmc_light_level_frame_read(frame,out.as_mut_ptr()),17);
+                    assert_eq!(super::super::level::mattmc_light_level_frame_bind_source(frame,&source),0);
+                    assert_eq!(mattmc_sky_source_probe_owners(probe),2);drop(source);
+                    assert_eq!(mattmc_sky_source_probe_owners(probe),1);
+                    assert_eq!(super::super::level::mattmc_light_level_frame_step(frame,0,std::ptr::null(),out.as_mut_ptr()),0);
+                    assert_eq!(mattmc_sky_source_probe_owners(probe),0);
+                    ((* (frame as *mut crate::world::level::lighting::task_batch::FrameToken)).release)(frame as *mut _);
+                } else if path==1 {
+                    let tasks=mattmc_light_tasks_create();assert!(mattmc_light_tasks_append_level(tasks,level,1,0,1,1)>=0);
+                    let mut metadata=[0u64;2];let cursor=mattmc_light_tasks_change(tasks,1,0,0,metadata.as_mut_ptr());assert!(cursor>0);
+                    assert!(mattmc_light_tasks_change(tasks,2,cursor as u64,0,metadata.as_mut_ptr())>1);
+                    assert_eq!(mattmc_light_tasks_context(tasks,cursor as u64,0,0,std::ptr::null(),out.as_mut_ptr()),17);
+                    assert_eq!(mattmc_light_tasks_context_bind_source(tasks,cursor as u64,&source),0);
+                    assert_eq!(mattmc_sky_source_probe_owners(probe),2);drop(source);
+                    assert_eq!(mattmc_light_tasks_context(tasks,cursor as u64,1,0,std::ptr::null(),out.as_mut_ptr()),0);
+                    assert_eq!(mattmc_sky_source_probe_owners(probe),0);
+                    assert_eq!(mattmc_light_tasks_change(tasks,3,cursor as u64,0,metadata.as_mut_ptr()),0);
+                    mattmc_light_tasks_destroy(tasks);
+                } else {
+                    let request=requests::mattmc_light_request_create(level,0,0,1);
+                    let frame=requests::mattmc_light_request_begin(request,1);assert_ne!(frame,0);
+                    assert_eq!(requests::mattmc_light_request_read(frame,out.as_mut_ptr()),17);
+                    assert_eq!(requests::mattmc_light_request_bind_source(frame,&source),0);
+                    assert_eq!(mattmc_sky_source_probe_owners(probe),2);drop(source);
+                    assert_eq!(requests::mattmc_light_request_step(frame,0,std::ptr::null(),out.as_mut_ptr()),0);
+                    assert_eq!(mattmc_sky_source_probe_owners(probe),0);
+                    requests::mattmc_light_request_end(frame);requests::mattmc_light_request_release(request);
+                }
+                mattmc_sky_source_probe_release(probe);
+                super::super::level::mattmc_light_level_release(level);ffi::mattmc_light_coordinator_bind_release(binding);
+                ffi::mattmc_light_coordinator_release(owner);
+            }
+        }
+    }
+}

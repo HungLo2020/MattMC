@@ -26,6 +26,7 @@ pub(crate) struct FrameToken {
     pub step:unsafe extern "C" fn(*mut FrameToken,i64,*const c_void,*mut i64)->i32,
     pub release:unsafe extern "C" fn(*mut FrameToken),
     pub resource:unsafe extern "C" fn(*mut FrameToken)->*const c_void,
+    pub bind_source:unsafe extern "C" fn(*mut FrameToken,*const super::source_owner::Source)->i32,
 }
 struct FrameLease {owner:*mut FrameToken}
 impl Drop for FrameLease {fn drop(&mut self){unsafe{((*self.owner).release)(self.owner);}}}
@@ -261,6 +262,11 @@ impl Queue {
         let action=if advance{((*frame.owner).step)(frame.owner,scalar,entry,output)}else{((*frame.owner).read)(frame.owner,output)};
         if action==0{cursor.frame=None;}
         action
+    }
+    unsafe fn context_source(&mut self,id:u64,source:*const super::source_owner::Source)->i32 {
+        let Some(cursor)=id.checked_sub(1).and_then(|id|self.cursors.get_mut(id as usize)).and_then(Option::as_mut) else{return -27;};
+        let Some(frame)=cursor.frame.as_ref() else{return -27;};
+        ((*frame.owner).bind_source)(frame.owner,source)
     }
     unsafe fn context_resource(&mut self,id:u64)->*const c_void{
         self.cursors.get_mut(id.wrapping_sub(1) as usize).and_then(Option::as_mut)

@@ -387,6 +387,15 @@ pub unsafe extern "C" fn mattmc_light_request_step(
     mattmc_light_request_read(id, output)
 }
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_light_request_bind_source(id:u64,source:*const super::source_owner::Source)->i32 {
+    if id==0 || source.is_null() { return -27; }
+    catch_unwind(AssertUnwindSafe(|| {
+        let frame=&mut *(id as *mut Frame);
+        if !matches!(frame.action,8|17) { return -27; }
+        frame.child.as_ref().map_or(-27,|child|((*child.0).bind_source)(child.0,source))
+    })).unwrap_or(-99)
+}
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_light_request_import(id: u64) -> i32 {
     if id == 0 {
         return -27;
