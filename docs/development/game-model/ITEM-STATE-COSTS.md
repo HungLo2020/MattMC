@@ -209,6 +209,28 @@ Debt: a changed player broadcast is 4× Frozen. Ten player-menu slots (armor,
 offhand, crafting grid and result) are `Slot` subclasses without native links,
 so each tick reads them through Java.
 
+### Copy churn and the owner table
+
+`copy_churn` (in `--workload equality`) times `ItemStack.copy` of a damaged
+sword whose result is dropped at once. That makes owner creation run alongside
+Cleaner retirement. On `3427968` with a sharded item owner table
+(`build/s34-v20/equality`): Frozen 8.9, pre 635, Current 864 ns per copy. A
+scratch comparison of the same copy with every result kept alive gives about
+280 ns, against about 900 ns under churn, with or without sharding. The gap is
+therefore the per-copy Cleaner registration, GC reference processing and
+Cleaner-thread retirement of short-lived facades, not owner-table lock
+contention. The sharding was not published; its patch is kept in
+`build/s34-v20/negative`.
+
+Debt: `copy()` is about 0.7–0.9 µs against about 2–9 ns in Frozen. The
+ownership exit is a copy that registers no owner or Cleaner until it escapes.
+That has to keep facade identity (the handle) and the lifetime contracts.
+
+`build/s34-v21` (crafting grid rows) ran on a noisier machine: rows on paths
+the change does not touch moved several-fold against earlier screens, for
+example `native_damage_copy` on Current at 196 ns against 42 ns. No performance
+conclusion is drawn from it.
+
 ### Pending-content resources
 
 `VerifyItemResources.py --workload pending` (`build/s34-v5/resource-pending2`)

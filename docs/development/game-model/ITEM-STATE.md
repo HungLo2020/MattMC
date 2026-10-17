@@ -425,6 +425,19 @@ between the native commit and the publication. Out-of-bounds `get` keeps the
 original message. `NativeBroadcastTest.menuSlotListMirrorTracksEveryEdit`
 covers 300 random edits and each refused-edit shape.
 
+## Crafting grids
+
+An exact `TransientCraftingContainer` (the 2×2 grid of `InventoryMenu` and the
+3×3 grid of `CraftingMenu`) keeps its cells in native rows, in a container cell
+like stock chests. It implements `NativeStockContainer`, and its `Slot`s link
+those rows (`NativeItemState.bindStockSlot`). So menu reads and the per-tick
+broadcast of grid slots are native. The list is never replaced. Every original
+container method and its `menu.slotsChanged` notification is unchanged, so
+recipe lookup, `ResultSlot.onTake` and the recipe book still run the original
+Java code over the same contents. A subclass grid keeps a plain list and
+unlinked slots. `NativeCraftingGridTest` compares 400 random container
+operations, with their notification order, against a subclass grid.
+
 ## Native component comparison
 
 `ItemStack.isSameItemSameComponents` (and therefore `ItemStack.matches`)

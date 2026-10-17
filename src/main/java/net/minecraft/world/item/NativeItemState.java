@@ -1206,6 +1206,10 @@ public final class NativeItemState {
             if(source!=null)return source.bindMainSlot(index);
         }else if(net.minecraft.world.level.block.entity.NativeStockContainer.exact(container)&&index>=0&&index<27){
             var chest=(net.minecraft.world.level.block.entity.NativeStockContainer)container;return chest.nativeContainerForSlots().slot(chest,index,0);
+        }else if(container!=null&&container.getClass()==net.minecraft.world.inventory.TransientCraftingContainer.class){
+            // An exact crafting grid keeps native rows (TransientCraftingContainer); its slots link them.
+            var grid=(net.minecraft.world.inventory.TransientCraftingContainer)container;
+            return grid.nativeContainerForSlots()!=null&&index>=0&&index<grid.getContainerSize()?grid.nativeContainerForSlots().slot(grid,index,0):null;
         }else if(container!=null&&container.getClass()==net.minecraft.world.CompoundContainer.class){
             // A double chest of two exact stock halves: link the half's row. Reads and
             // broadcasts use it; writes and setChanged still go through the compound.

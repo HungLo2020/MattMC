@@ -14,7 +14,9 @@ import net.minecraft.world.item.Items;
  * default helmets), the genuine Java fallback (equal custom names held by
  * distinct Component objects), and one equipment-tick shape (six mixed slot
  * pairs, as LivingEntity.collectEquipmentChanges compares last and live stacks).
- * Timed: the matches calls only; pools are built once per mode outside the timer.
+ * copy_churn times ItemStack.copy of a damaged sword whose result is dropped at
+ * once, so owner creation runs alongside Cleaner retirement.
+ * Timed: the matches (or copy) calls only; pools are built once per mode outside the timer.
  * Arguments: output CSV, then a side flag (unused; identical code on every side).
  */
 public final class EqualityTimingReference {
@@ -44,18 +46,20 @@ public final class EqualityTimingReference {
         return new ItemStack[][] {left, right};
     }
     record Sample(long elapsed, long bytes, long checksum) {}
+    static boolean copyChurn;
     static Sample run(ItemStack[][] pairs) {
         long elapsed = 0, bytes = 0, checksum = 0;
         for (int batch = 0; batch < BATCHES; batch++) {
             long allocated = StockChestTransferTimingReference.allocation(), start = System.nanoTime(); int equal = 0;
-            for (int i = 0; i < POOL; i++) if (ItemStack.matches(pairs[0][i], pairs[1][i])) equal++;
+            if (copyChurn) { for (int i = 0; i < POOL; i++) equal += pairs[0][i].copy().getCount(); }
+            else for (int i = 0; i < POOL; i++) if (ItemStack.matches(pairs[0][i], pairs[1][i])) equal++;
             elapsed += System.nanoTime() - start; bytes += StockChestTransferTimingReference.allocation() - allocated;
             checksum = checksum * 31 + equal;
         }
         return new Sample(elapsed, bytes, checksum);
     }
     static void measure(String mode) throws Exception {
-        ItemStack[][] pairs = pool(mode);
+        copyChurn = mode.equals("copy_churn"); ItemStack[][] pairs = pool(copyChurn ? "native_damage_equal" : mode);
         long began = System.nanoTime(), quiet = began, compiler = StockChestTransferTimingReference.compilation(); int rounds = 0;
         do { sink ^= run(pairs).checksum(); rounds++; Thread.sleep(25); long next = StockChestTransferTimingReference.compilation(); if (next != compiler) quiet = System.nanoTime(); compiler = next;
             if (rounds >= 5 && System.nanoTime() - began >= 1_000_000_000L && System.nanoTime() - quiet >= 250_000_000L) break;
@@ -74,7 +78,7 @@ public final class EqualityTimingReference {
         long boot = System.nanoTime(); net.minecraft.SharedConstants.tryDetectVersion(); net.minecraft.server.Bootstrap.bootStrap();
         rows.add("# boot_ns=" + (System.nanoTime() - boot) + " pools_outside_timer native_allocated_bytes=not_measured");
         rows.add("workload,sample,operations,elapsed_ns,checksum,compiler_ms,gc_count,allocated_bytes");
-        for (String mode : List.of("native_damage_copy", "native_damage_equal", "native_default", "fallback_custom_name", "equipment_tick")) measure(mode);
+        for (String mode : List.of("native_damage_copy", "native_damage_equal", "native_default", "fallback_custom_name", "equipment_tick", "copy_churn")) measure(mode);
         Files.write(Path.of(args[0]), rows); System.out.println("EQUALITY_TIMING sink=" + sink + " pid=" + ManagementFactory.getRuntimeMXBean().getPid());
     }
 }
