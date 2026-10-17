@@ -58,4 +58,23 @@ class NativeCraftingGridTest {
         assertSame(grid.getItem(3), slot.getItem());
         assertNull(new Slot(new TransientCraftingContainer(menu, 2, 2) {}, 0, 0, 0).nativeLinkForMenu(), "a subclass grid stays unlinked");
     }
+
+    // Sizes outside 1..27 (including negative and overflowing products) keep the
+    // original list: the same exception class and message, or the same empty grid.
+    static String construct(boolean exact, int width, int height) {
+        AbstractContainerMenu menu = mock(AbstractContainerMenu.class);
+        try {
+            var grid = exact ? new TransientCraftingContainer(menu, width, height) : new TransientCraftingContainer(menu, width, height) {};
+            return "size " + grid.getContainerSize() + " empty " + grid.isEmpty() + " native " + (grid.nativeSlotsForTransfer() != null);
+        } catch (Throwable failure) { return failure.getClass().getName() + ":" + failure.getMessage(); }
+    }
+    @Test void constructorBoundariesMatchTheOriginal() {
+        int[][] shapes = {{-1, 1}, {1, -1}, {-3, -3}, {0, 3}, {3, 0}, {0, 0}, {1, 1}, {3, 9}, {4, 7}, {65536, 65537}, {Integer.MIN_VALUE, -1}, {46341, 46341}, {Integer.MAX_VALUE, 2}};
+        for (int[] shape : shapes) {
+            String original = construct(false, shape[0], shape[1]).replace(" native false", "");
+            String exact = construct(true, shape[0], shape[1]).replace(" native true", "").replace(" native false", "");
+            assertEquals(original, exact, shape[0] + "x" + shape[1]);
+        }
+        assertTrue(construct(true, -3, -3).endsWith("native true"), "a positive product of negative dimensions keeps native rows like the original list size");
+    }
 }

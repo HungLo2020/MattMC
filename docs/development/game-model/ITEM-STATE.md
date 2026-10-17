@@ -435,8 +435,11 @@ broadcast of grid slots are native. The list is never replaced. Every original
 container method and its `menu.slotsChanged` notification is unchanged, so
 recipe lookup, `ResultSlot.onTake` and the recipe book still run the original
 Java code over the same contents. A subclass grid keeps a plain list and
-unlinked slots. `NativeCraftingGridTest` compares 400 random container
-operations, with their notification order, against a subclass grid.
+unlinked slots. Only grid sizes 1–27 (the original int product) get native rows.
+Other sizes keep the original list and its exceptions, for example
+`NegativeArraySizeException` for a negative or wrapped-negative product
+(`constructorBoundariesMatchTheOriginal`). `NativeCraftingGridTest` compares 400
+random container operations, with their notification order, against a subclass grid.
 
 ## Native component comparison
 
