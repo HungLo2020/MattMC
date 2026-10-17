@@ -694,7 +694,11 @@ public final class ItemStack implements DataComponentHolder {
 		if (!itemStack.is(itemStack2.getItem())) {
 			return false;
 		} else {
-			return itemStack.isEmpty() && itemStack2.isEmpty() ? true : Objects.equals(itemStack.components, itemStack2.components);
+			if (itemStack.isEmpty() && itemStack2.isEmpty()) return true;
+			// Both stacks hold the same item here, so neither is empty: compare natively,
+			// falling back to the original equals only for component values Rust cannot decide.
+			int same = NativeItemState.sameComponents(itemStack.state, itemStack2.state);
+			return same >= 0 ? same != 0 : Objects.equals(itemStack.components, itemStack2.components);
 		}
 	}
 

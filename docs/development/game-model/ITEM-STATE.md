@@ -410,6 +410,33 @@ computable natively keep the S0030 adoption path.
 - Rust tests: `operation_lease_tests` cover rollback before/after recording,
   stale keys/rows and version refusal.
 
+## Native component comparison
+
+`ItemStack.isSameItemSameComponents` (and therefore `ItemStack.matches`)
+decides two non-empty stacks of the same item natively
+(`NativeItemState.sameComponents`, FFI `mattmc_item_stack_same_components`,
+`slots.rs` `inventory_same`). The original `PatchedDataComponentMap.equals`
+built a native `Patch` owner for each side through `patchView()`, then compared
+the two map views over FFI. That cost about 1.8 µs per call, against about
+8 ns in Frozen.
+
+The native comparison returns equal or different only when Rust can decide.
+That covers the same prototype and default owner, and patches whose values
+are native integers, empty or identical enchantments, or removals. Anything
+else returns "needs Java", and the original `equals` runs. Per-tick consumers
+include `LivingEntity.collectEquipmentChanges` (every equipment slot of every
+equipped entity), merges and recipe matching.
+`NativeInventoryTest.nativeComponentComparisonMatchesTheOriginalEquals` compares
+every pair of a 25-stack corpus with the original formula.
+The `component_equality` observer (`ComponentEqualityReference.java`, run through
+`VerifyItemState.py` on Frozen, pre and Current) checks the call prefix as well
+as the result. It uses custom `Component` values whose `equals` records each
+call and its operand order. The values answer asymmetrically, throw a sentinel,
+or re-enter the comparison. The observer also covers identity, empty, count,
+copy-on-write, damage, removal, size-mismatch, key-mismatch and mixed
+native/foreign patches. Probes are armed only during the measured calls, because
+setting a component also calls `equals` against the prototype value.
+
 ## Complete stock-chest ownership
 
 Both stock 27-slot chest directions now use native destination owners. Reverse

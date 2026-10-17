@@ -843,6 +843,18 @@ public final class NativeItemState {
         void popTime(int value);
     }
     private static Overlay stackOwner(Stack stack) { return (Overlay)stack; }
+    private static final MethodHandle STACK_SAME=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_stack_same_components",
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG));
+    /**
+     * The component comparison of {@link ItemStack#isSameItemSameComponents} for two
+     * non-empty stacks, computed natively: 1 equal, 0 different, or -1 when a
+     * component value needs the original Java {@code equals}.
+     */
+    static int sameComponents(Stack left,Stack right){
+        try{long value=(long)STACK_SAME.invokeExact(stackOwner(left).checkBound(),stackOwner(right).checkBound(),TransferIds.AIR);return value<0?-1:(int)value;}
+        catch(Throwable failure){throw failed(failure);}
+        finally{java.lang.ref.Reference.reachabilityFence(left);java.lang.ref.Reference.reachabilityFence(right);}
+    }
     static ScalarLeaseForTest scalarLeaseForTest(Stack stack) {
         Overlay allocation = stackOwner(stack);
         try { return adopt(STACK_RETAIN, (handle, ownership) -> new ScalarLeaseForTest(handle,

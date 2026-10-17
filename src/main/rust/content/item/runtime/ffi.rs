@@ -1138,6 +1138,13 @@ fn menu(handle:i64)->Option<Arc<super::slots::BoundaryOwner<super::menu::Menu>>>
         owner.lock().unwrap().set_carried(next);0})
 }
 #[no_mangle] pub extern "C" fn mattmc_item_menu_retain(handle:i64)->i64 {guard(||menu(handle).map_or(BAD,|owner|keep(Owner::Menu(owner))))}
+/// `ItemStack.isSameItemSameComponents` for two non-empty stacks (scalar
+/// addresses): 1 equal, 0 different, -1 when a foreign or unpaired component
+/// value needs the original Java `equals` (slots.rs `inventory_same`).
+#[no_mangle] pub unsafe extern "C" fn mattmc_item_stack_same_components(left:i64,right:i64,air:i64)->i64 {
+    guard(||{let (Some(a),Some(b))=(menu_stack(left),menu_stack(right)) else{return BAD};
+        match super::slots::inventory_same(&a,&b,air as u64){Some(true)=>1,Some(false)=>0,None=>-1}})
+}
 #[no_mangle] pub extern "C" fn mattmc_item_menu_double_match(handle:i64,first_handle:i64,second_handle:i64,inventory_handle:i64)->i64 {
     guard(||{let (Some(owner),Some(first),Some(second),Some(inventory))=(menu(handle),container(first_handle),container(second_handle),inventory(inventory_handle)) else{return BAD};
         let result=owner.lock().unwrap().matches_double(&first,&second,&inventory);i64::from(result)})

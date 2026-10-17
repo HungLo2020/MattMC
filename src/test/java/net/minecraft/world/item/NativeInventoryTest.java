@@ -576,5 +576,37 @@ class NativeInventoryTest {
         bootstrap();
         assertEquals(swapScenario(false),swapScenario(true));
     }
+
+    // ItemStack.isSameItemSameComponents decides two non-empty stacks natively
+    // (slots.rs inventory_same) and falls back to the original equals for values
+    // Rust cannot decide. Every pair must match the original formula.
+    private static boolean originalSame(ItemStack a,ItemStack b){
+        if(!a.is(b.getItem()))return false;
+        return a.isEmpty()&&b.isEmpty()?true:java.util.Objects.equals(a.components,b.components);
+    }
+    @Test void nativeComponentComparisonMatchesTheOriginalEquals() {
+        bootstrap();
+        var corpus=new java.util.ArrayList<ItemStack>();
+        ItemStack stick=new ItemStack(Items.STICK,7);corpus.add(stick);corpus.add(stick.copy());corpus.add(new ItemStack(Items.STICK,8));
+        ItemStack sword=new ItemStack(Items.IRON_SWORD);sword.setDamageValue(3);corpus.add(sword);corpus.add(sword.copy());
+        ItemStack other=new ItemStack(Items.IRON_SWORD);other.setDamageValue(4);corpus.add(other);
+        ItemStack reset=sword.copy();reset.setDamageValue(0);corpus.add(reset);corpus.add(new ItemStack(Items.IRON_SWORD));
+        ItemStack mutated=sword.copy();mutated.setDamageValue(4);corpus.add(mutated);
+        ItemStack repair=new ItemStack(Items.IRON_SWORD);repair.set(net.minecraft.core.component.DataComponents.REPAIR_COST,1);corpus.add(repair);corpus.add(repair.copy());
+        for(String name:new String[]{"a","a","b"}){ItemStack named=new ItemStack(Items.STICK,7);named.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,net.minecraft.network.chat.Component.literal(name));corpus.add(named);}
+        ItemStack enchanted=new ItemStack(Items.IRON_SWORD);enchanted.set(net.minecraft.core.component.DataComponents.ENCHANTMENTS,net.minecraft.world.item.enchantment.ItemEnchantments.EMPTY);corpus.add(enchanted);
+        ItemStack removed=new ItemStack(Items.STICK,7);removed.remove(net.minecraft.core.component.DataComponents.MAX_STACK_SIZE);corpus.add(removed);corpus.add(removed.copy());
+        ItemStack dyed=new ItemStack(Items.LEATHER_HELMET);dyed.set(net.minecraft.core.component.DataComponents.DYED_COLOR,new net.minecraft.world.item.component.DyedItemColor(0x123456));corpus.add(dyed);corpus.add(dyed.copy());
+        corpus.add(new ItemStack(Items.LEATHER_HELMET));corpus.add(new ItemStack(Items.DIAMOND_HELMET));corpus.add(new ItemStack(Items.DIAMOND_HELMET));
+        int decided=0,pairs=0;
+        for(ItemStack a:corpus)for(ItemStack b:corpus){
+            pairs++;
+            assertEquals(originalSame(a,b),ItemStack.isSameItemSameComponents(a,b),a+" / "+b+" "+a.getComponentsPatch()+" "+b.getComponentsPatch());
+            assertEquals(a.getCount()==b.getCount()&&originalSame(a,b)||a==b,ItemStack.matches(a,b));
+            if(a.is(b.getItem())&&!a.isEmpty()&&NativeItemState.sameComponents(a.state,b.state)>=0)decided++;
+        }
+        assertTrue(decided>pairs/4,"most same-item pairs decide natively: "+decided+" of "+pairs);
+        assertEquals(1,NativeItemState.sameComponents(sword.state,sword.copy().state),"a damaged copy decides natively");
+    }
 }
 

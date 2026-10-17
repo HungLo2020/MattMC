@@ -150,6 +150,23 @@ Quick moves from the inventory into the double chest then became native too
 5.4× Frozen. `tick_quick_move_empty` (unchanged code) is back to 8287 ns, which
 fits run-to-run variance. That row stays on watch.
 
+### Component comparison
+
+`ItemStack.matches` on a stack and its copy (iron sword with damage 3, diamond
+helmet, 7 sticks and shield, in rotation) was timed with a scratch loop. This
+is diagnostic only, not the acceptance driver: one JVM per side, warmed, the
+last five rounds of two million calls.
+
+| Image | ns per call |
+|---|---:|
+| Frozen | 7.9–12.2 |
+| Current before | 1230–2146 |
+| Current with native comparison | 117–119 |
+
+Debt: about 15× Frozen remains. The cost is the FFI crossing, the Arc retains
+and the two component locks per call. Equipment change detection pays it per
+equipped slot, per entity, per tick.
+
 ### Pending-content resources
 
 `VerifyItemResources.py --workload pending` (`build/s34-v5/resource-pending2`)
