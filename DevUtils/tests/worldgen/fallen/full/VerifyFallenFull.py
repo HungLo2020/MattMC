@@ -17,6 +17,52 @@ full.JDK=JAVA
 def sha(path):
     with Path(path).open('rb')as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 
+def guard_selected_runtime(root, side, receipt, report_dir):
+    """Guard the runtime actually reused, excluding unrelated historical sides.
+
+    Recompile the archived observer against its original classpath and require
+    byte-identical classes in its retained JAR. Never substitute a new observer
+    or silently remap an overwritten class directory.
+    """
+    import zipfile
+    command=json.loads((root/(side+'-fresh/command.json')).read_text())
+    entries=command[command.index('-cp')+1].split(os.pathsep)
+    agent=next(Path(arg.split(':',1)[1]) for arg in command if arg.startswith('-javaagent:'))
+    expected_deps=json.loads((ROOT/'build/fallen-tree/s0029-complete-cost-1/result.json').read_text())['input_images']
+    selected={}
+    for entry in entries:
+        path=Path(entry)
+        if path.is_dir():
+            expected={p:h for p,h in receipt['class_images'].items() if Path(p).is_relative_to(path)}
+            actual={str(p):sha(p) for p in path.rglob('*.class')}
+            assert actual==expected,('Selected reference classes changed',entry)
+            selected.update(expected)
+        elif path!=agent:
+            assert expected_deps.get(entry)==sha(path),('Selected reference dependency changed/unpinned',entry)
+            selected[entry]=sha(path)
+    native=next((Path(arg.split('=',1)[1])/'mattmc_rust-linux-x64.so' for arg in command if arg.startswith('-Dmattmc.rust.natives.dir=')),None)
+    if native is not None:
+        assert receipt['native_images'].get(str(native))==sha(native)
+        selected[str(native)]=sha(native)
+    sources=[root/'observer-source'/Path(p).name for p in receipt['sources']]
+    assert all(sha(root/'observer-source'/Path(p).name)==h for p,h in receipt['sources'].items())
+    report_dir.mkdir(parents=True,exist_ok=False)
+    with(report_dir/'compile.log').open('w')as log:
+        subprocess.run([str(JAVA/'javac'),'-g','-nowarn','-cp',os.pathsep.join(e for e in entries if Path(e)!=agent),
+            '-d',str(report_dir/'classes'),*map(str,sources)],stdout=log,stderr=subprocess.STDOUT,check=True)
+    with zipfile.ZipFile(agent)as jar:
+        archived={name:hashlib.sha256(jar.read(name)).hexdigest() for name in jar.namelist() if name.endswith('.class')}
+    rebuilt={str(p.relative_to(report_dir/'classes')):sha(p) for p in (report_dir/'classes').rglob('*.class')}
+    assert rebuilt==archived,('Archived observer is not reproducible',root,side)
+    selected[str(agent)]=sha(agent)
+    unused_changed=[p for group in ('class_images','native_images') for p,h in receipt[group].items()
+        if p not in selected and (not Path(p).exists()or sha(Path(p))!=h)]
+    report={'root':str(root),'side':side,'selected_images':selected,'archived_observer_reproduced':True,
+        'observer_classes':len(archived),'unused_changed_historical_images':unused_changed,
+        'original_receipt_sha256':sha(root/'result.json')}
+    (report_dir/'result.json').write_text(json.dumps(report,indent=2)+'\n')
+    return report
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,required=True)
@@ -58,14 +104,14 @@ def main():
         if args.reuse_baselines:
             baseline=args.reuse_baselines.resolve();prior=json.loads((baseline/'result.json').read_text())
             assert prior['guards_pass'] and prior['stage']==args.stage and prior['radius']==args.radius and prior['resume']==args.resume and prior['reopen']==args.reopen
-            assert all(Path(p).exists()and sha(p)==h for images in(prior['class_images'],prior['native_images'],resources)for p,h in images.items())
+            assert all(Path(p).exists()and sha(p)==h for p,h in resources.items())
             for path,digest in prior['sources'].items():assert sha(baseline/'observer-source'/Path(path).name)==digest
             for side in('frozen','pre'):
                 if side=='pre' and args.fresh_pre:continue
                 if side=='pre' and args.reuse_pre_current:
                     pinned=args.reuse_pre_current.resolve();actual=json.loads((pinned/'result.json').read_text())
                     assert actual['guards_pass'] and actual['stage']==args.stage and actual['radius']==args.radius and actual['resume']==args.resume and actual['reopen']==args.reopen
-                    assert all(Path(p).exists()and sha(p)==h for images in(actual['class_images'],actual['native_images'])for p,h in images.items())
+                    proof=guard_selected_runtime(pinned,'current',actual,out/'reference-proof-pre');result.setdefault('reference_proofs',{})['pre']=proof
                     # Bind the archived actual Current to this new pre's complete
                     # selected classes and actual mapped native launch argument.
                     assert all(actual['class_images'].get(p)==h for p,h in resource_manifest['complete_classes'].items())
@@ -76,6 +122,7 @@ def main():
                     regions['pre']=json.loads((pinned/'current-fresh/regions.json').read_text())
                     result['runs']['pre']={'reused_from':str(pinned),'original_side':'current','pinned_pre_commit':resource_manifest['pre_commit'],'receipt_sha256':sha(pinned/'result.json'),'original':actual['runs']['current']}
                     continue
+                proof=guard_selected_runtime(baseline,side,prior,out/('reference-proof-'+side));result.setdefault('reference_proofs',{})[side]=proof
                 regions[side]=json.loads((baseline/(side+'-fresh/regions.json')).read_text());result['runs'][side]={'reused_from':str(baseline),'original':prior['runs'][side]}
             old=(baseline/'observer-source/FallenFullAgent.java').read_text();new=Path(__file__).with_name('FallenFullAgent.java').read_text()
             for path in sources:
@@ -143,7 +190,9 @@ def main():
             result['candidate_checks_pass']=True;result['known_reference_debt']=not strict
         else:assert strict
     finally:
-        result['guards_pass']=all(Path(path).exists()and sha(Path(path))==digest for images in(original,classes,libraries,resources)for path,digest in images.items());result['passed']=result['passed']and result['guards_pass'];save()
+        selected_references={p:h for proof in result.get('reference_proofs',{}).values()for p,h in proof['selected_images'].items()}
+        result['selected_reference_guards_pass']=all(Path(p).exists()and sha(Path(p))==h for p,h in selected_references.items())
+        result['guards_pass']=result['selected_reference_guards_pass']and all(Path(path).exists()and sha(Path(path))==digest for images in(original,classes,libraries,resources)for path,digest in images.items());result['passed']=result['passed']and result['guards_pass'];save()
     print('FALLEN FULL',args.stage,'PASS'if result['passed']else'KNOWN REFERENCE DEBT',result['runs'],flush=True);assert result['guards_pass']and(result['passed']or result.get('candidate_checks_pass'))
 
 if __name__=='__main__':main()

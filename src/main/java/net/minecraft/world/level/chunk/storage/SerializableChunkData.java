@@ -389,8 +389,8 @@ public record SerializableChunkData(
 			for (int i = levelLightEngine.getMinLightSection(); i < levelLightEngine.getMaxLightSection(); i++) {
 				int j = chunkAccess.getSectionIndexFromSectionY(i);
 				boolean bl = j >= 0 && j < levelChunkSections.length;
-				DataLayer dataLayer = levelLightEngine.getLayerListener(LightLayer.BLOCK).getDataLayerData(SectionPos.of(chunkPos, i));
-				DataLayer dataLayer2 = levelLightEngine.getLayerListener(LightLayer.SKY).getDataLayerData(SectionPos.of(chunkPos, i));
+				DataLayer dataLayer = levelLightEngine.dataLayerForSave(LightLayer.BLOCK, SectionPos.of(chunkPos, i));
+				DataLayer dataLayer2 = levelLightEngine.dataLayerForSave(LightLayer.SKY, SectionPos.of(chunkPos, i));
 				DataLayer dataLayer3 = dataLayer != null && !dataLayer.isEmpty() ? dataLayer.copy() : null;
 				DataLayer dataLayer4 = dataLayer2 != null && !dataLayer2.isEmpty() ? dataLayer2.copy() : null;
 				if (bl || dataLayer3 != null || dataLayer4 != null) {

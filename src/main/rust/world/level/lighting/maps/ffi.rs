@@ -47,6 +47,9 @@ fn owner(registry: Arc<Registry>, state: LightMap) -> Arc<Owner> {
 /// Typed sibling-owner operations. Every lock ends before the caller can
 /// return an effect to Java; snapshots retain both map roots and layer pins.
 impl Owner {
+    pub(in crate::world::level::lighting) fn shares_registry(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.registry, &other.registry)
+    }
     pub(in crate::world::level::lighting) fn snapshot(&self) -> Arc<Self> {
         owner(Arc::clone(&self.registry), self.state.read().unwrap().snapshot())
     }

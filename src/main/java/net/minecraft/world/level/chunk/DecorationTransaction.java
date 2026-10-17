@@ -155,6 +155,24 @@ public final class DecorationTransaction {
 		if (tx != null) tx.touch(chunk);
 	}
 
+	/** A callback replaced canonical section owners in an already captured chunk.
+	 * Arm new owners under the same transaction without replacing its original
+	 * Java snapshot or dropping the old owners needed for rollback. */
+	static void reconcileCurrent(ChunkAccess chunk) {
+		var tx = CURRENT.get();
+		if (tx == null || !tx.open || !tx.chunks.containsKey(chunk)) return;
+		int first = tx.live.size();
+		var sections = chunk.getSectionsForRead();
+		for (int i = 0; i < sections.length; i++) {
+			var owner = sections[i].nativeGenerationInput();
+			if (owner == null || tx.live.contains(owner)) continue;
+			tx.live.add(owner);
+			tx.liveChunks.add(chunk);
+			tx.liveSections.add(i);
+		}
+		tx.arm(first);
+	}
+
 	private void touch(ChunkAccess chunk) {
 		if (!this.open || this.chunks.containsKey(chunk)) return;
 		boolean writable = false;
@@ -168,6 +186,10 @@ public final class DecorationTransaction {
 		}
 		int first = this.live.size();
 		this.chunks.put(chunk, new ChunkState(chunk, this));
+		this.arm(first);
+	}
+
+	private void arm(int first) {
 		int armed = this.live.size() - first;
 		if (armed == 0) return;
 		var owners = this.arena.allocate(ValueLayout.ADDRESS, armed);
@@ -389,6 +411,7 @@ public final class DecorationTransaction {
 	private static final class ChunkState {
 		final ChunkAccess chunk;
 		final long[] counters;
+		final LevelChunkSection[] originalSections;
 		/** Sections without a native owner: copies to put back. */
 		final LevelChunkSection[] javaSections;
 		final Map<Heightmap.Types, long[]> heightmaps = new EnumMap<>(Heightmap.Types.class);
@@ -403,6 +426,7 @@ public final class DecorationTransaction {
 		ChunkState(ChunkAccess chunk, DecorationTransaction tx) {
 			this.chunk = chunk;
 			var sections = chunk.getSectionsForRead();
+			this.originalSections = sections.clone();
 			this.counters = new long[sections.length];
 			this.javaSections = new LevelChunkSection[sections.length];
 			for (int i = 0; i < sections.length; i++) {
@@ -448,7 +472,8 @@ public final class DecorationTransaction {
 			this.tentativeEmpty = new boolean[sections.length];
 			for (int i = 0; i < sections.length; i++) {
 				this.tentativeEmpty[i] = sections[i].hasOnlyAir();
-				var saved = this.javaSections[i];
+				var saved = this.javaSections[i] != null ? this.javaSections[i]
+					: sections[i] != this.originalSections[i] ? this.originalSections[i] : null;
 				if (saved == null) continue;
 				var origin = proto.getPos();
 				int baseY = net.minecraft.core.SectionPos.sectionToBlockCoord(proto.getSectionYFromSectionIndex(i));
@@ -479,7 +504,10 @@ public final class DecorationTransaction {
 			var sections = this.chunk.getSections();
 			for (int i = 0; i < sections.length; i++) {
 				if (this.javaSections[i] != null) sections[i] = this.javaSections[i];
-				else sections[i].restorePackedCounts(this.counters[i]);
+				else {
+					sections[i] = this.originalSections[i];
+					sections[i].restorePackedCounts(this.counters[i]);
+				}
 			}
 			this.chunk.heightmaps.keySet().removeIf(type -> !this.heightmaps.containsKey(type));
 			this.heightmaps.forEach((type, data) -> {

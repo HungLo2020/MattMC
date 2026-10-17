@@ -296,9 +296,13 @@ public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>>
     /** Applies the facade handoff selected/prepared by the native coordinator. */
     @SuppressWarnings("unchecked")
     void publishNativeMap(NativeLightingMap map) {
-        this.visibleSectionData=(M)(this.layer==LightLayer.SKY
+        M replacement=(M)(this.layer==LightLayer.SKY
             ? new SkyLightSectionStorage.SkyDataLayerStorageMap(map)
             : new BlockLightSectionStorage.BlockDataLayerStorageMap(map));
+        if(this.coordinator!=null&&this.visibleSectionData.nativeMap!=null)
+            this.coordinator.prepareSavePublication(this.visibleSectionData.nativeMap,map);
+        // All allocation/native preparation precedes this volatile commit.
+        this.visibleSectionData=replacement;
     }
 
 	public LayerLightSectionStorage.SectionType getDebugSectionType(long l) {

@@ -8,8 +8,8 @@ use crate::world::level::chunk::{biomes, counters, live};
 
 /// Binding header words, then `SECTION_WORDS` per chunk section (row-major over
 /// the 3x3 neighbourhood, `dz` outer), then `HEIGHTMAP_TYPES` raw heightmaps per chunk.
-pub(crate) const VERSION: i64 = 1;
-pub(crate) const HEADER: usize = 16;
+pub(crate) const VERSION: i64 = 2;
+pub(crate) const HEADER: usize = 17;
 pub(crate) const SECTION_WORDS: usize = 3;
 pub(crate) const HEIGHTMAP_TYPES: usize = 2;
 pub(crate) const CHUNKS: usize = 9;
@@ -33,6 +33,74 @@ const H_LAZY_PRIMING: usize = 13;
 const H_LIGHT_CHUNKS: usize = 14;
 /// `ChunkSkyLightSources` storage bits.
 const H_SKY_BITS: usize = 15;
+const H_OWNER: usize = 16;
+
+/// One confined FEATURES binding owns its writable metadata and pending effects.
+/// Java only borrows projections of these buffers at exposure/reconciliation
+/// boundaries. An active Region or effect batch retains the allocation even if
+/// its Java handle is closed by a callback. No Rust borrow crosses an upcall.
+pub(crate) struct Owner {
+    words: std::cell::UnsafeCell<Box<[i64]>>,
+    out: std::cell::UnsafeCell<Box<[i64]>>,
+    pending: std::cell::RefCell<Vec<[i64; 5]>>,
+    leases: std::cell::RefCell<Vec<Option<live::WorldLease>>>,
+}
+
+impl Owner {
+    pub(crate) fn new(words: usize, out: usize) -> Self {
+        Self {
+            words: std::cell::UnsafeCell::new(vec![0; words].into_boxed_slice()),
+            out: std::cell::UnsafeCell::new(vec![0; out].into_boxed_slice()),
+            pending: std::cell::RefCell::new(Vec::new()),
+            leases: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+
+    pub(crate) fn pointers(&self) -> (*mut i64, usize, *mut i64, usize) {
+        // Confined to the binding's Java thread. The boxes never resize, and
+        // these references end before Java can access the returned pointers.
+        unsafe {
+            let words = &mut *self.words.get();
+            let out = &mut *self.out.get();
+            (words.as_mut_ptr(), words.len(), out.as_mut_ptr(), out.len())
+        }
+    }
+
+    pub(crate) fn claim(owner: std::sync::Arc<Self>) -> Effects {
+        let events = std::mem::take(&mut *owner.pending.borrow_mut());
+        Effects { owner, events, acknowledged: 0 }
+    }
+
+    pub(crate) fn reconcile(&self) {
+        // Called only when Java admitted a replacement owner. Retire all old
+        // generation leases before a subsequent native consumer can resume.
+        self.leases.borrow_mut().iter_mut().for_each(|slot| *slot = None);
+    }
+
+    pub(crate) fn pending_empty(&self) -> bool {
+        self.pending.borrow().is_empty()
+    }
+}
+
+/// A replay claims a whole ordered batch. Reentrant placements produce into a
+/// separate pending queue. Only completed VM effects are acknowledged; an
+/// unsuccessful adoption/replay restores the unacknowledged suffix.
+pub(crate) struct Effects {
+    owner: std::sync::Arc<Owner>,
+    pub(crate) events: Vec<[i64; 5]>,
+    pub(crate) acknowledged: usize,
+}
+
+impl Drop for Effects {
+    fn drop(&mut self) {
+        if self.acknowledged < self.events.len() {
+            let mut pending = self.owner.pending.borrow_mut();
+            self.events.drain(..self.acknowledged);
+            self.events.append(&mut pending);
+            *pending = std::mem::take(&mut self.events);
+        }
+    }
+}
 /// Final heightmap types per chunk (`ChunkStatus.FINAL_HEIGHTMAPS`).
 pub(crate) const FINAL_TYPES: usize = 4;
 
@@ -194,6 +262,7 @@ impl std::ops::IndexMut<usize> for Shared {
 }
 
 pub(crate) struct Region<'a> {
+    owner: Option<std::sync::Arc<Owner>>,
     words: Shared,
     out: Shared,
     lifetime: std::marker::PhantomData<&'a mut [i64]>,
@@ -268,13 +337,35 @@ impl<'a> Region<'a> {
         {
             return None;
         }
+        let owner = if words[H_OWNER] == 0 {
+            None // Isolated Rust fixtures have no Java binding owner.
+        } else {
+            // Java keeps this confined handle alive through the downcall. The
+            // independent strong reference protects callbacks closing it.
+            let pointer = words[H_OWNER] as *const Owner;
+            unsafe {
+                std::sync::Arc::increment_strong_count(pointer);
+                let owner = std::sync::Arc::from_raw(pointer);
+                let (wp, wl, op, ol) = owner.pointers();
+                if wp != words.as_ptr() || wl != words.len() || op != out.as_ptr() || ol != out.len() {
+                    return None;
+                }
+                Some(owner)
+            }
+        };
+        if let Some(owner) = &owner {
+            let mut leases = owner.leases.borrow_mut();
+            if leases.len() != CHUNKS * sections {
+                leases.resize_with(CHUNKS * sections, || None);
+            }
+        }
         let policies = counters::installed_policies()?;
         let registry = crate::content::block::installed()?;
         let air = registry.block(registry.air()?).default_state().0 as u32;
         let void_air = registry.block(registry.by_name("minecraft:void_air")?).default_state().0 as u32;
         // Java fills the final heightmaps and sky sources; only the rest starts clear.
         let keep = OUT_RESIZED + CHUNKS * sections + 1 + CHUNKS * HEIGHTMAP_TYPES * heightmap_words;
-        out.fill(0..keep, 0);
+        if owner.is_none() { out.fill(0..keep, 0); }
         Some(Self {
             center_x: words[H_CENTER_X] as i32,
             center_z: words[H_CENTER_Z] as i32,
@@ -297,7 +388,8 @@ impl<'a> Region<'a> {
             slot: -1,
             deferred: std::cell::Cell::new(None),
             touched: std::cell::Cell::new(0),
-            leases: std::cell::RefCell::new((0..CHUNKS * sections).map(|_| None).collect()),
+            leases: std::cell::RefCell::new(if owner.is_some() { Vec::new() } else { (0..CHUNKS * sections).map(|_| None).collect() }),
+            owner,
             words,
             out,
             lifetime: std::marker::PhantomData,
@@ -361,7 +453,12 @@ impl<'a> Region<'a> {
     }
 
     pub(crate) fn event(&mut self, kind: i64, x: i32, y: i32, z: i32, argument: i64) {
-        self.events.push([kind, x as i64, y as i64, z as i64, argument]);
+        let event = [kind, x as i64, y as i64, z as i64, argument];
+        if let Some(owner) = &self.owner {
+            owner.pending.borrow_mut().push(event);
+        } else {
+            self.events.push(event);
+        }
     }
 
     /// `ProtoChunk.getBlockState` for a chunk of the region: void air outside the build height.
@@ -609,7 +706,8 @@ impl<'a> Region<'a> {
 
     fn read_section(&self, chunk: usize, section: usize, index: usize) -> Result<u32> {
         let owner = self.blocks(chunk, section)?;
-        let mut leases = self.leases.borrow_mut();
+        let store = self.owner.as_ref().map_or(&self.leases, |owner| &owner.leases);
+        let mut leases = store.borrow_mut();
         let slot = &mut leases[chunk * self.sections + section];
         if let Some(value) = slot.as_ref().and_then(|lease| lease.get(owner, index)) {
             return Ok(value);
@@ -811,5 +909,44 @@ impl<'a> Region<'a> {
         let owner = unsafe { pointer.as_ref() }.ok_or(Failure::Unbound)?;
         let index = (((clamped & 3) << 4) | ((qz & 3) << 2) | (qx & 3)) as usize;
         owner.value(index).ok_or(Failure::Unbound)
+    }
+}
+
+#[cfg(test)]
+mod owner_tests {
+    use super::*;
+    use std::sync::Arc;
+
+    #[test]
+    fn claimed_effects_isolate_reentry_and_restore_only_unacknowledged_suffix() {
+        let owner = Arc::new(Owner::new(17, 1));
+        owner.pending.borrow_mut().extend([[1, 0, 0, 0, 0], [2, 0, 0, 0, 0], [3, 0, 0, 0, 0]]);
+        let mut outer = Owner::claim(owner.clone());
+        owner.pending.borrow_mut().push([4, 0, 0, 0, 0]);
+        let mut inner = Owner::claim(owner.clone());
+        assert_eq!(inner.events.iter().map(|e| e[0]).collect::<Vec<_>>(), [4]);
+        inner.acknowledged = 1;
+        drop(inner);
+        // The first VM effect completed; adoption/replay failed before the next.
+        outer.acknowledged = 1;
+        owner.pending.borrow_mut().push([5, 0, 0, 0, 0]);
+        drop(outer);
+        assert_eq!(owner.pending.borrow().iter().map(|e| e[0]).collect::<Vec<_>>(), [2, 3, 5]);
+        let mut retry = Owner::claim(owner.clone());
+        retry.acknowledged = retry.events.len();
+        drop(retry);
+        assert!(owner.pending.borrow().is_empty());
+    }
+
+    #[test]
+    fn claimed_effects_retain_owner_after_java_handle_retirement() {
+        let owner = Arc::new(Owner::new(17, 1));
+        let weak = Arc::downgrade(&owner);
+        owner.pending.borrow_mut().push([1, 0, 0, 0, 0]);
+        let batch = Owner::claim(owner.clone());
+        drop(owner);
+        assert!(weak.upgrade().is_some());
+        drop(batch);
+        assert!(weak.upgrade().is_none());
     }
 }

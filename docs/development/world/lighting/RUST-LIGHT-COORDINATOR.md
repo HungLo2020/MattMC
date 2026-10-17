@@ -124,6 +124,118 @@ obtains the five chunk source objects. Custom readers, custom storage and mixed
 or escaped layers use the original conditional Java loop. The old Java
 per-section matrix replay is not the production fallback.
 
+## Lighting and save continuation under development
+
+Rust now retains actual removed light entries while their column remains active.
+Admission requires the real prior publication and happens before the Java
+visible-map commit. This preserves COW writes made since the prior publication;
+old visible membership qualifies an entry but never supplies a fallback value.
+Disabling a column releases committed and pending custody, including mutations
+through native set views. Rust projects pending eligibility into its existing
+88-byte header so ordinary publications skip save preparation.
+
+The serialization adapter first calls the original listener. Only an exact stock
+listener returning null can resolve a retired entry. A scoped actual entry Arc
+protects facade resolution and is released through a primitive handle on error
+paths. Custom dispatch and the original `isEmpty`/`copy` ordering remain VM
+effects. This retains the actual source identity, rather than an earlier byte
+snapshot; ordinary propagation membership and listener results stay unchanged.
+See [`State`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/lighting/coordinator/mod.rs),
+[the CPU handoff](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/lighting/coordinator/ffi.rs)
+and [the save adapter](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/lighting/LevelLightEngine.java).
+
+**Current unpublished evidence:** base `c5a9de42` plus the owned patch, native
+`5f56832a` and 13,907 sealed Main classes. All 87 focused Java checks pass,
+including seven custody contracts and the incoming item/broadcast and
+weather/temperature and noise-constructor boundaries. Fresh Rust checks pass
+six lighting, 59 item, 30 biome and five constructor cases. Custody covers actual retirement/COW, failed-publication
+retry, column disable/re-enable, never-published exclusion, aliases, custom-copy
+effects and lifetime. Omitting the publication handoff fails the five
+selection/identity/COW contracts.
+
+A 512-column retention check holds 1,536 actual entries while active, releases
+all observed layers on disable and reaches zero final native-owner delta.
+The capacity-based table-payload estimate is 15,240 bytes initially, 105,400
+active and 68,920 disabled. The legacy output key is
+`requested_table_payload_bytes`; it is not an allocator-request or physical-heap
+measurement. Bucket bookkeeping, allocator overhead, layers and RSS are excluded;
+reusable native capacity remains until owner release. JVM swap is zero.
+
+Both controlled early/unload saves match every sampled saved light byte against
+guarded Frozen, through actual snapshot, encode, write and disk. The original
+125-chunk fresh/own-reopen case matches pre-change Current and its own reopened
+world exactly. The inherited 25 Primordial differences against Frozen remain
+unchanged and separately reported. The fresh full Rust tier has 3,064 passes,
+the exact same 57 known rendering-host failure names/bodies and nine ignores;
+guards pass, but the raw aggregate remains non-green.
+
+The completed Java broad tiers remain the earlier `77b6d654`/`f3cc80c1` image:
+2,557 ordinary passes/10 skips, 193 parity passes and 11 exhaustive passes.
+The bounded impact review verifies all 12 owned production files, one native test file and 76 lighting
+source/test/fixture files unchanged, with incoming runtime paths and unchanged build
+configuration listed. Fresh combined-image contracts, save/reopen, lifetime and
+reserved FEATURES owner/callback checks cover the changed boundaries. Earlier
+results are not relabeled as testing the later image.
+
+The desktop's exact 57 rendering checks pass on its preserved earlier packet.
+Current bounded reuse hashes all 57 test-function source files and 711
+render/direct-data-boundary files, Cargo/build configuration and resources.
+Changed lighting producers receive fresh CPU/save checks; this review does not
+turn the server aggregate green or certify gameplay/FPS. Extend the recorded
+source-impact review when integrating another runtime change. Lighting ownership
+and final system acceptance remain in progress.
+
+The current retained-import screen measures 23.148 microseconds/cycle against
+19.575 Frozen and 21.466 pre-change: 18.25% and 7.83% overhead respectively.
+The one fresh Current process has eight compilation/GC-quiet groups of 1,024
+cycles, identical work and native origin, zero JVM swap and passing guards.
+Original valid Frozen/pre observations are reused with runtime/source/configuration
+checks; Current's all-group and quiet medians coincide. Java allocation is
+22,328 bytes/cycle versus 33,664 Frozen and 22,304 pre-change. These are short
+intermediate observations with retained temporary debt, not a final 10%/25%
+allowance pass or native CPU/allocation attribution. The old `c3842c23` screen
+(26.495 microseconds, 35.35% Frozen overhead) and inconclusive 32-cycle screen
+remain historical receipts, not measurements of this correction.
+
+Receipts are under `build/lighting/`: `s0031-save-custody-inputs-6`,
+`focused-8`/`rust-focused-8` and `order-5`/`mutation-6`/`full-dimensions-5`
+with the same `s0031-save-custody-` prefix. The source-impact records are
+`s0031-postc5-reuse-impact-1` and `s0036-reuse-impact-4`.
+
+**Preserved investigation:** controlled unload light loss reproduces on
+published `4199640e`, parent `41d441c8` and the original S31 combination, while
+Frozen `7a4d1817` retains the sampled fields. Initial data matches; tracing finds
+actual neighboring-section retirement before the genuine last save, rather than
+an encoder/disk rewrite. Prototype `a529fcf4` passed saves/reopen but restored
+stale visible 9 after a genuine COW clear to 0. Prototype `c3842c23` fixed that
+case but resurrected visible 9 after retirement while disabled and re-enable
+before publication; Frozen returns null. Neither image will publish. Their
+positive and negative receipts remain tied to their original images.
+The first new Rust column fixture lacked an engine binding; that failure and
+the corrected six-test run are preserved. A test-only source change during the
+release build caused its whole-source guard to fail. Release dependency info
+excludes that fixture; a fresh seven-test Java run used identical release bytes
+and strict current-source guards. Original failures are not relabeled as passes.
+
+Run the paired native and Java build before focused consumer tests:
+
+```sh
+CARGO_TARGET_DIR=build/rust/target cargo test --manifest-path src/main/rust/Cargo.toml \
+  --profile suite --lib world::level::lighting::coordinator::tests::save_custody
+./gradlew -PmattmcRustProfile=release test -x testRustNative \
+  --tests net.minecraft.world.level.lighting.NativeLightSaveCustodyTest
+```
+
+The isolated omission and physical retention drivers are in
+`DevUtils/tests/lighting/lifecycle/`. `VerifyLightSaveCustody.py` takes a sealed
+candidate directory, Java home and new output directory; it never overwrites
+production classes. `VerifyLightSaveRetention.java` checks active-column
+identities, actual column retirement and final native-owner release. Its header
+byte counts cover requested table payload, not allocator overhead or total RSS.
+`VerifyLightSaveReference.py --reuse-frozen` reuses completed reference runs only
+with identical observer source/bytecode and guarded reference inputs; it does
+not relabel an older Current run as the new candidate.
+
 ## Contracts when changing this code
 
 - Preserve fastutil table order, live cursors, resize/trim behavior, default/null

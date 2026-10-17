@@ -2,13 +2,17 @@ package net.minecraft.world.level.chunk;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.ValueLayout;
+import java.lang.invoke.MethodHandle;
+import java.lang.ref.Cleaner;
 import java.lang.ref.Reference;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.util.Mth;
+import net.minecraft.util.NativeLibraryLoader;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -16,15 +20,38 @@ import net.minecraft.world.level.levelgen.WorldGenerationContext;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One decoration call's {@link WorldGenRegion} as Rust binding words: the
- * center chunk and its eight neighbours' live section owners, their
- * world-generation heightmaps and the biome zoom seed. Layout:
- * {@code levelgen/decoration/region.rs}. The binding pins every owner it
- * records; {@link #refresh} re-checks them and copies current heightmaps
- * before each native placement, because Java features run in between.
+ * A retained native region inside the existing FEATURES transaction. Rust
+ * owns its writable metadata, dirty state, section leases and ordered effects;
+ * Java pins the actual section owners and reconciles their exposed views at
+ * public calls and callbacks. Layout: {@code levelgen/decoration/region.rs}.
+ * {@link #refresh} imports current VM state after retrying unfinished adoption;
+ * {@link #afterPlacement} and {@link #replayPending} expose native changes.
  */
 public final class NativeDecorationRegion implements AutoCloseable {
-	private static final int VERSION = 1, HEADER = 16, SECTION_WORDS = 3, CHUNKS = 9;
+	private static final int VERSION = 2, HEADER = 17, SECTION_WORDS = 3, CHUNKS = 9;
+	private static final Cleaner CLEANER = Cleaner.create();
+	private static final MethodHandle CREATE = handle("create", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+		ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+	private static final MethodHandle RELEASE = handle("release", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+	private static final MethodHandle CLAIM = handle("claim", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+	private static final MethodHandle ACK = handle("ack", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+	private static final MethodHandle PROJECTED = handle("projected", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+	private static final MethodHandle RECONCILE = handle("reconcile", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+	private static final MethodHandle PENDING = handle("pending", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+	private static MethodHandle handle(String suffix, FunctionDescriptor descriptor) {
+		return NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_decoration_region_" + suffix, descriptor);
+	}
+
+	private static final class Release implements Runnable {
+		final java.util.concurrent.atomic.AtomicLong pointer = new java.util.concurrent.atomic.AtomicLong();
+		@Override public void run() {
+			long address = this.pointer.getAndSet(0);
+			if (address != 0) {
+				try { RELEASE.invokeExact(address); }
+				catch (Throwable failure) { throw new IllegalStateException("Native region release failed", failure); }
+			}
+		}
+	}
 	private static final Heightmap.Types[] HEIGHTMAPS = {Heightmap.Types.WORLD_SURFACE_WG, Heightmap.Types.OCEAN_FLOOR_WG};
 	/** {@code ChunkStatus.FINAL_HEIGHTMAPS} in enum order: what proto-chunk writes update from CARVERS on. */
 	private static final Heightmap.Types[] FINAL = {Heightmap.Types.WORLD_SURFACE, Heightmap.Types.OCEAN_FLOOR,
@@ -38,6 +65,10 @@ public final class NativeDecorationRegion implements AutoCloseable {
 	public static final int REFRESHED = 0, REFRESH_BLOCKS = 1, REFRESH_BIOMES = 2, REFRESH_HEIGHTMAP = 3;
 	private final WorldGenRegion region;
 	private final Arena arena = Arena.ofConfined();
+	private final Release release = new Release();
+	// Borrowed projections retain this scope. GC cannot release the owner while
+	// a projection segment is reachable, even if the region itself is abandoned.
+	private final Cleaner.Cleanable cleanable = CLEANER.register(this.arena.scope(), this.release);
 	private final ProtoChunk[] chunks = new ProtoChunk[CHUNKS];
 	private final LevelChunkSection[][] sections = new LevelChunkSection[CHUNKS][];
 	private final NativeLiveBlockSection[][] blocks = new NativeLiveBlockSection[CHUNKS][];
@@ -59,8 +90,22 @@ public final class NativeDecorationRegion implements AutoCloseable {
 		this.heightmapWords = (256 + 64 / bits - 1) / (64 / bits);
 		this.skyBits = Mth.ceillog2(region.getMaxY() + 1 - (region.getMinY() - 1) + 1);
 		this.skyWords = (256 + 64 / this.skyBits - 1) / (64 / this.skyBits);
-		this.words = this.arena.allocate((HEADER + CHUNKS * sectionCount * SECTION_WORDS + CHUNKS * HEIGHTMAPS.length * (long)this.heightmapWords) * 8L, 8);
-		this.out = this.arena.allocate((this.outSky() + 2 + CHUNKS * (long)this.skyWords) * 8L, 8);
+		int wordCount = HEADER + CHUNKS * sectionCount * SECTION_WORDS + CHUNKS * HEIGHTMAPS.length * this.heightmapWords;
+		int outCount = Math.toIntExact(this.outSky() + 2 + CHUNKS * (long)this.skyWords);
+		var descriptor = this.arena.allocate(ValueLayout.JAVA_LONG, 3);
+		try {
+			if ((int)CREATE.invokeExact(wordCount, outCount, descriptor) != 1) throw new IllegalStateException("Native region allocation failed");
+			this.release.pointer.set(descriptor.getAtIndex(ValueLayout.JAVA_LONG, 0));
+			this.words = MemorySegment.ofAddress(descriptor.getAtIndex(ValueLayout.JAVA_LONG, 1)).reinterpret(wordCount * 8L, this.arena, null);
+			this.out = MemorySegment.ofAddress(descriptor.getAtIndex(ValueLayout.JAVA_LONG, 2)).reinterpret(outCount * 8L, this.arena, null);
+		} catch (Throwable failure) {
+			this.release.pointer.compareAndSet(0, descriptor.getAtIndex(ValueLayout.JAVA_LONG, 0));
+			this.cleanable.clean();
+			this.arena.close();
+			if (failure instanceof RuntimeException runtime) throw runtime;
+			if (failure instanceof Error error) throw error;
+			throw new IllegalStateException("Native region adoption failed", failure);
+		}
 	}
 
 	private long outPrimed() {
@@ -151,7 +196,7 @@ public final class NativeDecorationRegion implements AutoCloseable {
 				if (live == null) return false;
 				if (!(section.getBiomes() instanceof PalettedContainer<?> container) || container.getClass() != PalettedContainer.class) return false;
 				var biome = container.nativeLiveBiomes();
-				if (biome == null || biome.binding != this.biomeBinding) return false;
+				if (biome == null || !this.sameBiomeIds(biome.binding)) return false;
 				this.blocks[index][s] = live;
 				this.counters[index][s] = section.nativeGenerationCounters();
 				this.biomes[index][s] = biome;
@@ -223,6 +268,12 @@ public final class NativeDecorationRegion implements AutoCloseable {
 	 * heightmap is unprimed: that placement keeps Java's path.
 	 */
 	public int refresh(boolean oceanFloorOnly, boolean setBlock) {
+		try {
+			int pending = (int)PENDING.invokeExact(this.owner());
+			if ((pending & 1) != 0) this.afterPlacement();
+			if ((pending & 2) != 0) this.replayPending();
+		} catch (RuntimeException | Error failure) { throw failure; }
+		catch (Throwable failure) { throw new IllegalStateException("Native region pending adoption failed", failure); }
 		if (setBlock && !this.writeReady) return REFRESH_HEIGHTMAP;
 		long present = 0;
 		for (int index = 0; index < CHUNKS; index++) {
@@ -230,13 +281,11 @@ public final class NativeDecorationRegion implements AutoCloseable {
 			var chunkSections = chunk.getSectionsForRead();
 			for (int s = 0; s < this.sectionCount; s++) {
 				var section = chunkSections[s];
-				if (section != this.sections[index][s] || section.nativeGenerationInput() != this.blocks[index][s]) {
-					chunk.nativeDecorationCapture = null;
-					return REFRESH_BLOCKS;
-				}
-				if (!(section.getBiomes() instanceof PalettedContainer<?> container) || container.nativeLiveBiomes() != this.biomes[index][s]) {
-					chunk.nativeDecorationCapture = null;
-					return REFRESH_BIOMES;
+				if (section != this.sections[index][s] || section == null || section.nativeGenerationInput() != this.blocks[index][s]
+						|| !(section.getBiomes() instanceof PalettedContainer<?> container) || container.nativeLiveBiomes() != this.biomes[index][s]) {
+					int reconciled = this.recapture(index, chunkSections);
+					if (reconciled != REFRESHED) return reconciled;
+					break;
 				}
 			}
 			for (int type = 0; type < HEIGHTMAPS.length; type++) {
@@ -259,6 +308,56 @@ public final class NativeDecorationRegion implements AutoCloseable {
 			this.out.setAtIndex(ValueLayout.JAVA_LONG, this.outSky(), 0);
 		}
 		return REFRESHED;
+	}
+
+	/** Admit the complete replacement before publishing any pointer or changing
+	 * the pins. Cached captures can be shared by another binding, so replace the
+	 * arrays rather than mutating a previously published capture. */
+	private int recapture(int index, LevelChunkSection[] current) {
+		var chunk = this.chunks[index];
+		chunk.nativeDecorationCapture = null;
+		if (current.length != this.sectionCount) return REFRESH_BLOCKS;
+		var sections = current.clone();
+		var blocks = new NativeLiveBlockSection[this.sectionCount];
+		var counters = new MemorySegment[this.sectionCount];
+		var biomes = new NativeLiveBiomeSection<?>[this.sectionCount];
+		var captured = new long[this.sectionCount * SECTION_WORDS];
+		for (int s = 0; s < this.sectionCount; s++) {
+			var section = sections[s];
+			if (section == null || (blocks[s] = section.nativeGenerationInput()) == null) return REFRESH_BLOCKS;
+			if (!(section.getBiomes() instanceof PalettedContainer<?> container) || container.getClass() != PalettedContainer.class) return REFRESH_BIOMES;
+			var biome = container.nativeLiveBiomes();
+			if (biome == null || !this.sameBiomeIds(biome.binding)) return REFRESH_BIOMES;
+			biomes[s] = biome;
+			counters[s] = section.nativeGenerationCounters();
+			captured[s * SECTION_WORDS] = blocks[s].stageOwner().address();
+			captured[s * SECTION_WORDS + 1] = counters[s].address();
+			captured[s * SECTION_WORDS + 2] = biome.owner.address();
+		}
+		DecorationTransaction.reconcileCurrent(chunk);
+		this.sections[index] = sections;
+		this.blocks[index] = blocks;
+		this.counters[index] = counters;
+		this.biomes[index] = biomes;
+		MemorySegment.copy(captured, 0, this.words, ValueLayout.JAVA_LONG,
+			(HEADER + (long)index * this.sectionCount * SECTION_WORDS) * 8L, captured.length);
+		chunk.nativeDecorationCapture = new Captured(sections, blocks, counters, biomes, this.biomeBinding, captured);
+		try { RECONCILE.invokeExact(this.owner()); }
+		catch (RuntimeException | Error failure) { throw failure; }
+		catch (Throwable failure) { throw new IllegalStateException("Native region reconciliation failed", failure); }
+		return REFRESHED;
+	}
+
+	/** A fresh canonical factory can register a distinct binding for the same
+	 * registry. Native biome IDs remain valid only when every holder has the
+	 * identical position in both tables; never compare just lengths or IDs. */
+	private boolean sameBiomeIds(NativeLiveBiomeSection.Binding<?> binding) {
+		if (binding == this.biomeBinding) return true;
+		var values = binding.values;
+		var expected = this.biomeBinding.values;
+		if (values.size() != expected.size()) return false;
+		for (int i = 0; i < values.size(); i++) if (values.get(i) != expected.get(i)) return false;
+		return true;
 	}
 
 	/** The final heightmaps and lit chunks' sky-light sources that native {@code setBlock} edits in place. */
@@ -322,9 +421,8 @@ public final class NativeDecorationRegion implements AutoCloseable {
 		long finalDirty = installPrimed ? this.out.getAtIndex(ValueLayout.JAVA_LONG, this.outFinal() + 1) : 0;
 		for (int bit = 0; finalDirty != 0 && bit < CHUNKS * FINAL.length; bit++) {
 			if ((finalDirty >>> bit & 1) == 0) continue;
-			long[] raw = new long[this.heightmapWords];
-			MemorySegment.copy(this.out, ValueLayout.JAVA_LONG, (this.outFinal() + 2 + (long)bit * this.heightmapWords) * 8L, raw, 0, raw.length);
-			this.chunks[bit / FINAL.length].setHeightmap(FINAL[bit % FINAL.length], raw);
+			this.projectHeightmap(this.chunks[bit / FINAL.length], FINAL[bit % FINAL.length],
+				this.outFinal() + 2 + (long)bit * this.heightmapWords);
 		}
 		long skyDirty = installPrimed ? this.out.getAtIndex(ValueLayout.JAVA_LONG, this.outSky() + 1) : 0;
 		for (int index = 0; skyDirty != 0 && index < CHUNKS; index++) {
@@ -336,9 +434,8 @@ public final class NativeDecorationRegion implements AutoCloseable {
 		long primed = this.out.getAtIndex(ValueLayout.JAVA_LONG, primedAt);
 		for (int bit = 0; installPrimed && bit < CHUNKS * HEIGHTMAPS.length; bit++) {
 			if ((primed >>> bit & 1) == 0) continue;
-			long[] raw = new long[this.heightmapWords];
-			MemorySegment.copy(this.out, ValueLayout.JAVA_LONG, (primedAt + 1 + (long)bit * this.heightmapWords) * 8L, raw, 0, raw.length);
-			this.chunks[bit / HEIGHTMAPS.length].setHeightmap(HEIGHTMAPS[bit % HEIGHTMAPS.length], raw);
+			this.projectHeightmap(this.chunks[bit / HEIGHTMAPS.length], HEIGHTMAPS[bit % HEIGHTMAPS.length],
+				primedAt + 1 + (long)bit * this.heightmapWords);
 		}
 		long far = this.out.getAtIndex(ValueLayout.JAVA_LONG, OUT_FAR_COUNT);
 		for (int i = 0; i < Math.min(far, FAR_LOG_ENTRIES); i++) {
@@ -347,12 +444,64 @@ public final class NativeDecorationRegion implements AutoCloseable {
 				(int)this.out.getAtIndex(ValueLayout.JAVA_LONG, at + 1), (int)this.out.getAtIndex(ValueLayout.JAVA_LONG, at + 2)));
 		}
 		if (far > FAR_LOG_ENTRIES) throw new IllegalStateException("Native decoration logged " + far + " far writes");
+		if (installPrimed) this.resetAfterSync();
+	}
+
+	private void projectHeightmap(ProtoChunk chunk, Heightmap.Types type, long at) {
+		var map = chunk.getOrCreateHeightmapUnprimed(type);
+		if (map.getClass() == Heightmap.class) {
+			long[] raw = map.getRawData();
+			if (raw.length == this.heightmapWords) {
+				// The canonical setRawData operation copies into this same live
+				// array. Preserve every escaped alias without a temporary array.
+				MemorySegment.copy(this.out, ValueLayout.JAVA_LONG, at * 8L, raw, 0, raw.length);
+				return;
+			}
+		}
+		// Preserve virtual dispatch for an escaped/custom heightmap entry.
+		long[] raw = new long[this.heightmapWords];
+		MemorySegment.copy(this.out, ValueLayout.JAVA_LONG, at * 8L, raw, 0, raw.length);
+		chunk.setHeightmap(type, raw);
 	}
 
 	/** After a sync upcall applied Rust's state: clear what {@link #afterPlacement} already applied. */
 	public void resetAfterSync() {
-		long primedAt = OUT_RESIZED + (long)CHUNKS * this.sectionCount;
-		this.out.asSlice(0, primedAt * 8L + 8L).fill((byte)0);
+		try { PROJECTED.invokeExact(this.owner()); }
+		catch (RuntimeException | Error failure) { throw failure; }
+		catch (Throwable failure) { throw new IllegalStateException("Native region projection acknowledgement failed", failure); }
+	}
+
+	private MemorySegment owner() {
+		// Enforce the confined scope's thread and close checks before a downcall.
+		this.words.getAtIndex(ValueLayout.JAVA_LONG, 0);
+		// The opaque argument must retain/acquire the same scope as words/out.
+		// A global address alone can outlive the last Java reference to its owner.
+		return MemorySegment.ofAddress(this.release.pointer.get()).reinterpret(1, this.arena, null);
+	}
+
+	/** Replays and acknowledges one owned batch. Nested calls claim their own
+	 * effects; a failed replay returns only its unfinished suffix to this owner. */
+	public void replayPending() {
+		try (var scratch = Arena.ofConfined()) {
+			var descriptor = scratch.allocate(ValueLayout.JAVA_LONG, 3);
+			int completed = 0;
+			try {
+				CLAIM.invokeExact(this.owner(), descriptor);
+				if (descriptor.getAtIndex(ValueLayout.JAVA_LONG, 0) == 0) return;
+				int count = Math.toIntExact(descriptor.getAtIndex(ValueLayout.JAVA_LONG, 2));
+				var events = MemorySegment.ofAddress(descriptor.getAtIndex(ValueLayout.JAVA_LONG, 1)).reinterpret(count * 40L, scratch, null);
+				for (; completed < count; completed++) {
+					long at = completed * 5L;
+					this.replayEvent(events.getAtIndex(ValueLayout.JAVA_LONG, at), events.getAtIndex(ValueLayout.JAVA_LONG, at + 1),
+						events.getAtIndex(ValueLayout.JAVA_LONG, at + 2), events.getAtIndex(ValueLayout.JAVA_LONG, at + 3),
+						events.getAtIndex(ValueLayout.JAVA_LONG, at + 4));
+				}
+			} finally {
+				long batch = descriptor.getAtIndex(ValueLayout.JAVA_LONG, 0);
+				if (batch != 0) ACK.invokeExact(batch, completed);
+			}
+		} catch (RuntimeException | Error failure) { throw failure; }
+		catch (Throwable failure) { throw new IllegalStateException("Native region effects failed", failure); }
 	}
 
 	/** Verification only: every heightmap and lit chunk's sky sources, to restore before Java's replay. */
@@ -549,13 +698,17 @@ public final class NativeDecorationRegion implements AutoCloseable {
 	 * and {@code scheduleTick} make.
 	 */
 	public void replay(long[] events, int count) {
-		var states = net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY;
 		for (int i = 0; i < count; i++) {
 			int at = i * 5;
-			var pos = new BlockPos((int)events[at + 1], (int)events[at + 2], (int)events[at + 3]);
-			long argument = events[at + 4];
+			this.replayEvent(events[at], events[at + 1], events[at + 2], events[at + 3], events[at + 4]);
+		}
+	}
+
+	private void replayEvent(long event, long x, long y, long z, long argument) {
+			var states = net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY;
+			var pos = new BlockPos((int)x, (int)y, (int)z);
 			ChunkAccess chunk = this.region.getChunk(pos);
-			int kind = (int)events[at];
+			int kind = (int)event;
 			if (kind > 0 && kind < 9) net.minecraft.world.level.levelgen.NativeDecoration.countEvent(kind);
 			switch (kind) {
 				case EVENT_POI -> this.region.nativeUpdatePoi(pos, states.byId((int)(argument >>> 32)), states.byId((int)argument));
@@ -581,9 +734,8 @@ public final class NativeDecorationRegion implements AutoCloseable {
 				case EVENT_FLUID_TICK -> this.region.scheduleTick(pos, net.minecraft.core.registries.BuiltInRegistries.FLUID.byId((int)(argument >>> 32)), (int)argument);
 				case EVENT_BLOCK_TICK -> this.region.scheduleTick(pos, net.minecraft.core.registries.BuiltInRegistries.BLOCK.byId((int)(argument >>> 32)), (int)argument);
 				case 9 -> net.minecraft.world.level.levelgen.NativeDecoration.templateBlockEntity(pos, argument);
-				default -> throw new IllegalStateException("Unknown native decoration event " + events[at]);
+				default -> throw new IllegalStateException("Unknown native decoration event " + event);
 			}
-		}
 	}
 
 	/** A native read reached a chunk the region does not serve: raise the region's own crash. */
@@ -602,6 +754,7 @@ public final class NativeDecorationRegion implements AutoCloseable {
 	@Override
 	public void close() {
 		this.arena.close();
+		this.cleanable.clean();
 		Reference.reachabilityFence(this.blocks);
 		Reference.reachabilityFence(this.biomes);
 		Reference.reachabilityFence(this.counters);

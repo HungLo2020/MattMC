@@ -83,7 +83,6 @@ public final class NativeDecoration {
 	private static final boolean JAVA_SEQUENCE = Boolean.getBoolean("mattmc.worldgen.javaSequence");
 	private static final java.util.concurrent.atomic.LongAdder SEQUENCED = new java.util.concurrent.atomic.LongAdder(),
 		SEQUENCE_DECLINED = new java.util.concurrent.atomic.LongAdder(), SEQUENCE_RESUMED = new java.util.concurrent.atomic.LongAdder();
-	private static final MethodHandle EVENTS = handle("events", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 	private static final MethodHandle INSTALL_FACTS = handle("install_facts", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 	private static volatile boolean factsInstalled;
 	private static final MethodHandle LAZY_PRIMING = handle("lazy_priming", FunctionDescriptor.of(ValueLayout.JAVA_INT));
@@ -111,7 +110,7 @@ public final class NativeDecoration {
     static MemorySegment fallenCallback() { return UPCALL; }
     /** Publish a child consumer's complete effect prefix before the next VM effect. */
     static void finishFallenRegion(NativeDecorationRegion region,int status) {
-        region.afterPlacement();replayEvents(region);region.resetAfterSync();
+        region.afterPlacement();replayEvents(region);
         if(status==PLACED)return;
         var call=CURRENT.get();
         if(call!=null&&call.failure!=null)throw NativeFallenTrees.<RuntimeException>propagate(call.failure);
@@ -1098,7 +1097,6 @@ public final class NativeDecoration {
 			var region = call.region;
 			region.afterPlacement();
 			replayEvents(region);
-			region.resetAfterSync();
 			int result = switch (op) {
 				case 23 -> NativeEndFeatures.generationEffect(args, count);
                 case 24 -> {
@@ -1192,26 +1190,10 @@ public final class NativeDecoration {
 
 	/** Java-owned effects of the last native placement on this thread, in their order. */
 	private static void replayEvents(NativeDecorationRegion region) {
-		long[] events = takeEvents();
-		if (events.length != 0) region.replay(events, events.length / 5);
+		region.replayPending();
 	}
 
-	/** The last native placement's events, five words each; clears them. */
-	private static long[] takeEvents() {
-		try {
-			int count = (int)EVENTS.invokeExact(MemorySegment.NULL, 0);
-			if (count == 0) return new long[0];
-			try (var arena = Arena.ofConfined()) {
-				var buffer = arena.allocate(count * 5L * 8L, 8);
-				if ((int)EVENTS.invokeExact(buffer, count) != count) throw new IllegalStateException("Native decoration events changed");
-				return buffer.toArray(ValueLayout.JAVA_LONG);
-			}
-		} catch (RuntimeException | Error failure) {
-			throw failure;
-		} catch (Throwable failure) {
-			throw new IllegalStateException("Native decoration events failed", failure);
-		}
-	}
+
 
 	/**
 	 * Verification mode: the native placement has been applied in full. Put the

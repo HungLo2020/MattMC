@@ -771,3 +771,156 @@ mod enable_sources {
         }
     }
 }
+
+mod save_custody {
+    use super::super::*;
+    unsafe fn map() -> Arc<LightMap> {
+        let registry = super::super::super::maps::ffi::mattmc_light_map_registry_create();
+        let map = super::super::super::maps::ffi::mattmc_light_map_create(registry);
+        super::super::super::maps::ffi::mattmc_light_map_registry_release(registry);
+        Arc::from_raw(map)
+    }
+    fn retire_state(state: &mut State, key: i64) {
+        state.tables[REMOVING].put(key, 1).unwrap(); state.inconsistent = true;
+        let frame = state.begin(Op::Reconcile, 0).unwrap();
+        assert!(matches!(state.step(frame, 0, None).unwrap(), Effect::Done(_)));
+        state.end(frame).unwrap();
+    }
+    unsafe fn retire_owner(owner: *const ffi::Owner, key: i64) {
+        let mut output = [0i64; 6];
+        assert_eq!(ffi::mattmc_light_coordinator_collection(owner, std::ptr::null(), REMOVING as i32, 2, key, 1, std::ptr::null(), output.as_mut_ptr()), 0);
+        assert_eq!(ffi::mattmc_light_coordinator_collection(owner, std::ptr::null(), 0, 10, 0, 1, std::ptr::null(), output.as_mut_ptr()), 0);
+        let frame = ffi::mattmc_light_coordinator_begin(owner, std::ptr::null(), 1, 0, 0);
+        assert_ne!(frame, 0);
+        assert_eq!(ffi::mattmc_light_coordinator_step(owner, frame, 0, std::ptr::null(), output.as_mut_ptr()), 0);
+        assert_eq!(ffi::mattmc_light_coordinator_end(owner, frame), 0);
+    }
+    #[test]
+    fn actual_publication_retains_only_live_retired_identity_and_acquired_entry_survives_retirement() {
+        unsafe {
+            let updating = map();
+            let key = propagation::section_pos(12, 4, -7);
+            let entry = updating.native_entry(Arc::new(Layer::new(9))).unwrap();
+            let weak = Arc::downgrade(&entry);
+            updating.set(key, Some(Arc::clone(&entry)));
+            let previous = updating.snapshot();
+            let owner = ffi::mattmc_light_coordinator_create(Arc::as_ptr(&updating), 0);
+            let mut output = [0i64; 2];
+            assert_eq!(ffi::mattmc_light_coordinator_collection(owner, std::ptr::null(), ENABLED as i32, 2, column(key), 1, std::ptr::null(), output.as_mut_ptr()), 0);
+            retire_owner(owner, key);
+            let next = updating.snapshot();
+            assert_eq!(ffi::mattmc_light_coordinator_prepare_save_publication(owner, Arc::as_ptr(&previous), Arc::as_ptr(&next), output.as_mut_ptr()), 0);
+            assert!(updating.raw(key).is_none(), "save custody does not revive propagation membership");
+            assert_eq!(ffi::mattmc_light_coordinator_collection(owner, std::ptr::null(), QUEUED as i32, 0, key, 0, std::ptr::null(), output.as_mut_ptr()), 0);
+            assert_eq!(output[0], 0, "no queued-state mirror");
+            assert_eq!(ffi::mattmc_light_coordinator_saved_acquire(owner, key, output.as_mut_ptr()), 0);
+            assert_ne!(output[0], 0); assert_eq!(output[1], i64::from(entry.id));
+            let token = output[0];
+            // Actual public set-view removal must retire private save custody too.
+            assert_eq!(ffi::mattmc_light_coordinator_collection(owner, std::ptr::null(), ENABLED as i32, 3, column(key), 0, std::ptr::null(), output.as_mut_ptr()), 0);
+            assert_eq!(ffi::mattmc_light_coordinator_saved_acquire(owner, key, output.as_mut_ptr()), 0);
+            assert_eq!(output, [0, 0]);
+            drop(entry); drop(previous); drop(next); drop(updating);
+            ffi::mattmc_light_coordinator_release(owner);
+            assert!(weak.upgrade().is_some(), "the actual acquired Entry Arc survives parent/column retirement");
+            ffi::mattmc_light_coordinator_saved_release(token);
+            assert!(weak.upgrade().is_none(), "final scoped release retires the native identity");
+        }
+    }
+    #[test]
+    fn failed_preparation_keeps_saved_membership_and_original_maps_uncommitted() {
+        unsafe {
+            let updating = map(); let key = propagation::section_pos(4, 3, 2);
+            let entry = updating.native_entry(Arc::new(Layer::new(8))).unwrap();
+            updating.set(key, Some(Arc::clone(&entry))); let previous = updating.snapshot();
+            let mut state = State::new(false, Arc::clone(&updating)).unwrap();
+            state.tables[ENABLED].put(column(key), 1).unwrap(); retire_state(&mut state, key);
+            let next = updating.snapshot();
+            let before = Arc::strong_count(&entry);
+            assert!(matches!(state.prepare_save_publication_with(&previous, &next,
+                || Err(Error::Table(Fault::Allocation))), Err(Error::Table(Fault::Allocation))));
+            assert_eq!(state.save_count, 0); assert!(state.saved_layer(key).is_none());
+            assert_eq!(Arc::strong_count(&entry), before, "failed preparation releases every planned entry pin");
+            assert_eq!(previous.raw(key).unwrap().identity, entry.identity); assert!(next.raw(key).is_none());
+            state.prepare_save_publication(&previous, &next).unwrap();
+            assert_eq!(state.saved_layer(key).unwrap().identity, entry.identity, "same original publication can retry");
+        }
+    }
+    #[test]
+    fn actual_removal_preserves_unpublished_cow_source_and_failed_publication_retries_it() {
+        unsafe {
+            let updating = map(); let key = propagation::section_pos(2, 1, 0);
+            let published = updating.native_entry(Arc::new(Layer::new(9))).unwrap();
+            updating.set(key, Some(Arc::clone(&published))); let previous = updating.snapshot();
+            let current = updating.native_entry(Arc::new(Layer::new(0))).unwrap();
+            updating.set(key, Some(Arc::clone(&current)));
+            let mut state = State::new(false, Arc::clone(&updating)).unwrap();
+            state.tables[ENABLED].put(column(key), 1).unwrap();
+            state.tables[REMOVING].put(key, 1).unwrap(); state.inconsistent = true;
+            let frame = state.begin(Op::Reconcile, 0).unwrap();
+            assert!(matches!(state.step(frame, 0, None).unwrap(), Effect::Done(_))); state.end(frame).unwrap();
+            assert!(updating.raw(key).is_none()); assert!(state.saved_layer(key).is_none());
+            assert_eq!(state.retiring_save[&key].identity, current.identity);
+            let next = updating.snapshot();
+            assert!(state.prepare_save_publication_with(&previous, &next, || Err(Error::Table(Fault::Allocation))).is_err());
+            assert!(state.saved_layer(key).is_none()); assert_eq!(state.retiring_save[&key].identity, current.identity);
+            // A failed CHANGED insertion after physical removal must not lose
+            // the same committed map prefix on a later complete publication.
+            state.tables[CHANGED].clear_membership();
+            state.prepare_save_publication(&previous, &next).unwrap();
+            assert_eq!(state.saved_layer(key).unwrap().identity, current.identity);
+            assert_ne!(state.saved_layer(key).unwrap().identity, published.identity);
+            assert!(state.retiring_save.is_empty());
+        }
+    }
+    #[test]
+    fn disabled_actual_retirement_is_not_revived_by_reenable_before_publication() {
+        unsafe {
+            let updating = map(); let key = propagation::section_pos(0, 1, 0);
+            let entry = updating.native_entry(Arc::new(Layer::new(9))).unwrap();
+            updating.set(key, Some(entry)); let previous = updating.snapshot();
+            let mut state = State::new(false, Arc::clone(&updating)).unwrap();
+            retire_state(&mut state, key);
+            assert!(updating.raw(key).is_none()); assert!(state.retiring_save.is_empty());
+            let (engine, _) = state.attach(Arc::new(Queues::default()), 0).unwrap();
+            let enable = state.begin(Op::Enable(0, true), engine).unwrap();
+            assert!(matches!(state.step(enable, 0, None).unwrap(), Effect::Done(_))); state.end(enable).unwrap();
+            assert!(state.enabled(key));
+            state.prepare_save_publication(&previous, &updating.snapshot()).unwrap();
+            assert!(state.saved_layer(key).is_none(), "previous visible membership alone is not an active retirement");
+        }
+    }
+    #[test]
+    fn actual_retirement_without_prior_publication_is_not_adopted_for_save() {
+        unsafe {
+            let updating = map(); let previous = updating.snapshot();
+            let key = propagation::section_pos(3, 1, 0);
+            let current = updating.native_entry(Arc::new(Layer::new(7))).unwrap();
+            updating.set(key, Some(current));
+            let mut state = State::new(false, Arc::clone(&updating)).unwrap();
+            state.tables[ENABLED].put(column(key), 1).unwrap();
+            state.tables[REMOVING].put(key, 1).unwrap(); state.inconsistent = true;
+            let frame = state.begin(Op::Reconcile, 0).unwrap();
+            assert!(matches!(state.step(frame, 0, None).unwrap(), Effect::Done(_))); state.end(frame).unwrap();
+            assert_eq!(state.retiring_save.len(), 1);
+            state.prepare_save_publication(&previous, &updating.snapshot()).unwrap();
+            assert!(state.saved_layer(key).is_none()); assert!(state.retiring_save.is_empty());
+        }
+    }
+    #[test]
+    fn unpublished_or_foreign_registry_data_is_not_adopted_for_save() {
+        unsafe {
+            let updating = map(); let foreign = map(); let key = propagation::section_pos(3, 2, 1);
+            let entry = foreign.native_entry(Arc::new(Layer::new(7))).unwrap(); foreign.set(key, Some(entry));
+            let owner = ffi::mattmc_light_coordinator_create(Arc::as_ptr(&updating), 0);
+            let mut out = [0i64; 2];
+            assert_eq!(ffi::mattmc_light_coordinator_collection(owner, std::ptr::null(), ENABLED as i32, 2, column(key), 1, std::ptr::null(), out.as_mut_ptr()), 0);
+            assert_eq!(ffi::mattmc_light_coordinator_collection(owner, std::ptr::null(), CHANGED as i32, 2, key, 1, std::ptr::null(), out.as_mut_ptr()), 0);
+            assert_eq!(ffi::mattmc_light_coordinator_prepare_save_publication(owner, Arc::as_ptr(&foreign), Arc::as_ptr(&updating), out.as_mut_ptr()), -27);
+            assert_eq!(ffi::mattmc_light_coordinator_saved_acquire(owner, key, out.as_mut_ptr()), 0); assert_eq!(out, [0, 0]);
+            let previous = updating.snapshot();
+            assert_eq!(ffi::mattmc_light_coordinator_prepare_save_publication(owner, Arc::as_ptr(&previous), Arc::as_ptr(&updating), out.as_mut_ptr()), 0);
+            ffi::mattmc_light_coordinator_release(owner);
+        }
+    }
+}

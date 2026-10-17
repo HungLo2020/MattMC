@@ -79,6 +79,19 @@ public class LevelLightEngine implements LightEventListener {
 		return i;
 	}
 
+    /** Save reads retain their original listener effects and virtual copy order.
+     * Only an exact stock listener can recover its native retired save identity. */
+    @Nullable
+    public final net.minecraft.world.level.chunk.DataLayer dataLayerForSave(LightLayer layer, SectionPos position) {
+        LayerLightEventListener listener=this.getLayerListener(layer);
+        var result=listener.getDataLayerData(position);
+        if(result!=null)return result;
+        LightEngine<?,?> engine=layer==LightLayer.BLOCK?this.blockEngine:this.skyEngine;
+        if(listener!=engine||engine==null||engine.lightCoordinator==null||position==null||position.getClass()!=SectionPos.class
+                ||(layer==LightLayer.BLOCK?engine.getClass()!=BlockLightEngine.class:engine.getClass()!=SkyLightEngine.class))return null;
+        return engine.lightCoordinator.retiredLayerForSave(position.asLong());
+    }
+
 	@Override
 	public void updateSectionStatus(SectionPos sectionPos, boolean bl) {
         if(this.nativeLevel!=null&&sectionPos!=null&&sectionPos.getClass()==SectionPos.class

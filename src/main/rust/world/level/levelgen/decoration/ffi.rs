@@ -1,7 +1,102 @@
-//! Decoration exports. Programs are owned boxes released by Java; region and
-//! output words are borrowed for one call. No Java callbacks.
+//! Decoration exports. Programs and retained region state are native owners.
+//! Each downcall borrows the region's metadata projections; sync upcalls expose
+//! changes before VM effects and reconcile the same owner before native resume.
 use super::placement::{heights_resolve, Placement, Scratch};
 use std::cell::RefCell;
+
+/// Allocates a confined region owner. Publishing the handle into caller-owned
+/// storage is the last operation, so Java can retire it if adoption fails.
+/// # Safety
+/// `descriptor` is writable for three longs; lengths are the binding dimensions.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_decoration_region_create(words: i32, out: i32, descriptor: *mut i64) -> i32 {
+    if descriptor.is_null() || !(17..=16_000_000).contains(&words) || !(1..=16_000_000).contains(&out) {
+        return 0;
+    }
+    let owner = std::sync::Arc::new(super::region::Owner::new(words as usize, out as usize));
+    let (wp, _, op, _) = owner.pointers();
+    let handle = std::sync::Arc::into_raw(owner);
+    *wp.add(16) = handle as i64;
+    *descriptor.add(1) = wp as i64;
+    *descriptor.add(2) = op as i64;
+    *descriptor = handle as i64;
+    1
+}
+
+/// # Safety
+/// `owner` is a live confined handle, released exactly once by Java.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_decoration_region_release(handle: i64) {
+    let owner = handle as *const super::region::Owner;
+    if !owner.is_null() { drop(std::sync::Arc::from_raw(owner)); }
+}
+
+/// # Safety
+/// `owner` is a live confined binding, after Java admitted replacement owners.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_decoration_region_reconcile(owner: *const super::region::Owner) {
+    (*owner).reconcile();
+}
+
+/// Whether an earlier exposure still has metadata or effects to adopt. Java
+/// retries those before importing exposed aliases for another native call.
+/// # Safety
+/// `owner` is a live confined binding with its initialized header.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_decoration_region_pending(owner: *const super::region::Owner) -> i32 {
+    let (words, _, out, _) = (*owner).pointers();
+    let primed = super::region::OUT_RESIZED + super::region::CHUNKS * *words.add(4) as usize;
+    let final_maps = primed + 1 + super::region::CHUNKS * 2 * *words.add(10) as usize;
+    let sky = final_maps + 2 + super::region::CHUNKS * 4 * *words.add(10) as usize;
+    let metadata = (super::region::OUT_FAR_COUNT..=primed).any(|i| *out.add(i) != 0)
+        || *out.add(final_maps + 1) != 0 || *out.add(sky + 1) != 0;
+    metadata as i32 | ((!(*owner).pending_empty()) as i32) << 1
+}
+
+/// Acknowledges successful metadata projection; a failed projection keeps its
+/// dirty state until it is retried or the region is retired.
+/// # Safety
+/// `owner` is a live confined binding with an initialized, validated header.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_decoration_region_projected(owner: *const super::region::Owner) {
+    let (words, _, out, _) = (*owner).pointers();
+    let sections = *words.add(4) as usize;
+    let height_words = *words.add(10) as usize;
+    let primed = super::region::OUT_RESIZED + super::region::CHUNKS * sections;
+    let final_maps = primed + 1 + super::region::CHUNKS * 2 * height_words;
+    let sky = final_maps + 2 + super::region::CHUNKS * 4 * height_words;
+    // Failure coordinates remain observable until Java raises the region's
+    // own unavailable-chunk exception after projecting the successful prefix.
+    std::ptr::write_bytes(out.add(super::region::OUT_FAR_COUNT), 0, primed + 1 - super::region::OUT_FAR_COUNT);
+    *out.add(final_maps + 1) = 0;
+    *out.add(sky + 1) = 0;
+}
+
+/// Claims a replay batch without borrowing the owner across Java effects.
+/// # Safety
+/// `owner` is live on this thread; `descriptor` is writable for three longs.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_decoration_region_claim(owner: *const super::region::Owner, descriptor: *mut i64) {
+    if (*owner).pending_empty() { return; }
+    std::sync::Arc::increment_strong_count(owner);
+    let batch = Box::new(super::region::Owner::claim(std::sync::Arc::from_raw(owner)));
+    *descriptor.add(1) = batch.events.as_ptr() as i64;
+    *descriptor.add(2) = batch.events.len() as i64;
+    *descriptor = Box::into_raw(batch) as i64;
+}
+
+/// Commits the successfully replayed prefix and restores the remaining suffix.
+/// # Safety
+/// `batch` came from `region_claim` and is released once. `completed` is the
+/// number of effects whose VM operation returned successfully.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_decoration_region_ack(handle: i64, completed: i32) {
+    let batch = handle as *mut super::region::Effects;
+    if !batch.is_null() {
+        let mut batch = Box::from_raw(batch);
+        batch.acknowledged = (completed.max(0) as usize).min(batch.events.len());
+    }
+}
 
 thread_local! {
     /// Vein buffers reused across placements on each worker thread.

@@ -15,6 +15,15 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
  * deliberately outside the retained-layer import window. No copied policy. */
 public final class BenchmarkLightCoordinator {
     static volatile long sink;
+    private static final java.util.List<java.lang.management.GarbageCollectorMXBean> COLLECTORS=ManagementFactory.getGarbageCollectorMXBeans();
+    private static long[] collections() {
+        long count=0,millis=0;
+        for(var collector:COLLECTORS) {
+            count+=Math.max(0,collector.getCollectionCount());
+            millis+=Math.max(0,collector.getCollectionTime());
+        }
+        return new long[]{count,millis};
+    }
     final VerifyThreadedLighting.Fixture fixture;
     final LevelLightEngine direct;
     final String mode;
@@ -109,16 +118,18 @@ public final class BenchmarkLightCoordinator {
     void sample(int steps,int index,String prefix,java.lang.management.CompilationMXBean compilation,
                 com.sun.management.ThreadMXBean memory,long thread) throws Exception {
         checksum=0;
+        long[] gcBefore=collections();
         long compiled=compilation.getTotalCompilationTime(),allocated=memory.getThreadAllocatedBytes(thread);
         long dispatch=fixture.dispatch.executed,light=fixture.light.executed;
         long began=System.nanoTime();for(int i=0;i<steps;i++)cycle();long elapsed=System.nanoTime()-began;
         long bytes=memory.getThreadAllocatedBytes(thread)-allocated,jit=compilation.getTotalCompilationTime()-compiled;
+        long[] gcAfter=collections();
         long check=observe();
         String status=java.nio.file.Files.readString(java.nio.file.Path.of("/proc/self/status"));
         String rss=status.lines().filter(s->s.startsWith("VmRSS:")).findFirst().orElse("VmRSS: unavailable");
         String swap=status.lines().filter(s->s.startsWith("VmSwap:")).findFirst().orElse("VmSwap: unavailable");
         System.out.println(prefix+" "+index+" "+elapsed+" "+bytes+" "+jit+" "+check+" "+(fixture.dispatch.executed-dispatch)+" "+(fixture.light.executed-light));
-        System.out.println("RESOURCE "+prefix+" "+index+" 0 0 "+rss+" "+swap);
+        System.out.println("RESOURCE "+prefix+" "+index+" "+(gcAfter[0]-gcBefore[0])+" "+(gcAfter[1]-gcBefore[1])+" "+rss+" "+swap);
     }
 
     public static void main(String[] args) throws Exception {

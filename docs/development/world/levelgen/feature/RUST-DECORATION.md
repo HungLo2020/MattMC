@@ -140,6 +140,9 @@ temperature policy. Historical Java contract: [cache scope][temperature-cache] �
   checks and bees, Java leaves, Java predicates, a step's structures and a
   Java-route feature. Pure upcalls (no sync): `Math` functions, block light,
   and reads beyond the bound 3×3.
+- **Exposure boundaries.** Every public Java return also projects metadata and
+  replays effects. Callers can observe and mutate live arrays between public
+  calls; retaining a native owner never permits skipping this synchronization.
 - **No partial fallback.** A program declines (`JAVA_ROUTE`) only before its
   first draw; inside the loop that feature is placed by Java instead. Program
   creation requires counter policies for every state it can write. A binding
@@ -163,7 +166,10 @@ chunks (the End's islands) cheap:
 - Each `ProtoChunk` keeps its last capture (section, block, counter and biome
   owners and their words) while its section array is unchanged; the next
   region reuses it, and `refresh` re-checks every owner before native work.
-  A failed check drops the capture so the next bind recaptures.
+  Canonical replacements are recaptured after validating block/counter owners
+  and the complete ordered biome-holder table. A different factory binding is
+  compatible only when every biome ID denotes the identical holder. Unsupported
+  replacements drop the capture and follow the existing binding-failure rules.
 - A structure step calls back only when the chunk references one of the
   step's structures: `startsForStructure` finds nothing otherwise, and each
   feature reseeds the random the step would have set.
@@ -171,6 +177,178 @@ chunks (the End's islands) cheap:
 Unprimed WG heightmaps (chunks restored from disk at CARVERS) are primed by
 Rust at the first read, exactly as `ChunkAccess.getHeight` primes them,
 unless a custom `BlockState` subclass is registered.
+
+### Retained region ownership
+
+[`NativeDecorationRegion`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/chunk/NativeDecorationRegion.java)
+holds a confined handle to Rust-owned WG/final heightmaps, sky sources, dirty
+flags, section-generation leases and pending effects. Placement producers and
+successive programs in the existing native sequence use that same state.
+Java's binding segments are borrowed projections, and its section-owner arrays
+keep the live chunk storage reachable. The FEATURES transaction remains the
+rollback and deferred-effect authority.
+
+At each actual VM boundary, project metadata into the existing live arrays,
+then claim an ordered effect batch. A nested placement produces into its own
+pending batch. Replay acknowledges only effects whose VM operation completed;
+failed adoption or replay retains the unfinished suffix. Before importing VM
+state for a subsequent call, retry unfinished projections/effects. Canonical
+heightmap projection copies directly into the existing raw array; custom
+heightmaps retain virtual `setRawData` dispatch.
+
+When a callback replaces canonical sections, reconcile the complete capture
+before native work resumes and retire old generation leases. New owners join
+the same transaction without overwriting its original snapshot; rollback puts
+the original sections and counters back and discards deferred effects.
+
+Close the binding through the existing decoration scope. An active downcall's
+borrow prevents premature confined-scope close; failed close leaves the native
+owner live. A Cleaner tied to the projection scope handles abandonment, so a
+retained projection segment also retains its native allocation. Active native
+calls and claimed effect batches hold independent strong native references.
+Rust stores no raw JVM object pointers. Release and replay acknowledgement use
+primitive handles, so cleanup does not allocate a Java segment after taking
+responsibility for a native allocation. The allocation-failure controls retain
+the original failed release/ack argument cases as negatives.
+
+#### Recorded S31 measurements and remaining work
+
+**Historical correctness hold, October 16:** the combined S31/S32 production
+image on `4199640e` (native `b7502e37`, sealed Main `d3d4f7d6`) matches the
+125 fresh dimension chunks, but its own reopen lost saved End light fields.
+Separate runs lost nine SkyLight fields in three far End chunks and three
+BlockLight fields near the origin. The actual final unload-save snapshots
+already lacked the fields before encoding; encoded tapes, region writes and
+final disk agreed. These failures remain preserved, separate from the known
+Primordial differences and any performance exception.
+
+A single buffered native diagnostic used a distinct image (`ceac5f5f`) with the
+same production classes. It observed actual section removals and task snapshot
+adoption without dropped events, but saving preceded removal and the loss did
+not recur. Direct resumes ran; all observed action5 publications used task mode.
+The original driver's duplicate-binding event-count assertion failed after the
+probe; read-only validation identified two actual owners across fifty returns,
+without rerunning the server. Keep both receipts. No production fix, new
+acceptance timing, or correctness waiver follows from this instrumented capture.
+
+A later controlled-order test reproduced the loss on published `4199640e`, the
+combined S31 image, and exact parent `41d441c8`. Each image retained the sampled
+light data when saved with tickets held; each lost nonzero fields when original
+ticket release led to the genuine last unload save. All six runs began with
+identical sampled light bytes, and the parent used identical observer bytecode.
+Thus S31 and the changes published in `4199640e` are unnecessary for this
+controlled failure. A later portable observer compiled against immutable Frozen
+`7a4d1817` retains all sampled fields under both schedules, while the earlier Current image lost
+them on unload with identical initial data and observer bytecode. The current lighting correction on `c5a9de42` (native `5f56832a`) retains the
+actual active-column retirement source, including COW changes. Controlled saves
+match all sampled Frozen bytes; the original 125 fresh/own-reopen chunks match
+pre-change Current and their own reopened world. The inherited 25 Primordial
+Frozen differences remain separate. Both earlier prototypes are rejected:
+`a529fcf4` restored stale visible light after COW, and `c3842c23` resurrected a
+layer retired while disabled. Preserve their original positive/negative receipts.
+Fresh reserved FEATURES owner and all ten callback/alias cases pass on the
+combined correction. See the
+[lighting continuation](../../lighting/RUST-LIGHT-COORDINATOR.md#lighting-and-save-continuation-under-development)
+for exact current correctness, capability-impact and resource evidence. This
+checkpoint does not complete either whole lighting or whole world generation.
+
+**Current October 17 intermediate screen:** `c5a9de42`/`5f56832a` matches
+actual output, callbacks, native work and the original observer bytecode.
+The same 4,096 warmups and 32 groups of 64 complete operations yield 13 normal
+and 23 callback compilation/GC-quiet groups. Normal measures 74.654 us and
+callbacks 77.294 us, with 5,664/8,352 Java bytes respectively. Relative to the
+original guarded Frozen/pre observations, Current/Frozen is 1.183/1.153 and
+Current/pre-change is 1.047/1.000. The complete quiet ranges are
+67.947–84.148 us and
+75.534–115.895 us.
+This is retained temporary cost under policy317, not a final allowance pass
+or native allocator/CPU attribution. The historical image comparison below
+remains relevant evidence of image-sensitive costs, not a causal percentage.
+Latest receipts: `build/lighting/s0031-reserved-feature-screen-8`.
+
+**Historical October 17 pre-noise screen:** the combined `929fb693`/`f4010bdd`
+image matches both triplets' actual output/callback/native-work identity, with
+13 normal and 23 callback compilation/GC-quiet groups. Each group has 64
+complete operations after 4,096 warmups. Same observer bytecode and guarded
+original Frozen/pre observations are retained. Normal measures 75.514 us
+versus 63.128 Frozen/71.301 pre-change; callbacks measure 87.955 us versus
+67.018/77.307. Java allocation is 5,664/8,352 bytes per operation respectively.
+Current/Frozen is 1.196/1.312; Current/pre-change is 1.059/1.138.
+These are explicit temporary costs, not final performance allowance passes.
+
+The material increase was investigated with one process on each of two
+preserved images under the same observer/configuration. Rejected `c3842c23`
+measures 54.427/60.153 us and corrected pre-integration `f3cc80c1` measures
+65.223/64.441 us. Both match work and guards; neither is relabeled as the
+current candidate. Current quiet ranges remain 71.098–88.481 us normal and
+80.175–104.985 us callback. The image-sensitive cost spans integrations;
+these bounded observations do not identify a causal function or justify
+attributing all overhead to the Java/Rust boundary. Save/reopen, callback,
+owner and release checks pass; no runaway ownership is observed. Keep the
+whole cost charged and continue direct native caller/world-service ownership.
+The generation reservation remains with S31 until explicit verified handoff;
+whole lighting continues independently. Receipts are under
+`build/lighting/s0031-reserved-feature-screen-5` and its two labeled diagnostic
+siblings. Two earlier wrapper guard failures occurred before any JVM/benchmark
+and remain preserved; Frozen-only jar hashes now come from the original
+guarded runtime, with every selected dependency checked.
+
+The October 16 S31 measurement on documentation base `41d441c8` used the
+cleanup-safe native image `ea4c79c3` and sealed Main manifest `1b0367db`.
+Frozen remains `7a4d1817`; pre-change Current is published S29 `2b183557`
+(native `925a27bf`). These are historical measurements of that exact image;
+subsequent chunk-generation integration requires its own affected checks.
+All 28 original complete public-call observations and both production
+three-feature sequences matched their Frozen observations. JDK 25, release
+Rust, ZGC, CPU affinity 2–7, 1,024 warmups and 32 groups of 64 operations were
+used with other local builds and server drivers stopped.
+
+| Complete workload | Current | Current / Frozen | Current / pre-change |
+| --- | --- | --- | --- |
+| Native public fallen call, including four-decorator chains | 23.95–30.74 μs | 4.032–6.859 | 1.333–1.655 |
+| Native selector public call | 23.91–26.07 μs | 3.245–6.344 | 1.376–1.500 |
+| Production three-feature sequence | 61.29 μs | 0.976 | 0.828 |
+| Same sequence with a mutating VM callback | 65.75 μs | 0.837 | 0.775 |
+
+Each public-call route had at least 14 GC/compiler-quiet groups; the sequence
+rows had 7–14 across the three runtimes. These single-process comparisons do
+not establish stable causal percentages. Public calls exceed the normal
+Frozen allowance. Under the current
+[intermediate migration policy](../../../tooling/MIGRATION-ACCEPTANCE.md), this
+remains recorded temporary debt with an owned exit; an intermediate checkpoint
+does not require a new performance-exception turn. Full matched performance
+acceptance still applies at subsystem completion, and historical exceptions do
+not automatically cover changed workloads.
+
+Separate requested-heap controls measured 40,712/41,440 native bytes per
+three-feature operation, of which 39,776/40,456 were attributed to Rust.
+Pre-change totals were 40,544/41,224 bytes. Moving the metadata allocation
+category is not a process-memory reduction. Tagged allocations retired at
+return; held-owner, projection/opaque-handle GC and final-release controls
+also reached zero Rust bytes. This instrumentation excludes Java heap,
+`mmap`, code cache, RSS and work on other threads, and supplies no latency
+acceptance result.
+
+One paired JFR diagnostic of complete `chain_jdk/native` calls selected only
+owned-operation stacks: pre-change had four Java execution samples (three
+in refresh), Current eight (five in refresh). Allocation samples moved from
+`afterPlacement` toward the public call and replay boundary. These sparse
+samples identify retained synchronization and lifetime work; their weights
+are neither exact bytes per operation nor native CPU shares, and do not
+explain every nanosecond of the public-call regression. Raw recordings stay
+local. Preserve the raw cost rows, selected stacks and source/image guards
+when reviewing this result.
+
+The remaining ownership debt belongs to the decoration migration owner.
+A proposed next slice should connect canonical chunk metadata production,
+VM alias custody and native consumers through the transaction, retaining
+projection only at genuine VM exposure. Its exit criteria are exact callback,
+replacement, rollback and saved-world observations; no stale live arrays or
+premature retirement; and matched complete public and multi-feature costs
+within the applicable Frozen allowance (or a separately reviewed bounded
+exception). The existing native step loop and fallen-chain algorithms need
+no second port. This proposal is not authorization to change chunk-loading,
+saving or another worker's interfaces.
 
 | Property | Effect |
 | --- | --- |
@@ -206,6 +384,100 @@ The [FULL-chunk driver](../RUST-FULL-GENERATION.md) is the acceptance check.
 Compare against pre-change Current in every dimension and against Frozen
 where Frozen is reproducible. Check `native_decoration` in `regions.json` to
 confirm the native route ran.
+
+The retained-region controls use sealed classpaths/native directories and
+preserve Frozen and pre-change observations:
+
+```sh
+python3 DevUtils/tests/worldgen/region/VerifyRegion.py \
+  --output build/decoration-region/<callback-controls> --reference <sealed-pre>
+python3 DevUtils/tests/worldgen/region/ownership/VerifyRegionOwnership.py \
+  --output build/decoration-region/<ownership-controls> --reference <sealed-pre> \
+  --classpath <current-classpath-file> --native <current-native-directory>
+python3 DevUtils/tests/worldgen/region/sequence/VerifyRegionSequence.py \
+  --output build/decoration-region/<sequence-controls> --reference <sealed-pre> \
+  --current-classpath <current-classpath-file> --current-native <current-native-directory>
+```
+
+The first command establishes ten callback/alias baselines, including a real
+native biome consumer after VM mutation. The original pre-change section
+replacement failure is preserved as a negative control. Candidate runs
+add `--sides current`, explicit current inputs and `--frozen-observations` from
+the identical archived observer. Ownership controls exercise actual adoption,
+projection, replay, replacement rollback, close and last-projection GC. Run
+`--kill-release` and `--kill-ack` separately to require their intended failures.
+Their libc requested-heap instrumentation is excluded from latency measurements.
+Use the sequence driver's `--resources` switch for a separate matched allocation
+and last-use retirement run; its instrumented timings are not acceptance data.
+The sequence observer calls production `applyBiomeDecoration` with three native
+features, including a callback between native consumers. Its short defaults
+establish work parity; matched cost runs need idle hosts, explicit warmup/batch
+settings and sufficient GC/compiler-quiet groups. These focused controls do not
+replace FULL/save/reopen, failure/cancellation or the mandatory test tiers.
+
+For a save/reopen discrepancy, preserve the failing world's final disk state
+and its earlier live fingerprints separately. The opt-in save discriminator
+replays the archived commands into new worlds:
+
+```sh
+python3 DevUtils/tests/worldgen/region/diagnostics/VerifyRegionSave.py \
+  --output build/decoration-region/<save-diagnostic> \
+  --inputs <sealed-current-main-directory> --template <preserved-dimension-run>
+```
+
+It traces eight selected End chunks (the positions are explicit in
+`RegionSaveAgent.java`): actual save snapshots versus harness snapshots,
+encoded tape contents, and region-write entry/return. Snapshot identity is
+weakly tracked. Light bytes are reconstructed with public nibble reads,
+without exporting a mutable array or retaining another light owner. Those reads
+can acquire the layer's normal cached read projection. The boot agent installs
+its transformer before resolving the snapshot helper's classes. Java events use
+a fixed buffer and flush after capture; its summary reports capacity and dropped
+events. Any dropped event makes the capture inconclusive. No lighting barrier
+is inserted, but observation allocations and calls can change save scheduling.
+`completed` means the probes ran successfully;
+`fresh_reopen.identical` remains a separate, strict comparison. Keep failed
+or incomplete traces, actual loaded native paths and all input guards; these
+instrumented runs provide no acceptance latency or automatic correctness waiver.
+
+Add `--live-light --fresh-only` for the bounded writer trace of original public
+reads, weak engine/storage/map identities and existing lifecycle callbacks.
+Canonical stock commands can bypass Java per-section coordinator wrappers;
+absence of those wrapper events does not establish absence of native removal.
+For an explicitly authorized native diagnostic, `--native-diag <artifact-dir>`
+requires a separately built image, its exact source-selection receipt, diagnostic
+patch, source hashes and build result. It keeps the selected production classes
+and original native image pinned, verifies any original source selection after
+upstream edits, and never calls that old runtime a build of the newer tip.
+Native buffers record owner incarnations, command/removal/retention decisions,
+publication membership and sequence identities. The matching opt-in Java hooks
+observe both direct-frame and task action5 adoption. Native and Java drop counts
+must both be zero. Keep diagnostic changes excluded from production verification;
+if observation masks the loss, report the observed save ordering and stop the
+bounded experiment rather than treating the quiet run as a fix.
+
+The pinned S31 investigation also has a test-only controlled-order driver:
+
+```sh
+python3 DevUtils/tests/worldgen/region/diagnostics/VerifyRegionSaveOrder.py \
+  --output build/decoration-region/<controlled-order> \
+  --published <sealed-published-419-image> --failing <sealed-combined-main> \
+  --template <preserved-dimension-run>
+```
+
+Use the preserved review artifacts for these exact images. The controller runs
+FEATURES/FULL requests and ticket release in one actual server-executor job,
+using the normal managed request loop. Its unload budget permits real queued
+continuations and becomes false before eager saving. It requires naturally dirty
+targets, no earlier successful target save, actual `scheduleUnload` save callers,
+and that this unload's cleanup enqueue follows its save. It changes no dirty or
+status flag and never invokes cleanup ahead of its own save. Missing legitimate
+preconditions stop the test as unsupported. Native diagnostic hooks are excluded.
+Only after both original images reproduce can `--pre-s32` and `--prerequisite`
+select the exact parent; source and compiled Java observer equality are checked.
+Compare the captured live light, final save snapshots, encoded tapes, writes and
+saved world separately. A successful fixture precondition is not a correctness
+pass or permission to erase the original failing worlds.
 
 Shadow verification undoes each native placement, replays it on Java's route
 with the same seeded random and compares blocks, heightmaps, sky sources,

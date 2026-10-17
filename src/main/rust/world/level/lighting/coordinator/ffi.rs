@@ -11,10 +11,15 @@ struct Header {
     sky_seeds: AtomicU32,
     phases: [AtomicU64; 4],
     bytes: AtomicU64,
+    saved_layers: AtomicU32,
+    retiring_save_layers: AtomicU32,
 }
 pub(super) struct Owner { header: Header, state: Mutex<State>, refreshed_ids: Mutex<Vec<u32>> }
 impl Drop for Owner { fn drop(&mut self) { LIVE.fetch_sub(1, Ordering::Relaxed); } }
-pub(super) fn publish(owner: &Owner, state: &State) {
+pub(super) fn publish(owner: &Owner, state: &mut State) {
+    state.cleanup_save_columns();
+    owner.header.saved_layers.store(state.save_count.min(u32::MAX as usize) as u32, Ordering::Release);
+    owner.header.retiring_save_layers.store(state.retiring_save.len().min(u32::MAX as usize) as u32, Ordering::Release);
     for (target, table) in owner.header.sizes.iter().zip(&state.tables) { target.store(table.len(), Ordering::Release); }
     owner.header.sky_seeds.store(state.sky_seeds,Ordering::Release);
     owner.header.inconsistent.store(i32::from(state.inconsistent), Ordering::Release);
@@ -29,7 +34,7 @@ pub(super) fn publish(owner: &Owner, state: &State) {
             !pending && !publication_pending && engine.kind != 2 && engine.nodes.table_len() <= 1025);
     }
     owner.header.bytes.store((state.tables.iter().map(Table::allocation_bytes).sum::<usize>()
-        + state.engines.values().map(|e| e.nodes.allocation_bytes()).sum::<usize>()) as u64, Ordering::Release);
+        + state.engines.values().map(|e| e.nodes.allocation_bytes()).sum::<usize>() + state.save_bytes) as u64, Ordering::Release);
 }
 unsafe fn retain<T>(pointer: *const T) -> Arc<T> { Arc::increment_strong_count(pointer); Arc::from_raw(pointer) }
 fn failure(error: Error, out: &mut [i64]) -> i32 {
@@ -50,8 +55,8 @@ pub unsafe extern "C" fn mattmc_light_coordinator_create(map: *const LightMap, s
     if map.is_null() { return std::ptr::null_mut(); }
     let Ok(state) = State::new(sky != 0, retain(map)) else { return std::ptr::null_mut(); };
     let owner = Arc::new(Owner { header: Header { sizes: std::array::from_fn(|_| AtomicI32::new(0)), inconsistent: AtomicI32::new(0),
-        sky_seeds:AtomicU32::new(0), phases: std::array::from_fn(|_| AtomicU64::new(0)), bytes: AtomicU64::new(0) }, state: Mutex::new(state), refreshed_ids: Mutex::new(Vec::new()) });
-    publish(&owner, &owner.state.lock().unwrap()); LIVE.fetch_add(1, Ordering::Relaxed); Arc::into_raw(owner) as *mut Owner
+        sky_seeds:AtomicU32::new(0), phases: std::array::from_fn(|_| AtomicU64::new(0)), bytes: AtomicU64::new(0), saved_layers: AtomicU32::new(0), retiring_save_layers: AtomicU32::new(0) }, state: Mutex::new(state), refreshed_ids: Mutex::new(Vec::new()) });
+    publish(&owner, &mut owner.state.lock().unwrap()); LIVE.fetch_add(1, Ordering::Relaxed); Arc::into_raw(owner) as *mut Owner
 }
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_light_coordinator_release(owner: *mut Owner) { if !owner.is_null() { drop(Arc::from_raw(owner)); } }
@@ -72,7 +77,7 @@ pub unsafe extern "C" fn mattmc_light_coordinator_bind(owner: *const Owner, queu
     let mut state = (*owner).state.lock().unwrap();
     let Ok((id, projection)) = state.attach(retain(queues), kind) else { return std::ptr::null_mut(); };
     let levels=Arc::clone(&state.engines.get(&id).unwrap().levels);
-    publish(&*owner, &state);
+    publish(&*owner, &mut state);
     drop(state);
     Box::into_raw(Box::new(Binding { owner: retain(owner), id, projection, levels }))
 }
@@ -131,7 +136,7 @@ pub unsafe extern "C" fn mattmc_light_coordinator_collection(owner: *const Owner
             13 if which == QUEUED => i64::from(id(&state.queued_default)),
             _ => return Err(Error::MissingOwner),
         }))();
-        if matches!(op, 2 | 3 | 5 | 7 | 10 | 11 | 12) { publish(o, &state); }
+        if matches!(op, 2 | 3 | 5 | 7 | 10 | 11 | 12) { publish(o, &mut state); }
         match result { Ok(value) => { out[0] = value; 0 }, Err(error) => failure(error, out) }
     })).unwrap_or(-99)
 }
@@ -182,7 +187,7 @@ pub unsafe extern "C" fn mattmc_light_coordinator_walk(owner: *const Owner, walk
             }
             Ok(())
         })();
-        if op == 1 { publish(o, &state); }
+        if op == 1 { publish(o, &mut state); }
         match result { Ok(()) => 0, Err(error) => failure(error, out) }
     })).unwrap_or(-99)
 }
@@ -291,7 +296,7 @@ pub unsafe extern "C" fn mattmc_light_coordinator_step(owner: *const Owner, id: 
         let mut state = o.state.lock().unwrap();
         let result = state.step(lease.id, scalar, if entry.is_null() { None } else { Some(retain(entry)) });
         let mut ids = o.refreshed_ids.lock().unwrap(); ids.clear(); ids.extend(state.refreshed.iter().map(|e| e.id));
-        out[4] = ids.as_ptr() as i64; out[5] = ids.len() as i64; publish(o, &state);
+        out[4] = ids.as_ptr() as i64; out[5] = ids.len() as i64; publish(o, &mut state);
         match result {
             Ok(Effect::Done(value)) => { out[0] = value; 0 },
             Ok(Effect::Repeat(slot)) => { out[0] = i64::from(slot); 1 },
@@ -437,7 +442,7 @@ pub unsafe extern "C" fn mattmc_light_coordinator_queue(
         let mut state = owner.state.lock().unwrap();
         let result = queue_admit(&mut state, key, reservation, layer, identity, out, || Ok(()));
         // A failed insertion can preserve its original partial table prefix.
-        publish(owner, &state);
+        publish(owner, &mut state);
         match result { Ok(()) => 0, Err(error) => failure(error, out) }
     })).unwrap_or(-99)
 }
@@ -468,7 +473,7 @@ pub unsafe extern "C" fn mattmc_light_coordinator_queue_batch(owner:*const Owner
     catch_unwind(AssertUnwindSafe(||{
         let mut state=owner.state.lock().unwrap();
         let result=queue_batch_admit(&mut state,key,batch,index,layer,identity,out,||Ok(()));
-        publish(owner,&state);match result{Ok(())=>0,Err(error)=>failure(error,out)}
+        publish(owner, &mut state);match result{Ok(())=>0,Err(error)=>failure(error,out)}
     })).unwrap_or(-99)
 }
 
@@ -485,7 +490,7 @@ pub unsafe extern "C" fn mattmc_light_coordinator_queue_existing(owner:*const Ow
         let Some(entry)=state.updating.existing_entry(identity,layer) else{return 1;};
         let result=state.put_queued(key,Some(entry));
         if result.is_ok(){state.inconsistent=true;}
-        publish(owner,&state);
+        publish(owner, &mut state);
         match result{Ok(_)=>0,Err(error)=>failure(error,out)}
     })).unwrap_or(-99)
 }
@@ -527,7 +532,7 @@ impl PropagationInput {
         let mut state=self.owner.state.lock().unwrap();
         let result=state.step(id,scalar,if entry.is_null(){None}else{Some(retain(entry))});
         let mut ids=self.owner.refreshed_ids.lock().unwrap();ids.clear();ids.extend(state.refreshed.iter().map(|entry|entry.id));
-        output[4]=ids.as_ptr() as i64;output[5]=ids.len() as i64;publish(&self.owner,&state);
+        output[4]=ids.as_ptr() as i64;output[5]=ids.len() as i64;publish(&self.owner, &mut state);
         match result{
             Ok(Effect::Done(value))=>{output[0]=value;0},
             Ok(Effect::Repeat(slot))=>{output[0]=i64::from(slot);1},
@@ -556,7 +561,7 @@ impl PropagationInput {
     pub(super) fn retain_data(&self,key:i64,value:bool)->i32{
         let mut state=self.owner.state.lock().unwrap();
         let result=if value{state.tables[RETAINED].put(key,1)}else{state.tables[RETAINED].remove(key)};
-        publish(&self.owner,&state);
+        publish(&self.owner, &mut state);
         match result{Ok(_)=>0,Err(Fault::Allocation)=>-20,Err(_)=>-27}
     }
     pub(super) unsafe fn import(&self,key:i64,entry:*const Entry)->i32{
@@ -565,7 +570,7 @@ impl PropagationInput {
         let result=if entry.is_null(){state.remove_queued(key).map(|_|())}else{
             state.put_queued(key,Some(retain(entry))).map(|_|{state.inconsistent=true;})
         };
-        publish(&self.owner,&state);
+        publish(&self.owner, &mut state);
         match result{Ok(())=>0,Err(Error::Table(Fault::Allocation))=>-20,Err(_)=>-27}
     }
     pub(in crate::world::level::lighting) fn enqueue_node(&self, pos: i64) -> i32 {
@@ -574,7 +579,7 @@ impl PropagationInput {
             state.table_mut(self.engine, NODES)?.put(pos, 1)?;
             Ok(())
         })();
-        publish(&self.owner, &state);
+        publish(&self.owner, &mut state);
         match result { Ok(()) => 0, Err(Error::Table(Fault::Allocation)) => -20, Err(_) => -27 }
     }
     pub(in crate::world::level::lighting) unsafe fn retain(binding: *const std::ffi::c_void) -> Option<Self> {
@@ -598,4 +603,43 @@ impl PropagationInput {
         }
         Ok(LayerInput::Ready(light_on))
     }
+}
+
+
+/// Prepare save custody before Java commits the corresponding visible facade.
+/// No borrow, map guard, or native lock survives this call.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_coordinator_prepare_save_publication(owner: *const Owner,
+    previous: *const LightMap, next: *const LightMap, output: *mut i64) -> i32 {
+    if output.is_null() { return -27; }
+    let out = std::slice::from_raw_parts_mut(output, 2); out.fill(0);
+    let (Some(owner), Some(previous), Some(next)) = (owner.as_ref(), previous.as_ref(), next.as_ref()) else { return -27; };
+    catch_unwind(AssertUnwindSafe(|| {
+        let mut state = owner.state.lock().unwrap();
+        let result = state.prepare_save_publication(previous, next);
+        publish(owner, &mut state);
+        match result { Ok(()) => 0, Err(error) => failure(error, out) }
+    })).unwrap_or(-99)
+}
+/// A scoped actual Entry Arc protects identity/materialization after the state
+/// guard ends, including reentry or concurrent column retirement in Java.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_coordinator_saved_acquire(owner: *const Owner, key: i64, output: *mut i64) -> i32 {
+    if output.is_null() { return -27; }
+    let out = std::slice::from_raw_parts_mut(output, 2); out.fill(0);
+    let Some(owner) = owner.as_ref() else { return -27; };
+    catch_unwind(AssertUnwindSafe(|| {
+        let entry = owner.state.lock().unwrap().saved_layer(key);
+        if let Some(entry) = entry {
+            let id = entry.id;
+            let token = Arc::into_raw(entry);
+            out[0] = token as i64; out[1] = i64::from(id);
+        }
+        0
+    })).unwrap_or(-99)
+}
+/// Primitive release remains usable on VM allocation/error paths.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_coordinator_saved_release(token: i64) {
+    if token != 0 { drop(Arc::from_raw(token as *const Entry)); }
 }

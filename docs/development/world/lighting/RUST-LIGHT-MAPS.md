@@ -71,6 +71,15 @@ the historical map verification below does not certify it.
 - All handles are CPU owners in the existing Rust library. Preserve original
   caller exclusion and publication sequencing; this adds no GPU ownership path.
 
+The unpublished lighting/save continuation retains actual removed layer entries
+for serialization when a neighbor retires their propagation section before the
+active column saves. The cache lives in the native coordinator, shares actual
+entry identity, including newer COW writes, rather than copying bytes early.
+Save adoption requires a prior publication, and custody retires with the column.
+It does not add entries to the ordinary visible or queued map. See the
+[coordinator's current save work](RUST-LIGHT-COORDINATOR.md#lighting-and-save-continuation-under-development)
+for current verification, retained debt and the original failure.
+
 ## Verification and current limits
 
 The suite, runtime, profile and artifact-retirement outcomes below are committed

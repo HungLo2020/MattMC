@@ -20,7 +20,7 @@ def main():
     assert bool(args.current_classpath)==bool(args.current_native)
     if args.current_classpath:cp['current']=args.current_classpath.read_text().strip();native['current']=args.current_native.resolve()
     folder=Path(__file__).parent;source=[folder.parent/'FallenAudit.java',folder.parent/'FallenChainRisks.java',*[folder/s for s in ('FallenCost.java','FallenResourceAgent.java','FallenAllocation.java','FallenNativeCost.java')]];observer=folder/'fallen_alloc.c';library=out/'libfallen_alloc.so'
-    original=ROOT/'build/fallen-tree/s0027-complete-cost-pilot-1/result.json';inputs={p:h for p,h in json.loads(original.read_text())['input_images'].items() if '/DevUtils/tests/worldgen/fallen/' not in p};inputs[str(original)]=sha(original);inputs.update({str(p):sha(p)for p in [*source,observer,Path(__file__).resolve(),pre/'manifest.json']})
+    original=ROOT/'build/fallen-tree/s0027-complete-cost-pilot-1/result.json';reference=json.loads((pre/'manifest.json').read_text());inputs={**reference['resource_images'],**reference['frozen_resource_images'],**reference['dependency_jars']};inputs[str(original)]=sha(original);inputs.update({str(p):sha(p)for p in [*source,observer,Path(__file__).resolve(),pre/'manifest.json']})
     for side in sides:
         for entry in cp[side].split(os.pathsep):
             if Path(entry).is_dir():inputs.update({str(p):sha(p)for p in Path(entry).rglob('*.class')})

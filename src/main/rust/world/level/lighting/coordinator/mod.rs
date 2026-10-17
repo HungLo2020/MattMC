@@ -166,6 +166,13 @@ struct State {
     state_default: u8,
     inconsistent: bool,
     updating: Arc<LightMap>,
+    // Actual retired entries qualified by prior publication while their column is live.
+    // This is save custody, not propagation membership or a Java state mirror.
+    save_columns: HashMap<i64, HashMap<i64, Arc<Entry>>>,
+    retiring_save: HashMap<i64, Arc<Entry>>,
+    save_count: usize,
+    save_bytes: usize,
+    save_cleanup_needed: bool,
     engines: HashMap<u64, Engine>,
     next_engine: u64,
     // Materialization updates are handed to Java before any effect. These pins
@@ -186,7 +193,7 @@ impl State {
         tables[STATES].primitive_values();
         tables[QUEUED].typed_values()?;
         Ok(Self { sky, tables: tables.try_into().ok().unwrap(), queued_default: None, state_default: 0,
-            inconsistent: false, updating, engines: HashMap::new(), next_engine: 1, refreshed: Vec::new(), frames: Vec::new(), free_frames: Vec::new(), phase_counts: [0; 4],sky_seeds:0 })
+            inconsistent: false, updating, save_columns: HashMap::new(), retiring_save: HashMap::new(), save_count: 0, save_bytes: 0, save_cleanup_needed: false, engines: HashMap::new(), next_engine: 1, refreshed: Vec::new(), frames: Vec::new(), free_frames: Vec::new(), phase_counts: [0; 4],sky_seeds:0 })
     }
     fn attach(&mut self, queues: Arc<Queues>, kind: i32) -> Result<(u64, Arc<EngineProjection>), Error> {
         let id = self.next_engine; let next = id.checked_add(1).ok_or(Error::Table(Fault::Allocation))?;
@@ -207,8 +214,93 @@ impl State {
         else { self.tables.get(which).ok_or(Error::MissingOwner) }
     }
     fn table_mut(&mut self, engine: u64, which: usize) -> Result<&mut Table, Error> {
+        if which == ENABLED { self.save_cleanup_needed = true; }
         if which == NODES { Ok(&mut self.engines.get_mut(&engine).ok_or(Error::MissingOwner)?.nodes) }
         else { self.tables.get_mut(which).ok_or(Error::MissingOwner) }
+    }
+    fn refresh_save_bytes(&mut self) {
+        self.save_bytes = self.retiring_save.capacity() * std::mem::size_of::<(i64, Arc<Entry>)>()
+            + self.save_columns.capacity() * std::mem::size_of::<(i64, HashMap<i64, Arc<Entry>>)>()
+            + self.save_columns.values().map(|layers| layers.capacity() * std::mem::size_of::<(i64, Arc<Entry>)>()).sum::<usize>();
+    }
+    fn retire_save_column(&mut self, key: i64) {
+        if let Some(layers) = self.save_columns.remove(&key) {
+            self.save_count -= layers.len();
+        }
+        self.retiring_save.retain(|section, _| column(*section) != key);
+        self.refresh_save_bytes();
+    }
+    fn cleanup_save_columns(&mut self) {
+        if !self.save_cleanup_needed { return; }
+        self.save_cleanup_needed = false;
+        let enabled = &self.tables[ENABLED];
+        let mut removed = 0;
+        self.save_columns.retain(|key, layers| {
+            if enabled.find(*key).is_ok() { true } else { removed += layers.len(); false }
+        });
+        self.save_count -= removed;
+        self.retiring_save.retain(|key, _| enabled.find(column(*key)).is_ok());
+        self.refresh_save_bytes();
+    }
+    /// Keep the actual updating entry before removal. It may contain COW
+    /// writes which the prior visible snapshot has never observed. Admission
+    /// to committed save custody still requires that prior publication.
+    fn prepare_retiring_save_layer(&mut self, key: i64) -> Result<(), Error> {
+        if self.enabled(key) {
+            if let Some(entry) = self.updating.raw(key) {
+                self.retiring_save.try_reserve(1).map_err(|_| Error::Table(Fault::Allocation))?;
+                self.retiring_save.insert(key, entry);
+                self.refresh_save_bytes();
+            }
+        }
+        Ok(())
+    }
+    fn saved_layer(&self, key: i64) -> Option<Arc<Entry>> {
+        if !self.enabled(key) { return None; }
+        self.save_columns.get(&column(key)).and_then(|layers| layers.get(&key)).cloned()
+    }
+    /// Prepare every fallible allocation before making a new visible map
+    /// available to Java. Ordinary reads continue using that actual map;
+    /// serialization alone may recover its retired, last-published identity.
+    fn prepare_save_publication(&mut self, previous: &LightMap, next: &LightMap) -> Result<(), Error> {
+        self.prepare_save_publication_with(previous, next, || Ok(()))
+    }
+    fn prepare_save_publication_with(&mut self, previous: &LightMap, next: &LightMap,
+        before_commit: impl FnOnce() -> Result<(), Error>) -> Result<(), Error> {
+        if !self.updating.shares_registry(previous) || !self.updating.shares_registry(next) { return Err(Error::MissingOwner); }
+        let result = (|| {
+            let mut pending = Vec::new();
+            pending.try_reserve(self.retiring_save.len()).map_err(|_| Error::Table(Fault::Allocation))?;
+            // The actual retirement producer is authoritative. Prior visible
+            // membership alone cannot revive a layer retired while disabled.
+            // This also covers a failed CHANGED insertion after physical removal.
+            for (&key, entry) in &self.retiring_save {
+                if self.enabled(key) && next.raw(key).is_none() && previous.raw(key).is_some() {
+                    pending.push((column(key), key, Arc::clone(entry)));
+                }
+            }
+            if pending.is_empty() { return Ok(()); }
+            pending.sort_unstable_by_key(|(column, key, _)| (*column, *key));
+            let columns = 1 + pending.windows(2).filter(|pair| pair[0].0 != pair[1].0).count();
+            self.save_columns.try_reserve(columns).map_err(|_| Error::Table(Fault::Allocation))?;
+            let mut first = 0;
+            while first < pending.len() {
+                let column = pending[first].0;
+                let mut end = first + 1;
+                while end < pending.len() && pending[end].0 == column { end += 1; }
+                self.save_columns.entry(column).or_default().try_reserve(end - first).map_err(|_| Error::Table(Fault::Allocation))?;
+                first = end;
+            }
+            before_commit()?;
+            // Native-only commit, with no remaining allocation or VM effect.
+            for (column, key, entry) in pending {
+                if self.save_columns.get_mut(&column).unwrap().insert(key, entry).is_none() { self.save_count += 1; }
+            }
+            Ok(())
+        })();
+        if result.is_ok() { self.retiring_save.clear(); }
+        self.refresh_save_bytes();
+        result
     }
     fn contains(&self, table: usize, key: i64) -> bool { self.tables[table].find(key).is_ok() }
     fn add(&mut self, table: usize, key: i64) -> Result<bool, Error> { Ok(self.tables[table].put(key, 1)? == NONE) }
@@ -346,7 +438,7 @@ impl State {
             match op {
                 Op::Enable(chunk,enabled)=>{
                     let key=propagation::section_pos(chunk as i32,0,(chunk>>32) as i32);
-                    if enabled{self.tables[ENABLED].put(key,1)?;}else{self.tables[ENABLED].remove(key)?;}
+                    if enabled{self.tables[ENABLED].put(key,1)?;}else{self.tables[ENABLED].remove(key)?;self.retire_save_column(key);}
                     let kind=self.engines.get(&f.engine).ok_or(Error::MissingOwner)?.kind;
                     if enabled&&kind==1{
                         f.ops.push(Op::EnableHighest(chunk));return Ok(Effect::HighestSource(chunk as i32,(chunk>>32) as i32));
@@ -531,7 +623,9 @@ impl State {
                 Op::RemoveWalk(mut cursor) => {
                     if cursor.has_next() {
                         let key = cursor.next_key(&self.tables[REMOVING])?;
-                        let queued = self.remove_queued(key)?; let removed = self.updating.remove(key);
+                        let queued = self.remove_queued(key)?;
+                        self.prepare_retiring_save_layer(key)?;
+                        let removed = self.updating.remove(key);
                         if self.contains(RETAINED, column(key)) {
                             if let Some(entry) = queued.or(removed) { self.put_queued(key, Some(entry))?; }
                         }

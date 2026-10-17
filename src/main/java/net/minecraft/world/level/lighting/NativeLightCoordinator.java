@@ -19,6 +19,9 @@ import net.minecraft.world.level.chunk.DataLayer;
  * delegate to the same native owner; they contain no membership mirror. */
 final class NativeLightCoordinator {
     private static final MethodHandle CREATE=handle("create",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    private static final MethodHandle PREPARE_SAVE=handle("prepare_save_publication",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+    private static final MethodHandle SAVED_ACQUIRE=handle("saved_acquire",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
+    private static final MethodHandle SAVED_RELEASE=handle("saved_release",FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
     private static final MethodHandle RELEASE=handle("release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final MethodHandle HEADER=handle("header",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle LIVE=handle("live",FunctionDescriptor.of(ValueLayout.JAVA_LONG));
@@ -82,7 +85,7 @@ final class NativeLightCoordinator {
             MemorySegment created=(MemorySegment)CREATE.invokeExact(map.ownerForCoordinator(),layer==LightLayer.SKY?1:0);
             if(created.address()==0)throw new IllegalStateException("Missing native light coordinator");
             owner=NativeLightingMap.adopt(created,1,RELEASE);
-            metadata=((MemorySegment)HEADER.invokeExact(owner)).asReadOnly().reinterpret(80);
+            metadata=((MemorySegment)HEADER.invokeExact(owner)).asReadOnly().reinterpret(88);
         }catch(Throwable error){throw failure(error);}
         finally{Reference.reachabilityFence(map);}
     }
@@ -131,6 +134,31 @@ final class NativeLightCoordinator {
                 }
             }
         }finally{map.drainForCoordinator();Reference.reachabilityFence(value);Reference.reachabilityFence(this);}
+    }
+    void prepareSavePublication(NativeLightingMap previous, NativeLightingMap next) {
+        if(!map.sharesIdentityResources(previous)||!map.sharesIdentityResources(next))throw new IllegalStateException("Incompatible light save publication");
+        try {
+            // Rust's actual retirement producer owns eligibility. Ordinary
+            // publications have no save continuation to prepare or synthesize.
+            if((int)INT.getAcquire(metadata,84L)==0)return;
+            synchronized(collectionOutput) {
+                check((int)PREPARE_SAVE.invokeExact(owner,previous.ownerForCoordinator(),next.ownerForCoordinator(),collectionOutput),collectionOutput);
+            }
+        }catch(Throwable failure){throw failure(failure);}
+        finally{Reference.reachabilityFence(previous);Reference.reachabilityFence(next);Reference.reachabilityFence(this);}
+    }
+    DataLayer retiredLayerForSave(long key) {
+        try {
+            if((int)INT.getAcquire(metadata,80L)==0)return null;
+            try(Arena arena=Arena.ofConfined()) {
+                MemorySegment output=arena.allocate(2L*Long.BYTES,Long.BYTES);
+                try {
+                    check((int)SAVED_ACQUIRE.invokeExact(owner,key,output),output);
+                    return map.resolveForCoordinator((int)output.getAtIndex(ValueLayout.JAVA_LONG,1));
+                }finally{SAVED_RELEASE.invokeExact(output.getAtIndex(ValueLayout.JAVA_LONG,0));}
+            }
+        }catch(Throwable failure){throw failure(failure);}
+        finally{Reference.reachabilityFence(this);}
     }
     void markInconsistent(){change(0,10,0,1);}
     void updateSectionStatus(long key,boolean empty){run(0,key,empty?1:0);}
