@@ -165,6 +165,8 @@ impl Enchantments {
         Self { table: Root::new(EnchantmentTable::new(n)), shape: Mutex::new(Shape { n, min_n: n, size: 0, contains_null: false, default_level: 0, revision: 0 }) }
     }
     pub fn size(&self) -> i32 { self.shape.lock().unwrap().size }
+    /// Holds the shape lock (contention controls for bounded entries).
+    #[cfg(test)] pub(crate) fn hold_shape_for_test(&self) -> impl Drop + '_ { self.shape.lock().unwrap() }
     pub fn mask(&self) -> usize { self.shape.lock().unwrap().n - 1 }
     pub fn capacity(&self) -> usize { self.shape.lock().unwrap().n }
     pub fn contains_null(&self) -> bool { self.shape.lock().unwrap().contains_null }

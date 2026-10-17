@@ -42,8 +42,8 @@ def main():
             assert (sha(pre / name) if name.startswith('native/') else hashlib.sha256(jar.read(name)).hexdigest()) == digest
     native = {'frozen': FROZEN / 'build/rust/native', 'pre': pre / 'native', 'current': ROOT / 'build/rust/native'}
     libraries = {side: {p.name: {'sha256': sha(p), 'inode': p.stat().st_ino} for p in directory.glob('*mattmc*')} for side, directory in native.items()}
-    # Timing a dev-profile (opt-level 0) library is meaningless: Gradle test runs rebuild
-    # build/rust/native in that profile. Release builds strip debug sections.
+    # Timing a dev-profile (opt-level 0) library is meaningless: a Gradle run without
+    # -PmattmcRustProfile=release rebuilds build/rust/native in that profile.
     def section_names(path):
         # ELF64 little-endian section header names (a string search would match literals in the data).
         import struct

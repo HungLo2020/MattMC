@@ -508,7 +508,8 @@ measured operations take observer tags, because the observer has 16,384.
 
 Compile and verify the selected image first; use new output directories.
 Build the native library last with `./gradlew -PmattmcRustProfile=release classes`.
-Any Gradle `test` run rebuilds `build/rust/native` in the dev profile (opt-level 0),
+A Gradle run without `-PmattmcRustProfile=release` (the dev profile is the
+default in `build.gradle`) rebuilds `build/rust/native` at opt-level 0,
 and `MeasureItemState.py` refuses a library that still has debug sections. A
 dev-profile run on October 17 (`build/s34-v12-equality`) made native calls look
 several times slower and is invalid.

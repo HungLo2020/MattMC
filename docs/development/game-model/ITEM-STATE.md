@@ -426,7 +426,17 @@ are native integers, empty or identical enchantments, or removals. Anything
 else returns "needs Java", and the original `equals` runs. A bounded critical
 entry (`mattmc_item_stack_same_bounded`, `try_lock` only) is tried first. Contention
 returns -1 and sends the comparison to the regular entry. A value that needs Java
-returns -2 and goes straight to the original `equals`. Per-tick consumers
+returns -2 and goes straight to the original `equals`. The bounded entry's
+work is capped. It compares patches of at most `Patch::BOUNDED_ENTRIES` (16)
+entries per side, which is at most 256 key comparisons and 32 payload lookups,
+with no allocation, upcall or blocking lock. A payload table whose retained
+capacity exceeds `Patch::BOUNDED_PAYLOAD_CAPACITY` (64) after earlier growth is
+declined too, so each lookup probes a bounded table. A larger patch or table, or
+two different enchantment lists (whose size needs the shape's blocking lock),
+returns -1 before the scan, and the regular entry decides. Rust tests cover all
+three declines: the work bound, retained payload capacity, and distinct
+enchantments while their shape lock is held (no wait). Each fails when its
+safeguard is removed. Per-tick consumers
 include `LivingEntity.collectEquipmentChanges` (every equipment slot of every
 equipped entity), merges and recipe matching.
 `NativeInventoryTest.nativeComponentComparisonMatchesTheOriginalEquals` compares

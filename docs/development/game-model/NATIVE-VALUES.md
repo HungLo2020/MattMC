@@ -159,9 +159,9 @@ JAVA_HOME=/path/to/jdk-25 python3 DevUtils/tests/content/VerifyContent.py --obse
 `--reference-repo` runs that checkout's compiled classes and
 `build/rust/native` as they are; the drivers never build it. After checking
 out a different commit there, rebuild it with
-`./gradlew -PmattmcRustProfile=release classes`. A Gradle test task rebuilds
-`build/rust/native` in the dev profile, so don't time a checkout after running
-its tests without rebuilding.
+`./gradlew -PmattmcRustProfile=release classes`. A Gradle test task run without
+`-PmattmcRustProfile=release` rebuilds `build/rust/native` in the default dev
+profile, so rebuild in release before timing a checkout whose tests you ran.
 **Integer wrapping:** debug builds check integer overflow and release
   builds don't, so arithmetic that Java wraps must use `wrapping_*`, such as
   `Mth.floor` for an out-of-range color channel.

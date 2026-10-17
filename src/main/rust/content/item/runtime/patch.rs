@@ -78,11 +78,21 @@ impl Patch {
         if self.shares_backing(other) { return Ok(Some(true)); }
         let (a,b,swapped)=if Arc::as_ptr(&self.0) < Arc::as_ptr(&other.0) {(&self.0,&other.0,false)} else {(&other.0,&self.0,true)};
         let (a,b)=if bounded {(a.contents.try_lock().map_err(|_|())?,b.contents.try_lock().map_err(|_|())?)} else {(a.contents.lock().unwrap(),b.contents.lock().unwrap())};
-        Ok(Self::compare_contents(&a,&b,swapped))
+        Self::compare_contents(&a,&b,swapped,bounded)
     }
-    fn compare_contents(a:&Contents,b:&Contents,swapped:bool) -> Option<bool> {
+    /// Patches above this size are not compared by the bounded entry: its work is
+    /// at most BOUNDED_ENTRIES^2 key comparisons plus 2*BOUNDED_ENTRIES payload lookups.
+    pub const BOUNDED_ENTRIES: usize = 16;
+    /// Payload tables whose retained capacity exceeds this (after earlier growth)
+    /// are declined too, so each bounded lookup probes a table of bounded size.
+    pub const BOUNDED_PAYLOAD_CAPACITY: usize = 64;
+    /// Err: the bounded entry cannot decide without unbounded work or a blocking
+    /// lock (the regular entry retries). Ok(None): a value needs the original Java equals.
+    fn compare_contents(a:&Contents,b:&Contents,swapped:bool,bounded:bool) -> Result<Option<bool>,()> {
         let (left,right)=if swapped {(&*b,&*a)} else {(&*a,&*b)};
-        if left.entries.len()!=right.entries.len(){return Some(false);}
+        if bounded && (left.entries.len()>Self::BOUNDED_ENTRIES || right.entries.len()>Self::BOUNDED_ENTRIES
+            || left.payloads.capacity()>Self::BOUNDED_PAYLOAD_CAPACITY || right.payloads.capacity()>Self::BOUNDED_PAYLOAD_CAPACITY) {return Err(());}
+        if left.entries.len()!=right.entries.len(){return Ok(Some(false));}
         let mut equal=true;
         for entry in &right.entries {
             let Some(left_entry)=left.entries.iter().find(|left|left.key==entry.key) else {equal=false;continue;};
@@ -96,16 +106,18 @@ impl Patch {
                     (Some(Payload::Integer(a)),Some(Payload::Integer(b)))=>Some(a==b),
                     (Some(Payload::Integer(_)),_)=>Some(false),
                     (Some(Payload::Enchantments(a)),Some(Payload::Enchantments(b)))=>{
-                        if Arc::ptr_eq(a,b){Some(true)}else{let sa=a.size();let sb=b.size();if sa!=sb{Some(false)}else if sa==0{Some(true)}else{None}}
+                        // size() takes the shape's blocking lock: the bounded entry declines.
+                        if Arc::ptr_eq(a,b){Some(true)}else if bounded{return Err(())}else{let sa=a.size();let sb=b.size();if sa!=sb{Some(false)}else if sa==0{Some(true)}else{None}}
                     },
                     _=>None,
                 },
             };
             // A later unknown pair may have preceded an earlier mismatch in the
             // original right-map traversal. Decline the whole comparison then.
-            equal &= compared?;
+            let Some(compared)=compared else{return Ok(None)};
+            equal &= compared;
         }
-        Some(equal)
+        Ok(Some(equal))
     }
     pub fn len(&self) -> usize { self.0.contents.lock().unwrap().entries.len() }
     pub fn is_empty(&self) -> bool { self.len() == 0 }
@@ -270,6 +282,45 @@ impl Overlay {
         map.set_after_compare(A, Some(NEW), Some(BASE), false);
         assert_eq!(escaped.get(A), None); assert_eq!(copied.get_override(A), None);
         assert_eq!(map.get_override(A), Some(Value::Present(NEW)));
+    }
+    // The bounded entry compares at most BOUNDED_ENTRIES per side; a larger patch
+    // that the regular entry decides natively is declined (Err) before any scan.
+    #[test] fn bounded_comparison_declines_patches_above_its_work_bound() {
+        let (a, b) = (Patch::default(), Patch::default());
+        for key in 0..Patch::BOUNDED_ENTRIES as u64 { a.put(Key(1000 + key), Value::Removed); b.put(Key(1000 + key), Value::Removed); }
+        assert_eq!(a.pure_equal_bounded(&b), Ok(Some(true)), "at the bound: decided");
+        a.put(Key(5000), Value::Removed); b.put(Key(5000), Value::Removed);
+        assert_eq!(a.pure_equal_bounded(&b), Err(()), "above the bound: declined before scanning");
+        assert_eq!(a.pure_equal(&b), Some(true), "the regular entry still decides");
+    }
+    // Two distinct enchantment stores would need size() (the shape's blocking
+    // lock): the bounded entry declines before it, even while that lock is held.
+    #[test] fn bounded_comparison_declines_distinct_enchantments_without_waiting() {
+        let (x, y) = (Arc::new(super::super::components::Enchantments::new(2)), Arc::new(super::super::components::Enchantments::new(2)));
+        let (a, b) = (Patch::default(), Patch::default());
+        a.put_payload(Key(7), Value::Present(Leaf(70)), Some(Payload::Enchantments(x.clone()))).unwrap();
+        b.put_payload(Key(7), Value::Present(Leaf(71)), Some(Payload::Enchantments(y.clone()))).unwrap();
+        let held = x.hold_shape_for_test();
+        let (send, receive) = std::sync::mpsc::channel();
+        let (left, right) = (a.clone(), b.clone());
+        std::thread::spawn(move || { send.send(left.pure_equal_bounded(&right)).unwrap(); });
+        assert_eq!(receive.recv_timeout(std::time::Duration::from_secs(1)), Ok(Err(())), "declined without waiting on the held shape lock");
+        drop(held);
+        assert_eq!(a.pure_equal(&b), Some(true), "the regular entry decides two empty stores (size 0)");
+        let same = Patch::default(); same.put_payload(Key(7), Value::Present(Leaf(72)), Some(Payload::Enchantments(x.clone()))).unwrap();
+        let _held = x.hold_shape_for_test();
+        assert_eq!(a.pure_equal_bounded(&same), Ok(Some(true)), "identical stores decide without the lock");
+    }
+    // A payload table that grew and shrank keeps its capacity: the bounded entry
+    // declines it before any lookup, whatever the current entry count.
+    #[test] fn bounded_comparison_declines_payload_tables_with_large_retained_capacity() {
+        let (a, b) = (Patch::default(), Patch::default());
+        for id in 0..200 { a.put_payload(Key(id), Value::Present(Leaf(1000 + id)), Some(Payload::Integer(id as i32))).unwrap(); }
+        for id in 1..200 { a.remove(Key(id)); }
+        b.put_payload(Key(0), Value::Present(Leaf(5000)), Some(Payload::Integer(0))).unwrap();
+        assert_eq!(a.len(), 1);
+        assert_eq!(a.pure_equal_bounded(&b), Err(()), "large retained payload capacity: declined before lookup");
+        assert_eq!(a.pure_equal(&b), Some(true), "the regular entry still decides");
     }
     #[test] fn tombstone_set_and_remove_have_different_previous_results() {
         let mut map = Overlay::new(1); map.prepare_change();
