@@ -345,8 +345,11 @@ renderer CPU owners, separate from authoritative world storage and GAL resources
 for section entries and sky column tops. Snapshots share roots; a later mutation
 detaches the root and its changed shard. Exact canonical block/sky scalar reads
 sample retained owners directly, including sky traversal through missing layers.
-Java retains light-engine orchestration, queued-section precedence, publication
-sequencing, section callbacks and temporary `DataLayer` identity slots. Supplied
+The [native lighting coordinator](world/lighting/RUST-LIGHT-COORDINATOR.md) owns
+stock node/section policy, queued-section precedence, publication sequencing and
+their live tables/continuations. Java retains contextual lookups, section/custom
+callbacks, VM lifetime adapters and temporary `DataLayer` identity slots; complete
+lighting performance and final acceptance remain open. Supplied
 Java maps, custom storage/layers and escaped mutable arrays retain compatibility
 behavior. Terrain rebuilds retain layer references before the bulk consumer leases
 their current generations. These are CPU owners, separate from renderer resources.

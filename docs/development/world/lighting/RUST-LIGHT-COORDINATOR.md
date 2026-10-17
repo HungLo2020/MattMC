@@ -122,7 +122,67 @@ frame, without a Java height snapshot or a global Source registry. The frame
 drops its Source before any later VM effect, including a neighbour lookup;
 abandonment drops an unconsumed input.
 
-This continuation was verified on `a9e2ae14` plus the owned change, release
+Block-node section inputs are under development. A pending node can retain the
+existing primary section owner and consume its selected live state in Rust.
+Admission requires an exact stock chunk, a known pure height accessor and an
+unescaped supported section. Custom chunks/accessors, debug chunks, empty or
+outside sections and unsupported states keep the original getter. Perform the
+contextual chunk lookup first: reentry can change the engine's mutable position,
+which the original getter must still receive. Never repeat that lookup or reset
+the position when native admission declines. No section lock crosses a VM effect.
+
+`VerifyBlockInputEffects.java` and `VerifyBlockHeightEffects.java` in
+`DevUtils/tests/lighting/coordinator/` observe actual custom getters, checked
+failure identity, lookup/getter reentry, mutable-position aliases and effectful
+height providers. Compile them once against original Frozen together with
+`DevUtils/tests/lighting/threaded/VerifyThreadedLighting.java`; run those same
+classes on Frozen, a complete preserved pre-change runtime and Current. Compare
+every `BLOCK_INPUT` and `BLOCK_HEIGHT` row. The eighteen plus three observations
+match Frozen, published `172ef018` and the local candidate; broader checkpoint
+verification remains separate. Three cases return a real stock chunk after
+lookup reentry and inspect the actual updating layer, so the native path must
+use the position changed by that callback. The original fifteen rows remain
+byte-for-byte unchanged.
+`VerifyBlockInputLifetime.java` is Current-only: it captures the real section
+in a level frame, closes its actual release scope, collects the VM objects and
+then consumes or abandons the input through direct, level and typed-task-pass
+frames. Primary mutation distinguishes a live owner
+from a copied state ID. Its `blockInput.omitBaseClose` and
+`blockInput.omitFrameCapture` properties are expected-failure controls; leave
+both unset in ordinary verification.
+`BenchmarkBlockInputs.java`, compiled once against Frozen with the original
+threaded fixture and `BenchmarkThreadedLighting.java`, measures complete public
+64-edit lighting cycles. Run the same classes on each full runtime with `4 12`
+for a short screen, keeping CPU/JVM flags identical and other jobs stopped.
+Its untimed complete state hashes and work counts must match, with at least
+eight samples free of measured JIT and GC. It reports Java allocation and RSS;
+it does not establish native allocation bounds or final performance acceptance.
+
+The earlier combined `2c3bbc29` test image passed 393 focused JVM tests, those
+21 effect observations, twelve actual frame lifetime cases, both ownership
+omission controls and the existing Source portability checks. Its 27,534 engine
+rows and 50,144 threaded events match their preserved references. The full native
+run remains raw failed: 3,167 passed, 57 failed, nine ignored. All 57 failure
+names and bodies match the recorded host failures, normalizing only OS thread
+IDs. These component checks do not complete integration or lighting acceptance.
+
+Custom VM block states also need the original node lifetime. The native frame
+projects that requirement in private reply word three; effect adapters clear
+their actual local reference when the node finishes. Keep it through stored-layer
+callbacks and a pending custom empty-shape query, including zero emission.
+`VerifyBlockStateRetirement.java` checks both boundaries with real unregistered
+states, custom layer getters, notifications and caller-retained controls. Compile
+it once against Frozen and keep the same five-second collection bound. The
+original eight cases retain the state during stored reads and collect before
+notification; preserved `172ef018` retains it through the whole pass. The local
+`3416723` plus owned lighting image matches all eight original cases. Reusing the
+old effect adapters with that corrected native library restores the late-retention
+failure in all eight cases. Both results keep the original collection bound,
+caller-retained controls and actual loaded class/native identities. This image
+also passed 397 focused JVM tests and the four original factory-formatting
+observations; broader checkpoint verification remains separate.
+
+The published Source-frame continuation was verified on `a9e2ae14` plus its owned change, release
 `ef6452ec4a7b9044cd335021b269d8b9224f9cb8e39a03aab79eaf94d8e73674`:
 379 focused JVM tests, 252 portable checks and 139 native lighting tests passed.
 The same once-Frozen-compiled 24 level-consumer, 20 source-effect and nine

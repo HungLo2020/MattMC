@@ -47,7 +47,12 @@ public final class BlockLightEngine extends LightEngine<BlockLightSectionStorage
 		}
 	}
 
-    BlockState stateForNativeNode(long pos) { return this.getState(this.mutablePos.set(pos)); }
+    BlockState stateForNativeNode(long pos,net.minecraft.world.level.chunk.NativeLightBlocks.NodeLease input)throws Throwable {
+        this.mutablePos.set(pos);
+        // The contextual lookup can reenter and mutate this exact position.
+        LightChunk chunk=this.getChunk(SectionPos.blockToSectionCoord(this.mutablePos.getX()),SectionPos.blockToSectionCoord(this.mutablePos.getZ()));
+        return input.acquire(chunk,this.mutablePos)?null:input.compatibility();
+    }
 
 	@Override
 	protected void propagateIncrease(long l, long m, int i) {

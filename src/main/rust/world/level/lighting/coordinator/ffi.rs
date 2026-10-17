@@ -296,7 +296,35 @@ pub unsafe extern "C" fn mattmc_light_coordinator_bind_source(owner:*const Owner
         .bind_source(lease.id,&*source).map_or(-27,|()|0))).unwrap_or(-99)
 }
 
-/// Output [a,b,c,unused,changed-slot-address,changed-slot-count]. Consume the
+/// Capture an existing section allocation; 1 declines without changing the frame.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_coordinator_bind_block(owner:*const Owner,id:u64,
+    section:*const crate::world::level::chunk::live::Owner,index:i32)->i32 {
+    if owner.is_null() || id==0 || section.is_null()
+        || section as usize % std::mem::align_of::<crate::world::level::chunk::live::Owner>()!=0{return -27;}
+    let lease=&*(id as *const FrameLease);
+    if Arc::as_ptr(&lease.owner)!=owner{return -27;}
+    catch_unwind(AssertUnwindSafe(||(*owner).state.lock().unwrap().bind_block(lease.id,section,index as usize))).unwrap_or(-99)
+}
+
+/// Diagnostic weak handle to the actual section Arc. It owns no section or VM root.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_coordinator_block_probe_new(section:*const crate::world::level::chunk::live::Owner)->u64 {
+    if section.is_null(){return 0;}
+    let owner=retain(section);
+    Box::into_raw(Box::new(Arc::downgrade(&owner))) as u64
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_coordinator_block_probe_owners(probe:u64)->u64 {
+    if probe==0{return 0;}
+    (*(probe as *const std::sync::Weak<crate::world::level::chunk::live::Owner>)).strong_count() as u64
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_coordinator_block_probe_release(probe:u64) {
+    if probe!=0{drop(Box::from_raw(probe as *mut std::sync::Weak<crate::world::level::chunk::live::Owner>));}
+}
+
+/// Output [a,b,c,keep-VM-block-state,changed-slot-address,changed-slot-count]. Consume the
 /// bounded projection before another coordinator call or any Java effect.
 #[no_mangle]
 pub unsafe extern "C" fn mattmc_light_coordinator_step(owner: *const Owner, id: u64, scalar: i64,
@@ -308,6 +336,7 @@ pub unsafe extern "C" fn mattmc_light_coordinator_step(owner: *const Owner, id: 
     catch_unwind(AssertUnwindSafe(|| {
         let mut state = o.state.lock().unwrap();
         let result = state.step(lease.id, scalar, if entry.is_null() { None } else { Some(retain(entry)) });
+        out[3]=state.frames.get(lease.id.wrapping_sub(1)as usize).and_then(Option::as_ref).map_or(0,|frame|i64::from(frame.vm_block_state));
         let mut ids = o.refreshed_ids.lock().unwrap(); ids.clear(); ids.extend(state.refreshed.iter().map(|e| e.id));
         out[4] = ids.as_ptr() as i64; out[5] = ids.len() as i64; publish(o, &mut state);
         match result {
@@ -544,9 +573,13 @@ impl PropagationInput {
     pub(super) fn bind_source(&self,id:u64,source:&super::super::source_owner::Source)->i32 {
         self.owner.state.lock().unwrap().bind_source(id,source).map_or(-27,|()|0)
     }
+    pub(super) unsafe fn bind_block(&self,id:u64,section:*const crate::world::level::chunk::live::Owner,index:i32)->i32 {
+        self.owner.state.lock().unwrap().bind_block(id,section,index as usize)
+    }
     pub(super) unsafe fn level_step(&self,id:u64,scalar:i64,entry:*const Entry,output:&mut[i64],snapshot:&mut Option<Arc<LightMap>>)->i32{
         let mut state=self.owner.state.lock().unwrap();
         let result=state.step(id,scalar,if entry.is_null(){None}else{Some(retain(entry))});
+        output[3]=state.frames.get(id.wrapping_sub(1)as usize).and_then(Option::as_ref).map_or(0,|frame|i64::from(frame.vm_block_state));
         let mut ids=self.owner.refreshed_ids.lock().unwrap();ids.clear();ids.extend(state.refreshed.iter().map(|entry|entry.id));
         output[4]=ids.as_ptr() as i64;output[5]=ids.len() as i64;publish(&self.owner, &mut state);
         match result{

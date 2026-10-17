@@ -26,6 +26,8 @@ final class NativeLightRequests implements LevelLightEngine.LightRequest {
         ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
     private static final MethodHandle STEP = handle("step", FunctionDescriptor.of(
         ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    private static final MethodHandle BLOCK_INPUT = handle("bind_block", FunctionDescriptor.of(
+        ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     private static final MethodHandle SOURCE_INPUT = handle("bind_source", FunctionDescriptor.of(
         ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
     private static final MethodHandle RESOURCE = handle("resource", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
@@ -132,6 +134,9 @@ final class NativeLightRequests implements LevelLightEngine.LightRequest {
         return (int)READ.invokeExact(frame, output);
     }
 
+    static int bindBlock(long frame,MemorySegment section,int index)throws Throwable {
+        return (int)BLOCK_INPUT.invokeExact(frame,section,index);
+    }
     static int bindSource(long frame,MemorySegment source)throws Throwable {
         return (int)SOURCE_INPUT.invokeExact(frame,source);
     }

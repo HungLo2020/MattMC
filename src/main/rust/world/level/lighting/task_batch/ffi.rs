@@ -213,6 +213,12 @@ pub unsafe extern "C" fn mattmc_light_tasks_context_bind_source(owner:*const Own
     catch_unwind(AssertUnwindSafe(||(&mut *(*owner).queue.get()).context_source(cursor,source))).unwrap_or(-99)
 }
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_light_tasks_context_bind_block(owner:*const Owner,cursor:u64,
+    section:*const crate::world::level::chunk::live::Owner,index:i32)->i32 {
+    if owner.is_null() || section.is_null(){return -27;}
+    catch_unwind(AssertUnwindSafe(||(&mut *(*owner).queue.get()).context_block(cursor,section,index))).unwrap_or(-99)
+}
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_light_tasks_context_resource(owner:*const Owner,cursor:u64)->*const c_void{
     owner.as_ref().map_or(std::ptr::null(),|owner|(&mut *owner.queue.get()).context_resource(cursor))
 }

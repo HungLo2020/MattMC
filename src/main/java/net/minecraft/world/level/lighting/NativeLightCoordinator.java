@@ -23,6 +23,7 @@ final class NativeLightCoordinator {
     private static final MethodHandle SAVED_ACQUIRE=handle("saved_acquire",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle SAVED_RELEASE=handle("saved_release",FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
     private static final MethodHandle RELEASE=handle("release",FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    private static final MethodHandle BLOCK_INPUT=handle("bind_block",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
     private static final MethodHandle SOURCE_INPUT=handle("bind_source",FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle HEADER=handle("header",FunctionDescriptor.of(ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle LIVE=handle("live",FunctionDescriptor.of(ValueLayout.JAVA_LONG));
@@ -211,10 +212,12 @@ final class NativeLightCoordinator {
             if(frame==0)throw new IllegalStateException("Native light continuation unavailable");
             long scalar=0;
             net.minecraft.world.level.block.state.BlockState nodeState=null;
+            net.minecraft.world.level.chunk.NativeLightBlocks.NodeLease nodeInput=null;
             for(;;){
                 int action;
                 try{action=(int)STEP.invokeExact(owner,frame,scalar,resultEntry,output);}
                 finally{map.releaseCoordinatorEntry(resultEntry);resultEntry=MemorySegment.NULL;}
+                if(output.getAtIndex(ValueLayout.JAVA_LONG,3)==0)nodeState=null;
                 long changed=output.getAtIndex(ValueLayout.JAVA_LONG,5);
                 MemorySegment changes=MemorySegment.ofAddress(output.getAtIndex(ValueLayout.JAVA_LONG,4)).reinterpret(changed*Integer.BYTES);
                 for(long i=0;i<changed;i++)map.refreshForCoordinator(changes.getAtIndex(ValueLayout.JAVA_INT,i));
@@ -229,7 +232,19 @@ final class NativeLightCoordinator {
                     case 4 -> map.resolveForCoordinator((int)x).set((int)y&15,(int)y>>8,(int)y>>4&15,(int)z);
                     case 5 -> storage.publishNativeMap(map.adoptSnapshot(MemorySegment.ofAddress(x)));
                     case 6 -> storage.chunkSource.onLightUpdate(layer,SectionPos.of(x));
-                    case 7 -> {nodeState=((BlockLightEngine)engine).stateForNativeNode(x);scalar=Block.BLOCK_STATE_REGISTRY.getId(nodeState);}
+                    case 7 -> {
+                        if(nodeInput==null)nodeInput=new net.minecraft.world.level.chunk.NativeLightBlocks.NodeLease();
+                        try {
+                            nodeState=((BlockLightEngine)engine).stateForNativeNode(x,nodeInput);
+                            if(nodeInput.hasOwner()){
+                                int status=(int)BLOCK_INPUT.invokeExact(owner,frame,nodeInput.pointer(),nodeInput.index());
+                                if(status==1)nodeState=nodeInput.compatibility();
+                                else if(status!=0)throw new IllegalStateException("Native block input rejected: "+status);
+                                else break;
+                            }
+                            scalar=Block.BLOCK_STATE_REGISTRY.getId(nodeState);
+                        }finally{nodeInput.clear();}
+                    }
                     case 8 -> {
                         ChunkSkyLightSources source=((SkyLightEngine)engine).sourceInputForNative((int)x,(int)y,false);
                         if(source==null)scalar=z;

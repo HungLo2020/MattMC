@@ -38,6 +38,14 @@ public final class NativeSkySourceSections {
  public static ChunkData prepare(ChunkAccess chunk) throws Throwable {
   if(chunk==null || (chunk.getClass()!=ProtoChunk.class && chunk.getClass()!=LevelChunk.class)
     || !NativeBlockRegistry.ready())return null;
+  LevelHeightAccessor accessor=pureAccessor(chunk);
+  if(accessor==null)return null;
+  LevelChunkSection[] sections=chunk.getSectionsForRead();
+  for(LevelChunkSection section:sections)if(section==null || section.getClass()!=LevelChunkSection.class)return null;
+  return new ChunkData(sections,accessor.getMinY(),accessor.getHeight(),chunk.getHighestFilledSectionIndex());
+ }
+ /** Admission without invoking a custom height provider or scanning a chunk. */
+ static LevelHeightAccessor pureAccessor(ChunkAccess chunk) throws Throwable {
   LevelHeightAccessor accessor=(LevelHeightAccessor)ACCESSOR.invokeExact(chunk);
   boolean pure=accessor.getClass()==CONSTANT_ACCESSOR;
   if(!pure && (accessor.getClass()==net.minecraft.server.level.ServerLevel.class
@@ -46,10 +54,7 @@ public final class NativeSkySourceSections {
    pure=(holder.getClass()==Holder.Direct.class || holder.getClass()==Holder.Reference.class)
      && holder.isBound() && holder.value() instanceof net.minecraft.world.level.dimension.DimensionType;
   }
-  if(!pure)return null; // Do not invoke a custom provider to ask whether it is canonical.
-  LevelChunkSection[] sections=chunk.getSectionsForRead();
-  for(LevelChunkSection section:sections)if(section==null || section.getClass()!=LevelChunkSection.class)return null;
-  return new ChunkData(sections,accessor.getMinY(),accessor.getHeight(),chunk.getHighestFilledSectionIndex());
+  return pure?accessor:null; // Do not invoke a custom provider to ask whether it is canonical.
  }
  public static SectionData export(LevelChunkSection section,MemorySegment words,
    MemorySegment ids,MemorySegment header){

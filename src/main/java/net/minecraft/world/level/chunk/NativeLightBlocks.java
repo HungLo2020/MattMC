@@ -34,6 +34,43 @@ public final class NativeLightBlocks {
         public void clear() { this.owner = null; }
     }
 
+    /** One pending node's actual CPU owner and original compatibility captures. */
+    public static final class NodeLease {
+        private LightChunk chunk;
+        private BlockPos position;
+        private NativeLiveBlockSection owner;
+        private int index;
+        public boolean acquire(@Nullable LightChunk chunk,BlockPos position)throws Throwable {
+            clear();this.chunk=chunk;this.position=position;
+            if(chunk==null || (chunk.getClass()!=ProtoChunk.class && chunk.getClass()!=LevelChunk.class))return false;
+            ChunkAccess access=(ChunkAccess)chunk;
+            var height=NativeSkySourceSections.pureAccessor(access);
+            if(height==null)return false;
+            if(chunk.getClass()==LevelChunk.class){
+                var level=((LevelChunk)chunk).getLevel();
+                if(level.getClass()!=net.minecraft.server.level.ServerLevel.class
+                    && level.getClass()!=net.minecraft.client.multiplayer.ClientLevel.class)return false;
+                if(level.isDebug())return false;
+            }
+            int min=height.getMinY(),y=position.getY();
+            var sections=access.getSectionsForRead();
+            if((min&15)!=0 || sections.length*16!=height.getHeight() || y<min || y>=min+height.getHeight())return false;
+            var section=sections[(y>>4)-(min>>4)];
+            if(section==null || section.getClass()!=LevelChunkSection.class || section.hasOnlyAir())return false;
+            var states=section.getStates();
+            if(states.getClass()!=PalettedContainer.class)return false;
+            owner=states.nativeLiveBlocks();
+            index=(y&15)<<8|(position.getZ()&15)<<4|position.getX()&15;
+            return owner!=null;
+        }
+        public boolean hasOwner(){return owner!=null;}
+        public MemorySegment pointer(){return owner.stageOwner();}
+        public int index(){return index;}
+        /** Reuses the position after any original lookup reentry; never repeats lookup. */
+        public BlockState compatibility(){return chunk==null?Blocks.BEDROCK.defaultBlockState():chunk.getBlockState(position);}
+        public void clear(){java.lang.ref.Reference.reachabilityFence(owner);owner=null;chunk=null;position=null;}
+    }
+
     /** Header [light-on, default value or -1] then the bytes; -1 for layer subclasses. */
     public static int layer(DataLayer layer, boolean lightOn, MemorySegment buffer) {
         if (layer.getClass() != DataLayer.class) return -1;

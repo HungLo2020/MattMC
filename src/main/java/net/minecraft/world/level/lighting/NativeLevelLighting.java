@@ -41,6 +41,10 @@ final class NativeLevelLighting {
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle TASK_SOURCE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_tasks_context_bind_source",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
+    private static final MethodHandle FRAME_BLOCK = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_level_frame_bind_block",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
+    private static final MethodHandle TASK_BLOCK = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_tasks_context_bind_block",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.JAVA_INT));
     private final MemorySegment owner,projection;
     private final LightEngine<?, ?> block, sky;
     private final NativeLightingMap resources;
@@ -137,9 +141,11 @@ final class NativeLevelLighting {
         MemorySegment result=MemorySegment.NULL;
         NativeLightingMap resultMap=null;
         net.minecraft.world.level.block.state.BlockState nodeState=null;
+        net.minecraft.world.level.chunk.NativeLightBlocks.NodeLease nodeInput=null;
         try{
             for(;;){
                 NativeLightCoordinator.checkEffectStatus(action,output);
+                if(output.getAtIndex(ValueLayout.JAVA_LONG,3)==0)nodeState=null;
                 if(action==0)return;
                 if(request!=null&&action>=32){
                     long scalar=0;
@@ -183,8 +189,21 @@ final class NativeLevelLighting {
                     }
                     case 6->engine.storage.chunkSource.onLightUpdate(target==0?net.minecraft.world.level.LightLayer.BLOCK:net.minecraft.world.level.LightLayer.SKY,
                         net.minecraft.core.SectionPos.of(output.getAtIndex(ValueLayout.JAVA_LONG,0)));
-                    case 7->{nodeState=((BlockLightEngine)engine).stateForNativeNode(output.getAtIndex(ValueLayout.JAVA_LONG,0));
-                        scalar=net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.getId(nodeState);}
+                    case 7->{
+                        if(nodeInput==null)nodeInput=new net.minecraft.world.level.chunk.NativeLightBlocks.NodeLease();
+                        try {
+                            nodeState=((BlockLightEngine)engine).stateForNativeNode(output.getAtIndex(ValueLayout.JAVA_LONG,0),nodeInput);
+                            if(nodeInput.hasOwner()){
+                                int status=request!=null?NativeLightRequests.bindBlock(frame,nodeInput.pointer(),nodeInput.index()):frame==0?
+                                    (int)TASK_BLOCK.invokeExact(tasks,cursor,nodeInput.pointer(),nodeInput.index()):
+                                    (int)FRAME_BLOCK.invokeExact(frame,nodeInput.pointer(),nodeInput.index());
+                                if(status==1)nodeState=nodeInput.compatibility();
+                                else if(status!=0)throw new IllegalStateException("Native block input rejected: "+status);
+                                else break;
+                            }
+                            scalar=net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.getId(nodeState);
+                        }finally{nodeInput.clear();}
+                    }
                     case 8->{
                         int z=(int)output.getAtIndex(ValueLayout.JAVA_LONG,1);
                         ChunkSkyLightSources source=((SkyLightEngine)engine).sourceInputForNative(slot,z,false);

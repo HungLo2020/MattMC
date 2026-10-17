@@ -1,5 +1,41 @@
 use super::ordered::{Fault, Table, NONE};
 
+mod vm_block_state_retirement {
+    use super::super::*;
+
+    #[test]
+    fn custom_vm_state_survives_stored_layer_effects_then_retires_at_node_completion() {
+        unsafe {
+            for (emission,enabled) in [(0,false),(7,false),(7,true)] {
+                let registry=super::super::super::maps::ffi::mattmc_light_map_registry_create();
+                let map=Arc::from_raw(super::super::super::maps::ffi::mattmc_light_map_create(registry));
+                super::super::super::maps::ffi::mattmc_light_map_registry_release(registry);
+                let layer=Arc::new(Layer::new(0));
+                let entry=map.native_entry(Arc::clone(&layer)).unwrap();
+                let id=entry.id;map.set(0,Some(entry));layer.invalidate();
+                let mut state=State::new(false,map).unwrap();
+                let(engine,_)=state.attach(Arc::new(Queues::default()),0).unwrap();
+                if enabled{state.tables[ENABLED].put(0,1).unwrap();}
+                let frame=state.begin(Op::Node(0),engine).unwrap();
+                assert!(matches!(state.step(frame,0,None).unwrap(),Effect::BlockState(0)));
+                assert!(!state.frames[frame as usize-1].as_ref().unwrap().vm_block_state);
+                assert!(matches!(state.step(frame,-1,None).unwrap(),Effect::BlockEmission));
+                assert!(state.frames[frame as usize-1].as_ref().unwrap().vm_block_state);
+                assert!(matches!(state.step(frame,emission,None).unwrap(),Effect::Read(slot,0)if slot==id));
+                assert!(state.frames[frame as usize-1].as_ref().unwrap().vm_block_state,"Original checkNode still owns its state inside the stored-layer callback");
+                let effect=state.step(frame,0,None).unwrap();
+                if enabled{
+                    assert!(matches!(effect,Effect::BlockEmpty));
+                    assert!(state.frames[frame as usize-1].as_ref().unwrap().vm_block_state);
+                    assert!(matches!(state.step(frame,1,None).unwrap(),Effect::Done(0)));
+                }else{assert!(matches!(effect,Effect::Done(0)));}
+                assert!(!state.frames[frame as usize-1].as_ref().unwrap().vm_block_state,"No custom state crosses node completion into later VM effects");
+                state.end(frame).unwrap();
+            }
+        }
+    }
+}
+
 mod connected_inputs {
     use super::super::*;
     use super::super::ffi::{LayerInput, PropagationInput};

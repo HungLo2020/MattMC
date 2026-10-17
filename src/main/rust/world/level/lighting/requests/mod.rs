@@ -396,6 +396,15 @@ pub unsafe extern "C" fn mattmc_light_request_bind_source(id:u64,source:*const s
     })).unwrap_or(-99)
 }
 #[no_mangle]
+pub unsafe extern "C" fn mattmc_light_request_bind_block(id:u64,section:*const crate::world::level::chunk::live::Owner,index:i32)->i32 {
+    if id==0 || section.is_null(){return -27;}
+    catch_unwind(AssertUnwindSafe(||{
+        let frame=&mut *(id as *mut Frame);
+        if frame.action!=7{return -27;}
+        frame.child.as_ref().map_or(-27,|child|((*child.0).bind_block)(child.0,section,index))
+    })).unwrap_or(-99)
+}
+#[no_mangle]
 pub unsafe extern "C" fn mattmc_light_request_import(id: u64) -> i32 {
     if id == 0 {
         return -27;

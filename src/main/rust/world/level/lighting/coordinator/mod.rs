@@ -149,9 +149,14 @@ struct Frame {
     engine: u64,
     source_query: Option<SourceQuery>,
     source_input: Option<super::source_owner::Source>,
+    block_query: bool,
+    block_input: Option<(Arc<crate::world::level::chunk::live::Owner>,usize)>,
+    // The original checkNode VM frame keeps its custom state through stored
+    // layer callbacks, then releases it before later nodes/publication effects.
+    vm_block_state: bool,
 }
 impl Frame {
-    fn new(op: Op, engine: u64) -> Self { Self { ops: vec![op], scalar: 0, entry: None, result: 0, sky_floor: 0, engine, source_query: None, source_input: None } }
+    fn new(op: Op, engine: u64) -> Self { Self { ops: vec![op], scalar: 0, entry: None, result: 0, sky_floor: 0, engine, source_query: None, source_input: None, block_query:false, block_input:None, vm_block_state:false } }
     fn await_source(&mut self, effect: Effect) -> Effect {
         self.source_query = match effect {
             Effect::SkySource(x,z,_) => Some(SourceQuery::Column(x & 15,z & 15)),
@@ -415,6 +420,10 @@ impl State {
                 None => Err(super::source_owner::Error::Scan),
             }.map(i64::from).map_err(|_| Error::Unsupported)
         } else { Ok(scalar) };
+        frame.block_query=false;
+        let scalar=if let Some((owner,index))=frame.block_input.take(){
+            owner.world_value(index).map(i64::from).ok_or(Error::Unsupported)
+        }else{scalar};
         frame.entry = entry; self.refreshed.clear();
         let result = match scalar {
             Ok(value) => { frame.scalar = value; self.advance(&mut frame) },
@@ -428,6 +437,16 @@ impl State {
         if frame.source_query.is_none() || frame.source_input.is_some() { return Err(Error::MissingOwner); }
         frame.source_input = Some(source.clone());
         Ok(())
+    }
+    unsafe fn bind_block(&mut self,id:u64,owner:*const crate::world::level::chunk::live::Owner,index:usize)->i32 {
+        let Some(frame)=id.checked_sub(1).and_then(|id|self.frames.get_mut(id as usize)).and_then(Option::as_mut)else{return -27;};
+        if !frame.block_query || frame.block_input.is_some() || owner.is_null() || index>=4096{return -27;}
+        let supported=(*owner).world_value(index).and_then(|state|propagation::installed_tables()
+            .and_then(|tables|tables.state_types.get(state as usize).and_then(|&kind|tables.types.get(kind as usize)))).is_some();
+        if !supported{return 1;}
+        Arc::increment_strong_count(owner);
+        frame.block_input=Some((Arc::from_raw(owner),index));
+        0
     }
     /// Complete stock sky-source producer/COW/queue consumer. Admission has
     /// no observable mutation; every accepted section has no Java leaf effect.
@@ -777,7 +796,7 @@ impl State {
                         if self.enabled(section(pos)) { return Ok(f.await_source(Effect::SkySource(propagation::block_x(pos), propagation::block_z(pos), i32::MAX))); }
                         f.scalar = i64::from(i32::MAX);
                     } else if self.updating.get(section(pos)).is_some() {
-                        f.ops.push(Op::BlockChecked(pos)); return Ok(Effect::BlockState(pos));
+                        f.ops.push(Op::BlockChecked(pos)); f.block_query=true; return Ok(Effect::BlockState(pos));
                     }
                 }
                 Op::BlockChecked(pos) => {
@@ -785,7 +804,7 @@ impl State {
                     if let Some(properties) = properties {
                         let emission = if self.enabled(section(pos)) { i32::from(properties.emission) } else { 0 };
                         f.ops.push(Op::BlockLevel(pos, emission, Some(properties.empty))); f.ops.push(Op::ReadStored(pos));
-                    } else { f.ops.push(Op::BlockCustomEmission(pos)); return Ok(Effect::BlockEmission); }
+                    } else { f.vm_block_state=true; f.ops.push(Op::BlockCustomEmission(pos)); return Ok(Effect::BlockEmission); }
                 }
                 Op::BlockCustomEmission(pos) => {
                     let emission = if f.scalar > 0 && self.enabled(section(pos)) { f.scalar as i32 } else { 0 };
@@ -806,8 +825,9 @@ impl State {
                         if let Some(empty) = empty { self.enqueue(f.engine, 1, pos, 1008 | emission as u64 & 15 | 2048 | if empty { 1024 } else { 0 })?; }
                         else { f.ops.push(Op::BlockCustomEmpty(pos, emission)); return Ok(Effect::BlockEmpty); }
                     }
+                    f.vm_block_state=false;
                 }
-                Op::BlockCustomEmpty(pos, emission) => { self.enqueue(f.engine, 1, pos, 1008 | emission as u64 & 15 | 2048 | if f.scalar != 0 { 1024 } else { 0 })?; }
+                Op::BlockCustomEmpty(pos, emission) => { self.enqueue(f.engine, 1, pos, 1008 | emission as u64 & 15 | 2048 | if f.scalar != 0 { 1024 } else { 0 })?; f.vm_block_state=false; }
                 Op::SkySourceReady(pos) => {
                     let lowest = f.scalar as i32;
                     f.ops.push(Op::SkyTarget(pos, lowest));
