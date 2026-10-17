@@ -30,6 +30,7 @@ public class WorldgenRandom extends LegacyRandomSource {
 	final int nativeNextLegacy(int bits) { return ((LegacyRandomSource)this.randomSource).next(bits); }
 	final long nativeNextWord() { return this.randomSource.nextLong(); }
 	final NativeWorldgenSource nativeState() { return this.state(); }
+	final NativeWorldgenSource nativeInitializedState() { return this.nativeState; }
 	public static long nativeNoiseLeaf(RandomSource source,boolean simplex) {
 		if(source==null||source.getClass()!=WorldgenRandom.class)return 0;
 		var actual=(WorldgenRandom)source;var target=NativeWorldgenSource.target(actual.randomSource);

@@ -17,7 +17,7 @@ impl Worldgen {
     fn next(&self,target:&Target,bits:i32)->Result<i32,()>{self.bump();target.next(bits)}
 }
 impl Drop for Worldgen {fn drop(&mut self){LIVE.fetch_sub(1,Ordering::Relaxed);RETIRED.fetch_add(1,Ordering::Relaxed);}}
-enum Target { Legacy(Arc<owned_legacy::Source>), Xoroshiro(Arc<owned_source::Source>) }
+pub(crate) enum Target { Legacy(Arc<owned_legacy::Source>), Xoroshiro(Arc<owned_source::Source>) }
 fn word(bits:i32,value:i64)->i32{((value as u64)>>((64_i32.wrapping_sub(bits)&63)as u32))as i32}
 impl Target {
     fn next(&self,bits:i32)->Result<i32,()>{match self{Self::Legacy(source)=>source.next(bits),Self::Xoroshiro(source)=>Ok(source.with(|data|word(bits,data.next_long())))}}
@@ -25,6 +25,7 @@ impl Target {
 /// A real native consumer owns count AND the exact backing data until last use.
 pub(crate) struct Kernel { owner:Arc<Worldgen>, target:Target }
 impl Kernel {
+    pub(crate) fn owned(owner:Arc<Worldgen>,target:Target)->Self{Self{owner,target}}
     pub(crate) fn next(&self,bits:i32)->Result<i32,()>{self.owner.next(&self.target,bits)}
     pub(crate) fn double(&self)->Result<f64,()>{Ok(random::legacy_double(self.next(26)?,self.next(27)?))}
     pub(crate) fn bounded(&self,bound:i32)->Result<i32,()>{random::legacy_bounded(bound,|bits|self.next(bits))}
@@ -68,7 +69,7 @@ pub(crate) mod ffi {
     use super::*;
     pub(crate) unsafe fn retain(id:u64)->Arc<Worldgen>{let ptr=std::ptr::with_exposed_provenance::<Worldgen>(id as usize);Arc::increment_strong_count(ptr);Arc::from_raw(ptr)}
     unsafe fn owner<'a>(id:u64)->&'a Worldgen{&*std::ptr::with_exposed_provenance::<Worldgen>(id as usize)}
-    unsafe fn target(kind:i32,id:u64)->Option<Target>{if id==0{return None;}match kind{1=>Some(Target::Legacy(owned_legacy::ffi::retain(id))),2=>Some(Target::Xoroshiro(owned_source::ffi::retain(id))),_=>None}}
+    pub(crate) unsafe fn target(kind:i32,id:u64)->Option<Target>{if id==0{return None;}match kind{1=>Some(Target::Legacy(owned_legacy::ffi::retain(id))),2=>Some(Target::Xoroshiro(owned_source::ffi::retain(id))),_=>None}}
     pub(crate) unsafe fn kernel(id:u64,kind:i32,source:u64)->Option<Kernel>{Some(Kernel{owner:retain(id),target:target(kind,source)?})}
     #[no_mangle]pub extern "C" fn mattmc_worldgen_new()->u64{Arc::into_raw(Worldgen::new()).expose_provenance()as u64}
     #[no_mangle]pub unsafe extern "C" fn mattmc_worldgen_release(id:u64){if id!=0{drop(Arc::from_raw(std::ptr::with_exposed_provenance::<Worldgen>(id as usize)));}}

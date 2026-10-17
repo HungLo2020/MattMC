@@ -28,6 +28,7 @@ final class NativeGaussian {
     private static final MethodHandle RESET = fixed("reset", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
     private static final MethodHandle SET = fixed("set", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
     private static final MethodHandle START = handle("draw_new_source", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+    private static final MethodHandle WORLDGEN = handle("draw_bind_worldgen", FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG));
     private static final MethodHandle NEXT = handle("draw_next", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
     private static final MethodHandle END = handle("draw_release", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
     private static final MethodHandle STATS = handle("statistics", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
@@ -105,11 +106,16 @@ final class NativeGaussian {
     }
     private static double draw(long id, int kind, Object cache, MarsagliaPolarGaussian caller, NativeXoroshiroSource producer) {
         long frame = 0;
+        NativeWorldgenSource.GaussianTarget worldgenProducer=null;
         NativeLegacySource legacyProducer = LegacyRandomSource.nativeGaussianProducer(caller.randomSource);
         try {
             long source = legacyProducer != null ? legacyProducer.handle() : producer == null ? 0 : producer.handle();
             frame = (long) START.invokeExact(id, kind, source, legacyProducer != null ? 2 : 1);
             if (frame == 0) return Double.longBitsToDouble((long) VALUE.invokeExact(id, kind));
+            // Inspect real source facts only after the committed cache miss. Native
+            // control requests the first actual count resource when it needs one.
+            worldgenProducer=NativeWorldgenSource.gaussianTarget(caller.randomSource);
+            if(worldgenProducer!=null&&(int)WORLDGEN.invokeExact(frame,worldgenProducer.countHandle(),worldgenProducer.backing().kind(),worldgenProducer.backing().id())==0)worldgenProducer=null;
             MemorySegment words = MemorySegment.ofAddress(frame).reinterpret(16).asReadOnly();
             long response = 0;
             while ((int) NEXT.invokeExact(frame, response) != 0) {
@@ -118,6 +124,7 @@ final class NativeGaussian {
                     case 1 -> Double.doubleToRawLongBits(caller.nativeGaussianNextDouble());
                     case 2 -> Double.doubleToRawLongBits(Math.log(Double.longBitsToDouble(words.getAtIndex(ValueLayout.JAVA_LONG, 1))));
                     case 3 -> throw NativeLegacySource.collision();
+                    case 4 -> worldgenProducer.materializeCount();
                     default -> throw new IllegalStateException("Unknown Gaussian effect " + op);
                 };
             }
@@ -127,6 +134,7 @@ final class NativeGaussian {
             try { if (frame != 0) END.invokeExact(frame); }
             catch (Throwable failure) { throw propagate(failure); }
             finally {
+                Reference.reachabilityFence(worldgenProducer);
                 Reference.reachabilityFence(legacyProducer);
                 Reference.reachabilityFence(producer);
                 Reference.reachabilityFence(caller);

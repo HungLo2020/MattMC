@@ -392,12 +392,27 @@ pub(crate) mod ffi {
         Box::into_raw(Box::new(Pending::new(draw))).expose_provenance() as u64
     }
 
+    /// Called only after the real cache miss. Target owns actual backing data;
+    /// a missing VM count owner is requested before any bit is consumed.
+    #[no_mangle]
+    pub unsafe extern "C" fn mattmc_gaussian_draw_bind_worldgen(id:u64,count:u64,kind:i32,source:u64)->i32 {
+        if id==0 {return 0;}
+        let frame=&mut*std::ptr::with_exposed_provenance_mut::<Pending>(id as usize);
+        if !matches!(frame.draw.stage,Stage::UncachedStart)||frame.draw.source.is_some(){return 0;}
+        let Some(target)=super::super::owned_worldgen::ffi::target(kind,source)else{return 0;};
+        frame.draw.source=Some(if count==0 {Producer::PendingWorldgen(target)}else{
+            Producer::Worldgen(super::super::owned_worldgen::Kernel::owned(super::super::owned_worldgen::ffi::retain(count),target))
+        });
+        1
+    }
+
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_gaussian_draw_next(id: u64, response: u64) -> i32 {
         let frame = &mut *std::ptr::with_exposed_provenance_mut::<Pending>(id as usize);
         let (op, value) = match frame.draw.advance(response) {
             Effect::DrawDouble => (1, 0),
             Effect::LegacyCollision => (3, 0),
+            Effect::WorldgenCount => (4, 0),
             Effect::JavaLog(value) => (2, value.to_bits()),
             Effect::Complete(bits) => (0, bits),
         };
@@ -432,6 +447,54 @@ pub(crate) mod ffi {
     #[cfg(test)]
     mod tests {
         use super::*;
+        #[test]
+        fn actual_worldgen_kernel_retires_count_and_backing_before_math_but_keeps_cache() {
+            unsafe {
+                use super::super::super::{owned_worldgen::ffi as wg,owned_legacy::ffi as legacy};
+                let source=legacy::mattmc_random_source_legacy_new();legacy::mattmc_random_source_legacy_seed(source,42,1);
+                let source_weak=Arc::downgrade(&legacy::retain(source));let count=wg::mattmc_worldgen_new();let cw=wg::mattmc_worldgen_weak_new(count);
+                let cache=mattmc_gaussian_new();let watch=mattmc_gaussian_weak_new(cache,0);let frame=mattmc_gaussian_draw_new_source(cache,0,0,1);
+                assert_eq!(mattmc_gaussian_draw_bind_worldgen(frame,count,1,source),1);
+                wg::mattmc_worldgen_release(count);legacy::mattmc_random_source_legacy_release(source);mattmc_gaussian_release(cache);
+                assert_eq!(wg::mattmc_worldgen_weak_count(cw),1);assert_eq!(source_weak.strong_count(),1);assert_eq!(mattmc_gaussian_weak_count(watch),1);
+                assert_eq!(mattmc_gaussian_draw_next(frame,0),1);let words=std::ptr::with_exposed_provenance::<[u64;2]>(frame as usize).read();assert_eq!(words[0],2);
+                assert_eq!(wg::mattmc_worldgen_weak_count(cw),0);assert_eq!(source_weak.strong_count(),0);assert_eq!(mattmc_gaussian_weak_count(watch),1);
+                assert_eq!(mattmc_gaussian_draw_next(frame,f64::from_bits(words[1]).ln().to_bits()),0);assert_eq!(mattmc_gaussian_has(cache,0),1);
+                mattmc_gaussian_draw_release(frame);assert_eq!(mattmc_gaussian_weak_count(watch),0);mattmc_gaussian_weak_release(watch);wg::mattmc_worldgen_weak_release(cw);
+            }
+        }
+        #[test]
+        fn actual_worldgen_first_draw_requests_count_before_consuming_any_backing_bits() {
+            unsafe {
+                use super::super::super::{owned_worldgen::ffi as wg,owned_legacy::ffi as legacy};
+                let source=legacy::mattmc_random_source_legacy_new();legacy::mattmc_random_source_legacy_seed(source,42,1);let sw=Arc::downgrade(&legacy::retain(source));
+                let cache=mattmc_gaussian_new();let frame=mattmc_gaussian_draw_new_source(cache,0,0,1);assert_eq!(mattmc_gaussian_draw_bind_worldgen(frame,0,1,source),1);
+                legacy::mattmc_random_source_legacy_release(source);assert_eq!(sw.strong_count(),1);assert_eq!(mattmc_gaussian_draw_next(frame,0),1);assert_eq!(std::ptr::with_exposed_provenance::<[u64;2]>(frame as usize).read(),[4,0]);assert_eq!(sw.strong_count(),1);
+                let count=wg::mattmc_worldgen_new();let cw=wg::mattmc_worldgen_weak_new(count);assert_eq!(mattmc_gaussian_draw_next(frame,count),1);let words=std::ptr::with_exposed_provenance::<[u64;2]>(frame as usize).read();assert_eq!(words[0],2);
+                assert_eq!(wg::mattmc_worldgen_count(count),4);assert_eq!(wg::mattmc_worldgen_weak_count(cw),1);assert_eq!(sw.strong_count(),0);wg::mattmc_worldgen_release(count);assert_eq!(wg::mattmc_worldgen_weak_count(cw),0);
+                mattmc_gaussian_draw_next(frame,f64::from_bits(words[1]).ln().to_bits());mattmc_gaussian_draw_release(frame);mattmc_gaussian_release(cache);wg::mattmc_worldgen_weak_release(cw);
+            }
+        }
+        #[test]
+        fn abandoned_actual_worldgen_count_request_retires_target_without_a_draw() {
+            unsafe {
+                use super::super::super::owned_legacy::ffi as legacy;
+                let source=legacy::mattmc_random_source_legacy_new();let sw=Arc::downgrade(&legacy::retain(source));let cache=mattmc_gaussian_new();let watch=mattmc_gaussian_weak_new(cache,0);
+                let frame=mattmc_gaussian_draw_new_source(cache,0,0,1);assert_eq!(mattmc_gaussian_draw_bind_worldgen(frame,0,1,source),1);legacy::mattmc_random_source_legacy_release(source);mattmc_gaussian_release(cache);
+                assert_eq!(mattmc_gaussian_draw_next(frame,0),1);assert_eq!(std::ptr::with_exposed_provenance::<[u64;2]>(frame as usize).read(),[4,0]);assert_eq!(sw.strong_count(),1);
+                mattmc_gaussian_draw_release(frame);assert_eq!(sw.strong_count(),0);assert_eq!(mattmc_gaussian_weak_count(watch),0);mattmc_gaussian_weak_release(watch);
+            }
+        }
+        #[test]
+        fn aliased_actual_gaussian_cache_keeps_backing_until_commit_after_worldgen_count_retires() {
+            unsafe {
+                use super::super::super::{owned_worldgen::ffi as wg,owned_legacy::ffi as legacy};
+                let source=legacy::mattmc_random_source_legacy_new();legacy::mattmc_random_source_legacy_seed(source,42,1);let sw=Arc::downgrade(&legacy::retain(source));let count=wg::mattmc_worldgen_new();let cw=wg::mattmc_worldgen_weak_new(count);
+                let frame=mattmc_gaussian_draw_new_source(source,2,0,1);assert_eq!(mattmc_gaussian_draw_bind_worldgen(frame,count,1,source),1);wg::mattmc_worldgen_release(count);legacy::mattmc_random_source_legacy_release(source);assert_eq!(sw.strong_count(),2);
+                assert_eq!(mattmc_gaussian_draw_next(frame,0),1);let words=std::ptr::with_exposed_provenance::<[u64;2]>(frame as usize).read();assert_eq!(words[0],2);assert_eq!(wg::mattmc_worldgen_weak_count(cw),0);assert_eq!(sw.strong_count(),1);
+                assert_eq!(mattmc_gaussian_draw_next(frame,f64::from_bits(words[1]).ln().to_bits()),0);assert_eq!(mattmc_gaussian_has(source,2),1);mattmc_gaussian_draw_release(frame);assert_eq!(sw.strong_count(),0);wg::mattmc_worldgen_weak_release(cw);
+            }
+        }
         #[test]
         fn actual_legacy_cache_and_producer_keep_data_until_the_final_commit() {
             unsafe {
@@ -611,6 +674,7 @@ pub(crate) mod ffi {
 pub(crate) enum Effect {
     DrawDouble,
     LegacyCollision,
+    WorldgenCount,
     JavaLog(f64),
     Complete(u64),
 }
@@ -618,6 +682,7 @@ pub(crate) enum Effect {
 enum Stage {
     Start,
     UncachedStart,
+    BindWorldgen,
     First,
     Second,
     Log,
@@ -627,12 +692,16 @@ enum Stage {
 enum Producer {
     Xoroshiro(Arc<Source>),
     Legacy(Arc<super::owned_legacy::Source>),
+    Worldgen(super::owned_worldgen::Kernel),
+    PendingWorldgen(super::owned_worldgen::Target),
 }
 impl Producer {
     fn double(&self) -> Result<f64, ()> {
         match self {
             Self::Xoroshiro(source) => Ok(source.with(|data| data.double())),
             Self::Legacy(source) => source.double(),
+            Self::Worldgen(kernel) => kernel.double(),
+            Self::PendingWorldgen(_) => unreachable!("count resource must bind before a draw"),
         }
     }
 }
@@ -677,7 +746,20 @@ impl Draw {
                     }
                     self.stage = Stage::First;
                 }
-                Stage::UncachedStart => self.stage = Stage::First,
+                Stage::UncachedStart => {
+                    if matches!(self.source,Some(Producer::PendingWorldgen(_))) {
+                        self.stage=Stage::BindWorldgen;
+                        return Effect::WorldgenCount;
+                    }
+                    self.stage=Stage::First;
+                }
+                Stage::BindWorldgen => {
+                    if response==0 {return Effect::WorldgenCount;}
+                    let Some(Producer::PendingWorldgen(target))=self.source.take()else{unreachable!()};
+                    self.source=Some(Producer::Worldgen(super::owned_worldgen::Kernel::owned(
+                        unsafe{super::owned_worldgen::ffi::retain(response)},target)));
+                    self.stage=Stage::First;
+                }
                 Stage::First => {
                     self.d = 2. * f64::from_bits(response) - 1.;
                     self.stage = Stage::Second;

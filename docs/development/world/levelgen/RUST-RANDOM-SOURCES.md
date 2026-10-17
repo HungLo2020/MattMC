@@ -376,3 +376,82 @@ its passing XML is retained with a failed source guard and does not count as
 acceptance. Capture inputs only after Git operations settle. Earlier mandatory,
 world, resource and affected item receipts retain their actual image scopes,
 with the explicit unchanged-input impact records above.
+
+
+## Worldgen Gaussian consumer in progress
+
+The next working slice connects the actual worldgen kernel to native Gaussian
+production. The cache miss must commit before any target inspection or count
+owner creation. If the wrapper has no actual count owner yet, native control
+requests that genuine VM resource before its first draw. The native pending
+producer owns backing data while waiting, then owns count and backing together;
+both retire after the last draw, with the actual cache retained through commit.
+Custom wrapper/source/generator callbacks keep original VM dispatch.
+
+Before implementation, seven dangerous contracts passed on original Frozen,
+complete published `c298904f` and Current. The 36,504 Gaussian/cache/count/backing
+observations match at SHA256
+`cc7a23aea7c64679339036f9eb1aa67ed79821442f380753d4ae4a73b21f5b72`.
+Use `VerifyWorldgenGaussians.py` with complete
+`build/worldgen/worldgen-gaussian/pre-c298-runtime`. The paired release passes
+325 focused Java checks, including three actual JVM collection proofs. Native
+count/backing data survive facade and arena-anchor collection, retire before
+`Math.log`, and leave the cache alive through commit. Abandoning a deferred
+count-resource request releases its backing and cache without drawing. The
+seven contracts and all 36,504 observations match all three runtimes after the
+port. The 74 native module checks and three safe controls detect the wrong
+count-resource effect, skipped backing draws and leaked producer ownership.
+
+Run the bounded resource screen with:
+
+```sh
+python3 DevUtils/tests/worldgen/random_source/VerifyWorldgenGaussianScreen.py \
+  --pre-runtime build/worldgen/worldgen-gaussian/pre-c298-runtime \
+  --output build/worldgen/worldgen-gaussian/new-resource-screen
+```
+
+The first screen records exact Gaussian/count/successor outputs and actual
+class/native origins, with all native owners and frames retiring. Prepared
+Legacy/Xoroshiro Gaussian32-plus-word groups take 2.60–2.63/2.92–3.64 µs versus
+3.60–3.63/4.00–4.14 µs pre-change. Construction plus three Gaussian draws takes
+0.64–0.87/0.80–0.86 µs versus 0.93–1.09/0.81–0.90 µs; the Xoroshiro creation
+comparison overlaps and is inconclusive. All four remain substantially slower
+than Frozen. Java allocation increases from 488 to 976 bytes per prepared group
+and by 40 bytes per creation group. Genuine VM target descriptors cross the
+ordinary FFM boundary on cache misses; bounded descriptor traffic remains debt
+for encompassing native consumer orchestration. Native owner/frame counts do
+not increase relative to pre-change. RSS is process memory, not a native
+allocator measurement. See `resource-screen/resource-assessment.json` under the
+same evidence root. This intermediate screen grants no final budget or hardware
+pass.
+
+On the `c298904f` plus Gaussian working image (release `f8e3bf2b`), mandatory
+tiers pass 2,752 ordinary Java checks with six skips, 193 parity checks, 11 slow
+checks and 3,203 native checks with nine ignored. Fresh FULL and CARVERS-resume
+runs generate/save 648 chunks per runtime each: all eight pre-change regions
+match, standard Frozen dimensions match, and the known 162 Primordial
+differences remain. Both injected failure paths restore all nine chunks;
+cancellation retires 660 holders to zero with all 169 statuses matching. Stock
+fresh/reopen and pending player shutdown/own-save/reopen checks pass on all
+three runtimes. See `stable-tiers`, `full-*`, `failure-cancel`, `stock-binding`,
+`player-shutdown` and `saves` under the Gaussian evidence root. These receipts
+identify that tested working image; later reconciliation requires affected
+integration checks and does not relabel these aggregates.
+
+
+The reconciled `a438a03c` plus Gaussian image (release `2add5acd`) passes 328
+focused Java checks and a fresh complete native tier: 3,203 passed, nine
+ignored. The incoming changes affect six item production sources and 33 item
+Main classes; all 840 worldgen/noise classes, owned Gaussian/worldgen Rust,
+resources and 117 dependencies remain exact. The original public equipment
+observer verifies null-equipment construction/read order and live mapping
+remap/removal broadcasts on the actual rebuilt pair. Fresh Current Gaussian
+contracts and corpus match the preserved original reference observations;
+item 15 and hopper 16/save checks pass on all three runtimes. Fresh Current FULL
+and CARVERS-resume each save 648 chunks and match the explicit reference rows
+with identical audit bytecode and settings. Stock and player shutdown/own-save/
+reopen pass; stock fingerprints and future aliases also match the preserved
+references. See `a438-{focused,impact,observers,native,full-*,saves}` and
+`a438-stock-binding/original-reference-comparison.json`. Earlier full Java and
+resource receipts retain their actual `f8e3bf2b` scope; affected item/runtime
+checks above verify integration, without relabeling those aggregates.

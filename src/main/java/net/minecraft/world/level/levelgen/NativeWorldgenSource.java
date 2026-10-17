@@ -55,6 +55,16 @@ final class NativeWorldgenSource {
         }
         return new Target(source instanceof LegacyRandomSource?3:4,0,source);
     }
+    /** Genuine facade/source identities only; no count owner materializes on a cached hit. */
+    record GaussianTarget(WorldgenRandom facade,NativeWorldgenSource initialized,Target backing) {
+        long countHandle(){return initialized==null?0:initialized.handle();}
+        long materializeCount(){return facade.nativeState().handle();}
+    }
+    static GaussianTarget gaussianTarget(RandomSource source) {
+        if(source==null||source.getClass()!=WorldgenRandom.class)return null;
+        var facade=(WorldgenRandom)source;var backing=target(facade.nativeTarget());
+        return backing.id()==0?null:new GaussianTarget(facade,facade.nativeInitializedState(),backing);
+    }
     int next(WorldgenRandom caller,int bits) {
         Target target=target(caller.nativeTarget());
         try {
