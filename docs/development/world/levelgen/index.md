@@ -13,6 +13,7 @@ Preserve seed compatibility, evaluation order, and Java/native ownership rules.
 - [Noise Evaluation](RUST-NOISE.md): sampler behavior and parity checks.
 - [Perlin Graph Construction](RUST-PERLIN.md): native octave policy, actual VM identities, mutable amplitude readers and verification.
 - [Normal Noise Production](RUST-NORMAL.md): actual child ownership, iterator boundaries and mutable-tail cache correction.
+- [Blended and Perlin-Simplex Production](RUST-COMPOSITE-PRODUCERS.md): actual child graphs, VM allocation boundaries and snapshot lifetimes.
 - [Density Evaluation](RUST-DENSITY.md): expression evaluation, batching, and verification.
 - [Terrain Splines](RUST-SPLINE.md): native curve plans, coordinate bindings, and focused parity/performance checks.
 - [Structure Generation](structure/index.md): native structure-template placement, processors and verification.

@@ -85,6 +85,7 @@ final class NativePerlin {
         finally{if(driver!=0)release(BUILDER_RELEASE,driver);}
     }
     void bindNormal(long driver,int slot){try{NativeNormal.bind(driver,id,slot);}finally{Reference.reachabilityFence(this);}}
+    void bindBlended(long driver,int slot){try{NativeBlended.bind(driver,id,slot);}finally{Reference.reachabilityFence(this);}}
     private long reader(int mode,double input){try{return (long)READER.invokeExact(id,mode,input);}catch(Throwable failure){throw propagate(failure);}finally{Reference.reachabilityFence(this);}}
     double edge(DoubleList amplitudes,double input){return Double.longBitsToDouble(read(reader(0,input),amplitudes,null,null,0));}
     void write(DoubleList amplitudes,MemorySegment state,int start){read(reader(1,0),amplitudes,null,state,start);}

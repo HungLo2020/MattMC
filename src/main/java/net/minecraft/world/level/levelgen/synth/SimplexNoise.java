@@ -47,6 +47,7 @@ public class SimplexNoise {
 		return value;
 	}
 
+    void bindSimplexOctaves(long driver){seed.bindSimplexOctaves(driver);}
 	void writeNative(java.lang.foreign.MemorySegment state, int index) {
 		seed.write(state, index, 1.0);
 	}

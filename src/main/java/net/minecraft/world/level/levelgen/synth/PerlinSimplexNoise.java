@@ -4,61 +4,11 @@ import it.unimi.dsi.fastutil.ints.IntRBTreeSet;
 import it.unimi.dsi.fastutil.ints.IntSortedSet;
 import java.util.List;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.levelgen.LegacyRandomSource;
-import net.minecraft.world.level.levelgen.WorldgenRandom;
 
 public class PerlinSimplexNoise {
-	private final SimplexNoise[] noiseLevels;
-	private final double highestFreqValueFactor;
-	private final double highestFreqInputFactor;
-
-	public PerlinSimplexNoise(RandomSource randomSource, List<Integer> list) {
-		this(randomSource, new IntRBTreeSet(list));
-	}
-
-	private PerlinSimplexNoise(RandomSource randomSource, IntSortedSet intSortedSet) {
-		if (intSortedSet.isEmpty()) {
-			throw new IllegalArgumentException("Need some octaves!");
-		} else {
-			int i = -intSortedSet.firstInt();
-			int j = intSortedSet.lastInt();
-			int k = i + j + 1;
-			if (k < 1) {
-				throw new IllegalArgumentException("Total number of octaves needs to be >= 1");
-			} else {
-				SimplexNoise simplexNoise = new SimplexNoise(randomSource);
-				int l = j;
-				this.noiseLevels = new SimplexNoise[k];
-				if (j >= 0 && j < k && intSortedSet.contains(0)) {
-					this.noiseLevels[j] = simplexNoise;
-				}
-
-				for (int m = j + 1; m < k; m++) {
-					if (m >= 0 && intSortedSet.contains(l - m)) {
-						this.noiseLevels[m] = new SimplexNoise(randomSource);
-					} else {
-						randomSource.consumeCount(262);
-					}
-				}
-
-				if (j > 0) {
-					long n = (long)(simplexNoise.getValue(simplexNoise.xo, simplexNoise.yo, simplexNoise.zo) * 9.223372E18F);
-					RandomSource randomSource2 = new WorldgenRandom(new LegacyRandomSource(n));
-
-					for (int o = l - 1; o >= 0; o--) {
-						if (o < k && intSortedSet.contains(l - o)) {
-							this.noiseLevels[o] = new SimplexNoise(randomSource2);
-						} else {
-							randomSource2.consumeCount(262);
-						}
-					}
-				}
-
-				this.highestFreqInputFactor = Math.pow(2.0, j);
-				this.highestFreqValueFactor = 1.0 / (Math.pow(2.0, k) - 1.0);
-			}
-		}
-	}
+    private final NativeSimplexOctaves nativePlan;
+    public PerlinSimplexNoise(RandomSource randomSource,List<Integer> list){this(randomSource,new IntRBTreeSet(list));}
+    private PerlinSimplexNoise(RandomSource randomSource,IntSortedSet octaves){nativePlan=new NativeSimplexOctaves(randomSource,octaves);}
 
 	public double getValue(double d, double e, boolean bl) {
 		return nativeNoise().sample(d, e, 0.0, 0.0, 0.0, bl ? 1 : 0);
@@ -73,9 +23,8 @@ public class PerlinSimplexNoise {
 			synchronized (this) {
 				value = nativeNoise;
 				if (value == null) {
-					var state = NativeNoise.allocate(6, noiseLevels.length, 0, 0, highestFreqInputFactor, highestFreqValueFactor);
-					for (int i = 0; i < noiseLevels.length; i++)
-						if (noiseLevels[i] != null) noiseLevels[i].writeNative(state, i);
+                    var state=nativePlan.allocate();
+                    nativePlan.write(state);
 					value = new NativeNoise(state);
 					nativeNoise = value;
 				}

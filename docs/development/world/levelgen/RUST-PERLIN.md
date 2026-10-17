@@ -49,7 +49,8 @@ The pre-change runtime must be complete and immutable, as described in the
 [chunk-generation guide](../chunk-loading/RUST-CHUNK-GENERATION.md).
 Leaf construction and sampling constraints are in [native noise](RUST-NOISE.md).
 The [Normal producer/pair correction](RUST-NORMAL.md) continues this ownership
-work. Blended, Perlin-Simplex construction and random-source state remain;
+work. The next [Blended/Perlin-Simplex increment](RUST-COMPOSITE-PRODUCERS.md)
+continues construction ownership; random-source state remains;
 this checkpoint does not complete noise.
 
 ## Historical Perlin-only screen — October 16, 2026

@@ -16,7 +16,7 @@ public final class CompositeConstructorProbe {
  public static void main(String[] args)throws Exception {
   net.minecraft.SharedConstants.tryDetectVersion();net.minecraft.server.Bootstrap.bootStrap();
   for(Class<?> type:new Class<?>[]{PerlinNoise.class,ImprovedNoise.class,NormalNoise.class,PerlinSimplexNoise.class,BlendedNoise.class,RandomSource.class,LegacyRandomSource.class,XoroshiroRandomSource.class})origin(type);
-  for(String name:new String[]{"net.minecraft.world.level.levelgen.synth.NativePerlin","net.minecraft.world.level.levelgen.synth.NativeNoiseSeed"})try{origin(Class.forName(name));}catch(ClassNotFoundException absent){}
+  for(String name:new String[]{"net.minecraft.world.level.levelgen.synth.NativePerlin","net.minecraft.world.level.levelgen.synth.NativeNoiseSeed","net.minecraft.world.level.levelgen.synth.NativeNormal","net.minecraft.world.level.levelgen.synth.NativeBlended","net.minecraft.world.level.levelgen.synth.NativeSimplexOctaves"})try{origin(Class.forName(name));}catch(ClassNotFoundException absent){}
   long[] seeds={0,1,-1,42,-7340013412337L,Long.MIN_VALUE,Long.MAX_VALUE,0x1234567812345678L};
   double[] points={0,.125,-.125,1,-1,7.75,-19.25,10000.125,29999984.5,-29999984.5};
   for(int family=0;family<2;family++)for(long seed:seeds) {

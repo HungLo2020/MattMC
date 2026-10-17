@@ -1,0 +1,27 @@
+package net.minecraft.world.level.levelgen.synth;
+import static org.junit.jupiter.api.Assertions.*;
+import java.io.IOException;
+import it.unimi.dsi.fastutil.doubles.*;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.levelgen.PositionalRandomFactory;
+import org.junit.jupiter.api.Test;
+/** Original genuine checked VM Throwables must retain identity across native continuations. */
+class CheckedNoiseContractTest {
+ @org.junit.jupiter.api.BeforeAll static void bootstrap(){net.minecraft.SharedConstants.tryDetectVersion();net.minecraft.server.Bootstrap.bootStrap();}
+ @SuppressWarnings("unchecked")static<E extends Throwable>void raise(Throwable failure)throws E{throw(E)failure;}
+ static final class Source implements RandomSource {
+  final RandomSource actual=RandomSource.create(42);final IOException failure=new IOException("actual checked RNG");int calls;final boolean forkFails;
+  Source(boolean forkFails){this.forkFails=forkFails;}public RandomSource fork(){return actual.fork();}public PositionalRandomFactory forkPositional(){calls++;if(forkFails)CheckedNoiseContractTest.<RuntimeException>raise(failure);return actual.forkPositional();}public void setSeed(long seed){actual.setSeed(seed);}
+  public int nextInt(){return actual.nextInt();}public int nextInt(int bound){return actual.nextInt(bound);}public long nextLong(){return actual.nextLong();}public boolean nextBoolean(){return actual.nextBoolean();}public float nextFloat(){return actual.nextFloat();}public double nextDouble(){calls++;CheckedNoiseContractTest.<RuntimeException>raise(failure);return 0;}public double nextGaussian(){return actual.nextGaussian();}public void consumeCount(int count){actual.consumeCount(count);}
+ }
+ @Test void improvedKeepsTheActualCheckedRngFailure(){var source=new Source(false);assertSame(source.failure,assertThrows(IOException.class,()->new ImprovedNoise(source)));assertEquals(1,source.calls);assertEquals(RandomSource.create(42).nextLong(),source.nextLong());}
+ @Test void simplexKeepsTheActualCheckedRngFailure(){var source=new Source(false);assertSame(source.failure,assertThrows(IOException.class,()->new SimplexNoise(source)));assertEquals(1,source.calls);assertEquals(RandomSource.create(42).nextLong(),source.nextLong());}
+ @Test void perlinKeepsTheActualCheckedFactoryFailure(){var source=new Source(true);assertSame(source.failure,assertThrows(IOException.class,()->PerlinNoise.create(source,0,new DoubleArrayList(new double[]{1}))));assertEquals(1,source.calls);assertEquals(RandomSource.create(42).nextLong(),source.nextLong());}
+ @Test void normalKeepsTheActualCheckedIteratorFailureAfterBothChildren(){var failure=new IOException("actual checked iterator");var values=new DoubleArrayList(new double[]{1,1}){@Override public DoubleListIterator iterator(){CheckedNoiseContractTest.<RuntimeException>raise(failure);return super.iterator();}};var source=new Source(false);assertSame(failure,assertThrows(IOException.class,()->NormalNoise.create(source,new NormalNoise.NoiseParameters(-1,values))));assertEquals(2,source.calls);var expected=RandomSource.create(42);expected.forkPositional();expected.forkPositional();assertEquals(expected.nextLong(),source.nextLong());}
+ static DoubleArrayList values(boolean[]armed,IOException failure){return new DoubleArrayList(new double[]{1,1}){@Override public double getDouble(int index){if(armed[0])CheckedNoiseContractTest.<RuntimeException>raise(failure);return super.getDouble(index);}};}
+ @Test void perlinReaderPreservesCheckedFailureAndLaterUse(){boolean[]armed={false};var failure=new IOException("actual checked Perlin read");var noise=PerlinNoise.create(RandomSource.create(42),-1,values(armed,failure));double expected=noise.getValue(1,2,3);armed[0]=true;assertSame(failure,assertThrows(IOException.class,()->noise.getValue(1,2,3)));armed[0]=false;assertEquals(Double.doubleToRawLongBits(expected),Double.doubleToRawLongBits(noise.getValue(1,2,3)));}
+ @Test void normalReaderPreservesCheckedFailureAndLaterUse(){boolean[]armed={false};var failure=new IOException("actual checked Normal read");var noise=NormalNoise.create(RandomSource.create(42),new NormalNoise.NoiseParameters(-1,values(armed,failure)));double expected=noise.getValue(1,2,3);armed[0]=true;assertSame(failure,assertThrows(IOException.class,()->noise.getValue(1,2,3)));armed[0]=false;assertEquals(Double.doubleToRawLongBits(expected),Double.doubleToRawLongBits(noise.getValue(1,2,3)));}
+ @Test void blendedKeepsCheckedFailureAfterTheFirstActualChild(){var source=new BlendedConstructorContractTest.Source();var failure=new IOException("actual checked Blended source");source.onDouble=()->{if(source.doubles==49)CheckedNoiseContractTest.<RuntimeException>raise(failure);};assertSame(failure,assertThrows(IOException.class,()->new BlendedNoise(source,.25,.125,80,160,4)));assertEquals(49,source.doubles);var expected=RandomSource.create(42);for(int n=0;n<16;n++)new ImprovedNoise(expected);assertEquals(expected.nextLong(),source.nextLong());}
+ @Test void simplexOctavesKeepsTheCheckedSkipFailure(){var failure=new IOException("actual checked octave skip");var source=new net.minecraft.world.level.levelgen.LegacyRandomSource(42){@Override public void consumeCount(int count){CheckedNoiseContractTest.<RuntimeException>raise(failure);}};assertSame(failure,assertThrows(IOException.class,()->new PerlinSimplexNoise(source,java.util.List.of(-3,-1,0))));var expected=RandomSource.create(42);new SimplexNoise(expected);new SimplexNoise(expected);assertEquals(expected.nextLong(),source.nextLong());}
+
+}

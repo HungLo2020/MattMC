@@ -191,3 +191,6 @@ Checked-failure receipts: `build/worldgen/noise-composite/checked-contracts/`.
 This is an intermediate whole-worldgen checkpoint; native Blended/Perlin-Simplex
 construction, RNG ownership and remaining Java orchestration/compatibility
 producers and consumers continue under S33.
+
+The next [Blended/Perlin-Simplex producers](RUST-COMPOSITE-PRODUCERS.md) continue
+this work; their verification remains separately identified.

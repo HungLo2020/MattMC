@@ -59,6 +59,8 @@ public class PerlinNoise {
     }
 
     void bindNormal(long driver,int slot){nativePlan.bindNormal(driver,slot);}
+    void bindBlended(long driver,int slot){nativePlan.bindBlended(driver,slot);}
+    DoubleList nativeAmplitudes(){return amplitudes;}
     private final NativePerlin nativePlan;
     protected PerlinNoise(RandomSource randomSource, Pair<Integer, DoubleList> pair, boolean modern) {
         this.firstOctave = pair.getFirst();

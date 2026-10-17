@@ -5,7 +5,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Locale;
-import java.util.stream.IntStream;
 import net.minecraft.util.KeyDispatchDataCodec;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.DensityFunction;
@@ -40,33 +39,13 @@ public class BlendedNoise implements DensityFunction.SimpleFunction {
 		return new BlendedNoise(new XoroshiroRandomSource(0L), d, e, f, g, h);
 	}
 
-	private BlendedNoise(PerlinNoise perlinNoise, PerlinNoise perlinNoise2, PerlinNoise perlinNoise3, double d, double e, double f, double g, double h) {
-		this.minLimitNoise = perlinNoise;
-		this.maxLimitNoise = perlinNoise2;
-		this.mainNoise = perlinNoise3;
-		this.xzScale = d;
-		this.yScale = e;
-		this.xzFactor = f;
-		this.yFactor = g;
-		this.smearScaleMultiplier = h;
-		this.xzMultiplier = 684.412 * this.xzScale;
-		this.yMultiplier = 684.412 * this.yScale;
-		this.maxValue = perlinNoise.maxBrokenValue(this.yMultiplier);
-	}
-
-	@VisibleForTesting
-	public BlendedNoise(RandomSource randomSource, double d, double e, double f, double g, double h) {
-		this(
-			PerlinNoise.createLegacyForBlendedNoise(randomSource, IntStream.rangeClosed(-15, 0)),
-			PerlinNoise.createLegacyForBlendedNoise(randomSource, IntStream.rangeClosed(-15, 0)),
-			PerlinNoise.createLegacyForBlendedNoise(randomSource, IntStream.rangeClosed(-7, 0)),
-			d,
-			e,
-			f,
-			g,
-			h
-		);
-	}
+    private final NativeBlended nativePlan;
+    private BlendedNoise(NativeBlended plan,double d,double e,double f,double g,double h){
+        nativePlan=plan;minLimitNoise=plan.children[0];maxLimitNoise=plan.children[1];mainNoise=plan.children[2];
+        xzScale=d;yScale=e;xzFactor=f;yFactor=g;smearScaleMultiplier=h;xzMultiplier=plan.xz;yMultiplier=plan.y;maxValue=plan.max;
+    }
+    @VisibleForTesting
+    public BlendedNoise(RandomSource randomSource,double d,double e,double f,double g,double h){this(new NativeBlended(randomSource,d,e,f,g,h),d,e,f,g,h);}
 
 	public BlendedNoise withNewRandom(RandomSource randomSource) {
 		return new BlendedNoise(randomSource, this.xzScale, this.yScale, this.xzFactor, this.yFactor, this.smearScaleMultiplier);
@@ -130,10 +109,8 @@ public class BlendedNoise implements DensityFunction.SimpleFunction {
 			synchronized (this) {
 				value = nativeNoise;
 				if (value == null) {
-					var state = NativeNoise.allocate(4, 16, 16, 8, xzMultiplier, yMultiplier, xzFactor, yFactor, smearScaleMultiplier);
-					minLimitNoise.writeNative(state, 0);
-					maxLimitNoise.writeNative(state, 16);
-					mainNoise.writeNative(state, 32);
+					var state = nativePlan.allocate();
+                    nativePlan.write(state);
 					value = new NativeNoise(state);
 					nativeNoise = value;
 				}

@@ -15,13 +15,15 @@ VM effects on the actual source, preserving custom dispatch, reentry and
 exception prefixes. Rust owns the shuffle and compact immutable leaf state;
 Java retains the public offset fields and an arena-managed native owner.
 
-The subsequent [Perlin graph/factory increment](RUST-PERLIN.md) moves its
+The landedc8 [Perlin graph/factory increment](RUST-PERLIN.md) moves its
 modern/legacy decisions, frequency factors, bounds and ordered amplitude readers
 into Rust. Its verification is separate from the published leaf evidence below.
-The [Normal producer and paired readers](RUST-NORMAL.md) are the next connected
-implementation under focused verification. Blended and Perlin-Simplex
-construction, random-source state/consumption algorithms, codecs and public
-integration remain Java-owned. Neither increment completes
+The same publishedc8 [Normal producer and paired readers](RUST-NORMAL.md) complete that family’s
+constructor policy and mutable-tail validation. The next
+[Blended/Perlin-Simplex producers](RUST-COMPOSITE-PRODUCERS.md) move their
+constructor state, actual children and snapshot writers into Rust, with combined
+verification pending. Random-source state/consumption algorithms, codecs and
+remaining public integration still use Java. These increments do not complete
 noise construction or world generation. The unused Java Simplex gradient
 table and dot-product helper have been removed.
 
@@ -90,9 +92,11 @@ classpath setup from the [chunk-generation guide](../chunk-loading/RUST-CHUNK-GE
 It compares actual constructor effects, failures, reentry, array bounds, public
 metadata, debug permutation text, samples, derivatives and the next RNG word.
 Native-owner tests check real builder failure retirement and leaf collection
-while an independently copied evaluator remains usable. Intermediate leaf
-verification is in progress; earlier sampling results below are historical
-and do not validate this construction change. Add `--screen-only` for the
+while an independently copied evaluator remains usable. The original leaf
+verification phase is historical: it landed in publishedc5a9de42, with its
+exact construction evidence recorded below. The laterc8 Perlin/Normal evidence
+is separate; older sampling runs do not certify newer constructor changes.
+Add `--screen-only` for the
 bounded constructor screen on CPU4; it requires separate portable contract
 receipts. All runs retain source/class/native origins and immutable-runtime guards.
 

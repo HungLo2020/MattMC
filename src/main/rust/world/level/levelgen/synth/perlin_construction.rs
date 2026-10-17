@@ -257,7 +257,9 @@ pub(super) struct Reader {
     header: [u64; 4],
     graph: Arc<Graph>,
     second: Option<Arc<Graph>>,
+    third: Option<Arc<Graph>>,
     offset: usize,
+    group: usize,
     index: usize,
     phase: u8,
     mode: i32,
@@ -277,7 +279,9 @@ impl Reader {
             header: [0; 4],
             graph,
             second: None,
+            third: None,
             offset: 0,
+            group: 0,
             index: 0,
             phase: 0,
             mode,
@@ -293,19 +297,30 @@ impl Reader {
         reader.second = Some(second);
         reader
     }
+    pub(super) fn triple(
+        first: Arc<Graph>,
+        second: Arc<Graph>,
+        third: Arc<Graph>,
+        mode: i32,
+    ) -> Self {
+        let mut reader = Self::pair(first, second, mode);
+        reader.third = Some(third);
+        reader
+    }
     fn advance(&mut self) -> i32 {
         loop {
             while self.index < self.graph.leaves.len() {
                 if self.graph.leaves[self.index].is_some() {
-                    self.header = [AMPLITUDE, self.index as u64, 0, 0];
+                    self.header = [AMPLITUDE, self.index as u64, self.group as u64, 0];
                     self.phase = 1;
                     return 1;
                 }
                 self.index += 1;
                 self.factor /= 2.;
             }
-            if let Some(second) = self.second.take() {
+            if let Some(second) = self.second.take().or_else(|| self.third.take()) {
                 self.offset += self.graph.leaves.len();
+                self.group += 1;
                 self.graph = second;
                 self.index = 0;
                 self.factor = self.graph.value;

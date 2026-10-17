@@ -81,6 +81,7 @@ final class NativeNoiseSeed {
         try { NativePerlin.bind(driver,id); }
         finally { Reference.reachabilityFence(this); }
     }
+    void bindSimplexOctaves(long driver){try{NativeSimplexOctaves.bind(driver,id);}finally{Reference.reachabilityFence(this);}}
     static long[] statistics() {
         try(Arena arena=Arena.ofConfined()) {
             var words=arena.allocate(6L*Long.BYTES,Long.BYTES);
