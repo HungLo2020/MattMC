@@ -459,6 +459,29 @@ checks above verify integration, without relabeling those aggregates.
 
 ## Positional factory ownership in progress
 
+Formatting must read canonical private factory data directly. A same-package
+subclass can declare `seed()`, `seedLo()` or `seedHi()`; original
+`parityConfigString` never invokes those methods. The published `2c3bbc299`
+formatting path accidentally called them, changing text and allowing checked
+exceptions after a partial builder prefix. The bounded correction calls
+`nativeFactory.seed(index)` directly in the two formatting bodies, preserving
+the original append order and leaving package getters overridable.
+`PositionalFormattingContractTest` covers four value/checked-getter cases;
+`PositionalFormattingEffects.java` runs the same observer bytes compiled against
+original Frozen. The original four-row failure is retained under
+`build/worldgen/positional-formatting/original-baseline`. This correction changes
+no RNG arithmetic, factory API or native ownership.
+The correction passes 13 focused checks (four new formatting cases, seven
+original factory contracts and two physical lifetime checks). The same
+Frozen-compiled four-row observer matches original output; restoring the two
+virtual-getter bodies in an actual VM overlay reproduces all four published
+failures. Factory 10,073 and Gaussian 36,504 observations remain exact. Only the
+two nested factory classes differ from the complete published2c runtime;
+13,944 other Main classes and every Rust source/native byte remain unchanged.
+See `positional-formatting/{focused,corrected-effects,impact.json}` and
+`positional-factories/formatting-observers`. Prior broad gates retain their
+actual checkpoint identities; this is a bounded dispatch correction.
+
 Before changing production, seven public factory contracts and 10,073 actual
 source/cache/successor observations match original Frozen, complete published
 `58c319791` and Current at SHA256

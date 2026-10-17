@@ -84,7 +84,7 @@ public class LegacyRandomSource implements BitRandomSource {
 		@VisibleForTesting
 		@Override
 		public void parityConfigString(StringBuilder stringBuilder) {
-			stringBuilder.append("LegacyPositionalRandomFactory{").append(this.seed()).append("}");
+			stringBuilder.append("LegacyPositionalRandomFactory{").append(this.nativeFactory.seed(0)).append("}");
 		}
 	}
 }

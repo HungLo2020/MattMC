@@ -55,7 +55,7 @@ public class XoroshiroRandomSource implements RandomSource {
 		@VisibleForTesting
 		@Override
 		public void parityConfigString(StringBuilder stringBuilder) {
-			stringBuilder.append("seedLo: ").append(this.seedLo()).append(", seedHi: ").append(this.seedHi());
+			stringBuilder.append("seedLo: ").append(this.nativeFactory.seed(0)).append(", seedHi: ").append(this.nativeFactory.seed(1));
 		}
 	}
 }
