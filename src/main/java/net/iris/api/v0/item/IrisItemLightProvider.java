@@ -1,8 +1,10 @@
 package net.iris.api.v0.item;
 
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BlockItemStateProperties;
 import org.joml.Vector3f;
 
 public interface IrisItemLightProvider {
@@ -11,7 +13,8 @@ public interface IrisItemLightProvider {
 
 	default int getLightEmission(Player player, ItemStack stack) {
 		if (stack.getItem() instanceof BlockItem item) {
-			return item.getBlock().defaultBlockState().getLightEmission();
+			return stack.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY)
+				.apply(item.getBlock().defaultBlockState()).getLightEmission();
 		}
 
 		return 0;

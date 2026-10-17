@@ -7137,6 +7137,73 @@ fn dedicated_post_effect_route_rejects_resource_pack_overrides() {
 }
 
 #[test]
+fn held_light_uniforms_follow_hand_changes_and_policy_reload() {
+    let mut gal = gal();
+    let mut frontend = WorldPrimitiveFrontend::default();
+    frontend
+        .apply_world_mesh_asset_update(
+            &mut gal,
+            1,
+            Vec::new(),
+            vec![WorldMeshTextureAssetPayload {
+                texture_id: WORLD_MESH_TEXTURE_TERRAIN_BLOCK_ATLAS,
+                png_bytes: material_scene_png(0),
+                mip_png_bytes: Vec::new(),
+                frame_width: 0,
+                frame_height: 0,
+                frame_count: 1,
+                frame_ticks: 1,
+                animation_flags: 0,
+                frame_row_size: 0,
+                interpolation_policy: 0,
+                animation_frames: Vec::new(),
+                coordinate_origin: 0,
+                sampling: None,
+                requested_mip_levels: 0,
+            }],
+        )
+        .unwrap();
+    let mut source = frame(Vec::new());
+    source.shader_environment = WorldShaderEnvironmentFrame {
+        enabled: true,
+        world_generation: 5,
+        far_plane: 128.0,
+        ..WorldShaderEnvironmentFrame::default()
+    };
+    // These are the per-stack Light block values covered by the Java producer
+    // test. They arrive independently; only the active native policy combines them.
+    for (generation, properties, legacy) in [
+        (7, "", true),
+        (8, "oldHandLight=false\n", false),
+        (9, "oldHandLight=true\n", true),
+    ] {
+        frontend
+            .apply_shader_pack_source_update(ShaderPackSourceUpdate {
+                pack_name: "held-light-state-regression".to_string(),
+                generation,
+                files: vec![ShaderSourceFile::new("shaders.properties", properties)],
+            })
+            .unwrap();
+        for (main, off) in [(3, 12), (12, 3), (1, 3), (0, 0)] {
+            source.frame_id += 1;
+            source.shader_environment.main_hand_item_light_emission = main;
+            source.shader_environment.off_hand_item_light_emission = off;
+            let uniforms = frontend
+                .source_uniform_frame_for_owned_resources(&source)
+                .unwrap();
+            assert_eq!(Some(if legacy { main.max(off) } else { main }), uniforms.held_block_light_main);
+            assert_eq!(Some(off), uniforms.held_block_light_off_hand);
+            // Multiple consumers of the same frame observe identical values.
+            let repeated = frontend
+                .source_uniform_frame_for_owned_resources(&source)
+                .unwrap();
+            assert_eq!(uniforms.held_block_light_main, repeated.held_block_light_main);
+            assert_eq!(uniforms.held_block_light_off_hand, repeated.held_block_light_off_hand);
+        }
+    }
+}
+
+#[test]
 fn owned_source_uniform_preparation_derives_rain_factor_once_per_frame() {
     let mut gal = gal();
     let mut frontend = WorldPrimitiveFrontend::default();
