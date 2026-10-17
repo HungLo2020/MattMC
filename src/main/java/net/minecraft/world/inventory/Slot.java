@@ -18,7 +18,8 @@ public class Slot {
 
 	public Slot(Container container, int i, int j, int k) {
 		this.container = container;
-		this.nativeLink = container!=null&&(container.getClass()==net.minecraft.world.entity.player.Inventory.class||net.minecraft.world.level.block.entity.NativeStockContainer.exact(container))
+		this.nativeLink = container!=null&&(container.getClass()==net.minecraft.world.entity.player.Inventory.class||net.minecraft.world.level.block.entity.NativeStockContainer.exact(container)
+				||container.getClass()==net.minecraft.world.CompoundContainer.class)
 			?net.minecraft.world.item.NativeItemState.bindStockSlot(container,i):null;
 		this.legacyIndex = this.nativeLink==null?new LegacyIndex(i):null;
 		this.x = j;
@@ -161,7 +162,7 @@ public class Slot {
 	public int getContainerSlot() {
 		return this.containerIndex();
 	}
-	private int containerIndex(){return this.nativeLink==null?this.legacyIndex.value:this.nativeLink.index();}
+	private int containerIndex(){return this.nativeLink==null?this.legacyIndex.value:this.nativeLink.containerIndex();}
 
 	public boolean isHighlightable() {
 		return true;

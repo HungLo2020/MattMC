@@ -132,6 +132,57 @@ class NativeBarrelTest {
         }
     }
 
+    // A six-row menu over a double chest of two exact chests links each slot to
+    // its half's native row (half offset kept in getContainerSlot); writes and
+    // setChanged still go through the CompoundContainer. Subclass halves keep the
+    // original unlinked path. Random clicks, quick moves and broadcasts must match.
+    static List<String> doubleChestMenu(boolean exact) {
+        Inventory inventory = new Inventory(null, new EntityEquipment());
+        var player = mock(net.minecraft.world.entity.player.Player.class); var level = mock(Level.class);
+        doReturn(inventory).when(player).getInventory(); doReturn(level).when(player).level();
+        doReturn(net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS).when(level).enabledFeatures();
+        ChestBlockEntity a = exact ? new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()) : new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()) {};
+        ChestBlockEntity b = exact ? new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()) : new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()) {};
+        var compound = new net.minecraft.world.CompoundContainer(a, b);
+        a.setRemoved(); b.setRemoved(); ChestMenu menu = ChestMenu.sixRows(1, inventory, compound); a.clearRemoved(); b.clearRemoved();
+        var results = new ArrayList<String>();
+        menu.addSlotListener(new net.minecraft.world.inventory.ContainerListener() {
+            @Override public void slotChanged(AbstractContainerMenu changed, int slot, ItemStack stack) { results.add("listener " + slot + " " + stack.getItem() + "x" + stack.getCount()); }
+            @Override public void dataChanged(AbstractContainerMenu changed, int id, int value) {}
+        });
+        var random = new java.util.Random(6);
+        var items = List.of(Items.STICK, Items.ENDER_PEARL, Items.DIAMOND_SWORD, Items.DIRT);
+        for (int i = 0; i < 54; i++) if (random.nextInt(3) == 0) { var item = items.get(random.nextInt(items.size())); compound.setItem(i, new ItemStack(item, 1 + random.nextInt(new ItemStack(item).getMaxStackSize()))); }
+        for (int i = 0; i < 36; i++) if (random.nextInt(3) == 0) { var item = items.get(random.nextInt(items.size())); inventory.setItem(i, new ItemStack(item, 1 + random.nextInt(new ItemStack(item).getMaxStackSize()))); }
+        for (int i = 0; i < menu.slots.size(); i++) results.add("slot " + i + " " + menu.getSlot(i).getContainerSlot() + " " + menu.getSlot(i).getItem().getCount());
+        for (int step = 0; step < 400; step++) {
+            int slot = random.nextInt(menu.slots.size());
+            switch (random.nextInt(4)) {
+                case 0 -> results.add(step + " quick " + slot + " " + menu.quickMoveStack(player, slot).getCount());
+                case 1 -> { menu.clicked(slot, random.nextInt(2), net.minecraft.world.inventory.ClickType.PICKUP, player); results.add(step + " pickup " + slot); }
+                case 2 -> { menu.clicked(slot, 0, net.minecraft.world.inventory.ClickType.QUICK_MOVE, player); results.add(step + " shift " + slot); }
+                default -> { menu.clicked(slot, random.nextInt(9), net.minecraft.world.inventory.ClickType.SWAP, player); results.add(step + " swap " + slot); }
+            }
+            menu.broadcastChanges();
+            results.add(step + " carried " + menu.getCarried().getItem() + "x" + menu.getCarried().getCount() + " item " + menu.getSlot(slot).getItem().getCount() + " has " + menu.getSlot(slot).hasItem());
+        }
+        results.add("first " + contents(a)); results.add("second " + contents(b)); results.add("inventory " + contents(inventory));
+        return results;
+    }
+
+    @Test void doubleChestMenusMatchTheOriginalPath() {
+        assertEquals(doubleChestMenu(false), doubleChestMenu(true));
+        Inventory inventory = new Inventory(null, new EntityEquipment());
+        var a = new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()); var b = new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState());
+        a.setRemoved(); b.setRemoved(); ChestMenu menu = ChestMenu.sixRows(1, inventory, new net.minecraft.world.CompoundContainer(a, b)); a.clearRemoved(); b.clearRemoved();
+        for (int i = 0; i < 54; i++) { assertNotNull(menu.getSlot(i).nativeLinkForMenu(), "slot " + i); assertEquals(i, menu.getSlot(i).getContainerSlot()); }
+        var c = new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState()) {};
+        a.setRemoved(); c.setRemoved(); ChestMenu mixed = ChestMenu.sixRows(2, inventory, new net.minecraft.world.CompoundContainer(a, c)); a.clearRemoved(); c.clearRemoved();
+        assertNull(mixed.getSlot(0).nativeLinkForMenu(), "a subclass half keeps the whole compound unlinked");
+        b.setItem(4, new ItemStack(Items.STICK, 9));
+        assertEquals(9, menu.getSlot(31).getItem().getCount(), "the second half's row 4 is compound slot 31");
+    }
+
     // A hopper ejecting into, and another sucking from, a stock double chest
     // (ChestBlock.getContainer -> CompoundContainer of two exact chests): the
     // native halves path matches the all-subclass original path.

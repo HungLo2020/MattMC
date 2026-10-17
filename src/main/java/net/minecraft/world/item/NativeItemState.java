@@ -1111,7 +1111,7 @@ public final class NativeItemState {
             return nativeSlots.actualOwner().readCellStack(link);
         }
         synchronized int presence(SlotLink link){var facade=facade();return facade instanceof NativeItemSlots nativeSlots?nativeSlots.actualOwner().cellPresence(link):-1;}
-        SlotLink slot(net.minecraft.world.level.block.entity.NativeStockContainer chest,int index){return SlotLink.create(this,chest,index);}
+        SlotLink slot(net.minecraft.world.level.block.entity.NativeStockContainer chest,int index,int offset){return SlotLink.create(this,chest,index,offset);}
     }
 
     public static final class SlotLink {
@@ -1119,14 +1119,18 @@ public final class NativeItemState {
         private final Slots source;
         private final ContainerCell cell;
         private final net.minecraft.world.level.block.entity.NativeStockContainer chest;
+        /** Position of the linked chest's slot 0 in the slot's own container (27 for a double chest's second half). */
+        private final int offset;
         private final Cleaner.Cleanable cleanup;
-        private SlotLink(long handle,Release ownership,Slots source){this(handle,ownership,source,null,null);}
-        private SlotLink(long handle,Release ownership,Slots source,ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest){
-            this.handle=handle;this.source=source;this.cell=cell;this.chest=chest;this.address=c1(SLOT_ADDRESS,handle);this.cleanup=CLEANER.register(this,ownership);
+        private SlotLink(long handle,Release ownership,Slots source){this(handle,ownership,source,null,null,0);}
+        private SlotLink(long handle,Release ownership,Slots source,ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest,int offset){
+            this.handle=handle;this.source=source;this.cell=cell;this.chest=chest;this.offset=offset;this.address=c1(SLOT_ADDRESS,handle);this.cleanup=CLEANER.register(this,ownership);
         }
-        static SlotLink create(ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest,int index){return adopt(SLOT_CONTAINER_NEW,(handle,ownership)->new SlotLink(handle,ownership,null,cell,chest),cell.handle,index);}
+        static SlotLink create(ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest,int index,int offset){return adopt(SLOT_CONTAINER_NEW,(handle,ownership)->new SlotLink(handle,ownership,null,cell,chest,offset),cell.handle,index);}
         static SlotLink create(Slots source,int index){return adopt(SLOT_NEW,(handle,ownership)->new SlotLink(handle,ownership,source),source.handle,index);}
         public int index(){try{return (int)COUNT.getOpaque(SCALAR_RAW,address);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
+        /** The index in the slot's own container: the linked row plus the half offset. */
+        public int containerIndex(){return this.index()+this.offset;}
         public ItemStack stack(){return cell==null?source.readLinkedStack(this):chest.nativeSlotsForTransfer()==null?chest.getItem(index()):cell.stack(this);}
         public int presence(){return cell==null?source.linkedPresence(this):chest.nativeSlotsForTransfer()==null?-1:cell.presence(this);}
         /** Exact native snapshot of the linked contents for a broadcast comparison (slots.rs broadcast_digest), or -1. */
@@ -1152,7 +1156,18 @@ public final class NativeItemState {
             var source=((net.minecraft.world.entity.player.Inventory)container).nativeMainSlotsForTransfer();
             if(source!=null)return source.bindMainSlot(index);
         }else if(net.minecraft.world.level.block.entity.NativeStockContainer.exact(container)&&index>=0&&index<27){
-            var chest=(net.minecraft.world.level.block.entity.NativeStockContainer)container;return chest.nativeContainerForSlots().slot(chest,index);
+            var chest=(net.minecraft.world.level.block.entity.NativeStockContainer)container;return chest.nativeContainerForSlots().slot(chest,index,0);
+        }else if(container!=null&&container.getClass()==net.minecraft.world.CompoundContainer.class){
+            // A double chest of two exact stock halves: link the half's row. Reads and
+            // broadcasts use it; writes and setChanged still go through the compound.
+            var compound=(net.minecraft.world.CompoundContainer)container;
+            if(!net.minecraft.world.level.block.entity.NativeStockContainer.exact(compound.firstContainer())
+                ||!net.minecraft.world.level.block.entity.NativeStockContainer.exact(compound.secondContainer()))return null;
+            int split=compound.firstContainer().getContainerSize();
+            if(index<0||index>=compound.getContainerSize())return null;
+            var half=(net.minecraft.world.level.block.entity.NativeStockContainer)(index<split?compound.firstContainer():compound.secondContainer());
+            int local=index<split?index:index-split;
+            return local<27?half.nativeContainerForSlots().slot(half,local,index-local):null;
         }
         return null;
     }

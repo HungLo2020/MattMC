@@ -92,6 +92,30 @@ now checked before copying. After that fix (`build/s34-v5/inventory`),
 Debt: the broadcast rows remain 2.4×/5.1×/1.08× Frozen, and the inventory rows
 remain above Frozen (for example, `add_empty` 3.3×, `clicked_forward` 2.1×).
 
+### Double-chest slot links
+
+**October 17, 2026.** Six-row menus over an exact double chest link their slots to
+the halves' native rows (see the double-chest menus note in [ITEM-STATE](ITEM-STATE.md)).
+The broadcast workload gains two modes: `double_idle`, and `double_quick_move_one`
+(the inventory source at menu index 54). Both halves are emptied in the
+untimed reset. A first attempt (`build/s34-v6/broadcast-nonstationary`) left
+overflow from earlier runs in place, so its checksum depended on how many
+warmup rounds ran, and the driver correctly refused it.
+
+| Broadcast (`build/s34-v6/broadcast`) | Frozen ns | Pre ns | Current ns | C/pre |
+|---|---:|---:|---:|---:|
+| tick_idle | 984 | 6141 | 3267 | 0.53 |
+| tick_quick_move_empty | 2187 | 7429 | 8822 | 1.19 |
+| tick_quick_move_one | 2116 | 74783 | 9151 | 0.12 |
+| double_idle | 2131 | 9890 | 5275 | 0.53 |
+| double_quick_move_one | 2752 | 21741 | 20240 | 0.93 |
+
+The idle double-chest broadcast now skips unchanged linked rows. A six-row
+quick move still transfers through Java `moveItemStackTo` (7.4× Frozen), which
+is the next ownership gap. `tick_quick_move_empty` is an unchanged single-chest
+path. Its Frozen and pre values also moved between runs (Frozen 1579→2187 ns),
+so treat it as noise until it repeats.
+
 ### Pending-content resources
 
 `VerifyItemResources.py --workload pending` (`build/s34-v5/resource-pending2`)

@@ -21,7 +21,8 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
  * recording synchronizer/listener (read-only; a java.lang.reflect.Proxy that also
  * carries the S34 read-only marker where that type exists, identically on every
  * side). Timed: one broadcastChanges (tick_idle), or a quick move followed by the
- * broadcastChanges that ships it (tick_quick_move_*). Reset and a settling
+ * broadcastChanges that ships it (tick_quick_move_*). The double_* modes use a
+ * six-row menu over a CompoundContainer of two chests. Reset and a settling
  * broadcast run outside the timer. The original 25 workloads are unchanged.
  * Arguments: output CSV, then true on the Current side.
  */
@@ -35,12 +36,16 @@ public final class BroadcastTimingReference {
         final String mode;
         final Inventory inventory = new Inventory(null, new EntityEquipment());
         final ChestBlockEntity chest = new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState());
+        /** Second half for the double_* modes (a six-row menu over a CompoundContainer). */
+        final ChestBlockEntity other = new ChestBlockEntity(BlockPos.ZERO, Blocks.CHEST.defaultBlockState());
         final ChestMenu menu;
         final ItemStack source = new ItemStack(Items.STICK, 11);
         long sends;
         Fixture(String mode) {
             this.mode = mode;
-            chest.setRemoved(); menu = ChestMenu.threeRows(1, inventory, chest); chest.clearRemoved();
+            chest.setRemoved(); other.setRemoved();
+            menu = mode.startsWith("double") ? ChestMenu.sixRows(1, inventory, new net.minecraft.world.CompoundContainer(chest, other)) : ChestMenu.threeRows(1, inventory, chest);
+            chest.clearRemoved(); other.clearRemoved();
             List<Class<?>> types = new ArrayList<>(List.of(ContainerSynchronizer.class, ContainerListener.class));
             if (MARKER != null) types.add(MARKER);
             HashedPatchMap.HashGenerator hasher = component -> component.hashCode();
@@ -59,12 +64,15 @@ public final class BroadcastTimingReference {
         }
         void reset() {
             source.setCount(11); inventory.setItem(9, source);
+            // The double_* modes start each run from empty halves, so overflow from earlier runs
+            // cannot make the workload depend on how many warmup rounds ran.
+            if (mode.startsWith("double")) for (int i = 0; i < 27; i++) { chest.setItem(i, ItemStack.EMPTY); other.setItem(i, ItemStack.EMPTY); }
             chest.setItem(0, mode.endsWith("one") ? new ItemStack(Items.STICK, 60) : ItemStack.EMPTY);
             menu.broadcastChanges();
         }
         long run() {
             long before = sends;
-            if (!mode.equals("tick_idle")) menu.quickMoveStack(null, 27);
+            if (!mode.endsWith("idle")) menu.quickMoveStack(null, mode.startsWith("double") ? 54 : 27);
             menu.broadcastChanges(); return sends - before;
         }
     }
@@ -97,7 +105,7 @@ public final class BroadcastTimingReference {
         long boot = System.nanoTime(); net.minecraft.SharedConstants.tryDetectVersion(); net.minecraft.server.Bootstrap.bootStrap();
         rows.add("# boot_ns=" + (System.nanoTime() - boot) + " broadcast_marker=" + (MARKER != null) + " reset_and_settling_broadcast=outside_timer native_allocated_bytes=not_measured");
         rows.add("workload,sample,operations,elapsed_ns,checksum,compiler_ms,gc_count,allocated_bytes");
-        for (String mode : List.of("tick_idle", "tick_quick_move_empty", "tick_quick_move_one")) measure(mode);
+        for (String mode : List.of("tick_idle", "tick_quick_move_empty", "tick_quick_move_one", "double_idle", "double_quick_move_one")) measure(mode);
         Files.write(Path.of(args[0]), rows); System.out.println("BROADCAST_TIMING sink=" + sink + " pid=" + ManagementFactory.getRuntimeMXBean().getPid());
     }
 }

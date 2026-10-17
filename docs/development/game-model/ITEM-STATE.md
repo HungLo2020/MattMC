@@ -361,6 +361,18 @@ and the hopper's `inventoryFull` check before pulling, read occupancy from the
 rows (`slots.rs` `occupancy`). Fullness falls back to the Java scan only when a
 patched stack decides it.
 
+**Double-chest menus.** A `Slot` over an exact `CompoundContainer` whose halves
+are both exact stock chests links to its half's native row
+(`NativeItemState.bindStockSlot`). The link carries the half's offset (0 or 27),
+so `getContainerSlot` still returns the compound index. Slot reads, `hasItem`,
+the quick-move source selection and the per-tick broadcast use the link, so
+unchanged rows are skipped without materializing them. Writes, `remove` and
+`setChanged` still go through the compound, so both halves are marked as
+before. Transfers in a six-row menu still use the original `moveItemStackTo`.
+A subclass half keeps every slot of that compound unlinked.
+`NativeBarrelTest.doubleChestMenusMatchTheOriginalPath` compares 400 random
+quick moves, clicks and broadcasts with subclass halves.
+
 Inventory add (pickups) for a pure item also publishes its copies natively
 (`mattmc_item_inventory_add_pending_leased`).
 
