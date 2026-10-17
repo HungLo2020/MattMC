@@ -52,6 +52,8 @@ each module there has a short README with its own file map.
   frame placement and ongoing migration verification.
 - [Rust GUI item templates](RUST-GUI-ITEM-TEMPLATES.md): retained semantic
   layers, ABI 80 frame instances, lifetime rules and pending acceptance.
+- [TaCZ gun rendering](TACZ-GUN-RENDERING.md): Bedrock guns as retained model
+  rigs, illuminated passes, GUI bounds and the rig parity test.
 - [VulkanicGAL](VULKANIC-GAL.md): working with the graphics abstraction layer:
   handles, validation, submission, hazards and common errors.
 - [Java Bridge](JAVA-BRIDGE.md): the C ABI Java calls, and how to change it

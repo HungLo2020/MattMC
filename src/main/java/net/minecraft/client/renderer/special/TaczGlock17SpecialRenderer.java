@@ -40,6 +40,8 @@ import net.minecraft.Util;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.Model;
+import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -187,21 +189,19 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	private void submitAnimated(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, ItemStack itemStack) {
+		if (submitNodeCollector.isSemanticCoverageOnly()) {
+			// Count-only replays (whole-frame feature coverage, world text) revisit
+			// item layers the real pass already queued in Rust, and that pass fails
+			// closed on its own receipt. Contribute nothing here: any submission
+			// would count as an unadmitted family or queue a second copy.
+			return;
+		}
 		poseStack.pushPose();
 		AnimationPose animationPose = this.animations.sample(TaczGlock17AnimationController.snapshot(itemStack));
 		GunRenderContext gunRenderContext = GunRenderContext.from(itemStack);
 		this.applyTaczTransform(itemDisplayContext, poseStack, animationPose, itemStack);
 		RenderType gunRenderType = RenderType.entityCutoutNoCull(this.texture);
-		if (submitNodeCollector.isSemanticCoverageOnly()) {
-			// Coverage collectors record copied geometry only; they never draw.
-			submitNodeCollector.submitCustomGeometrySemantic(poseStack, gunRenderType, (pose, vertexConsumer) -> {
-				PoseStack modelPoseStack = new PoseStack();
-				modelPoseStack.last().set(pose);
-				for (BedrockNode root : this.geometry.roots()) {
-					root.render(modelPoseStack, itemDisplayContext, vertexConsumer, i, j, animationPose, null, gunRenderContext);
-				}
-			});
-		} else if (!this.submitSemanticBedrockRoots(poseStack, itemDisplayContext, animationPose, gunRenderContext, this.geometry.roots(), this.texture, gunRenderType, submitNodeCollector, i, j)) {
+		if (!submitBedrockModel(poseStack, this.geometry, animationPose, gunRenderContext, this.texture, gunRenderType, submitNodeCollector, i, j)) {
 			throw new IllegalStateException("Rust whole-frame TACZ route rejected semantic Bedrock gun mesh");
 		}
 		this.submitAttachments(itemStack, itemDisplayContext, poseStack, submitNodeCollector, i, j, animationPose);
@@ -225,34 +225,43 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			&& (!data.ocularNodes().isEmpty() || !data.geometry().divisionNodeGroups().isEmpty());
 	}
 
-	private boolean submitSemanticBedrockRoots(
+	/**
+	 * Submits a Bedrock geometry as its retained {@link BedrockGunModel}: the
+	 * ordinary direct-texture model route caches each node's local mesh once
+	 * and Rust composes the node hierarchy from the per-frame part poses (a
+	 * model rig, or Java part poses for the first-person hand). Nodes named
+	 * {@code *_illuminated} and their subtrees draw full-bright, so a gun with
+	 * such nodes is submitted twice with complementary draw masks.
+	 */
+	private static boolean submitBedrockModel(
 		PoseStack poseStack,
-		ItemDisplayContext itemDisplayContext,
+		BedrockGunGeometry geometry,
 		AnimationPose animationPose,
 		GunRenderContext gunRenderContext,
-		List<BedrockNode> roots,
 		ResourceLocation textureIdentity,
 		RenderType renderType,
 		SubmitNodeCollector submitNodeCollector,
 		int light,
 		int overlay
 	) {
-		SemanticBedrockBatchPool batchPool = SEMANTIC_BATCH_POOL.get();
-		batchPool.reset();
-		Map<Integer, List<SemanticBedrockBatch>> batches = new LinkedHashMap<>();
-		SemanticBedrockBudget budget = new SemanticBedrockBudget();
-		for (BedrockNode root : roots) {
-			collectSemanticBedrockNode(poseStack, itemDisplayContext, animationPose, null, gunRenderContext, root, light, batches, budget, batchPool);
+		BedrockGunModel model = geometry.model();
+		int fullBright = LightTexture.pack(15, 15);
+		boolean split = light != fullBright;
+		int drawn = model.pose(animationPose, gunRenderContext, split);
+		boolean any = false;
+		if ((drawn & BedrockGunModel.DRAWN_BASE) != 0) {
+			model.maskDraw(false);
+			submitNodeCollector.submitModelSemanticTexture(model.model(), net.minecraft.util.Unit.INSTANCE, poseStack,
+				renderType, light, overlay, -1, textureIdentity, 0, null);
+			any = true;
 		}
-		if (batches.isEmpty()) return false;
-		PoseStack identityPoseStack = new PoseStack();
-		for (Map.Entry<Integer, List<SemanticBedrockBatch>> entry : batches.entrySet()) {
-			for (SemanticBedrockBatch batch : entry.getValue()) {
-				if (!submitNodeCollector.submitTexturedQuadsWithNormalsSemantic(identityPoseStack, renderType, textureIdentity,
-					batch.vertices(), batch.uvs(), batch.normals(), batch.colors(), entry.getKey())) return false;
-			}
+		if ((drawn & BedrockGunModel.DRAWN_FULL_BRIGHT) != 0) {
+			model.maskDraw(true);
+			submitNodeCollector.submitModelSemanticTexture(model.model(), net.minecraft.util.Unit.INSTANCE, poseStack,
+				renderType, fullBright, overlay, -1, textureIdentity, 0, null);
+			any = true;
 		}
-		return true;
+		return any;
 	}
 
 	/**
@@ -563,8 +572,8 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			boolean submitted = optical
 				? this.submitSemanticOpticalAttachment(attachmentPoseStack, itemDisplayContext, animationPose, attachmentData,
 					submitNodeCollector, light, overlay)
-				: this.submitSemanticBedrockRoots(attachmentPoseStack, itemDisplayContext, animationPose, GunRenderContext.EMPTY,
-					attachmentData.geometry().roots(), attachmentData.texture(), RenderType.entityCutout(attachmentData.texture()), submitNodeCollector, light, overlay);
+				: submitBedrockModel(attachmentPoseStack, attachmentData.geometry(), animationPose, GunRenderContext.EMPTY,
+					attachmentData.texture(), RenderType.entityCutout(attachmentData.texture()), submitNodeCollector, light, overlay);
 			if (!submitted) {
 				if (optical) {
 					throw new IllegalStateException("Rust whole-frame TACZ optical attachment route rejected semantic stencil geometry");
@@ -754,93 +763,101 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		}
 	}
 
-	private record BedrockGunGeometry(List<BedrockNode> roots, Map<String, BedrockNode> nodes) {
+	private record BedrockGunGeometry(List<BedrockNode> roots, Map<String, BedrockNode> nodes, BedrockGunModel model) {
+		BedrockGunGeometry(List<BedrockNode> roots, Map<String, BedrockNode> nodes) {
+			this(roots, nodes, BedrockGunModel.build(roots));
+		}
+
 		static BedrockGunGeometry load(ResourceLocation location) {
 			try (Reader reader = Minecraft.getInstance().getResourceManager().openAsReader(location)) {
-				JsonObject root = GsonHelper.parse(reader);
-				JsonObject geometry = GsonHelper.getAsJsonArray(root, "minecraft:geometry").get(0).getAsJsonObject();
-				JsonObject description = GsonHelper.getAsJsonObject(geometry, "description");
-				int textureWidth = GsonHelper.getAsInt(description, "texture_width");
-				int textureHeight = GsonHelper.getAsInt(description, "texture_height");
-				JsonArray bones = GsonHelper.getAsJsonArray(geometry, "bones");
-				Map<String, BoneData> boneData = new HashMap<>();
-				Map<String, BedrockNode> nodes = new HashMap<>();
-				List<BedrockNode> roots = new ArrayList<>();
-
-				for (JsonElement element : bones) {
-					JsonObject bone = element.getAsJsonObject();
-					String name = GsonHelper.getAsString(bone, "name");
-					BoneData data = BoneData.read(bone);
-					boneData.put(name, data);
-					nodes.put(name, new BedrockNode(name));
-				}
-
-				for (JsonElement element : bones) {
-					JsonObject bone = element.getAsJsonObject();
-					String name = GsonHelper.getAsString(bone, "name");
-					BoneData data = boneData.get(name);
-					BedrockNode node = nodes.get(name);
-					node.hiddenMarker = FUNCTIONAL_MARKER_NODES.contains(name);
-					node.x = convertPivot(data, boneData, 0);
-					node.y = convertPivot(data, boneData, 1);
-					node.z = convertPivot(data, boneData, 2);
-					if (data.rotation != null) {
-						node.xRot = degreesToRadians(data.rotation[0]);
-						node.yRot = degreesToRadians(data.rotation[1]);
-						node.zRot = degreesToRadians(data.rotation[2]);
-					}
-
-					if (data.parent != null) {
-						BedrockNode parent = nodes.get(data.parent);
-						node.parent = parent;
-						parent.children.add(node);
-					} else {
-						roots.add(node);
-					}
-
-					JsonArray cubes = GsonHelper.getAsJsonArray(bone, "cubes", null);
-					if (cubes == null) {
-						continue;
-					}
-
-					for (JsonElement cubeElement : cubes) {
-						JsonObject cube = cubeElement.getAsJsonObject();
-						float[] size = readFloatArray(cube, "size", 3);
-						float inflate = GsonHelper.getAsFloat(cube, "inflate", 0.0F);
-						boolean mirror = GsonHelper.getAsBoolean(cube, "mirror", false);
-						float x;
-						float y;
-						float z;
-						JsonArray cubeRotation = GsonHelper.getAsJsonArray(cube, "rotation", null);
-						if (cubeRotation == null) {
-							x = convertOrigin(data, cube, 0);
-							y = convertOrigin(data, cube, 1);
-							z = convertOrigin(data, cube, 2);
-							node.cubes.add(BedrockCube.create(cube, x, y, z, size, inflate, mirror, textureWidth, textureHeight));
-						} else {
-							BedrockNode cubeNode = new BedrockNode(null);
-							cubeNode.x = convertCubePivot(data, cube, 0);
-							cubeNode.y = convertCubePivot(data, cube, 1);
-							cubeNode.z = convertCubePivot(data, cube, 2);
-							float[] rotation = readFloatArray(cube, "rotation", 3);
-							cubeNode.xRot = degreesToRadians(rotation[0]);
-							cubeNode.yRot = degreesToRadians(rotation[1]);
-							cubeNode.zRot = degreesToRadians(rotation[2]);
-							x = convertOrigin(cube, 0);
-							y = convertOrigin(cube, 1);
-							z = convertOrigin(cube, 2);
-							cubeNode.cubes.add(BedrockCube.create(cube, x, y, z, size, inflate, mirror, textureWidth, textureHeight));
-							cubeNode.parent = node;
-							node.children.add(cubeNode);
-						}
-					}
-				}
-
-				return new BedrockGunGeometry(roots, nodes);
+				return parse(reader);
 			} catch (Exception exception) {
-				LOGGER.error("Failed to load TACZ Glock 17 Bedrock geometry {}", location, exception);
+				LOGGER.error("Failed to load TACZ Bedrock geometry {}", location, exception);
 				return new BedrockGunGeometry(List.of(), Map.of());
 			}
+		}
+
+		static BedrockGunGeometry parse(Reader reader) {
+			JsonObject root = GsonHelper.parse(reader);
+			JsonObject geometry = GsonHelper.getAsJsonArray(root, "minecraft:geometry").get(0).getAsJsonObject();
+			JsonObject description = GsonHelper.getAsJsonObject(geometry, "description");
+			int textureWidth = GsonHelper.getAsInt(description, "texture_width");
+			int textureHeight = GsonHelper.getAsInt(description, "texture_height");
+			JsonArray bones = GsonHelper.getAsJsonArray(geometry, "bones");
+			Map<String, BoneData> boneData = new HashMap<>();
+			Map<String, BedrockNode> nodes = new HashMap<>();
+			List<BedrockNode> roots = new ArrayList<>();
+
+			for (JsonElement element : bones) {
+				JsonObject bone = element.getAsJsonObject();
+				String name = GsonHelper.getAsString(bone, "name");
+				BoneData data = BoneData.read(bone);
+				boneData.put(name, data);
+				nodes.put(name, new BedrockNode(name));
+			}
+
+			for (JsonElement element : bones) {
+				JsonObject bone = element.getAsJsonObject();
+				String name = GsonHelper.getAsString(bone, "name");
+				BoneData data = boneData.get(name);
+				BedrockNode node = nodes.get(name);
+				node.hiddenMarker = FUNCTIONAL_MARKER_NODES.contains(name);
+				node.x = convertPivot(data, boneData, 0);
+				node.y = convertPivot(data, boneData, 1);
+				node.z = convertPivot(data, boneData, 2);
+				if (data.rotation != null) {
+					node.xRot = degreesToRadians(data.rotation[0]);
+					node.yRot = degreesToRadians(data.rotation[1]);
+					node.zRot = degreesToRadians(data.rotation[2]);
+				}
+
+				if (data.parent != null) {
+					BedrockNode parent = nodes.get(data.parent);
+					node.parent = parent;
+					parent.children.add(node);
+				} else {
+					roots.add(node);
+				}
+
+				JsonArray cubes = GsonHelper.getAsJsonArray(bone, "cubes", null);
+				if (cubes == null) {
+					continue;
+				}
+
+				for (JsonElement cubeElement : cubes) {
+					JsonObject cube = cubeElement.getAsJsonObject();
+					float[] size = readFloatArray(cube, "size", 3);
+					float inflate = GsonHelper.getAsFloat(cube, "inflate", 0.0F);
+					boolean mirror = GsonHelper.getAsBoolean(cube, "mirror", false);
+					float x;
+					float y;
+					float z;
+					JsonArray cubeRotation = GsonHelper.getAsJsonArray(cube, "rotation", null);
+					if (cubeRotation == null) {
+						x = convertOrigin(data, cube, 0);
+						y = convertOrigin(data, cube, 1);
+						z = convertOrigin(data, cube, 2);
+						node.cubes.add(BedrockCube.create(cube, x, y, z, size, inflate, mirror, textureWidth, textureHeight));
+					} else {
+						BedrockNode cubeNode = new BedrockNode(null);
+						cubeNode.x = convertCubePivot(data, cube, 0);
+						cubeNode.y = convertCubePivot(data, cube, 1);
+						cubeNode.z = convertCubePivot(data, cube, 2);
+						float[] rotation = readFloatArray(cube, "rotation", 3);
+						cubeNode.xRot = degreesToRadians(rotation[0]);
+						cubeNode.yRot = degreesToRadians(rotation[1]);
+						cubeNode.zRot = degreesToRadians(rotation[2]);
+						x = convertOrigin(cube, 0);
+						y = convertOrigin(cube, 1);
+						z = convertOrigin(cube, 2);
+						cubeNode.cubes.add(BedrockCube.create(cube, x, y, z, size, inflate, mirror, textureWidth, textureHeight));
+						cubeNode.parent = node;
+						node.children.add(cubeNode);
+					}
+				}
+			}
+
+			return new BedrockGunGeometry(roots, nodes);
 		}
 
 		void applyFirstPersonPositioning(
@@ -1066,6 +1083,203 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		}
 	}
 
+	/**
+	 * Poses one Bedrock geometry with deterministic random animation and returns
+	 * the largest position/UV difference between the retained ModelPart rig and
+	 * the per-node Java walk it replaced (matched per light pass, in traversal
+	 * order), infinity when the emitted quad sets differ, or -1 when neither
+	 * emits any quad.
+	 */
+	static double maxBedrockModelDeviationForTest(Reader geometryJson, long seed) {
+		BedrockGunGeometry geometry = BedrockGunGeometry.parse(geometryJson);
+		java.util.Random random = new java.util.Random(seed);
+		AnimationPose animationPose = new AnimationPose(0.0F);
+		for (String name : geometry.nodes().keySet()) {
+			NodePose pose = animationPose.node(name);
+			pose.position.set(random.nextFloat() - 0.5F, random.nextFloat() - 0.5F, random.nextFloat() - 0.5F);
+			pose.rotation.set(random.nextFloat() - 0.5F, random.nextFloat() - 0.5F, random.nextFloat() - 0.5F);
+			// Zero scales are excluded: the Java walk emitted their subtrees as
+			// collapsed points, while the rig hides them; both draw nothing.
+			float scale = 0.5F + random.nextFloat();
+			pose.scale.set(scale, scale, scale);
+		}
+		PoseStack base = new PoseStack();
+		base.translate(0.3F, -1.2F, 2.0F);
+		base.mulPose(Axis.YP.rotation(0.7F));
+		base.scale(0.6F, 0.6F, 0.6F);
+		int light = LightTexture.pack(4, 9);
+		int fullBright = LightTexture.pack(15, 15);
+
+		Map<Integer, List<SemanticBedrockBatch>> batches = new LinkedHashMap<>();
+		SemanticBedrockBatchPool pool = new SemanticBedrockBatchPool();
+		for (BedrockNode root : geometry.roots()) {
+			collectSemanticBedrockNode(base, ItemDisplayContext.GROUND, animationPose, null, GunRenderContext.EMPTY,
+				root, light, batches, new SemanticBedrockBudget(), pool);
+		}
+		double deviation = 0.0;
+		int compared = 0;
+		BedrockGunModel model = geometry.model();
+		model.pose(animationPose, GunRenderContext.EMPTY, true);
+		for (int pass = 0; pass < 2; pass++) {
+			float[] expectedPositions = new float[0];
+			float[] expectedUvs = new float[0];
+			for (SemanticBedrockBatch batch : batches.getOrDefault(pass == 0 ? light : fullBright, List.of())) {
+				expectedPositions = concat(expectedPositions, batch.vertices());
+				expectedUvs = concat(expectedUvs, batch.uvs());
+			}
+			model.maskDraw(pass == 1);
+			it.unimi.dsi.fastutil.floats.FloatArrayList positions = new it.unimi.dsi.fastutil.floats.FloatArrayList();
+			it.unimi.dsi.fastutil.floats.FloatArrayList uvs = new it.unimi.dsi.fastutil.floats.FloatArrayList();
+			model.model().renderToBuffer(base, new VertexConsumer() {
+				@Override public VertexConsumer addVertex(float x, float y, float z) { positions.add(x); positions.add(y); positions.add(z); return this; }
+				@Override public VertexConsumer setColor(int r, int g, int b, int a) { return this; }
+				@Override public VertexConsumer setUv(float u, float v) { uvs.add(u); uvs.add(v); return this; }
+				@Override public VertexConsumer setUv1(int u, int v) { return this; }
+				@Override public VertexConsumer setUv2(int u, int v) { return this; }
+				@Override public VertexConsumer setNormal(float x, float y, float z) { return this; }
+			}, pass == 0 ? light : fullBright, 0);
+			if (positions.size() != expectedPositions.length || uvs.size() != expectedUvs.length) return Double.POSITIVE_INFINITY;
+			compared += expectedPositions.length;
+			for (int index = 0; index < expectedPositions.length; index++) {
+				deviation = Math.max(deviation, Math.abs(positions.getFloat(index) - expectedPositions[index]));
+			}
+			for (int index = 0; index < expectedUvs.length; index++) {
+				deviation = Math.max(deviation, Math.abs(uvs.getFloat(index) - expectedUvs[index]));
+			}
+		}
+		return compared == 0 ? -1.0 : deviation;
+	}
+
+	private static float[] concat(float[] first, float[] second) {
+		float[] result = java.util.Arrays.copyOf(first, first.length + second.length);
+		System.arraycopy(second, 0, result, first.length, second.length);
+		return result;
+	}
+
+	/**
+	 * A Bedrock geometry as an ordinary {@link ModelPart} tree, built once. Each
+	 * node's cubes become one part's local mesh, so the Rust model route caches
+	 * the gun's topology and composes its hierarchy instead of Java transforming
+	 * every vertex each frame. {@link #pose} writes one frame's animation into
+	 * the parts; Bedrock's node transform (animated translation, pivot, Z-Y-X
+	 * rotation, scale) is exactly ModelPart's, with pivot and translation folded
+	 * into the part offset.
+	 */
+	private static final class BedrockGunModel {
+		static final int DRAWN_BASE = 1;
+		static final int DRAWN_FULL_BRIGHT = 2;
+		private final Model.Simple model;
+		/** Depth-first Bedrock nodes and their parts; {@code parents[i] < i}, -1 for a root. */
+		private final BedrockNode[] nodes;
+		private final ModelPart[] parts;
+		private final int[] parents;
+		private final boolean[] hasCubes;
+		/** Per frame: the node's own cubes draw, and with full-bright light. */
+		private final boolean[] ownDrawn;
+		private final boolean[] fullBright;
+		/** Per frame: full-bright light inherited by children. */
+		private final boolean[] childFullBright;
+
+		private BedrockGunModel(ModelPart root, List<BedrockNode> nodes, List<ModelPart> parts, int[] parents) {
+			this.model = new Model.Simple(root, RenderType::entityCutoutNoCull);
+			this.nodes = nodes.toArray(BedrockNode[]::new);
+			this.parts = parts.toArray(ModelPart[]::new);
+			this.parents = parents;
+			this.hasCubes = new boolean[this.nodes.length];
+			for (int index = 0; index < this.nodes.length; index++) {
+				this.hasCubes[index] = !this.nodes[index].cubes.isEmpty();
+			}
+			this.ownDrawn = new boolean[this.nodes.length];
+			this.fullBright = new boolean[this.nodes.length];
+			this.childFullBright = new boolean[this.nodes.length];
+		}
+
+		static BedrockGunModel build(List<BedrockNode> roots) {
+			List<BedrockNode> nodes = new ArrayList<>();
+			List<ModelPart> parts = new ArrayList<>();
+			it.unimi.dsi.fastutil.ints.IntArrayList parents = new it.unimi.dsi.fastutil.ints.IntArrayList();
+			Map<String, ModelPart> rootChildren = new LinkedHashMap<>();
+			for (BedrockNode root : roots) {
+				addPart(root, -1, rootChildren, nodes, parts, parents);
+			}
+			ModelPart root = new ModelPart(List.of(), rootChildren);
+			return new BedrockGunModel(root, nodes, parts, parents.toIntArray());
+		}
+
+		private static void addPart(
+			BedrockNode node, int parent, Map<String, ModelPart> siblings,
+			List<BedrockNode> nodes, List<ModelPart> parts, it.unimi.dsi.fastutil.ints.IntArrayList parents
+		) {
+			List<ModelPart.Cube> cubes = new ArrayList<>(node.cubes.size());
+			for (BedrockCube cube : node.cubes) {
+				ModelPart.Cube part = cube.toModelCube();
+				if (part != null) cubes.add(part);
+			}
+			Map<String, ModelPart> children = new LinkedHashMap<>();
+			ModelPart part = new ModelPart(cubes, children);
+			// Cube-rotation nodes are unnamed; part names only need to be unique
+			// among siblings for ModelPart's child map and stable mesh paths.
+			String name = node.name == null ? "cube" : node.name;
+			String unique = name;
+			for (int suffix = 1; siblings.containsKey(unique); suffix++) unique = name + "#" + suffix;
+			siblings.put(unique, part);
+			int index = nodes.size();
+			nodes.add(node);
+			parts.add(part);
+			parents.add(parent);
+			for (BedrockNode child : node.children) {
+				addPart(child, index, children, nodes, parts, parents);
+			}
+		}
+
+		Model.Simple model() {
+			return this.model;
+		}
+
+		/**
+		 * Writes this frame's pose into the parts and returns which light passes
+		 * draw anything. Hidden subtrees (attachment context, zero animation
+		 * scale) are invisible parts; marker nodes keep drawing their children.
+		 */
+		int pose(AnimationPose animationPose, GunRenderContext gunRenderContext, boolean splitFullBright) {
+			int drawn = 0;
+			for (int index = 0; index < this.nodes.length; index++) {
+				BedrockNode node = this.nodes[index];
+				ModelPart part = this.parts[index];
+				NodePose nodePose = animationPose.node(node.name);
+				int parent = this.parents[index];
+				boolean inherited = parent >= 0 && this.childFullBright[parent];
+				boolean poseVisible = nodePose.visible();
+				boolean visible = poseVisible && gunRenderContext.visible(node);
+				part.visible = visible;
+				part.x = node.x + nodePose.position.x() * 16.0F;
+				part.y = node.y - nodePose.position.y() * 16.0F;
+				part.z = node.z + nodePose.position.z() * 16.0F;
+				part.xRot = node.xRot + nodePose.rotation.x();
+				part.yRot = node.yRot + nodePose.rotation.y();
+				part.zRot = node.zRot + nodePose.rotation.z();
+				// A zero scale only ever hides a subtree; keep the hidden pose finite.
+				part.xScale = visible ? nodePose.scale.x() : 1.0F;
+				part.yScale = visible ? nodePose.scale.y() : 1.0F;
+				part.zScale = visible ? nodePose.scale.z() : 1.0F;
+				boolean own = visible && !node.hiddenMarker && this.hasCubes[index];
+				boolean bright = (node.name != null && node.name.endsWith("_illuminated")) || inherited;
+				this.ownDrawn[index] = own;
+				this.fullBright[index] = splitFullBright && bright;
+				this.childFullBright[index] = !node.hiddenMarker && poseVisible ? bright : inherited;
+				if (own) drawn |= this.fullBright[index] ? DRAWN_FULL_BRIGHT : DRAWN_BASE;
+			}
+			return drawn;
+		}
+
+		/** Restricts drawing to the full-bright or the base-light nodes posed by {@link #pose}. */
+		void maskDraw(boolean fullBrightPass) {
+			for (int index = 0; index < this.parts.length; index++) {
+				this.parts[index].skipDraw = !this.ownDrawn[index] || this.fullBright[index] != fullBrightPass;
+			}
+		}
+	}
+
 	private static boolean isTaczNumberedNode(String name, String baseName) {
 		if (name.equals(baseName)) {
 			return true;
@@ -1191,64 +1405,6 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 
 		private BedrockNode(String name) {
 			this.name = name;
-		}
-
-		private void render(
-			PoseStack poseStack,
-			ItemDisplayContext itemDisplayContext,
-			VertexConsumer consumer,
-			int light,
-			int overlay,
-			AnimationPose animationPose
-		) {
-			this.render(poseStack, itemDisplayContext, consumer, light, overlay, animationPose, null, GunRenderContext.EMPTY);
-		}
-
-		private void render(
-			PoseStack poseStack,
-			ItemDisplayContext itemDisplayContext,
-			VertexConsumer consumer,
-			int light,
-			int overlay,
-			AnimationPose animationPose,
-			AttachmentRenderData attachmentRenderData
-		) {
-			this.render(poseStack, itemDisplayContext, consumer, light, overlay, animationPose, attachmentRenderData, GunRenderContext.EMPTY);
-		}
-
-		private void render(
-			PoseStack poseStack,
-			ItemDisplayContext itemDisplayContext,
-			VertexConsumer consumer,
-			int light,
-			int overlay,
-			AnimationPose animationPose,
-			AttachmentRenderData attachmentRenderData,
-			GunRenderContext gunRenderContext
-		) {
-			if (this.cubes.isEmpty() && this.children.isEmpty()) {
-				return;
-			}
-
-			poseStack.pushPose();
-			this.translateAndRotate(poseStack, animationPose.node(this.name));
-			if (this.hiddenByScopedFirstPerson(itemDisplayContext, attachmentRenderData, animationPose) || !gunRenderContext.visible(this)) {
-				poseStack.popPose();
-				return;
-			}
-
-			int cubeLight = this.name != null && this.name.endsWith("_illuminated") ? LightTexture.pack(15, 15) : light;
-			NodePose nodePose = animationPose.node(this.name);
-			if (!this.hiddenMarker && nodePose.visible()) {
-				for (BedrockCube cube : this.cubes) {
-					cube.compile(poseStack.last(), consumer, cubeLight, overlay);
-				}
-			}
-
-			for (BedrockNode child : this.children) {
-				child.render(poseStack, itemDisplayContext, consumer, cubeLight, overlay, animationPose, attachmentRenderData, gunRenderContext);
-			}
-			poseStack.popPose();
 		}
 
 		private boolean hiddenByScopedFirstPerson(ItemDisplayContext itemDisplayContext, AttachmentRenderData attachmentRenderData, AnimationPose animationPose) {
@@ -1630,27 +1786,24 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			return new BedrockPolygon(vertices, uv[0], uv[1], uv[0] + uvSize[0], uv[1] + uvSize[1], textureWidth, textureHeight, false, direction);
 		}
 
-		private void compile(PoseStack.Pose pose, VertexConsumer consumer, int light, int overlay) {
-			Matrix4f poseMatrix = pose.pose();
-			Matrix3f normalMatrix = pose.normal();
+		/** The non-empty faces as a ModelPart cube (pixel units, normalized UVs), or null. */
+		private ModelPart.Cube toModelCube() {
+			List<ModelPart.Polygon> faces = new ArrayList<>(this.polygons.length);
+			float minX = Float.POSITIVE_INFINITY, minY = Float.POSITIVE_INFINITY, minZ = Float.POSITIVE_INFINITY;
+			float maxX = Float.NEGATIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY, maxZ = Float.NEGATIVE_INFINITY;
 			for (BedrockPolygon polygon : this.polygons) {
-				if (polygon.empty) {
-					continue;
+				if (polygon.empty) continue;
+				ModelPart.Vertex[] vertices = new ModelPart.Vertex[polygon.vertices.length];
+				for (int index = 0; index < vertices.length; index++) {
+					BedrockVertex vertex = polygon.vertices[index];
+					vertices[index] = new ModelPart.Vertex(vertex.x, vertex.y, vertex.z, vertex.u, vertex.v);
+					minX = Math.min(minX, vertex.x); minY = Math.min(minY, vertex.y); minZ = Math.min(minZ, vertex.z);
+					maxX = Math.max(maxX, vertex.x); maxY = Math.max(maxY, vertex.y); maxZ = Math.max(maxZ, vertex.z);
 				}
-
-				Vector3f normal = new Vector3f(polygon.normal);
-				normal.mul(normalMatrix);
-				for (BedrockVertex vertex : polygon.vertices) {
-					Vector4f position = new Vector4f(vertex.x / 16.0F, vertex.y / 16.0F, vertex.z / 16.0F, 1.0F);
-					position.mul(poseMatrix);
-					consumer.addVertex(position.x(), position.y(), position.z())
-						.setColor(-1)
-						.setUv(vertex.u, vertex.v)
-						.setOverlay(overlay)
-						.setLight(light)
-						.setNormal(normal.x(), normal.y(), normal.z());
-				}
+				faces.add(new ModelPart.Polygon(vertices, new Vector3f(polygon.normal)));
 			}
+			return faces.isEmpty() ? null
+				: new ModelPart.Cube(faces.toArray(ModelPart.Polygon[]::new), minX, minY, minZ, maxX, maxY, maxZ);
 		}
 	}
 

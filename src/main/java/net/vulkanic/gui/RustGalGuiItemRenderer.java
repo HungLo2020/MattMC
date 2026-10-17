@@ -132,7 +132,11 @@ public final class RustGalGuiItemRenderer {
 			recordDiagnostic(selected[0] == null ? "special-renderer-empty" : foil[0] ? "special-renderer-foil" : "special-renderer-unavailable");
 			return List.of();
 		}
-		ScreenRectangle bounds = item.bounds();
+		// Rust applies the item's GUI pose to these bounds (mesh composite shader),
+		// so they must stay pose-local. item.bounds() is already transformed and
+		// scissored; container screens translate their pose by leftPos/topPos, so
+		// using it would offset every special item by that translation twice.
+		ScreenRectangle bounds = item.oversizedItemBounds();
 		int left = bounds == null ? item.x() : bounds.left();
 		int top = bounds == null ? item.y() : bounds.top();
 		int right = bounds == null ? item.x() + 16 : bounds.right();
@@ -646,7 +650,8 @@ public final class RustGalGuiItemRenderer {
 	}
 
 	private static final class TaczGuiQuadCapture {
-		private static final int MAX_QUADS = 4096;
+		// Rust GUI_MESH_MAX_VERTICES (65,536) at four vertices per quad.
+		private static final int MAX_QUADS = 16_384;
 		private final List<Batch> batches;
 
 		private TaczGuiQuadCapture() {
@@ -823,6 +828,13 @@ public final class RustGalGuiItemRenderer {
 			// Frozen OversizedItemRenderer: ITEMS_3D only for block-lit models.
 			int lightingMode = item.itemStackRenderState().usesBlockLight()
 				? VulkanicGalBridge.GUI_MESH_LIGHTING_OVERSIZED_ITEM : VulkanicGalBridge.GUI_MESH_LIGHTING_OVERSIZED_ITEM_FLAT;
+			// Scrolling lists (creative tabs) clip their items like every other GUI mesh.
+			ScreenRectangle clip = item.scissorArea();
+			int clipMode = clip == null ? 0 : 1;
+			int clipLeft = clip == null ? 0 : clip.left();
+			int clipTop = clip == null ? 0 : clip.top();
+			int clipWidth = clip == null ? 0 : clip.width();
+			int clipHeight = clip == null ? 0 : clip.height();
 			List<VulkanicGalBridge.GuiMeshBatchRecord> records = new ArrayList<>(prepared.size());
 			for (PreparedBatch batch : prepared) {
 				if (!batch.glint()) {
@@ -830,12 +842,12 @@ public final class RustGalGuiItemRenderer {
 						VulkanicGalBridge.GUI_MESH_MATERIAL_ENTITY_CUTOUT_NO_CULL,
 						lightingMode, batch.asset().assetId(), token.sequence(), 0.1F,
 						identity, guiPose, left, top, right, bottom, guiWidth, guiHeight, width, height, 1,
-						0, 0, 0, 0, 0, batch.vertices(), batch.indices(), null, 0, null, null, null));
+						clipMode, clipLeft, clipTop, clipWidth, clipHeight, batch.vertices(), batch.indices(), null, 0, null, null, null));
 				} else {
 					records.add(VulkanicGalBridge.GuiMeshBatchRecord.trustedOwned(layerOrder, records.size(), 4, 1,
 						batch.asset().assetId(), token.sequence(), 0.1F, identity, guiPose,
 						left, top, right, bottom, guiWidth, guiHeight, width, height, 1,
-						0, 0, 0, 0, 0, batch.vertices(), batch.indices(), null, 0, null, null, null));
+						clipMode, clipLeft, clipTop, clipWidth, clipHeight, batch.vertices(), batch.indices(), null, 0, null, null, null));
 				}
 				RustGalGuiRawImageAssets.stage(batch.asset());
 			}
@@ -930,9 +942,59 @@ public final class RustGalGuiItemRenderer {
 
 
 		@Override
+		public <S> void submitModelSemanticTexture(net.minecraft.client.model.Model<? super S> model, S state, PoseStack poseStack,
+			RenderType renderType, int light, int overlay, int color, ResourceLocation texture, int outline,
+			@Nullable net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
+			// The gun's retained Bedrock model, posed for this frame. GUI items are
+			// full-bright, so both light passes land in the same textured capture.
+			TaczGuiModelCapture vertices = new TaczGuiModelCapture();
+			model.renderToBuffer(poseStack, vertices, light, overlay, color);
+			if (!vertices.complete() || !capture.add(texture, vertices.positions(), vertices.uvs(), vertices.normals(), vertices.colors())) {
+				throw new IllegalStateException("TACZ GUI semantic capture rejected Bedrock model quads");
+			}
+		}
+
+		@Override
 		public void submitCustomGeometry(PoseStack poseStack, RenderType renderType, SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) {
 			throw new IllegalStateException("TACZ GUI semantic capture encountered arbitrary custom geometry");
 		}
+	}
+
+	/** Posed model vertices in TaczGuiQuadCapture's per-vertex array layout. */
+	private static final class TaczGuiModelCapture implements net.blaze3d.vertex.VertexConsumer {
+		private final it.unimi.dsi.fastutil.floats.FloatArrayList positions = new it.unimi.dsi.fastutil.floats.FloatArrayList();
+		private final it.unimi.dsi.fastutil.floats.FloatArrayList uvs = new it.unimi.dsi.fastutil.floats.FloatArrayList();
+		private final it.unimi.dsi.fastutil.floats.FloatArrayList normals = new it.unimi.dsi.fastutil.floats.FloatArrayList();
+		private final it.unimi.dsi.fastutil.ints.IntArrayList colors = new it.unimi.dsi.fastutil.ints.IntArrayList();
+
+		@Override public TaczGuiModelCapture addVertex(float x, float y, float z) {
+			positions.add(x); positions.add(y); positions.add(z);
+			uvs.add(0.0F); uvs.add(0.0F);
+			normals.add(0.0F); normals.add(0.0F); normals.add(0.0F);
+			colors.add(0xFFFFFFFF);
+			return this;
+		}
+		@Override public TaczGuiModelCapture setColor(int red, int green, int blue, int alpha) {
+			colors.set(colors.size() - 1, ARGB.color(alpha, red, green, blue));
+			return this;
+		}
+		@Override public TaczGuiModelCapture setUv(float u, float v) {
+			uvs.set(uvs.size() - 2, u); uvs.set(uvs.size() - 1, v);
+			return this;
+		}
+		@Override public TaczGuiModelCapture setUv1(int u, int v) { return this; }
+		@Override public TaczGuiModelCapture setUv2(int u, int v) { return this; }
+		@Override public TaczGuiModelCapture setNormal(float x, float y, float z) {
+			int last = normals.size();
+			normals.set(last - 3, x); normals.set(last - 2, y); normals.set(last - 1, z);
+			return this;
+		}
+
+		boolean complete() { return !colors.isEmpty() && colors.size() % 4 == 0; }
+		float[] positions() { return positions.toFloatArray(); }
+		float[] uvs() { return uvs.toFloatArray(); }
+		float[] normals() { return normals.toFloatArray(); }
+		int[] colors() { return colors.toIntArray(); }
 	}
 
 	private static List<RustGalGuiElementRenderState> enqueueModelPart(
