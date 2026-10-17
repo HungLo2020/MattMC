@@ -454,12 +454,18 @@ what the broadcast reads, while overridden `mayPlace`, `mayPickup` and
 Inventory indices 36–40 (armor and offhand) link to the inventory's bound
 native equipment row (`SlotContainer::Equipment`, `mattmc_item_slot_equipment_create`)
 only for an exact inventory whose `EntityEquipment` is exact and natively bound
-(`Inventory.nativeEquipmentRowsBound`). An absent row digests as `EMPTY`, and a
-null row is not digested. Every read, presence, pending-copy and transfer
+(`Inventory.nativeEquipmentRowsBound`; a null equipment declines, keeping the
+original failure in `getItem`). An absent row digests as `EMPTY`, and a
+null row is not digested. `Inventory.EQUIPMENT_SLOT_MAPPING` is public and mutable,
+and `Inventory.getItem` re-reads it. So the link records its bound `EquipmentSlot`,
+and a broadcast trusts its digest only while the mapping still maps the container
+index to that slot (`SlotLink.broadcastCurrent`). Every read, presence, pending-copy and transfer
 path treats an equipment link as unknown, so `Slot.getItem` still calls
 `Inventory.getItem`. `NativeBroadcastTest.playerMenuEquipmentBroadcastMatchesTheOriginal`
 compares 300 random armor, offhand, main-row and grid changes with an unlinked
-subclass inventory.
+subclass inventory. `nullEquipmentKeepsTheOriginalConstructionPrefix` and
+`remappedEquipmentRowsBroadcastLikeTheOriginal` cover the two admission rules, and
+each fails when its rule is removed.
 
 ## Native component comparison
 

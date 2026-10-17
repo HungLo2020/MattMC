@@ -1173,6 +1173,8 @@ public final class NativeItemState {
         private final int offset;
         /** A broadcast-only link to an inventory equipment row: reads keep the original container path. */
         private final boolean equipment;
+        /** The equipment slot this row was bound for; the public mapping may change later. */
+        private net.minecraft.world.entity.EquipmentSlot equipmentSlot;
         private final Cleaner.Cleanable cleanup;
         private SlotLink(long handle,Release ownership,Slots source){this(handle,ownership,source,null,null,0,false);}
         private SlotLink(long handle,Release ownership,Slots source,ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest,int offset){this(handle,ownership,source,cell,chest,offset,false);}
@@ -1182,8 +1184,16 @@ public final class NativeItemState {
         static SlotLink create(ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest,int index,int offset){return adopt(SLOT_CONTAINER_NEW,(handle,ownership)->new SlotLink(handle,ownership,null,cell,chest,offset),cell.handle,index);}
         static SlotLink create(Slots source,int index){return adopt(SLOT_NEW,(handle,ownership)->new SlotLink(handle,ownership,source),source.handle,index);}
         /** Equipment row {@code row} (EquipmentSlot ordinal) of an inventory, at container index {@code row+offset}. */
-        static SlotLink createEquipment(Slots source,int row,int offset){return adopt(SLOT_EQUIPMENT_NEW,(handle,ownership)->new SlotLink(handle,ownership,source,null,null,offset,true),source.handle,row);}
+        static SlotLink createEquipment(Slots source,net.minecraft.world.entity.EquipmentSlot slot,int offset){
+            var link=adopt(SLOT_EQUIPMENT_NEW,(handle,ownership)->new SlotLink(handle,ownership,source,null,null,offset,true),source.handle,slot.ordinal());link.equipmentSlot=slot;return link;
+        }
         public boolean isEquipment(){return this.equipment;}
+        /**
+         * Whether a broadcast may trust this link's digest now: an equipment row only while
+         * Inventory.EQUIPMENT_SLOT_MAPPING still maps its container index to the bound slot,
+         * because Inventory.getItem re-reads that public mutable map on every call.
+         */
+        public boolean broadcastCurrent(){return !this.equipment||net.minecraft.world.entity.player.Inventory.EQUIPMENT_SLOT_MAPPING.get(this.containerIndex())==this.equipmentSlot;}
         public int index(){try{return (int)COUNT.getOpaque(SCALAR_RAW,address);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
         /** The index in the slot's own container: the linked row plus the half offset. */
         public int containerIndex(){return this.index()+this.offset;}
@@ -1216,7 +1226,7 @@ public final class NativeItemState {
             // Equipment rows: a broadcast-only link to the bound native equipment row.
             var inventory=(net.minecraft.world.entity.player.Inventory)container;
             var slot=net.minecraft.world.entity.player.Inventory.EQUIPMENT_SLOT_MAPPING.get(index);
-            if(slot!=null&&inventory.nativeEquipmentRowsBound())return SlotLink.createEquipment(inventory.nativeMainSlotsForTransfer().actualOwner(),slot.ordinal(),index-slot.ordinal());
+            if(slot!=null&&inventory.nativeEquipmentRowsBound())return SlotLink.createEquipment(inventory.nativeMainSlotsForTransfer().actualOwner(),slot,index-slot.ordinal());
         }else if(net.minecraft.world.level.block.entity.NativeStockContainer.exact(container)&&index>=0&&index<27){
             var chest=(net.minecraft.world.level.block.entity.NativeStockContainer)container;return chest.nativeContainerForSlots().slot(chest,index,0);
         }else if(container!=null&&container.getClass()==net.minecraft.world.inventory.TransientCraftingContainer.class){

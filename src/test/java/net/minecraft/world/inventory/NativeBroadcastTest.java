@@ -229,5 +229,48 @@ class NativeBroadcastTest {
         assertNotNull(menu.getSlot(45).broadcastLinkForMenu(), "the offhand slot keeps Slot.getItem");
         assertNull(menu.getSlot(0).broadcastLinkForMenu(), "the result slot reads a non-native container");
     }
+
+    // A null equipment (legal for Inventory's constructor) keeps the original prefix:
+    // building the slot succeeds and the failure stays in getItem, as for an unlinked slot.
+    static String nullEquipment(boolean exact) {
+        Inventory inventory = exact ? new Inventory(null, null) : new Inventory(null, null) {};
+        Slot slot;
+        try { slot = new Slot(inventory, 36, 0, 0); } catch (Throwable failure) { return "construct " + failure.getClass().getName(); }
+        try { return "item " + slot.getItem(); } catch (Throwable failure) { return "getItem " + failure.getClass().getName() + " link " + (slot.broadcastLinkForMenu() != null); }
+    }
+    @Test void nullEquipmentKeepsTheOriginalConstructionPrefix() {
+        assertEquals(nullEquipment(false), nullEquipment(true));
+        assertEquals("getItem java.lang.NullPointerException link false", nullEquipment(true));
+    }
+
+    // Inventory.EQUIPMENT_SLOT_MAPPING is public and mutable; Inventory.getItem re-reads it.
+    // After a remap the equipment digest must not hide a real change of what the slot reads.
+    static List<String> remappedEquipment(boolean exact) {
+        var mapping = Inventory.EQUIPMENT_SLOT_MAPPING;
+        var original = mapping.get(36);
+        var player = org.mockito.Mockito.mock(net.minecraft.world.entity.player.Player.class);
+        var equipment = new EntityEquipment();
+        Inventory inventory = exact ? new Inventory(player, equipment) : new Inventory(player, equipment) {};
+        org.mockito.Mockito.doReturn(inventory).when(player).getInventory();
+        var menu = new InventoryMenu(inventory, true, player);
+        var events = new ArrayList<String>();
+        menu.addSlotListener(new ReadOnlyListener(events));
+        try {
+            equipment.set(net.minecraft.world.entity.EquipmentSlot.FEET, new ItemStack(net.minecraft.world.item.Items.DIAMOND_BOOTS));
+            menu.broadcastChanges(); events.add("tick feet");
+            mapping.put(36, net.minecraft.world.entity.EquipmentSlot.HEAD);
+            equipment.set(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(net.minecraft.world.item.Items.IRON_HELMET));
+            menu.broadcastChanges(); events.add("tick remapped");
+            equipment.set(net.minecraft.world.entity.EquipmentSlot.FEET, ItemStack.EMPTY);
+            menu.broadcastChanges(); events.add("tick feet cleared");
+            mapping.remove(36);
+            menu.broadcastChanges(); events.add("tick removed");
+        } finally { mapping.put(36, original); }
+        return events;
+    }
+    @Test void remappedEquipmentRowsBroadcastLikeTheOriginal() {
+        assertEquals(remappedEquipment(false), remappedEquipment(true));
+        assertEquals(net.minecraft.world.entity.EquipmentSlot.FEET, Inventory.EQUIPMENT_SLOT_MAPPING.get(36), "the shared mapping was restored");
+    }
 }
 
