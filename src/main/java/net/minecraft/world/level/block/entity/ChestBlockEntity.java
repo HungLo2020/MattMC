@@ -166,6 +166,20 @@ public class ChestBlockEntity extends RandomizableContainerBlockEntity implement
 		return this.currentItems();
 	}
 
+	/** The inherited setItem chain; an exact native chest discards the previous contents without observing them. */
+	@Override
+	public void setItem(int i, ItemStack itemStack) {
+		if (this.getClass() != ChestBlockEntity.class) {
+			super.setItem(i, itemStack);
+			return;
+		}
+		this.unpackLootTable(null);
+		if (this.getItems() instanceof NativeItemSlots nativeItems) nativeItems.replace(i, itemStack);
+		else this.getItems().set(i, itemStack);
+		itemStack.limitSize(this.getMaxStackSize(itemStack));
+		this.setChanged();
+	}
+
 	/** Actual replaceable stock owner; custom chest subclasses retain virtual behavior. */
 	public final net.minecraft.world.item.NativeItemState.ContainerCell nativeContainerForSlots() {return this.nativeContainer;}
 	private NonNullList<ItemStack> currentItems(){return this.nativeContainer==null?this.legacyItems.items:this.nativeContainer.facade();}

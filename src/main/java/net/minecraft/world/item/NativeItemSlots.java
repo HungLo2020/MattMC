@@ -13,6 +13,8 @@ public final class NativeItemSlots extends NonNullList<ItemStack> {
     NativeItemState.Slots actualOwner() { return this.owner; }
     NativeItemState.SlotLink bindMainSlot(int index) { return NativeItemState.SlotLink.create(this.owner,index); }
     @Override public void clear() { this.owner.clearAll(); }
+    /** {@link #set} whose caller discards the previous contents; unobserved native contents stay unmaterialized. */
+    public void replace(int index, ItemStack value) { java.util.Objects.requireNonNull(value); this.owner.replace(index, value); }
     public void bindEquipment(net.minecraft.world.entity.EntityEquipment equipment){
         if(equipment!=null){var store=equipment.nativeEquipmentForInventory();if(store!=null)this.owner.bindEquipment(store);}
     }
@@ -31,5 +33,8 @@ public final class NativeItemSlots extends NonNullList<ItemStack> {
     /** One native scan/commit ending before the next Java effect. */
     public long transferStep(ItemStack source, int phase, int index) { return this.owner.transferStep(source, phase, index); }
     public void commitTransferInsert(ItemStack source, int index, ItemStack inserted, int amount) { this.owner.commitTransferInsert(source, index, inserted, amount); }
+    /** Records the recipe for contents a native transfer published without a facade (op 18). */
+    public void recordPending(long key, ItemStack source, long retired, long adopted) { this.owner.recordPending(key, source, retired, adopted); }
+    int pendingForTest() { return this.owner.pendingForTest(); }
     long handleForTest() { return NativeItemState.handleForTest(this.owner); }
 }

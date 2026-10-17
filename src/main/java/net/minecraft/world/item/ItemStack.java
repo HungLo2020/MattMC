@@ -622,6 +622,11 @@ public final class ItemStack implements DataComponentHolder {
 		return new ItemStack(NativeItemState.adoptPreparedCopy(this.state, handle, address, adopted));
 	}
 
+	/** The canonical facade of natively published slot contents, with the copy constructor's same {@code asItem} dispatch. */
+	static ItemStack materializeNative(NativeItemState.Stack nativeStack) {
+		return new ItemStack(nativeStack);
+	}
+
 	private ItemStack(NativeItemState.Stack nativeStack) {
 		this.components = PatchedDataComponentMap.fromNativeStack(nativeStack);
 		// Preserve the original private copy constructor's single dispatch.

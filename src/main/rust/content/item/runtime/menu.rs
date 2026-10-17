@@ -16,6 +16,16 @@ impl SlotLink {
         let rows=inventory.slots.admitted();let Some(entry)=rows.get(self.index as usize) else{return -1};
         if presence{i64::from(super::slots::visible_count(&entry.stack,air)!=0)}else{entry.facade}
     }
+    /// Regular broadcast snapshot (slots::broadcast_digest) of the linked row.
+    /// Computed in place under the row gates: no VM call, allocation or blocking component lock.
+    pub fn digest(&self)->i64 {
+        if let SlotContainer::Inventory(inventory)=&self.container {
+            let rows=inventory.slots.lock().unwrap();return rows.get(self.index as usize).map_or(-1,|entry|super::slots::broadcast_digest(&entry.stack));
+        }
+        let SlotContainer::Container(container)=&self.container else{return -1};
+        let current=container.lock().unwrap();let Some(rows)=&current.slots else{return -1};
+        let rows=rows.lock().unwrap();rows.get(self.index as usize).map_or(-1,|entry|super::slots::broadcast_digest(&entry.stack))
+    }
     /// Regular operation: both guards end before the Java caller resolves a
     /// facade or executes a virtual/loot/equipment/world callback.
     pub fn read(&self,air:u64,presence:bool)->i64 {
@@ -51,6 +61,8 @@ impl Menu {
     pub fn address(&self)->usize{&self.header as *const Header as usize}
     pub fn get(&self,index:usize)->Option<&MenuSlot>{self.rows.get(index)}
     pub fn references(&self,facade:i64)->bool{self.rows.iter().any(|slot|slot.facade==facade)}
+    /// Broadcast snapshots (SlotLink::digest) of every linked row, -1 otherwise.
+    pub fn digests(&self,from:usize,out:&mut [i64]){for (slot,value) in self.rows.iter().skip(from).zip(out.iter_mut().skip(from)){*value=slot.link.as_ref().map_or(-1,|link|link.digest());}}
     pub fn set(&mut self,index:usize,slot:MenuSlot)->Option<MenuSlot>{self.rows.get_mut(index).map(|old|std::mem::replace(old,slot))}
     pub fn insert(&mut self,index:usize,slot:MenuSlot)->bool{
         if index>self.rows.len()||self.rows.len()>=i32::MAX as usize{return false;}

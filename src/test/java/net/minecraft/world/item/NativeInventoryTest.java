@@ -361,6 +361,8 @@ class NativeInventoryTest {
     }
     private static long preparedCopies() { return transferCounter(3L); }
     private static long retiredUnadopted() { return transferCounter(4L); }
+    private static long pendingPublished() { return transferCounter(5L); }
+    private static long pendingMaterialized() { return transferCounter(6L); }
     // The returned snapshot and an empty-destination insertion adopt copies the
     // native operation prepared, in both stock directions: one each, a
     // distinct published facade with the source's count/pop time/components,
@@ -374,11 +376,15 @@ class NativeInventoryTest {
             ItemStack source=new ItemStack(Items.STICK,11);source.setPopTime(7);
             source.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,net.minecraft.network.chat.Component.literal("a"));
             if(reverse)chest.setItem(0,source);else inv.setItem(9,source);
-            long before=preparedCopies();
+            long before=preparedCopies(),published=pendingPublished(),materialized=pendingMaterialized();
             ItemStack returned=menu.quickMoveStack(null,reverse?0:27);
-            assertEquals(before+2,preparedCopies(),"the snapshot and the inserted copy are both prepared natively");
+            assertEquals(before+1,preparedCopies(),"the returned snapshot is prepared natively");
+            assertEquals(published+1,pendingPublished(),"the inserted copy is published natively without a facade");
+            assertEquals(materialized,pendingMaterialized(),"nothing observed the inserted contents yet");
             assertSame(Items.STICK,returned.getItem());assertEquals(11,returned.getCount());assertEquals(7,returned.getPopTime());assertNotSame(source,returned);
             ItemStack inserted=reverse?inv.getItem(8):chest.getItem(0);
+            assertEquals(materialized+1,pendingMaterialized(),"the first read materializes its one canonical facade");
+            assertSame(inserted,reverse?inv.getItem(8):chest.getItem(0));assertEquals(materialized+1,pendingMaterialized());
             assertNotSame(source,inserted);assertNotSame(returned,inserted);
             assertSame(Items.STICK,inserted.getItem());assertEquals(11,inserted.getCount());assertEquals(7,inserted.getPopTime());
             assertEquals("a",inserted.getHoverName().getString());assertEquals(0,source.getCount());
@@ -414,9 +420,9 @@ class NativeInventoryTest {
         Inventory inv=new Inventory(null,new EntityEquipment());
         var chest=new net.minecraft.world.level.block.entity.ChestBlockEntity(net.minecraft.core.BlockPos.ZERO,net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
         chest.setRemoved();var menu=net.minecraft.world.inventory.ChestMenu.threeRows(1,inv,chest);chest.clearRemoved();
-        inv.setItem(9,new ItemStack(Items.STICK,11));long before=preparedCopies();
+        inv.setItem(9,new ItemStack(Items.STICK,11));long before=preparedCopies(),published=pendingPublished();
         ItemStack returned=menu.quickMoveStack(null,27);ItemStack inserted=chest.getItem(0);
-        assertEquals(before+2,preparedCopies());
+        assertEquals(before+1,preparedCopies());assertEquals(published+1,pendingPublished());
         long returnedHandle=NativeItemState.handleForTest(returned.state),insertedHandle=NativeItemState.handleForTest(inserted.state);
         assertTrue(NativeItemState.liveForTest(returnedHandle));assertTrue(NativeItemState.liveForTest(insertedHandle));
         return new PublishedCopies(new WeakReference<>(returned),new WeakReference<>(inserted),returnedHandle,insertedHandle);
@@ -444,5 +450,59 @@ class NativeInventoryTest {
             assertEquals(retired+1,retiredUnadopted(),"the copy Java declined is retired natively");
             ItemStack added=inv.getItem(0);assertNotSame(stick,added);assertEquals(11,added.getCount());assertEquals(5,added.getPopTime());assertEquals(0,stick.getCount());
         } finally { pure.setBoolean(Items.STICK,true); }
+    }
+
+    // Native contents feed a later native operation before any Java observation:
+    // the second quick move merges into the first move's pending chest copy, which
+    // stays facade-less until the first genuine read builds its one canonical facade.
+    @Test void pendingChestContentsAreConsumedByALaterNativeMergeBeforeExposure() {
+        bootstrap();
+        Inventory inv=new Inventory(null,new EntityEquipment());
+        var chest=new net.minecraft.world.level.block.entity.ChestBlockEntity(net.minecraft.core.BlockPos.ZERO,net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+        chest.setRemoved();var menu=net.minecraft.world.inventory.ChestMenu.threeRows(1,inv,chest);chest.clearRemoved();
+        ItemStack first=new ItemStack(Items.STICK,11),second=new ItemStack(Items.STICK,11);inv.setItem(9,first);inv.setItem(10,second);
+        long published=pendingPublished(),materialized=pendingMaterialized();
+        menu.quickMoveStack(null,27);
+        assertEquals(published+1,pendingPublished());
+        menu.quickMoveStack(null,28);
+        assertEquals(published+1,pendingPublished(),"the second move merged instead of publishing");
+        assertEquals(materialized,pendingMaterialized(),"the merge consumed the native contents without a facade");
+        assertEquals(0,first.getCount());assertEquals(0,second.getCount());
+        ItemStack merged=chest.getItem(0);
+        assertEquals(materialized+1,pendingMaterialized());assertEquals(22,merged.getCount());assertSame(Items.STICK,merged.getItem());
+        assertSame(merged,chest.getItem(0));assertSame(merged,menu.getSlot(0).getItem());
+        merged.setCount(5);assertEquals(5,chest.getItem(0).getCount(),"the canonical facade is the slot's own contents");
+        assertSame(ItemStack.EMPTY,chest.getItem(1));
+    }
+    // A replacement returns the previous contents, so pending contents are
+    // materialized first; the previous facade then stays usable and independent.
+    @Test void replacingPendingContentsReturnsTheirCanonicalFacade() throws Exception {
+        bootstrap();
+        Inventory inv=new Inventory(null,new EntityEquipment());
+        var chest=new net.minecraft.world.level.block.entity.ChestBlockEntity(net.minecraft.core.BlockPos.ZERO,net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+        chest.setRemoved();var menu=net.minecraft.world.inventory.ChestMenu.threeRows(1,inv,chest);chest.clearRemoved();
+        inv.setItem(9,new ItemStack(Items.STICK,11));menu.quickMoveStack(null,27);
+        long materialized=pendingMaterialized();
+        var getter=net.minecraft.world.level.block.entity.ChestBlockEntity.class.getDeclaredMethod("getItems");getter.setAccessible(true);
+        @SuppressWarnings("unchecked") var items=(net.minecraft.core.NonNullList<ItemStack>)getter.invoke(chest);ItemStack previous=items.set(0,new ItemStack(Items.DIRT,3));
+        assertEquals(materialized+1,pendingMaterialized());assertSame(Items.STICK,previous.getItem());assertEquals(11,previous.getCount());
+        previous.setCount(2);assertEquals(3,chest.getItem(0).getCount());assertSame(Items.DIRT,chest.getItem(0).getItem());
+    }
+    // setItem discards the previous contents, so unobserved pending contents are
+    // retired without ever building a facade; their recipe goes with them.
+    @Test void setItemRetiresPendingContentsWithoutObservingThem() {
+        bootstrap();
+        Inventory inv=new Inventory(null,new EntityEquipment());
+        var chest=new net.minecraft.world.level.block.entity.ChestBlockEntity(net.minecraft.core.BlockPos.ZERO,net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+        chest.setRemoved();var menu=net.minecraft.world.inventory.ChestMenu.threeRows(1,inv,chest);chest.clearRemoved();
+        inv.setItem(9,new ItemStack(Items.STICK,11));menu.quickMoveStack(null,27);
+        var rows=chest.nativeSlotsForTransfer();assertEquals(1,rows.pendingForTest());
+        long materialized=pendingMaterialized();
+        chest.setItem(0,ItemStack.EMPTY);
+        assertEquals(0,rows.pendingForTest());assertEquals(materialized,pendingMaterialized());assertSame(ItemStack.EMPTY,chest.getItem(0));
+        inv.setItem(10,new ItemStack(Items.STICK,3));menu.quickMoveStack(null,28);menu.quickMoveStack(null,0);
+        // The reverse move genuinely observes its chest source (op 1); only the inventory copy stays pending.
+        assertEquals(1,inv.nativeMainSlotsForTransfer().pendingForTest());ItemStack dirt=new ItemStack(Items.DIRT,2);materialized=pendingMaterialized();
+        inv.setItem(8,dirt);assertEquals(0,inv.nativeMainSlotsForTransfer().pendingForTest());assertSame(dirt,inv.getItem(8));assertEquals(materialized,pendingMaterialized());
     }
 }

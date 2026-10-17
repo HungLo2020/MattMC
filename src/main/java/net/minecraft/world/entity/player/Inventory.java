@@ -81,6 +81,13 @@ public class Inventory implements Container, Nameable {
 		if (slot != null) this.equipment.set(slot, stack);
 	}
 
+	/** {@link #nativeMainSetEffects} for natively published contents: observed only if an equipment slot needs them. */
+	public final void nativeMainSetEffectsPending(int index) {
+		if (this.nativeMainSlotsForTransfer() == null || index < 0 || index >= 36) throw new IllegalStateException("Invalid native inventory effect");
+		EquipmentSlot slot = EQUIPMENT_SLOT_MAPPING.get(index);
+		if (slot != null) this.equipment.set(slot, this.getItem(index));
+	}
+
 	public int getSelectedSlot() {
 		return this.selectedValue();
 	}
@@ -486,7 +493,8 @@ public class Inventory implements Container, Nameable {
 	@Override
 	public void setItem(int i, ItemStack itemStack) {
 		if (i < this.items.size()) {
-			this.items.set(i, itemStack);
+			if (this.items instanceof net.minecraft.world.item.NativeItemSlots nativeItems) nativeItems.replace(i, itemStack);
+			else this.items.set(i, itemStack);
 		}
 
 		EquipmentSlot equipmentSlot = EQUIPMENT_SLOT_MAPPING.get(i);

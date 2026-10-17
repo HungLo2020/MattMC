@@ -231,6 +231,74 @@ current comparison rows. Its exact pair is preserved in
 `build/item-state-r5-operation-lease-sealed1`. At that historical checkpoint, broader affected checks and complete cost were
 pending; later r6 results and disposition supersede that status.
 
+## Pending slot contents and menu broadcast
+
+S0034 (in progress): an admitted stock quick move into an empty slot publishes
+its copy natively, and the per-tick menu broadcast consumes native contents.
+A Java facade is built only when Java genuinely observes the slot.
+
+**Publication.** When the stock transfer adapters opt in (op 7 returns 6),
+Rust publishes the copy straight into the destination row under a reserved
+pending key (`slots.rs` `PENDING_BASE`, at or below -2^40), shrinking the source
+under the same row gate. There is no facade, `Cleaner` or registry handle.
+Op 18 then lets Java:
+
+- record a `NativeItemState.Pending` recipe (the source's roots, prototype and
+  `Item`, captured under the same monitors as prepared-copy adoption);
+- set the adoption flag;
+- run the original effects.
+
+If Java fails before recording, Rust restores the old row and source count.
+
+**Materialization.** `Slots.get`, link/cell reads (through their existing
+negative-token fallback), visitor tokens and `List.set` (which returns the
+previous contents) all materialize pending contents:
+
+1. `slots_materialize` registers the row's own stack. It refuses (-3) unless the
+   copy's patch version equals the recipe's `roots.version`.
+2. Java builds the facade through the original `ItemStack` constructor
+   (`asItem` dispatch).
+3. `slots_bind` binds it only if the row still holds that key and stack;
+   otherwise Java re-reads the row.
+
+Repeated reads return that one facade. `Inventory.setItem` and the exact
+`ChestBlockEntity.setItem` discard the previous contents, so they use
+`NativeItemSlots.replace`, which retires pending contents without observing them.
+
+**Native consumers.** Later transfers merge into pending rows natively. The
+quick-move source is still observed (op 1 reads `slot.getItem()`).
+
+**Broadcast.** `broadcastChanges` takes the native-assisted loop only for
+native menus whose listeners and synchronizer are all
+`AbstractContainerMenu.ReadOnlyBroadcastObserver` or server-player observers,
+because their received stacks become the listener baseline. Per slot, in the
+original order:
+
+- A plain native slot (`Slot.nativeLinkForMenu` plus a known endpoint) is
+  skipped when its exact snapshot (`slots.rs` `broadcast_digest`: item,
+  prototype and raw count, with no patched components) equals the snapshot
+  recorded when both comparisons last matched in the current sync epoch.
+- Changed pending contents are compared and sent through one natively built
+  copy (`slots_pending_copy`), leaving the slot pending.
+- Everything else runs the original body.
+
+Every listener, synchronizer, remote force/receive, suppression and
+state-transfer change bumps the sync epoch, which invalidates all records. A
+changed slot still needs its listener/packet copy, and `RemoteSlot.force` still
+copies it.
+
+Inventory add (pickups) still adopts prepared copies (S0030). Its Java
+`grow`/`setPopTime` steps run on the adopted facade.
+
+- Counters: `mattmc_item_transfer_counter` 5 counts pending publications, 6
+  materializations, 7 rollbacks and 8 broadcast copies.
+- Java tests: `NativeInventoryTest` covers native merge before exposure, replace,
+  `setItem` retirement, identity and alias mutation. `NativeBroadcastTest` runs
+  the admitted loop against the original loop over the same tick sequence and
+  requires identical listener, packet and order traces.
+- Rust tests: `operation_lease_tests` cover rollback before/after recording,
+  stale keys/rows and version refusal.
+
 ## Complete stock-chest ownership
 
 Both stock 27-slot chest directions now use native destination owners. Reverse

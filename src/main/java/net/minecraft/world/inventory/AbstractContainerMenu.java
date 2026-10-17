@@ -141,6 +141,7 @@ public abstract class AbstractContainerMenu {
 		this.slots.add(slot);
 		this.lastSlots.add(ItemStack.EMPTY);
 		this.remoteSlots.add(this.synchronizer != null ? this.synchronizer.createSlot() : RemoteSlot.PLACEHOLDER);
+		this.syncEpoch++;
 		return slot;
 	}
 
@@ -159,12 +160,14 @@ public abstract class AbstractContainerMenu {
 	public void addSlotListener(ContainerListener containerListener) {
 		if (!this.containerListeners.contains(containerListener)) {
 			this.containerListeners.add(containerListener);
+			this.syncEpoch++;
 			this.broadcastChanges();
 		}
 	}
 
 	public void setSynchronizer(ContainerSynchronizer containerSynchronizer) {
 		this.synchronizer = containerSynchronizer;
+		this.syncEpoch++;
 		this.remoteCarried = containerSynchronizer.createSlot();
 		this.remoteSlots.replaceAll(remoteSlot -> containerSynchronizer.createSlot());
 		this.sendAllDataToRemote();
@@ -173,6 +176,7 @@ public abstract class AbstractContainerMenu {
 	public void sendAllDataToRemote() {
 		List<ItemStack> list = new ArrayList(this.slots.size());
 		int i = 0;
+		this.syncEpoch++;
 
 		for (int j = this.slots.size(); i < j; i++) {
 			ItemStack itemStack = this.slots.get(i).getItem();
@@ -195,6 +199,7 @@ public abstract class AbstractContainerMenu {
 
 	public void removeSlotListener(ContainerListener containerListener) {
 		this.containerListeners.remove(containerListener);
+		this.syncEpoch++;
 	}
 
 	public NonNullList<ItemStack> getItems() {
@@ -208,7 +213,8 @@ public abstract class AbstractContainerMenu {
 	}
 
 	public void broadcastChanges() {
-		for (int i = 0; i < this.slots.size(); i++) {
+		if (this.nativeBroadcast()) this.broadcastNativeSlots();
+		else for (int i = 0; i < this.slots.size(); i++) {
 			ItemStack itemStack = this.slots.get(i).getItem();
 			Supplier<ItemStack> supplier = Suppliers.memoize(itemStack::copy);
 			this.triggerSlotListeners(i, itemStack, supplier);
@@ -225,6 +231,86 @@ public abstract class AbstractContainerMenu {
 			}
 
 			this.synchronizeDataSlotToRemote(i, j);
+		}
+	}
+
+	/**
+	 * Per-slot broadcast record for admitted native menus: the sync epoch and
+	 * exact native snapshot at which both the listener baseline and the remote
+	 * state last matched the contents. Every listener/remote/synchronizer/
+	 * suppression/transfer change bumps the epoch, invalidating all records.
+	 */
+	private int syncEpoch;
+	private int observerCalls;
+	private int[] syncCleanEpoch = new int[0];
+	private long[] syncDigest = new long[0];
+	private Slot[] syncSlot = new Slot[0];
+
+	/**
+	 * A listener or synchronizer that never mutates the stacks it receives (they
+	 * become the listener baseline). Server-player observers qualify as well.
+	 */
+	public interface ReadOnlyBroadcastObserver {}
+
+	private static boolean readOnlyObserver(Object observer) {
+		return observer instanceof ReadOnlyBroadcastObserver || observer.getClass().getEnclosingClass() == net.minecraft.server.level.ServerPlayer.class;
+	}
+
+	private boolean nativeBroadcast() {
+		if (this.nativeMenu == null) return false;
+		if (this.synchronizer != null && !readOnlyObserver(this.synchronizer)) return false;
+		for (ContainerListener containerListener : this.containerListeners) {
+			if (!readOnlyObserver(containerListener)) return false;
+		}
+		return true;
+	}
+
+	/**
+	 * The original per-slot loop, except: a plain native slot whose exact
+	 * snapshot is unchanged since both comparisons matched is skipped (they
+	 * would match again, with no effects); and changed pending contents are
+	 * compared and sent through one natively built copy, without materializing
+	 * the slot's own facade. Everything else runs the original body.
+	 */
+	private void broadcastNativeSlots() {
+		long[] digests = null;
+		boolean stale = false;
+		for (int i = 0; i < this.slots.size(); i++) {
+			Slot slot = this.slots.get(i);
+			if (this.syncSlot.length < this.slots.size()) {
+				int size = this.slots.size();
+				this.syncCleanEpoch = java.util.Arrays.copyOf(this.syncCleanEpoch, size);
+				this.syncDigest = java.util.Arrays.copyOf(this.syncDigest, size);
+				this.syncSlot = java.util.Arrays.copyOf(this.syncSlot, size);
+			}
+			// One native snapshot call per broadcast; refreshed after any slot whose processing could run other code.
+			if (digests == null || digests.length != this.slots.size()) digests = this.nativeMenu.broadcastDigests(new long[this.slots.size()], 0);
+			else if (stale) digests = this.nativeMenu.broadcastDigests(digests, i);
+			stale = false;
+			var link = slot.nativeLinkForMenu();
+			long digest = net.minecraft.world.item.NativeItemState.MenuActionEffects.broadcastEndpoint(link) ? digests[i] : -1;
+			if (digest >= 0 && this.syncSlot[i] == slot && this.syncCleanEpoch[i] == this.syncEpoch && this.syncDigest[i] == digest) continue;
+			int epoch = this.syncEpoch;
+			int called = this.observerCalls;
+			ItemStack copy = digest >= 0 ? link.pendingBroadcastCopy() : null;
+			if (copy != null) {
+				Supplier<ItemStack> supplier = () -> copy;
+				this.triggerSlotListeners(i, copy, supplier);
+				this.synchronizeSlotToRemote(i, copy, supplier);
+			} else {
+				ItemStack itemStack = slot.getItem();
+				Supplier<ItemStack> supplier = Suppliers.memoize(itemStack::copy);
+				this.triggerSlotListeners(i, itemStack, supplier);
+				this.synchronizeSlotToRemote(i, itemStack, supplier);
+			}
+			// Observers may run arbitrary code (for example advancement rewards); then later snapshots are re-read.
+			stale = this.observerCalls != called;
+			boolean clean = digest >= 0 && epoch == this.syncEpoch && i < this.slots.size() && this.slots.get(i) == slot && link.broadcastDigest() == digest;
+			if (i < this.syncSlot.length) {
+				this.syncSlot[i] = clean ? slot : null;
+				this.syncCleanEpoch[i] = epoch;
+				this.syncDigest[i] = digest;
+			}
 		}
 	}
 
@@ -256,6 +342,7 @@ public abstract class AbstractContainerMenu {
 			ItemStack itemStack3 = (ItemStack)supplier.get();
 			this.lastSlots.set(i, itemStack3);
 
+			this.observerCalls++;
 			for (ContainerListener containerListener : this.containerListeners) {
 				containerListener.slotChanged(this, i, itemStack3);
 			}
@@ -268,6 +355,7 @@ public abstract class AbstractContainerMenu {
 			if (!remoteSlot.matches(itemStack)) {
 				remoteSlot.force(itemStack);
 				if (this.synchronizer != null) {
+					this.observerCalls++;
 					this.synchronizer.sendSlotChange(this, i, (ItemStack)supplier.get());
 				}
 			}
@@ -299,11 +387,13 @@ public abstract class AbstractContainerMenu {
 	}
 
 	public void setRemoteSlot(int i, ItemStack itemStack) {
+		this.syncEpoch++;
 		this.remoteSlots.get(i).force(itemStack);
 	}
 
 	public void setRemoteSlotUnsafe(int i, HashedStack hashedStack) {
 		if (i >= 0 && i < this.remoteSlots.size()) {
+			this.syncEpoch++;
 			this.remoteSlots.get(i).receive(hashedStack);
 		} else {
 			LOGGER.debug("Incorrect slot index: {} available slots: {}", i, this.remoteSlots.size());
@@ -377,11 +467,12 @@ public abstract class AbstractContainerMenu {
 				case 6:return AbstractContainerMenu.this.slots.get(first).hasItem()?1:0;
 				case 7:
 					this.transfer=AbstractContainerMenu.this.prepareOwnedTransfer(this.slot,this.source,this.index);
-					if(this.transfer!=null){transfer(out,this.transfer,this.source);return 2;}
+					if(this.transfer!=null){transfer(out,this.transfer,this.source);return this.transfer.pendingInsertions()?6:2;}
 					return AbstractContainerMenu.this.moveItemStackTo(this.source,first,second,third!=0)?1:0;
 				case 15:return this.transfer.effect(first,second,(third>>>1)&3,(int)(third>>32),third&1);
 				case 16:return this.transfer.insertPrepared(first,second,third,preparedAddress(out),out+8);
 				case 17:this.snapshot=this.source.adoptPreparedCopy(third,preparedAddress(out),out+8);return 1;
+				case 18:return this.transfer.publishedPending(first,second,third,preparedAddress(out),out+8);
 				case 8:this.slot.onQuickCraft(this.source,this.snapshot);return 1;
 				case 9:
 					if(first!=0){if(second!=0)this.slot.setByPlayer(ItemStack.EMPTY,this.snapshot);else this.slot.setByPlayer(ItemStack.EMPTY);}else this.slot.setChanged();return 1;
@@ -781,6 +872,14 @@ public abstract class AbstractContainerMenu {
 			this.inventory.nativeMainSetEffects(index,inserted);
 			slot.setChanged();slot.setChanged();return 1;
 		}
+		@Override public boolean pendingInsertions(){return true;}
+		@Override public long publishedPending(long selected,long amount,long key,long retired,long adopted) {
+			int menuIndex=62-Math.toIntExact(selected);
+			Slot slot=AbstractContainerMenu.this.slots.get(menuIndex);int index=slot.getContainerSlot();
+			this.backend.recordPending(key,this.source,retired,adopted);
+			this.inventory.nativeMainSetEffectsPending(index);
+			slot.setChanged();slot.setChanged();return 1;
+		}
 	}
 
 	private final class StockTransferEffects extends net.minecraft.world.item.NativeItemState.TransferEffects {
@@ -822,6 +921,14 @@ public abstract class AbstractContainerMenu {
 			Slot slot = AbstractContainerMenu.this.slots.get(index);
 			ItemStack inserted = this.source.adoptPreparedCopy(handle, address, adopted);
 			this.backend.commitTransferInsert(this.source, index, inserted, (int)amount);
+			this.chest.setChanged(); slot.setChanged(); slot.setChanged();
+			return 1;
+		}
+		@Override public boolean pendingInsertions() { return true; }
+		@Override public long publishedPending(long selected, long amount, long key, long retired, long adopted) {
+			int index = Math.toIntExact(selected);
+			Slot slot = AbstractContainerMenu.this.slots.get(index);
+			this.backend.recordPending(key, this.source, retired, adopted);
 			this.chest.setChanged(); slot.setChanged(); slot.setChanged();
 			return 1;
 		}
@@ -959,15 +1066,18 @@ public abstract class AbstractContainerMenu {
 	}
 
 	public void suppressRemoteUpdates() {
+		this.syncEpoch++;
 		this.suppressRemoteUpdates = true;
 	}
 
 	public void resumeRemoteUpdates() {
+		this.syncEpoch++;
 		this.suppressRemoteUpdates = false;
 	}
 
 	public void transferState(AbstractContainerMenu abstractContainerMenu) {
 		Table<Container, Integer, Integer> table = HashBasedTable.create();
+		this.syncEpoch++;
 
 		for (int i = 0; i < abstractContainerMenu.slots.size(); i++) {
 			Slot slot = abstractContainerMenu.slots.get(i);

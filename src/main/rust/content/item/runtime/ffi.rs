@@ -576,6 +576,39 @@ unsafe fn result(out: *mut i64, visible: Option<Leaf>, old: Option<Value>, new: 
         let slots = slots.lock().unwrap(); slots.get(index as usize).map(|e| e.facade).unwrap_or(BAD)
     })
 }
+/// Registers the exact Arc in a pending row so Java can build its canonical
+/// facade outside the row gate. The row itself is unchanged until bind. The
+/// recipe's captured component roots must describe this copy's actual backing
+/// (`version`); otherwise no facade may be built from them (-3).
+#[no_mangle] pub extern "C" fn mattmc_item_slots_materialize(handle:i64,index:i64,key:i64,version:i64)->i64 {
+    guard(||{let (Some(rows),Ok(index))=(slots(handle),usize::try_from(index)) else{return BAD};
+        if !super::slots::is_pending(key){return BAD;}
+        let stack={let rows=rows.lock().unwrap();match rows.get(index){Some(entry) if entry.facade==key=>entry.stack.clone(),_=>return BAD}};
+        if stack.components.lock().unwrap().patch_version()!=version as u64{return -3;}
+        keep(Owner::Stack(stack))})
+}
+/// A registered copy of pending contents for a broadcast comparison/packet,
+/// leaving the row pending. Refused like materialize on a backing mismatch
+/// (-3), and for empty contents (-4), whose original copy is EMPTY.
+#[no_mangle] pub extern "C" fn mattmc_item_slots_pending_copy(handle:i64,index:i64,key:i64,version:i64)->i64 {
+    guard(||{let (Some(rows),Ok(index))=(slots(handle),usize::try_from(index)) else{return BAD};
+        if !super::slots::is_pending(key){return BAD;}
+        let stack={let rows=rows.lock().unwrap();match rows.get(index){Some(entry) if entry.facade==key=>entry.stack.clone(),_=>return BAD}};
+        if stack.components.lock().unwrap().patch_version()!=version as u64{return -3;}
+        let count=stack.scalars.count.load(Ordering::Relaxed);if stack.empty_identity||count<=0{return -4;}
+        super::slots::PENDING_BROADCAST_COPIES.fetch_add(1,Ordering::Relaxed);
+        prepare_copy(&stack,count).0})
+}
+/// Binds the constructed facade only if the row still holds that key and Arc.
+/// Returns 0 when the row changed meanwhile, otherwise 1, plus 2 when no other
+/// row still carries the key (Java then retires its recipe).
+#[no_mangle] pub extern "C" fn mattmc_item_slots_bind(handle:i64,index:i64,key:i64,facade:i64)->i64 {
+    guard(||{let (Some(rows),Some(stack),Ok(index))=(slots(handle),stack(facade),usize::try_from(index)) else{return BAD};
+        let mut rows=rows.lock().unwrap();
+        if !rows.get(index).is_some_and(|entry|entry.facade==key&&Arc::ptr_eq(&entry.stack,&stack)){return 0;}
+        rows.set(index,super::slots::Entry{facade,stack});super::slots::PENDING_MATERIALIZED.fetch_add(1,Ordering::Relaxed);
+        1|(i64::from(rows.entries_facade_index(key)<0)<<1)})
+}
 #[no_mangle] pub extern "C" fn mattmc_item_slots_set(handle: i64, index: i64, facade: i64) -> i64 {
     guard(|| {
         let (Some(slots), Some(stack)) = (slots(handle), stack(facade)) else { return BAD };
@@ -769,7 +802,8 @@ fn access_overlay(handle: i64) -> Option<Arc<Mutex<super::patch::CanonicalOverla
 }
 #[no_mangle] pub extern "C" fn mattmc_item_transfer_counter(which:i64)->i64 {
     match which {0=>super::slots::TRANSFER_STEPS.load(Ordering::Relaxed) as i64,1=>super::slots::TRANSFER_NATIVE_DEFAULTS.load(Ordering::Relaxed) as i64,2=>super::slots::TRANSFER_NATIVE_SLOTS.load(Ordering::Relaxed) as i64,
-        3=>PREPARED_COPIES.load(Ordering::Relaxed) as i64,4=>PREPARED_RETIRED.load(Ordering::Relaxed) as i64,_=>BAD}
+        3=>PREPARED_COPIES.load(Ordering::Relaxed) as i64,4=>PREPARED_RETIRED.load(Ordering::Relaxed) as i64,
+        5=>super::slots::PENDING_PUBLISHED.load(Ordering::Relaxed) as i64,6=>super::slots::PENDING_MATERIALIZED.load(Ordering::Relaxed) as i64,7=>super::slots::PENDING_ROLLED_BACK.load(Ordering::Relaxed) as i64,8=>super::slots::PENDING_BROADCAST_COPIES.load(Ordering::Relaxed) as i64,_=>BAD}
 }
 
 /// Copy actual scalar/overlay state as one owner. Java's scalar scope pins this
@@ -1061,7 +1095,7 @@ fn container(handle:i64)->Option<Arc<super::slots::BoundaryOwner<super::containe
         super::menu::SlotLink::for_container(owner,index).map_or(BAD,|link|keep(Owner::SlotLink(Arc::new(link))))})
 }
 #[no_mangle] pub extern "C" fn mattmc_item_slot_read_regular(handle:i64,air:i64,mode:i64)->i64 {
-    guard(||{if !(0..=1).contains(&mode){return BAD;}slot_link(handle).map_or(BAD,|link|link.read(air as u64,mode==1))})
+    guard(||{if !(0..=2).contains(&mode){return BAD;}slot_link(handle).map_or(BAD,|link|if mode==2{link.digest()}else{link.read(air as u64,mode==1)})})
 }
 
 fn menu(handle:i64)->Option<Arc<super::slots::BoundaryOwner<super::menu::Menu>>> {
@@ -1114,7 +1148,7 @@ fn menu_destination(address:i64,kind:i64)->Option<SlotsLease>{unsafe{match kind 
     1=>retain_vm_arc(address).map(SlotsLease::Inventory),_=>None,
 }}}
 type MenuCallback=unsafe extern "C" fn(i64,i64,i64,i64,i64)->i64;
-struct MenuEffects {callback:MenuCallback,source:Option<Arc<super::stack::Stack>>,prepared:Option<(Arc<super::stack::Stack>,Arc<super::stack::Stack>)>,known_has:Option<bool>,air:u64}
+struct MenuEffects {callback:MenuCallback,source:Option<Arc<super::stack::Stack>>,prepared:Option<(Arc<super::stack::Stack>,Arc<super::stack::Stack>)>,known_has:Option<bool>,air:u64,pending:bool}
 impl MenuEffects {
     fn call(&mut self,action:i64,a:i64,b:i64,c:i64)->Result<(i64,[i64;2]),()> {self.call_with(action,a,b,c,[0;2])}
     fn call_with(&mut self,action:i64,a:i64,b:i64,c:i64,mut out:[i64;2])->Result<(i64,[i64;2]),()> {
@@ -1135,6 +1169,33 @@ impl MenuEffects {
         if out[1]==0{retire_unadopted(handle);}
         result
     }
+    /// Publishes the copy straight into the destination row under a pending
+    /// key, without a Java facade, registry handle or Cleaner. Op 18 then lets
+    /// Java record the materialization recipe (adoption flag in out[1]) and run
+    /// the original post-publication effects. If Java fails before recording,
+    /// nothing ran in between, so the publication and source shrink are undone.
+    fn publish_pending(&mut self,destination:&SlotsLease,source:&Arc<super::stack::Stack>,selected:i64,amount:i64,reverse:bool)->i64 {
+        let (Ok(amount32),Ok(position))=(i32::try_from(amount),usize::try_from(selected)) else{return i64::MIN};
+        let index=super::slots::target_index(position,reverse&&matches!(destination,SlotsLease::Inventory(_)));
+        let copy=copy_stack(source,amount32);let key=super::slots::next_pending_key();
+        let (old,retired)={
+            let mut rows=destination.lock().unwrap();
+            let Some(old)=super::slots::transfer_insert(&mut rows,source,index,super::slots::Entry{facade:key,stack:copy},amount32) else{return i64::MIN};
+            let retired=rows.entries_facade_index(old.facade)<0;(old,retired)
+        };
+        super::slots::PENDING_PUBLISHED.fetch_add(1,Ordering::Relaxed);
+        let mut out=[if retired{old.facade}else{0},0];
+        let result=unsafe{(self.callback)(18,selected,amount,key,out.as_mut_ptr() as i64)};
+        if out[1]==0 {
+            let mut rows=destination.lock().unwrap();
+            if rows.get(index).is_some_and(|entry|entry.facade==key){
+                rows.set(index,old);source.scalars.count.fetch_add(amount32,Ordering::Relaxed);
+                super::slots::PENDING_ROLLED_BACK.fetch_add(1,Ordering::Relaxed);
+            }
+            return i64::MIN;
+        }
+        result
+    }
     /// A prepared copy adopted by Java through `op` (handle in the third argument).
     fn adopt_prepared(&mut self,op:i64,source:&super::stack::Stack,count:i32,a:i64,b:i64)->Result<Arc<super::stack::Stack>,()> {
         let (handle,address,copy)=prepare_copy(source,count);
@@ -1153,10 +1214,13 @@ fn retire_unadopted(handle:i64){if owners().lock().unwrap().remove(&handle).is_s
 /// A registered copy of `source` with `count` and its pop time: the native
 /// half of `ItemStack.copyOwnedStack` followed by `setCount`.
 fn prepare_copy(source:&super::stack::Stack,count:i32)->(i64,usize,Arc<super::stack::Stack>) {
+    let copied=copy_stack(source,count);let address=copied.address();PREPARED_COPIES.fetch_add(1,Ordering::Relaxed);(keep(Owner::Stack(copied.clone())),address,copied)
+}
+fn copy_stack(source:&super::stack::Stack,count:i32)->Arc<super::stack::Stack> {
     let copied={source.components.lock().unwrap().copy()};
     let mut copied=super::stack::Stack::from_overlay(source.scalars.item,count,copied);copied.empty_identity=source.empty_identity;
     copied.scalars.pop_time.store(source.scalars.pop_time.load(Ordering::Relaxed),Ordering::Relaxed);
-    let copied=Arc::new(copied);let address=copied.address();PREPARED_COPIES.fetch_add(1,Ordering::Relaxed);(keep(Owner::Stack(copied.clone())),address,copied)
+    Arc::new(copied)
 }
 impl super::menu::QuickMoveEffects for MenuEffects {
     fn select(&mut self,index:i32)->Result<super::menu::Selected,()>{
@@ -1179,10 +1243,11 @@ impl super::menu::QuickMoveEffects for MenuEffects {
     fn equipment_route(&mut self)->Result<(i32,i32),()>{let (_,out)=self.call(5,0,0,0)?;Ok((i32::try_from(out[0]).map_err(|_|())?,i32::try_from(out[1]).map_err(|_|())?))}
     fn target_has_item(&mut self,index:i32)->Result<bool,()>{Ok(self.call(6,index as i64,0,0)?.0!=0)}
     fn transfer(&mut self,start:i32,end:i32,reverse:bool)->Result<bool,()>{
-        let (result,out)=self.call(7,start as i64,end as i64,i64::from(reverse))?;if result!=2{return Ok(result!=0);}
+        let (result,out)=self.call(7,start as i64,end as i64,i64::from(reverse))?;if result!=2&&result!=6{return Ok(result!=0);}
+        self.pending=result==6;
         let destination=menu_destination(out[0],out[1]).ok_or(())?;let source=self.source.clone().ok_or(())?;
         let result=transfer_run_owned(&destination,&source,self.air,|action,index,phase,amount,changed|{
-            if action==2{return self.insert_prepared(&source,index,amount);}
+            if action==2{return if self.pending{self.publish_pending(&destination,&source,index,amount,reverse)}else{self.insert_prepared(&source,index,amount)};}
             let packed=(((amount as u32 as u64)<<32)|((phase as u64)<<1)|changed as u64) as i64;
             self.call(15,action,index,packed).map_or(i64::MIN,|result|result.0)
         });if result<0{Err(())}else{Ok(result!=0)}
@@ -1197,9 +1262,14 @@ impl super::menu::QuickMoveEffects for MenuEffects {
 }
 #[no_mangle] pub unsafe extern "C" fn mattmc_item_menu_action(handle:i64,index:i64,air:i64,repeated:i64,callback:Option<MenuCallback>)->i64 {
     guard(||{let (Some(owner),Some(callback),Ok(index))=(menu(handle),callback,i32::try_from(index)) else{return BAD};
-        let (kind,rows)={let owner=owner.lock().unwrap();(owner.kind,owner.chest_rows.load(Ordering::Relaxed))};let mut effects=MenuEffects{callback,source:None,prepared:None,known_has:None,air:air as u64};
+        let (kind,rows)={let owner=owner.lock().unwrap();(owner.kind,owner.chest_rows.load(Ordering::Relaxed))};let mut effects=MenuEffects{callback,source:None,prepared:None,known_has:None,air:air as u64,pending:false};
         if repeated!=0 {return super::menu::repeat_quick_move(&owner,kind,rows,index,air as u64,&mut effects).map_or(BAD,|_|0);}
         super::menu::quick_move(&owner,kind,rows,index,air as u64,&mut effects).map_or(BAD,|result|i64::from(result.is_some()))})
+}
+/// One broadcast's snapshots for menu rows `from..count`, written to `out[from..count]`.
+#[no_mangle] pub unsafe extern "C" fn mattmc_item_menu_digests(handle:i64,out:i64,from:i64,count:i64)->i64 {
+    guard(||{let (Some(owner),Ok(from),Ok(count))=(menu(handle),usize::try_from(from),usize::try_from(count)) else{return BAD};if out<=0||count>65536||from>count{return BAD;}
+        let out=std::slice::from_raw_parts_mut(out as *mut i64,count);out[from..].fill(-1);owner.lock().unwrap().digests(from,out);0})
 }
 #[no_mangle] pub extern "C" fn mattmc_item_menu_rows_address(handle:i64)->i64 {
     guard(||{let Some(owner)=menu(handle) else{return BAD};let pointer=&owner.lock().unwrap().chest_rows as *const std::sync::atomic::AtomicI32 as i64;pointer})
@@ -1269,7 +1339,7 @@ impl super::menu::QuickMoveEffects for MenuEffects {
 
 /// Caller fences the actual SlotLink lease, which retains its nested owners.
 #[no_mangle] pub unsafe extern "C" fn mattmc_item_slot_read_bounded(address:i64,air:i64,mode:i64)->i64 {
-    if address==0{return -1;}let link=&*(address as *const super::menu::SlotLink);link.try_read(air as u64,mode!=0)
+    if address==0||mode==2{return -1;}let link=&*(address as *const super::menu::SlotLink);link.try_read(air as u64,mode!=0)
 }
 
 /// Source is borrowed from the actual fenced Java stack owner. This is a regular
@@ -1431,7 +1501,7 @@ type InventoryEffect=unsafe extern "C" fn(i64,i64,i64,i64,i64)->i64;
     #[test] fn java_throw_before_adoption_retires_the_prepared_copy_and_after_adoption_keeps_it(){
         let defaults=defaults();let source=value(11,&defaults);
         for (callback,adopted) in [(throw_before_adoption as MenuCallback,false),(throw_after_adoption as MenuCallback,true)] {
-            let mut effects=MenuEffects{callback,source:None,prepared:None,known_has:None,air:0};
+            let mut effects=MenuEffects{callback,source:None,prepared:None,known_has:None,air:0,pending:false};
             assert!(effects.adopt_prepared(17,&source,11,0,0).is_err());
             let snapshot=last_thrown();assert_eq!(owners().lock().unwrap().contains_key(&snapshot),adopted);
             assert_eq!(effects.insert_prepared(&source,3,11),i64::MIN);
@@ -1445,5 +1515,48 @@ type InventoryEffect=unsafe extern "C" fn(i64,i64,i64,i64,i64)->i64;
         assert_eq!(THROWN.lock().unwrap().len(),thrown+1,"the add offered one prepared copy");
         let copy=last_thrown();assert_ne!(copy,0);assert!(!owners().lock().unwrap().contains_key(&copy));
         assert_eq!(added.scalars.count.load(Ordering::Relaxed),11,"nothing committed before the Java throw");
+    }
+    unsafe extern "C" fn record_then_throw(_:i64,_:i64,_:i64,_:i64,out:i64)->i64 {*(out as *mut i64).add(1)=1;i64::MIN}
+    unsafe extern "C" fn throw_before_record(_:i64,_:i64,_:i64,_:i64,_:i64)->i64 {i64::MIN}
+    // Op 18: a Java failure before the recipe is recorded undoes the native
+    // publication and source shrink exactly; once recorded, the publication
+    // stands (as an original commit before a failing effect would).
+    #[test] fn pending_publication_rolls_back_only_before_java_records_its_recipe(){
+        let defaults=defaults();let empty=value(0,&defaults);
+        for (callback,recorded) in [(throw_before_record as MenuCallback,false),(record_then_throw as MenuCallback,true)] {
+            let rows=Arc::new(BoundaryOwner::new(Slots::new(27,Entry{facade:1,stack:empty.clone()})));let destination=SlotsLease::Separate(rows.clone());
+            let source=value(11,&defaults);let mut effects=MenuEffects{callback,source:None,prepared:None,known_has:None,air:0,pending:true};
+            assert_eq!(effects.publish_pending(&destination,&source,4,11,false),i64::MIN);
+            let entry=rows.lock().unwrap().get(4).unwrap().clone();
+            if recorded {
+                assert!(super::super::slots::is_pending(entry.facade));assert_eq!(entry.stack.scalars.count.load(Ordering::Relaxed),11);
+                assert_eq!(source.scalars.count.load(Ordering::Relaxed),0);assert!(!Arc::ptr_eq(&entry.stack,&source));
+            } else {
+                assert_eq!(entry.facade,1);assert!(Arc::ptr_eq(&entry.stack,&empty));assert_eq!(source.scalars.count.load(Ordering::Relaxed),11);
+            }
+        }
+    }
+    // Materialization registers the row's own Arc only for the matching key and
+    // backing version; bind refuses a changed row, so a stale facade never binds.
+    #[test] fn materialize_and_bind_require_the_exact_pending_row_and_backing(){
+        let defaults=defaults();let empty=value(0,&defaults);
+        let rows=Arc::new(BoundaryOwner::new(Slots::new(3,Entry{facade:1,stack:empty.clone()})));
+        let handle=keep(Owner::Slots(rows.clone()));let key=super::super::slots::next_pending_key();let copy=value(5,&defaults);
+        rows.lock().unwrap().set(0,Entry{facade:key,stack:copy.clone()});
+        let version=copy.components.lock().unwrap().patch_version() as i64;
+        assert_eq!(mattmc_item_slots_materialize(handle,0,key,version+1),-3);
+        assert_eq!(mattmc_item_slots_materialize(handle,1,key,version),BAD);
+        assert_eq!(mattmc_item_slots_materialize(handle,0,key-1,version),BAD);
+        let facade=mattmc_item_slots_materialize(handle,0,key,version);assert!(facade>0);
+        assert!(Arc::ptr_eq(&stack(facade).unwrap(),&copy),"the facade owns the row's own stack, not a copy");
+        let other=keep(Owner::Stack(value(5,&defaults)));assert_eq!(mattmc_item_slots_bind(handle,0,key,other),0);
+        rows.lock().unwrap().set(1,Entry{facade:key,stack:copy.clone()});
+        assert_eq!(mattmc_item_slots_bind(handle,0,key,facade),1,"another row still carries the key");
+        assert_eq!(rows.lock().unwrap().get(0).unwrap().facade,facade);assert_eq!(mattmc_item_slots_bind(handle,0,key,facade),0);
+        assert_eq!(mattmc_item_slots_pending_copy(handle,1,key,version+1),-3);
+        copy.scalars.count.store(0,Ordering::Relaxed);assert_eq!(mattmc_item_slots_pending_copy(handle,1,key,version),-4);
+        copy.scalars.count.store(5,Ordering::Relaxed);let duplicate=mattmc_item_slots_pending_copy(handle,1,key,version);
+        assert!(duplicate>0&&!Arc::ptr_eq(&stack(duplicate).unwrap(),&copy));assert!(super::super::slots::is_pending(rows.lock().unwrap().get(1).unwrap().facade));
+        for owner in [facade,other,duplicate,handle]{owners().lock().unwrap().remove(&owner);}
     }
 }

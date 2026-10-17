@@ -24,6 +24,43 @@ is `build/item-state-pre-646986043`, native `ae6ed8f6…`, with the preserved me
 inventory, r5, upstream-lighting and enchantment class overlays recorded in each
 receipt. References and original workload sources are unchanged.
 
+## S0034 pending contents and native broadcast screen
+
+**October 16–17, 2026: short regression screen under
+[policy 317](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18984771).**
+These results record temporary debt. They are not a Frozen acceptance, which
+moves to the completed items/inventories milestone.
+
+- **Pre-change Current:** published `11346d05`, sealed as
+  `build/item-state-pre-s34-11346` (all 13,892 classes byte-identical to that
+  build, release native `17be1be3…`, jar first in `classpath.txt`).
+- **Origins:** every run uses `--complete-pre --origin-guard`. The guard caught
+  one contaminated attempt (`build/s34-broadcast2`): the workload probed a
+  Current-only class on the pre side. That run is not used.
+- **Broadcast workload:** `--workload broadcast` (`BroadcastTimingReference`) times one
+  `broadcastChanges` of an open stock chest menu with a read-only recording
+  synchronizer/listener (`tick_idle`), or a quick move plus the broadcast that
+  ships it. One JVM per side, five samples each.
+
+| Workload (`build/s34-broadcast3`) | Frozen ns | Pre ns | Current ns | C/pre | Java B/op F/P/C |
+|---|---:|---:|---:|---:|---|
+| tick_idle | 1004 | 6429 | 3261 | 0.51 | 2520/3256/520 |
+| tick_quick_move_empty | 1509 | 7906 | 8647 | 1.09 | 2808/3512/1240 |
+| tick_quick_move_one | 2208 | 84476 | 14035 | 0.17 | 2864/23145/1560 |
+
+The first screen (`build/s34-broadcast1`) measured `tick_quick_move_empty` at
+1.54× pre. Each processed slot re-read every slot snapshot, cloning two Arcs
+per row. Snapshots are now computed in place, and only the remaining slots
+are refreshed, only after an observer callback ran.
+
+The unchanged 25-row inventory workload (`build/s34-cost1`, one run) puts
+`quick_move_empty`/`reverse_empty` at 0.84/0.82× pre, with Java bytes
+468→336/464→320. The other rows are within single-run noise. Its consumption step reads every chest slot
+outside the timer, so it excludes materialization.
+
+Debt: every row remains above Frozen (idle broadcast 3.25×, changed tick
+5.73×). Native allocation and process memory are not measured.
+
 ## S0030 natively prepared copies
 
 **S0030/r2, October 16, 2026: temporary cost exception accepted for publication.**

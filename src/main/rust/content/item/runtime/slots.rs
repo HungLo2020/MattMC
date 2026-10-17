@@ -36,6 +36,21 @@ impl<T> Drop for BoundaryGuard<'_,T> {fn drop(&mut self){self.owner.gate.store(0
 
 #[derive(Clone)]
 pub struct Entry { pub facade: i64, pub stack: Arc<Stack> }
+
+/// Natively published contents that no Java facade has observed yet carry a
+/// pending key instead of a facade token. Keys never collide with registry
+/// handles (positive), 0 (null), -1 (absent), BAD (-2) or busy results.
+pub const PENDING_BASE:i64=-(1i64<<40);
+pub fn is_pending(token:i64)->bool{token<=PENDING_BASE}
+static NEXT_PENDING:std::sync::atomic::AtomicI64=std::sync::atomic::AtomicI64::new(PENDING_BASE);
+pub fn next_pending_key()->i64{NEXT_PENDING.fetch_sub(1,std::sync::atomic::Ordering::Relaxed)}
+/// Witnesses (`mattmc_item_transfer_counter` 5..7): pending publications,
+/// facades later materialized for them, and publications rolled back.
+pub static PENDING_PUBLISHED:std::sync::atomic::AtomicU64=std::sync::atomic::AtomicU64::new(0);
+pub static PENDING_MATERIALIZED:std::sync::atomic::AtomicU64=std::sync::atomic::AtomicU64::new(0);
+pub static PENDING_ROLLED_BACK:std::sync::atomic::AtomicU64=std::sync::atomic::AtomicU64::new(0);
+/// Broadcast copies built from pending contents without materializing them (counter 8).
+pub static PENDING_BROADCAST_COPIES:std::sync::atomic::AtomicU64=std::sync::atomic::AtomicU64::new(0);
 pub struct Slots { entries: Vec<Entry> }
 impl Slots {
     pub fn fill(&mut self,empty:Entry) {self.entries.fill(empty);}
@@ -70,6 +85,21 @@ impl Slots {
 // phase:0 evaluate stackability,1 merge,2 empty. Index is the next original read point.
 fn transfer_result(action:u64,index:usize,phase:u64,amount:i32)->i64 {
     (action | ((index as u64)<<3) | (phase<<9) | ((amount as u32 as u64)<<32)) as i64
+}
+/// Exact broadcast snapshot of contents whose only components are their
+/// prototype's: item identity, prototype identity and raw count packed
+/// losslessly (21 bits each; EMPTY's identity is 0), or -1 when the contents
+/// are not eligible (components patched, or a field out of range). Equal
+/// snapshots mean equal ItemStack.matches/remote-hash content.
+pub fn broadcast_digest(stack:&Stack)->i64 {
+    if stack.empty_identity {return 0;}
+    const LIMIT:u64=1<<21;
+    let item=stack.scalars.item;let count=stack.scalars.count.load(std::sync::atomic::Ordering::Relaxed);
+    // Never-patched contents (admission markers) need no component lock.
+    let prototype=if stack.admission.valid(){stack.admission.prototype}else{
+        let Ok(overlay)=stack.components.try_lock() else{return -1};if overlay.patch_len()!=0{return -1;}overlay.prototype};
+    if item==0||item>=LIMIT||prototype>=LIMIT||count<0||count as u64>=LIMIT {return -1;}
+    ((item<<42)|(prototype<<21)|count as u64) as i64
 }
 pub fn visible_count(stack:&Stack,air:u64)->i32 {
     if stack.empty_identity || stack.scalars.item==air {0} else {stack.scalars.count.load(std::sync::atomic::Ordering::Relaxed).max(0)}
@@ -116,7 +146,7 @@ pub fn transfer_step_inventory(slots:&Slots,source:&Stack,air:u64,phase:u64,inde
     transfer_step_inner(slots,source,air,phase,index,stats,None,true)
 }
 /// Original reverse menu62..27 is inventory8..0 followed by35..9.
-fn target_index(index:usize,inventory_reverse:bool)->usize {
+pub fn target_index(index:usize,inventory_reverse:bool)->usize {
     if !inventory_reverse {index}else if index<9 {8-index}else{44-index}
 }
 pub(super) fn transfer_payload_step(slots:&Slots,source:&Stack,air:u64,mut phase:u64,mut index:usize,stats:&mut TransferStats,inventory_reverse:bool,roles:&super::components::Roles)->i64 {

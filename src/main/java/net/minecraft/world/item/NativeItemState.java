@@ -73,6 +73,7 @@ public final class NativeItemState {
         private Throwable failure;
         public abstract long effect(int operation,int first,int second,long third,long out);
         protected static boolean knownEndpoint(SlotLink link){return link!=null&&(link.chest==null||link.chest.nativeSlotsForTransfer()!=null);}
+        public static boolean broadcastEndpoint(SlotLink link){return knownEndpoint(link);}
         protected static void endpoint(long out,SlotLink link){
             if(link!=null&&link.chest!=null&&link.chest.nativeSlotsForTransfer()==null)link=null;
             try{VIEW_LONG.set(SCALAR_RAW,out,link==null?0:link.address);}
@@ -119,7 +120,7 @@ public final class NativeItemState {
     private static final ThreadLocal<InventoryVisitEffects> INVENTORY_VISIT_EFFECTS = new ThreadLocal<>();
     private static long inventoryVisitEffect(long action,long index,long facade) {
         var effects=INVENTORY_VISIT_EFFECTS.get();if(effects==null)return Long.MIN_VALUE;
-        try {return effects.effect(action,Math.toIntExact(index),facade==0?null:effects.owner.resolveFacade(facade));}
+        try {return effects.effect(action,Math.toIntExact(index),facade==0?null:effects.owner.resolveFacade(Math.toIntExact(index),facade));}
         catch(Throwable failure){effects.failure=failure;return Long.MIN_VALUE;}
     }
     private static final class InventoryVisitCallback {
@@ -166,6 +167,13 @@ public final class NativeItemState {
     }
     private static final MethodHandle SLOTS_NEW = call("slots_create", 2);
     private static final MethodHandle SLOTS_GET = call("slots_get", 2);
+    private static final MethodHandle SLOTS_MATERIALIZE = call("slots_materialize", 4);
+    private static final MethodHandle SLOTS_BIND = call("slots_bind", 4);
+    private static final MethodHandle SLOTS_PENDING_COPY = call("slots_pending_copy", 4);
+    private static final MethodHandle MENU_DIGESTS = call("menu_digests", 4);
+    /** Natively published contents not yet observed by Java carry a pending key (slots.rs PENDING_BASE). */
+    static final long PENDING_BASE = -(1L << 40);
+    static boolean isPending(long token) { return token <= PENDING_BASE; }
     private static final MethodHandle SLOTS_PUBLISH=call("slots_publish_leased",5);
     private static final MethodHandle SLOTS_CLEAR = call("slots_clear", 2);
     private static final MethodHandle TRANSFER_STEP=call("transfer_step",5),TRANSFER_PUBLISH=call("transfer_publish_leased",7);
@@ -198,6 +206,16 @@ public final class NativeItemState {
          */
         public long insertPrepared(long index, long amount, long handle, long address, long adopted) {
             throw new IllegalStateException("No prepared native insertion for this transfer");
+        }
+        /** Whether the native transfer may publish empty-slot copies without a Java facade (op 18). */
+        public boolean pendingInsertions() { return false; }
+        /**
+         * The native transfer already published the copy under {@code key}: record
+         * its materialization recipe (setting {@code adopted}), then run the
+         * original insertion effects.
+         */
+        public long publishedPending(long index, long amount, long key, long retired, long adopted) {
+            throw new IllegalStateException("No pending native insertion for this transfer");
         }
     }
     /** {@code source}'s copy prepared by a native operation, adopted as its owner. */
@@ -536,6 +554,8 @@ public final class NativeItemState {
     private static long c1(MethodHandle h, long a) { try { return checked((long)h.invokeExact(a)); } catch (Throwable e) { throw failed(e); } }
     private static long c2(MethodHandle h, long a, long b) { try { return checked((long)h.invokeExact(a, b)); } catch (Throwable e) { throw failed(e); } }
     private static long c3(MethodHandle h, long a, long b, long c) { try { return checked((long)h.invokeExact(a, b, c)); } catch (Throwable e) { throw failed(e); } }
+    private static long raw2(MethodHandle h, long a, long b) { try { return (long)h.invokeExact(a, b); } catch (Throwable e) { throw failed(e); } }
+    private static long raw4(MethodHandle h, long a, long b, long c, long d) { try { return (long)h.invokeExact(a, b, c, d); } catch (Throwable e) { throw failed(e); } }
     private static long checked(long result) {
         if (result < -1) throw new IllegalStateException("Native item owner rejected call: " + result);
         return result;
@@ -949,6 +969,14 @@ public final class NativeItemState {
         public static Menu create(){return create(1);}
         public static Menu create(int kind){return adopt(MENU_NEW,(handle,release)->new Menu(handle,release,ItemStack.EMPTY),stackOwner(ItemStack.EMPTY.state).handle,kind);}
         public int chestRows(){try{return (int)COUNT.getOpaque(SCALAR_RAW,this.rowsAddress);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
+        private MemorySegment digests;
+        /** One native call: the broadcast snapshot (SlotLink#broadcastDigest) of rows {@code from..} into {@code into}, -1 when unlinked. */
+        public synchronized long[] broadcastDigests(long[] into,int from){
+            int count=into.length;
+            if(this.digests==null||this.digests.byteSize()<count*8L)this.digests=Arena.ofAuto().allocate(Math.max(64,count)*8L,8);
+            try{c4(MENU_DIGESTS,this.handle,this.digests.address(),from,count);MemorySegment.copy(this.digests,ValueLayout.JAVA_LONG,from*8L,into,from,count-from);return into;}
+            finally{java.lang.ref.Reference.reachabilityFence(this);}
+        }
         public void chestRows(int rows){try{COUNT.setOpaque(SCALAR_RAW,this.rowsAddress,rows);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
         public boolean action(int index,boolean repeated,MenuActionEffects effects){
             var previous=MENU_ACTION_EFFECTS.get();long result;
@@ -1068,6 +1096,22 @@ public final class NativeItemState {
         public int index(){try{return (int)COUNT.getOpaque(SCALAR_RAW,address);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
         public ItemStack stack(){return cell==null?source.readLinkedStack(this):chest.nativeSlotsForTransfer()==null?chest.getItem(index()):cell.stack(this);}
         public int presence(){return cell==null?source.linkedPresence(this):chest.nativeSlotsForTransfer()==null?-1:cell.presence(this);}
+        /** Exact native snapshot of the linked contents for a broadcast comparison (slots.rs broadcast_digest), or -1. */
+        public long broadcastDigest(){
+            if(cell!=null&&chest.nativeSlotsForTransfer()==null)return -1;
+            try{long value=(long)SLOT_READ_REGULAR.invokeExact(this.handle,TransferIds.AIR,2L);return value<0?-1:value;}
+            catch(Throwable failure){throw failed(failure);}
+            finally{java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        /**
+         * For pending linked contents, a copy built natively for a broadcast
+         * comparison and packet, leaving the slot itself unobserved; otherwise
+         * null, and the caller performs the original read.
+         */
+        public ItemStack pendingBroadcastCopy(){
+            Slots owner=cell==null?source:chest.nativeSlotsForTransfer() instanceof NativeItemSlots rows?rows.actualOwner():null;
+            return owner==null?null:owner.pendingCopy(this.index());
+        }
         ScalarLeaseForTest leaseForTest(){try{return adopt(SLOT_RETAIN,(handle,ownership)->new ScalarLeaseForTest(handle,leaseView(c1(SLOT_ADDRESS,handle),4,ownership).asReadOnly()),this.handle);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
     }
     public static SlotLink bindStockSlot(net.minecraft.world.Container container,int index){
@@ -1089,6 +1133,8 @@ public final class NativeItemState {
         private final int capacity;
         private final Cleaner.Cleanable cleanable;
         private it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<ItemStack> roots;
+        /** Recipes of natively published contents that no Java code has observed yet. */
+        private it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Pending> pending=new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         private Slots(long handle, int size, ItemStack empty, Release ownership) { this(handle,size,empty,ownership,false); }
         private Slots(long handle, int size, ItemStack empty, Release ownership, boolean inventory) {
             this.handle = handle; this.ownerAddress = c1(SLOTS_OWNER_ADDRESS, handle); this.capacity = size;
@@ -1175,6 +1221,53 @@ public final class NativeItemState {
             return Math.toIntExact(result);
         }
         private synchronized ItemStack resolveFacade(long token) {return Objects.requireNonNull(this.roots.get(token),"Missing inventory facade binding");}
+        private synchronized ItemStack resolveFacade(int index,long token) {return isPending(token)?this.materialize(index,token):this.resolveFacade(token);}
+        /** Records the recipe for contents op 18 published under {@code key}; sets {@code adopted} once recorded. */
+        void recordPending(long key,ItemStack source,long retired,long adopted){
+            Pending recipe=new Pending(stackOwner(source.state));
+            synchronized(this){this.pending.put(key,recipe);VIEW_LONG.set(SCALAR_RAW,adopted,1L);if(retired!=0)this.retire(retired);}
+        }
+        private void retire(long token){if(isPending(token))this.pending.remove(token);else this.roots.remove(token);}
+        int pendingForTest(){synchronized(this){return this.pending.size();}}
+        synchronized ItemStack pendingCopy(int index){
+            if(index<0||index>=this.capacity)return null;
+            long key=this.facade(index);if(!isPending(key))return null;
+            Pending recipe=Objects.requireNonNull(this.pending.get(key),"Native slot lost its pending contents");
+            long handle=raw4(SLOTS_PENDING_COPY,this.handle,index,key,recipe.roots.version);
+            if(handle==-3)throw new IllegalStateException("Native pending contents no longer match their component roots");
+            if(handle<=0)return null;
+            try{return ItemStack.materializeNative(net.minecraft.core.component.PatchedDataComponentMap.adoptPendingStack(recipe,handle,c1(STACK_ADDRESS,handle)));}
+            catch(Throwable failure){c1(RELEASE,handle);throw failure;}
+        }
+        /**
+         * The first genuine observation of pending contents: build its one
+         * canonical facade around the slot's own stack and bind it. A row that
+         * changed meanwhile is re-read; the unbound facade releases its handle.
+         */
+        private synchronized ItemStack materialize(int index,long key){
+            for(;;){
+                Pending recipe=Objects.requireNonNull(this.pending.get(key),"Native slot lost its pending contents");
+                long handle=raw4(SLOTS_MATERIALIZE,this.handle,index,key,recipe.roots.version);
+                if(handle==-3)throw new IllegalStateException("Native pending contents no longer match their component roots");
+                if(handle<=0){
+                    long token=this.facade(index);
+                    if(token==key)throw new IllegalStateException("Native pending contents could not be materialized: "+handle);
+                    if(!isPending(token))return Objects.requireNonNull(this.roots.get(token),"Native slot lost its facade root");
+                    key=token;continue;
+                }
+                ItemStack stack;
+                try{stack=ItemStack.materializeNative(net.minecraft.core.component.PatchedDataComponentMap.adoptPendingStack(recipe,handle,c1(STACK_ADDRESS,handle)));}
+                catch(Throwable failure){c1(RELEASE,handle);throw failure;}
+                ItemStack added=this.roots.get(handle);if(added!=null)throw new IllegalStateException("Native stack facade identity collision");
+                this.roots.put(handle,stack);long bound;
+                try{bound=checked(raw4(SLOTS_BIND,this.handle,index,key,handle));}
+                catch(Throwable failure){this.roots.remove(handle);throw failure;}
+                finally{java.lang.ref.Reference.reachabilityFence(stack);java.lang.ref.Reference.reachabilityFence(this);}
+                if(bound==0){this.roots.remove(handle);continue;}
+                if((bound&2)!=0)this.pending.remove(key);
+                return stack;
+            }
+        }
         private long readLink(SlotLink link,int mode){
             boolean held=false;
             try {
@@ -1184,7 +1277,8 @@ public final class NativeItemState {
             finally{if(held)VIEW_LONG.setRelease(SCALAR_RAW,this.ownerAddress,0L);java.lang.ref.Reference.reachabilityFence(link);java.lang.ref.Reference.reachabilityFence(this);}
         }
         private long readCell(SlotLink link,int mode){
-            try{long value=(long)SLOT_READ_BOUNDED.invokeExact(link.address,TransferIds.AIR,(long)mode);return value>=0?value:c3(SLOT_READ_REGULAR,link.handle,TransferIds.AIR,mode);}
+            try{long value=(long)SLOT_READ_BOUNDED.invokeExact(link.address,TransferIds.AIR,(long)mode);if(value>=0||isPending(value))return value;
+                value=(long)SLOT_READ_REGULAR.invokeExact(link.handle,TransferIds.AIR,(long)mode);if(value<-1&&!isPending(value))throw new IllegalStateException("Native item owner rejected call: "+value);return value;}
             catch(Throwable failure){throw failed(failure);}
             finally{java.lang.ref.Reference.reachabilityFence(link);java.lang.ref.Reference.reachabilityFence(this);}
         }
@@ -1202,7 +1296,8 @@ public final class NativeItemState {
             long empty=stackOwner(ItemStack.EMPTY.state).handle;
             var staged=new OpaqueBindings<ItemStack>(this.capacity+1);
             if(this.capacity!=0)staged.put(empty,ItemStack.EMPTY);
-            try {c2(SLOTS_CLEAR,this.handle,empty);this.roots=staged;}
+            var stagedPending=new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Pending>();
+            try {c2(SLOTS_CLEAR,this.handle,empty);this.roots=staged;this.pending=stagedPending;}
             finally {java.lang.ref.Reference.reachabilityFence(this);}
         }
         boolean visitInventory(ItemStack source,int mode,int limit,InventoryVisitEffects effects) {
@@ -1225,12 +1320,14 @@ public final class NativeItemState {
         }
         @Override public int size() { return this.capacity; }
         private long facade(int index){
-            try{long value=(long)SLOTS_FACADE_BOUNDED.invokeExact(this.ownerAddress,(long)index);return value>=0?value:c2(SLOTS_GET,this.handle,index);}
+            try{long value=(long)SLOTS_FACADE_BOUNDED.invokeExact(this.ownerAddress,(long)index);if(value>=0||isPending(value))return value;
+                value=raw2(SLOTS_GET,this.handle,index);if(value<-1&&!isPending(value))throw new IllegalStateException("Native item owner rejected call: "+value);return value;}
             catch(Throwable failure){throw failed(failure);}
             finally{java.lang.ref.Reference.reachabilityFence(this);}
         }
         @Override public synchronized ItemStack get(int index) {
             this.checkIndex(index); long token = this.facade(index);
+            if(isPending(token))return this.materialize(index,token);
             ItemStack root=this.roots.get(token);
             if(root==null)throw new IllegalStateException("Native slot lost its facade root: "+token);
             return root;
@@ -1280,24 +1377,28 @@ public final class NativeItemState {
         }
         synchronized void commitTransferInsert(ItemStack source,int index,ItemStack inserted,int amount){
             this.checkIndex(index);long next=stackOwner(inserted.state).handle,old=this.facade(index);
-            Objects.requireNonNull(this.roots.get(old),"Native slot lost its existing facade root");
+            if(!isPending(old))Objects.requireNonNull(this.roots.get(old),"Native slot lost its existing facade root");
             ItemStack added=this.roots.get(next);if(added!=null&&added!=inserted)throw new IllegalStateException("Native stack facade identity collision");
             this.roots.put(next,inserted);long retired;
             try{retired=checked((long)TRANSFER_PUBLISH.invokeExact(this.ownerAddress,stackOwner(source.state).checkBound(),(long)index,stackOwner(inserted.state).checkBound(),next,(long)amount,old));}
             catch(Throwable failure){if(added==null)this.roots.remove(next);throw failed(failure);}
             finally{java.lang.ref.Reference.reachabilityFence(source);java.lang.ref.Reference.reachabilityFence(inserted);java.lang.ref.Reference.reachabilityFence(this);}
-            if(retired!=0)this.roots.remove(old);
+            if(retired!=0)this.retire(old);
         }
-        @Override public synchronized ItemStack set(int index,ItemStack value){
+        @Override public synchronized ItemStack set(int index,ItemStack value){return this.set(index,value,true);}
+        /** {@link #set} for a caller that discards the previous contents: pending contents are retired unobserved. */
+        synchronized void replace(int index,ItemStack value){this.set(index,value,false);}
+        private ItemStack set(int index,ItemStack value,boolean observed){
             this.checkIndex(index);long next=stackOwner(value.state).handle,old=this.facade(index);
-            ItemStack previous=Objects.requireNonNull(this.roots.get(old),"Native slot lost its existing facade root");
+            if(isPending(old)&&observed){this.materialize(index,old);old=this.facade(index);}
+            ItemStack previous=isPending(old)?null:Objects.requireNonNull(this.roots.get(old),"Native slot lost its existing facade root");
             if(old==next)return previous;
             ItemStack added=this.roots.get(next);if(added!=null&&added!=value)throw new IllegalStateException("Native stack facade identity collision");
             this.roots.put(next,value);long retired;
             try{retired=checked((long)SLOTS_PUBLISH.invokeExact(this.ownerAddress,(long)index,stackOwner(value.state).checkBound(),next,old));}
             catch(Throwable failure){if(added==null)this.roots.remove(next);throw failed(failure);}
             finally{java.lang.ref.Reference.reachabilityFence(value);java.lang.ref.Reference.reachabilityFence(this);}
-            if(retired!=0)this.roots.remove(old);return previous;
+            if(retired!=0)this.retire(old);return previous;
         }
     }
 
@@ -1425,6 +1526,19 @@ public final class NativeItemState {
         }
     }
 
+    /**
+     * What a natively published copy needs to become its canonical facade: the
+     * source's component roots, prototype and item at publication, exactly what
+     * adoption captured. Materialization checks {@code roots.version} against
+     * the copy's actual backing before using them.
+     */
+    public static final class Pending {
+        final Roots roots; final DataComponentMap prototype; final Item item;
+        Pending(Overlay source) {
+            synchronized(source){synchronized(source.roots){this.roots=source.roots;this.prototype=source.prototype;this.item=source.itemAnchor;}}
+        }
+    }
+
     public abstract static non-sealed class Overlay extends Owner implements Stack {
         protected final DataComponentMap prototype;
         /** Register handle-only rollback before native acquisition on the actual facade. */
@@ -1471,6 +1585,13 @@ public final class NativeItemState {
             }}}
             catch(Throwable failure){this.release.run();if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;throw failed(failure);}
             finally{java.lang.ref.Reference.reachabilityFence(source);java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        /** The canonical facade for natively published contents ({@link Pending}); {@code handle} registers the slot's own stack. */
+        protected Overlay(Pending pending,long handle,long address) {
+            super();this.prototype=pending.prototype;
+            try{synchronized(pending.roots){this.acquired(handle);this.roots=pending.roots;this.bindAddress(pending.item,address);}}
+            catch(Throwable failure){this.release.run();if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;throw failed(failure);}
+            finally{java.lang.ref.Reference.reachabilityFence(this);}
         }
         private void bindDefaults(){
             DefaultMap defaults=DataComponentMap.nativeDefaults(this.prototype);

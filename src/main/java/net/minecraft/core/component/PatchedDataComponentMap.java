@@ -24,6 +24,8 @@ public final class PatchedDataComponentMap extends NativeItemState.Overlay imple
 	public static PatchedDataComponentMap copyNativeStack(NativeItemState.Overlay source){return new PatchedDataComponentMap(source,true);}
 	/** A copy of {@code source} a native operation already prepared, adopted as its owner. */
 	public static PatchedDataComponentMap adoptPreparedStack(NativeItemState.Overlay source,long handle,long address,long adopted){return new PatchedDataComponentMap(source,handle,address,adopted);}
+	private PatchedDataComponentMap(NativeItemState.Pending pending,long handle,long address) {super(pending,handle,address);}
+	public static PatchedDataComponentMap adoptPendingStack(NativeItemState.Pending pending,long handle,long address){return new PatchedDataComponentMap(pending,handle,address);}
 	public static PatchedDataComponentMap copyNativeComponents(NativeItemState.Overlay source){return new PatchedDataComponentMap(source,false);}
 	public NativeItemState.Overlay nativeState(){return this;}
 
