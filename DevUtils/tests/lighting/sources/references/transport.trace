@@ -1,0 +1,34 @@
+SKY_TRANSPORT count result=4 error=none marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT to result=null error=none marker=false raw=[11, 22, 33, 44] memory=[0, 11, 22, 33, 44, 0, 0, 0] events=[raw]
+SKY_TRANSPORT from result=null error=none marker=false raw=[100, 101, 102, 103] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT snapshot result=[11, 22, 33, 44] error=none marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT restore-short result=null error=none marker=false raw=[9, 8, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT restore-empty result=null error=none marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT restore-long result=null error=java.lang.ArrayIndexOutOfBoundsException marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT restore-null result=null error=java.lang.NullPointerException marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT matches-equal result=true error=none marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT matches-short result=false error=none marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT matches-null result=false error=none marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT to-readonly result=null error=java.lang.IllegalArgumentException marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT to-bounds result=null error=java.lang.IndexOutOfBoundsException marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT from-bounds result=null error=java.lang.IndexOutOfBoundsException marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT to-unaligned result=null error=java.lang.IllegalArgumentException marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT from-unaligned result=null error=java.lang.IllegalArgumentException marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT to-null result=null error=java.lang.NullPointerException marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT from-null result=null error=java.lang.NullPointerException marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT raw-null result=null error=java.lang.NullPointerException marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT raw-throw result=null error=java.io.IOException marker=true raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw]
+SKY_TRANSPORT raw-reenter result=[7, 6, 33, 44] error=none marker=false raw=[7, 6, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[raw, nested:begin, raw, nested:end]
+SKY_TRANSPORT eligibility-skip events=[bits, skip]
+SKY_TRANSPORT eligibility-count result=4 error=none marker=false raw=[11, 22, 33, 44] memory=[0, 100, 101, 102, 103, 0, 0, 0] events=[bits, raw]
+SKY_TRANSPORT canonical count=26 lowest=8 max=8 raw=[9, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 109802048057794950, 6544712070] matchesNull=false
+SKY_TRANSPORT canonical-to-readonly error=java.lang.IllegalArgumentException unchanged=true
+SKY_TRANSPORT canonical-to-bounds error=java.lang.IndexOutOfBoundsException unchanged=true
+SKY_TRANSPORT canonical-from-bounds error=java.lang.IndexOutOfBoundsException unchanged=true
+SKY_TRANSPORT canonical-to-unaligned error=java.lang.IllegalArgumentException unchanged=true
+SKY_TRANSPORT canonical-from-unaligned error=java.lang.IllegalArgumentException unchanged=true
+SKY_TRANSPORT canonical-to-null error=java.lang.NullPointerException unchanged=true
+SKY_TRANSPORT canonical-from-null error=java.lang.NullPointerException unchanged=true
+SKY_TRANSPORT canonical-restore-long error=java.lang.ArrayIndexOutOfBoundsException unchanged=true
+SKY_TRANSPORT canonical-restore-null error=java.lang.NullPointerException unchanged=true
+SKY_TRANSPORT canonical-restore-empty error=none unchanged=true

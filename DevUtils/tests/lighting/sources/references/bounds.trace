@@ -1,0 +1,20 @@
+SKY_BOUNDS case0 low=0 high=15 calls=[min, max] bits=5 words=22 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case1 low=0 high=31 calls=[min, max] bits=6 words=26 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case2 low=-64 high=319 calls=[min, max] bits=9 words=37 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case3 low=-2048 high=2047 calls=[min, max] bits=13 words=64 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case4 low=0 high=-1 calls=[min, max] bits=1 words=4 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case5 low=0 high=-2 calls=[min, max] bits=-1 words=-1 visible=none original=false type=java.lang.IllegalArgumentException message=The value 0 is not in the specified inclusive range of 1 to 32
+SKY_BOUNDS case6 low=0 high=-3 calls=[min, max] bits=-1 words=-1 visible=none original=false type=java.lang.IllegalArgumentException message=The value 0 is not in the specified inclusive range of 1 to 32
+SKY_BOUNDS case7 low=0 high=-4 calls=[min, max] bits=-1 words=-1 visible=none original=false type=java.lang.IllegalArgumentException message=The value 0 is not in the specified inclusive range of 1 to 32
+SKY_BOUNDS case8 low=0 high=2147483647 calls=[min, max] bits=-1 words=-1 visible=none original=false type=java.lang.IllegalArgumentException message=The value 0 is not in the specified inclusive range of 1 to 32
+SKY_BOUNDS case9 low=0 high=2147483646 calls=[min, max] bits=-1 words=-1 visible=none original=false type=java.lang.IllegalArgumentException message=The value 0 is not in the specified inclusive range of 1 to 32
+SKY_BOUNDS case10 low=0 high=2147483645 calls=[min, max] bits=31 words=128 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case11 low=-2147483648 high=2147483647 calls=[min, max] bits=1 words=4 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case12 low=2147483647 high=-2147483648 calls=[min, max] bits=2 words=8 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case13 low=-2147483648 high=-2147483648 calls=[min, max] bits=2 words=8 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case14 low=2147483647 high=2147483647 calls=[min, max] bits=2 words=8 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case15 low=-1 high=-1 calls=[min, max] bits=2 words=8 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case16 low=1 high=0 calls=[min, max] bits=1 words=4 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS case17 low=17 high=16 calls=[min, max] bits=1 words=4 visible=-2147483648:-2147483648 original=false type=none message=none
+SKY_BOUNDS throw-min low=0 high=31 calls=[min] bits=-1 words=-1 visible=none original=true type=java.io.IOException message=original height bounds effect
+SKY_BOUNDS throw-max low=0 high=31 calls=[min, max] bits=-1 words=-1 visible=none original=true type=java.io.IOException message=original height bounds effect

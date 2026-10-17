@@ -61,8 +61,15 @@ python3 DevUtils/tests/lighting/sources/VerifyNativeSkySources.py
 
 The portable driver requires Linux `/proc` to verify the mapped native library.
 It builds matching release inputs and compares public effects with checked-in
-original Frozen traces. MattMC word-transport extensions use the complete
-published `5e933129855fd5b82198204a1f093cb541127e04` literal-operation reference.
+original Frozen traces. All seven required `.trace` inputs are tracked explicitly;
+the repository's general trace ignore rule must not omit these fixtures.
+[`references/origins.json`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/lighting/sources/references/origins.json)
+records their original receipt, trace hashes and runtime provenance. MattMC word
+transport uses the literal Source implementation at
+`5e933129855fd5b82198204a1f093cb541127e04`, unchanged in the actually executed
+retained `3eeb5f02` plus S31 runtime (`ed529d88` native). The old run label
+`published5e` identifies that Source implementation, not a whole-application
+`5e` build. The fixture repair preserves those original bytes and labels.
 It also requires the real native bulk route. A second overlay makes VM section
 word export and cursor fallback fail, requiring the primary-owner/air route on
 the same 50 original Frozen fixtures. A Current-only scope observer compares the
