@@ -1583,11 +1583,15 @@ unsafe fn publish_pending_add(owner:&super::inventory::Inventory,source:&super::
         let wanted=super::slots::visible_count(source,air);
         let moved=wanted.min(1);if moved<=0{return None;}(moved,wanted-moved)
     } else {(held,0)};
+    // An occupied destination (a damaged add at an explicit index) keeps the
+    // prepared-copy path; decide that before copying the stack.
+    let empty=|rows:&super::slots::Slots|rows.get(index as usize).is_some_and(|entry|super::slots::visible_count(&entry.stack,air)==0);
+    if !empty(&owner.slots.lock().unwrap()){return None;}
     let copy=copy_stack(source,count);copy.scalars.pop_time.store(5,Ordering::Relaxed);
     let key=super::slots::next_pending_key();
     let (old,retired)={
         let mut rows=owner.slots.lock().unwrap();
-        if !rows.get(index as usize).is_some_and(|entry|super::slots::visible_count(&entry.stack,air)==0){return None;}
+        if !empty(&rows){return None;}
         let old=rows.set(index as usize,super::slots::Entry{facade:key,stack:copy})?;let retired=rows.entries_facade_index(old.facade)<0;(old,retired)
     };
     if action==4{source.scalars.count.store(0,Ordering::Relaxed);}

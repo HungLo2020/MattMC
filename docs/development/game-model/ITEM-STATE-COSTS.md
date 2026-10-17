@@ -78,13 +78,38 @@ because some rows had fewer than three quiet samples.
 In the inventory workload (`build/s34-v3/inventory`), pre itself moved by up to
 ±30% per row between this run and `build/s34-cost1`. Only one row changed
 consistently: **`add_damaged`**, with pre at 828/829 ns and Current going from 881 to
-1076 ns (1.30× pre, Java bytes unchanged at 228). Its timer covers only
-`Inventory.add`, so the cost belongs to the pending damaged-copy publication
-(action 36), not to materialization. `add_empty` went from 1126 to 718 ns
-(0.71× pre, Java bytes 228→88).
+1076 ns (1.30× pre, Java bytes unchanged at 228). `add_empty` went from 1126 to
+718 ns (0.71× pre, Java bytes 228→88).
 
-Debt: `add_damaged` +30% versus pre (19× Frozen) is attributed to action 36 but
-not yet broken down. The broadcast rows remain 2.4×/5.1×/1.08× Frozen.
+The published 8200f037 text first blamed the `add_damaged` cost on pending damaged
+publication (action 36). That was wrong. A counter probe showed the workload adds
+into an occupied slot, so it never publishes pending contents (prepared +1,
+pending +0). `publish_pending_add` copied the stack before checking that the row
+was empty, then fell back to the prepared path, which copied it again. The row is
+now checked before copying. After that fix (`build/s34-v5/inventory`),
+`add_damaged` is 883 ns (1.07× pre), and every row is 0.67–1.07× pre.
+
+Debt: the broadcast rows remain 2.4×/5.1×/1.08× Frozen, and the inventory rows
+remain above Frozen (for example, `add_empty` 3.3×, `clicked_forward` 2.1×).
+
+### Pending-content resources
+
+`VerifyItemResources.py --workload pending` (`build/s34-v5/resource-pending2`)
+reuses the S27 scoped libc-heap observer. It covers each pending producer:
+quick move, quick move then materialized, empty-slot pickup and damaged pickup.
+
+- Each publication allocates 320 B (quick move) or 160 B (pickup) of tagged
+  Rust heap. That memory stays live while the row exists and returns to 0 B
+  when the row is emptied with its owner still reachable. The pending recipe
+  map is empty after retirement.
+- A held pending row keeps 336 B until it is replaced, then 0 B. This shows
+  the accounting can see retention.
+- A churn of 12 rounds × 4000 cycles of all four producers (192,000 pending
+  publications) levels off: RSS after forced GC is about 816 MiB in rounds 7–11
+  (−Xmx1g, observer preloaded), and the Java heap stays flat at about 133 MiB.
+
+These are process samples, not allocator attribution. Untagged threads,
+mmap and the allocator's usable size are excluded.
 
 Correctness for this checkpoint:
 
@@ -94,6 +119,19 @@ Correctness for this checkpoint:
 - `VerifyHopperRuntime.py` passes all 16 checks on Current (native mapped)
   and on Frozen. That includes a real item entity collected by a hopper and
   a save/reload.
+
+Impact record for the reused broad tiers: Rust full 3118/0, Java ordinary
+2610/0, parity 193 and slow 11 ran on `c5a9de42` plus the pre-fix diff
+(`build/s34-v2-final`, fresh XML only). Since then there have been two kinds of change:
+
+- **Item changes:** two edits inside `publish_pending_add` (move one item, and
+  check the row before copying). The Rust item suite (68), the focused Java
+  packages (175) and the 14 contracts were rerun on each image.
+- **Upstream syncs:** `43f3c309`, `4c27ffce` and `c8ab7fb7`, covering lighting,
+  decoration and noise, with no path overlap. Focused tests, contracts and the
+  hopper witness were rerun on `c8ab`.
+
+The broad tiers were not rerun on the published images.
 
 ## S0030 natively prepared copies
 
@@ -367,6 +405,11 @@ made. Evidence is in `build/item-state-r6-integration-native-resources1`.
 python3 DevUtils/tests/content/item-state/resource/VerifyItemResources.py \
   --java-home /path/to/jdk --output build/item-native-resources
 ```
+
+Add `--workload pending` (with optional `--rounds`, `--cycles` and
+`--timeout`) for the S0034 pending producers, the held control and the RSS
+churn (see [pending-content resources](#pending-content-resources)). Only the
+measured operations take observer tags, because the observer has 16,384.
 
 ## Reproduce the cost diagnostics
 
