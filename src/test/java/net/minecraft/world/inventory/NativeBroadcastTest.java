@@ -147,5 +147,39 @@ class NativeBroadcastTest {
         World admitted = barrelWorld(true); sequence(admitted);
         assertEquals(original.recorder.events, admitted.recorder.events);
     }
+
+    // The menu's slot list keeps a Java mirror of its native rows: every get after
+    // add/set/remove (and their failures) matches a plain list, as does the original
+    // out-of-bounds message.
+    @Test void menuSlotListMirrorTracksEveryEdit() {
+        Inventory inventory = new Inventory(null, new EntityEquipment());
+        var chest = new net.minecraft.world.level.block.entity.ChestBlockEntity(BlockPos.ZERO, net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState());
+        chest.setRemoved(); ChestMenu menu = ChestMenu.threeRows(1, inventory, chest); chest.clearRemoved();
+        var expected = new ArrayList<Slot>(menu.slots);
+        var random = new java.util.Random(11);
+        for (int step = 0; step < 300; step++) {
+            int op = random.nextInt(3);
+            Slot slot = new Slot(inventory, random.nextInt(36), 0, 0);
+            if (op == 0 && !expected.isEmpty()) { int index = random.nextInt(expected.size()); assertSame(expected.set(index, slot), menu.slots.set(index, slot)); }
+            else if (op == 1) { int index = random.nextInt(expected.size() + 1); expected.add(index, slot); menu.slots.add(index, slot); }
+            else if (!expected.isEmpty()) { int index = random.nextInt(expected.size()); assertSame(expected.remove(index), menu.slots.remove(index)); }
+            assertEquals(expected.size(), menu.slots.size());
+            for (int i = 0; i < expected.size(); i++) assertSame(expected.get(i), menu.slots.get(i), "step " + step + " index " + i);
+        }
+        int size = expected.size();
+        var failure = assertThrows(IndexOutOfBoundsException.class, () -> menu.slots.get(size));
+        assertEquals("Index " + size + " out of bounds for length " + size, failure.getMessage());
+        assertThrows(IndexOutOfBoundsException.class, () -> menu.slots.get(-1));
+        assertThrows(NullPointerException.class, () -> menu.slots.set(0, null));
+        assertSame(expected.get(0), menu.slots.get(0), "a refused edit leaves the mirror unchanged");
+        // Every refused edit (bounds, null) fails before the native edit: projection and rows stay equal.
+        Slot spare = new Slot(inventory, 0, 0, 0);
+        for (Runnable refused : List.<Runnable>of(() -> menu.slots.set(size, spare), () -> menu.slots.set(-1, spare), () -> menu.slots.add(size + 1, spare),
+                () -> menu.slots.add(-1, spare), () -> menu.slots.remove(size), () -> menu.slots.remove(-1), () -> menu.slots.add(0, null))) {
+            assertThrows(RuntimeException.class, refused::run);
+            assertEquals(expected.size(), menu.slots.size());
+            for (int i = 0; i < expected.size(); i++) assertSame(expected.get(i), menu.slots.get(i));
+        }
+    }
 }
 

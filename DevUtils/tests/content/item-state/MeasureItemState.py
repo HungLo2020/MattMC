@@ -27,7 +27,7 @@ def main():
     parser.add_argument('--origin-guard', action='store_true', help='after timing, rerun each side once untimed with class-load logging and record class/native origins')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--timeout', type=float, default=240)
-    parser.add_argument('--workload', choices=['stock', 'generic-debt', 'stock-transfer', 'inventory', 'atomic-lower-bound', 'owner-access', 'broadcast', 'equality'], default='stock')
+    parser.add_argument('--workload', choices=['stock', 'generic-debt', 'stock-transfer', 'inventory', 'atomic-lower-bound', 'owner-access', 'broadcast', 'equality', 'player-inventory'], default='stock')
     parser.add_argument('--owner-shape', choices=['full', 'small'], default='full', help='32 or 1 active overrides; applies to owner-access only')
     args = parser.parse_args()
     out = args.output.resolve(); pre = args.pre.resolve()
@@ -89,7 +89,8 @@ def main():
         cp['pre'] = str(r5_pre / 'classes.jar') + ':' + cp['pre']
     cp['pre'], extra_pre_manifests = prepend_pre_overlays(cp['pre'], args.pre_overlay)
     inventory = args.workload == 'inventory'
-    if inventory:
+    mocked = inventory or args.workload == 'player-inventory'
+    if mocked:
         cache = Path.home() / '.gradle/caches/modules-2/files-2.1'
         extra = []
         for family in ['org.mockito/mockito-core', 'net.bytebuddy/byte-buddy', 'net.bytebuddy/byte-buddy-agent', 'org.objenesis/objenesis']:
@@ -101,9 +102,9 @@ def main():
     atomic = args.workload == 'atomic-lower-bound'
     owner = args.workload == 'owner-access'
     isolated = atomic or owner
-    source = Path(__file__).with_name('BroadcastTimingReference.java' if args.workload == 'broadcast' else 'EqualityTimingReference.java' if args.workload == 'equality' else 'OwnerAccessTimingReference.java' if owner else 'AtomicAccessTimingReference.java' if atomic else 'InventoryTimingReference.java' if inventory else 'StockChestTransferTimingReference.java' if transfer else 'ItemStateGenericDebtReference.java' if args.workload == 'generic-debt' else 'ItemStateTimingReference.java')
+    source = Path(__file__).with_name('BroadcastTimingReference.java' if args.workload == 'broadcast' else 'EqualityTimingReference.java' if args.workload == 'equality' else 'PlayerInventoryTimingReference.java' if args.workload == 'player-inventory' else 'OwnerAccessTimingReference.java' if owner else 'AtomicAccessTimingReference.java' if atomic else 'InventoryTimingReference.java' if inventory else 'StockChestTransferTimingReference.java' if transfer else 'ItemStateGenericDebtReference.java' if args.workload == 'generic-debt' else 'ItemStateTimingReference.java')
     adapter = Path(__file__).with_name('OwnerAccessTimingCurrent.java' if owner else 'AtomicAccessTimingCurrent.java') if isolated else None
-    dependencies = [Path(__file__).with_name('StockChestTransferTimingReference.java')] if inventory or args.workload in ('broadcast', 'equality') else []
+    dependencies = [Path(__file__).with_name('StockChestTransferTimingReference.java')] if inventory or args.workload in ('broadcast', 'equality', 'player-inventory') else []
     before = class_seal()
     out.mkdir(); classes = out / 'observer'; classes.mkdir(); (out / source.name).write_bytes(source.read_bytes())
     receipt = {'kind': 'EARLY DIAGNOSTIC ONLY; one JVM per side, five dependent samples',
@@ -137,7 +138,7 @@ def main():
         command = [str(args.java_home / 'bin/java'), '-Xmx1g', '--enable-native-access=ALL-UNNAMED',
                    '-Dmattmc.rust.natives.dir=' + str(native[base_side]), '-cp', str(classes) + ':' + cp[base_side],
                    main_class, str(out / (side + '.csv')), mode]
-        if inventory: command.insert(1, '-Dnet.bytebuddy.experimental=true')
+        if mocked: command.insert(1, '-Dnet.bytebuddy.experimental=true')
         if owner: command.append(args.owner_shape)
         mapped = []; begin = time.monotonic(); print('START', side, flush=True)
         with (out / (side + '.log')).open('w') as log:

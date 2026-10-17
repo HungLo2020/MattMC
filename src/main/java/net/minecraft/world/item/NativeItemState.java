@@ -1025,6 +1025,12 @@ public final class NativeItemState {
         private final long handle,address,rowsAddress,ownerAddress;
         private final Cleaner.Cleanable cleanup;
         private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<net.minecraft.world.inventory.Slot> bindings=new OpaqueBindings<>(16);
+        /**
+         * The slot facades in list order, replaced after each successful edit (the
+         * only way the native rows change), so get() is an array read rather than a
+         * native lookup per slot; the per-tick broadcast reads every slot.
+         */
+        private volatile net.minecraft.world.inventory.Slot[] mirror=new net.minecraft.world.inventory.Slot[0];
         private ItemStack carriedRoot;
         private Menu(long handle,Release release,ItemStack carried){this.handle=handle;this.address=c1(MENU_ADDRESS,handle);this.rowsAddress=c1(MENU_ROWS_ADDRESS,handle);this.ownerAddress=c1(MENU_OWNER_ADDRESS,handle);this.carriedRoot=carried;this.cleanup=CLEANER.register(this,release);}
         public static Menu create(){return create(1);}
@@ -1073,9 +1079,10 @@ public final class NativeItemState {
             catch(Throwable failure){throw failed(failure);}
             finally{java.lang.ref.Reference.reachabilityFence(this);}
         }
-        @Override public synchronized net.minecraft.world.inventory.Slot get(int index){
-            checkIndex(index,false);try{return Objects.requireNonNull(bindings.get(this.facade(index)),"Missing menu slot facade binding");}
-            finally{java.lang.ref.Reference.reachabilityFence(this);}
+        @Override public net.minecraft.world.inventory.Slot get(int index){
+            var slots=this.mirror;
+            if(index<0||index>=slots.length)throw new IndexOutOfBoundsException("Index "+index+" out of bounds for length "+slots.length);
+            return slots[index];
         }
         private net.minecraft.world.inventory.Slot edit(int operation,int index,net.minecraft.world.inventory.Slot value){
             checkIndex(index,operation==1);
@@ -1085,10 +1092,19 @@ public final class NativeItemState {
             var oldBinding=operation==2?null:bindings.get(nextKey);
             if(oldBinding!=null&&oldBinding!=value)throw new IllegalStateException("Menu facade identity collision");
             var link=operation==2?null:value.nativeLinkForMenu();boolean staged=false;
+            // The projection is allocated before the irreversible native edit and published
+            // immediately after it succeeds, so get() never disagrees with the native rows:
+            // a failure before the edit leaves both unchanged, and nothing can fail between.
+            var slots=this.mirror;var next=switch(operation){
+                case 0->{var copy=slots.clone();copy[index]=value;yield copy;}
+                case 1->{var copy=new net.minecraft.world.inventory.Slot[slots.length+1];System.arraycopy(slots,0,copy,0,index);copy[index]=value;System.arraycopy(slots,index,copy,index+1,slots.length-index);yield copy;}
+                default->{var copy=new net.minecraft.world.inventory.Slot[slots.length-1];System.arraycopy(slots,0,copy,0,index);System.arraycopy(slots,index+1,copy,index,slots.length-index-1);yield copy;}
+            };
             MemorySegment out=RESULT.get();long retired;
             try{
                 if(operation!=2){staged=true;bindings.put(nextKey,value);}
                 checked((long)MENU_EDIT.invokeExact(this.handle,(long)operation,(long)index,nextToken,link==null?0L:link.handle,out));
+                this.mirror=next;
                 retired=out.get(ValueLayout.JAVA_LONG,0);
             }catch(Throwable failure){
                 if(staged){if(oldBinding==null)bindings.remove(nextKey);else bindings.put(nextKey,oldBinding);}

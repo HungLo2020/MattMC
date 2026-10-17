@@ -185,6 +185,30 @@ Retained negatives: `build/s34-v12-equality` timed a dev-profile library and is
 invalid. `build/s34-v13` (screen NOTRUN) was refused by a byte-search guard
 that matched a string literal. The guard now reads ELF section headers.
 
+### Player inventory menu
+
+`--workload player-inventory` (`PlayerInventoryTimingReference.java`) times the
+always-open player `InventoryMenu`: main rows, armor, offhand, the 2×2 crafting
+grid and the result slot. It broadcasts to a read-only listener, as `ServerPlayer`
+does every tick (`player_idle`), or after one main-row change
+(`player_one_change`). It uses an identical stub-only mocked player on every
+side, and the read-only marker on Current. The run is `build/s34-v17/player-inventory`,
+on `35308d18` plus the slot-list projection, with release library `63a084a8…`.
+
+| Mode | Frozen ns | Pre ns | Current ns | C/pre | C/Frozen |
+|---|---:|---:|---:|---:|---:|
+| player_idle | 1505 | 33800 | 2129 | 0.06 | 1.41 |
+| player_one_change | 1726 | 13807 | 6978 | 0.51 | 4.04 |
+
+The broadcast screen from the same run (`build/s34-v17/broadcast`) puts the
+idle chest broadcast at 1974 ns, down from 3298 before the projection (2.0× Frozen).
+Frozen ran slower in this run (for example `double_quick_move_one` Frozen 4140 ns
+against 2506 before), and its ratios to Frozen are unchanged.
+
+Debt: a changed player broadcast is 4× Frozen. Ten player-menu slots (armor,
+offhand, crafting grid and result) are `Slot` subclasses without native links,
+so each tick reads them through Java.
+
 ### Pending-content resources
 
 `VerifyItemResources.py --workload pending` (`build/s34-v5/resource-pending2`)

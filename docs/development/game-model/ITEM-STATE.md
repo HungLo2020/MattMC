@@ -410,6 +410,21 @@ computable natively keep the S0030 adoption path.
 - Rust tests: `operation_lease_tests` cover rollback before/after recording,
   stale keys/rows and version refusal.
 
+## Menu slot list
+
+A native menu's slot list (`NativeItemState.Menu`, the `slots` of `ChestMenu` and
+`InventoryMenu`) keeps its rows and links in Rust. Java keeps a derived, read-only
+projection of the slot facades in list order (`mirror`). `get` reads it instead
+of making a native facade lookup and binding-map read for each slot, which the
+per-tick broadcast did for every slot. The projection is not a second
+authoritative list. `Menu.edit` (set, add, remove) is the only path that changes
+the native rows. It validates first, allocates the next projection before the
+irreversible native edit, and publishes it right after that edit succeeds. A
+refused or failed edit therefore leaves both unchanged, and nothing can fail
+between the native commit and the publication. Out-of-bounds `get` keeps the
+original message. `NativeBroadcastTest.menuSlotListMirrorTracksEveryEdit`
+covers 300 random edits and each refused-edit shape.
+
 ## Native component comparison
 
 `ItemStack.isSameItemSameComponents` (and therefore `ItemStack.matches`)
