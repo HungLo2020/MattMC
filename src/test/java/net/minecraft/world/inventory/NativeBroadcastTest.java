@@ -181,5 +181,53 @@ class NativeBroadcastTest {
             for (int i = 0; i < expected.size(); i++) assertSame(expected.get(i), menu.slots.get(i));
         }
     }
+
+    // Player InventoryMenu: armor/offhand slots (Slot subclasses keeping Slot.getItem) get
+    // broadcast-only native digests from the equipment rows; quick-move links are unchanged.
+    // Random equipment/main/grid changes must broadcast exactly like an unlinked subclass inventory.
+    static final class ReadOnlyListener implements ContainerListener, AbstractContainerMenu.ReadOnlyBroadcastObserver {
+        final List<String> events;
+        ReadOnlyListener(List<String> events) { this.events = events; }
+        @Override public void slotChanged(AbstractContainerMenu menu, int slot, ItemStack stack) { events.add("slot " + slot + " " + stack.getItem() + "x" + stack.getCount() + " d" + stack.getDamageValue()); }
+        @Override public void dataChanged(AbstractContainerMenu menu, int id, int value) {}
+    }
+    static List<String> playerMenu(boolean exact) {
+        var player = org.mockito.Mockito.mock(net.minecraft.world.entity.player.Player.class);
+        var equipment = new EntityEquipment();
+        Inventory inventory = exact ? new Inventory(player, equipment) : new Inventory(player, equipment) {};
+        org.mockito.Mockito.doReturn(inventory).when(player).getInventory();
+        var menu = new InventoryMenu(inventory, true, player);
+        var events = new ArrayList<String>();
+        menu.addSlotListener(new ReadOnlyListener(events));
+        menu.broadcastChanges();
+        var random = new java.util.Random(23);
+        var slots = net.minecraft.world.entity.EquipmentSlot.values();
+        var items = List.of(net.minecraft.world.item.Items.IRON_HELMET, net.minecraft.world.item.Items.SHIELD, net.minecraft.world.item.Items.STICK, net.minecraft.world.item.Items.DIAMOND_BOOTS);
+        for (int step = 0; step < 300; step++) {
+            switch (random.nextInt(5)) {
+                case 0 -> { var slot = slots[random.nextInt(slots.length)]; equipment.set(slot, random.nextInt(3) == 0 ? ItemStack.EMPTY : new ItemStack(items.get(random.nextInt(items.size())), 1 + random.nextInt(2))); }
+                case 1 -> { var stack = equipment.get(slots[random.nextInt(slots.length)]); if (!stack.isEmpty()) { if (stack.isDamageableItem()) stack.setDamageValue(random.nextInt(5)); else stack.setCount(1 + random.nextInt(3)); } }
+                case 2 -> inventory.setItem(random.nextInt(36), random.nextInt(3) == 0 ? ItemStack.EMPTY : new ItemStack(net.minecraft.world.item.Items.STICK, 1 + random.nextInt(9)));
+                case 3 -> menu.getSlot(1 + random.nextInt(4)).set(random.nextInt(2) == 0 ? ItemStack.EMPTY : new ItemStack(net.minecraft.world.item.Items.OAK_PLANKS, 1 + random.nextInt(4)));
+                default -> {}
+            }
+            menu.broadcastChanges();
+            events.add("tick " + step);
+        }
+        return events;
+    }
+    @Test void playerMenuEquipmentBroadcastMatchesTheOriginal() {
+        assertEquals(playerMenu(false), playerMenu(true));
+        var player = org.mockito.Mockito.mock(net.minecraft.world.entity.player.Player.class);
+        var inventory = new Inventory(player, new EntityEquipment()); org.mockito.Mockito.doReturn(inventory).when(player).getInventory();
+        var menu = new InventoryMenu(inventory, true, player);
+        Slot helmet = menu.getSlot(5);
+        assertEquals(39, helmet.getContainerSlot());
+        assertNull(helmet.nativeLinkForMenu(), "armor slots keep the original quick-move path");
+        assertNotNull(helmet.broadcastLinkForMenu());
+        assertTrue(helmet.broadcastLinkForMenu().isEquipment());
+        assertNotNull(menu.getSlot(45).broadcastLinkForMenu(), "the offhand slot keeps Slot.getItem");
+        assertNull(menu.getSlot(0).broadcastLinkForMenu(), "the result slot reads a non-native container");
+    }
 }
 

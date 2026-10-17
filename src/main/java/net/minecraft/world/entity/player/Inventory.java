@@ -80,6 +80,8 @@ public class Inventory implements Container, Nameable {
 	private int selectedValue() { return this.nativeItems != null ? this.nativeItems.selected() : this.legacyState.selected; }
 
 	/** Exact stock backing admission; no virtual container getter is called. */
+	/** True when equipment rows 36..40 read an exact EntityEquipment bound to these native rows. */
+	public final boolean nativeEquipmentRowsBound() { return this.nativeMainSlotsForTransfer() != null && this.equipment.nativeEquipmentForInventory() != null; }
 	public final NativeItemSlots nativeMainSlotsForTransfer() { return this.getClass() == Inventory.class && this.items == this.nativeItems ? this.nativeItems : null; }
 
 	/** Remaining original setItem effect after an admitted native main-slot commit. */

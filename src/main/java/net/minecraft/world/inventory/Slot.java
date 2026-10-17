@@ -51,7 +51,7 @@ public class Slot {
 	}
 
 	public ItemStack getItem() {
-		return this.nativeLink==null?this.container.getItem(this.containerIndex()):this.nativeLink.stack();
+		return this.nativeLink==null||this.nativeLink.isEquipment()?this.container.getItem(this.containerIndex()):this.nativeLink.stack();
 	}
 
 	public boolean hasItem() {
@@ -157,8 +157,17 @@ public class Slot {
 		return this.mayPickup(player) && this.mayPlace(this.getItem());
 	}
 
-	/** Actual plain-slot endpoint; specialized/custom methods remain effect boundaries. */
-	public final net.minecraft.world.item.NativeItemState.SlotLink nativeLinkForMenu(){return this.getClass()==Slot.class?this.nativeLink:null;}
+	/** Actual plain-slot endpoint; specialized/custom methods remain effect boundaries. Equipment links are broadcast-only. */
+	public final net.minecraft.world.item.NativeItemState.SlotLink nativeLinkForMenu(){return this.getClass()==Slot.class&&(this.nativeLink==null||!this.nativeLink.isEquipment())?this.nativeLink:null;}
+	/** Slot classes whose getItem is Slot's own, so the linked contents are exactly what a broadcast reads. */
+	private static final ClassValue<Boolean> READS_LINK=new ClassValue<>() {
+		@Override protected Boolean computeValue(Class<?> type) {
+			try { return type.getMethod("getItem").getDeclaringClass()==Slot.class; }
+			catch (ReflectiveOperationException | SecurityException unavailable) { return false; }
+		}
+	};
+	/** The link a menu broadcast may digest for this slot (also subclasses that keep Slot.getItem), or null. */
+	public final net.minecraft.world.item.NativeItemState.SlotLink broadcastLinkForMenu(){return this.nativeLink!=null&&(this.getClass()==Slot.class||READS_LINK.get(this.getClass()))?this.nativeLink:null;}
 	public int getContainerSlot() {
 		return this.containerIndex();
 	}

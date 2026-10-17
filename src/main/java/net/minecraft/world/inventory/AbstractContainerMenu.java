@@ -287,7 +287,7 @@ public abstract class AbstractContainerMenu {
 			if (digests == null || digests.length != this.slots.size()) digests = this.nativeMenu.broadcastDigests(new long[this.slots.size()], 0);
 			else if (stale) digests = this.nativeMenu.broadcastDigests(digests, i);
 			stale = false;
-			var link = slot.nativeLinkForMenu();
+			var link = slot.broadcastLinkForMenu();
 			long digest = net.minecraft.world.item.NativeItemState.MenuActionEffects.broadcastEndpoint(link) ? digests[i] : -1;
 			if (digest >= 0 && this.syncSlot[i] == slot && this.syncCleanEpoch[i] == this.syncEpoch && this.syncDigest[i] == digest) continue;
 			int epoch = this.syncEpoch;

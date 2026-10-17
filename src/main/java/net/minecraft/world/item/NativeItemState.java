@@ -40,8 +40,8 @@ public final class NativeItemState {
     private static final MethodHandle TRANSFER_CONTINUE = call("transfer_continue", 4);
     private static final MethodHandle TRANSFER_BOUNDED = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_item_transfer_bounded",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG), java.lang.foreign.Linker.Option.critical(false));
-    private static final MethodHandle MENU_STOCK=call("menu_stock_match",4),MENU_DOUBLE=call("menu_double_match",4),MENU_RETAIN=call("menu_retain",1),MENU_NEW=call("menu_create",2),MENU_ADDRESS=call("menu_address",1),MENU_GET=call("menu_get",2),MENU_CARRIED=call("menu_carried",2);
-    private static final MethodHandle MENU_EDIT=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_menu_edit",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
+    private static final MethodHandle MENU_STOCK=call("menu_stock_match",4),SLOT_EQUIPMENT_NEW=call("slot_equipment_create",2),MENU_DOUBLE=call("menu_double_match",4),MENU_RETAIN=call("menu_retain",1),MENU_NEW=call("menu_create",2),MENU_ADDRESS=call("menu_address",1),MENU_GET=call("menu_get",2),MENU_CARRIED=call("menu_carried",2);
+    private static final MethodHandle MENU_EDIT=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_menu_edit",FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS));
     private static final MethodHandle EQUIPMENT_NEW=call("equipment_create",1);
     private static final MethodHandle CONTAINER_NEW=call("container_create",2),CONTAINER_ADDRESS=call("container_address",1),CONTAINER_SET=call("container_replace",3);
     private static final MethodHandle SLOT_CONTAINER_NEW=call("slot_container_create",2),SLOT_READ_REGULAR=call("slot_read_regular",3);
@@ -1092,6 +1092,7 @@ public final class NativeItemState {
             var oldBinding=operation==2?null:bindings.get(nextKey);
             if(oldBinding!=null&&oldBinding!=value)throw new IllegalStateException("Menu facade identity collision");
             var link=operation==2?null:value.nativeLinkForMenu();boolean staged=false;
+            var digest=operation==2?null:value.broadcastLinkForMenu();
             // The projection is allocated before the irreversible native edit and published
             // immediately after it succeeds, so get() never disagrees with the native rows:
             // a failure before the edit leaves both unchanged, and nothing can fail between.
@@ -1103,13 +1104,13 @@ public final class NativeItemState {
             MemorySegment out=RESULT.get();long retired;
             try{
                 if(operation!=2){staged=true;bindings.put(nextKey,value);}
-                checked((long)MENU_EDIT.invokeExact(this.handle,(long)operation,(long)index,nextToken,link==null?0L:link.handle,out));
+                checked((long)MENU_EDIT.invokeExact(this.handle,(long)operation,(long)index,nextToken,link==null?0L:link.handle,digest==null?0L:digest.handle,out));
                 this.mirror=next;
                 retired=out.get(ValueLayout.JAVA_LONG,0);
             }catch(Throwable failure){
                 if(staged){if(oldBinding==null)bindings.remove(nextKey);else bindings.put(nextKey,oldBinding);}
                 if(failure instanceof RuntimeException runtime)throw runtime;if(failure instanceof Error error)throw error;throw failed(failure);
-            }finally{java.lang.ref.Reference.reachabilityFence(link);java.lang.ref.Reference.reachabilityFence(this);}
+            }finally{java.lang.ref.Reference.reachabilityFence(link);java.lang.ref.Reference.reachabilityFence(digest);java.lang.ref.Reference.reachabilityFence(this);}
             if(retired!=0){if(retired!=previousToken)throw new IllegalStateException("Wrong retired menu slot binding");bindings.remove(previousKey);}
             return previous;
         }
@@ -1170,18 +1171,24 @@ public final class NativeItemState {
         private final net.minecraft.world.level.block.entity.NativeStockContainer chest;
         /** Position of the linked chest's slot 0 in the slot's own container (27 for a double chest's second half). */
         private final int offset;
+        /** A broadcast-only link to an inventory equipment row: reads keep the original container path. */
+        private final boolean equipment;
         private final Cleaner.Cleanable cleanup;
-        private SlotLink(long handle,Release ownership,Slots source){this(handle,ownership,source,null,null,0);}
-        private SlotLink(long handle,Release ownership,Slots source,ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest,int offset){
-            this.handle=handle;this.source=source;this.cell=cell;this.chest=chest;this.offset=offset;this.address=c1(SLOT_ADDRESS,handle);this.cleanup=CLEANER.register(this,ownership);
+        private SlotLink(long handle,Release ownership,Slots source){this(handle,ownership,source,null,null,0,false);}
+        private SlotLink(long handle,Release ownership,Slots source,ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest,int offset){this(handle,ownership,source,cell,chest,offset,false);}
+        private SlotLink(long handle,Release ownership,Slots source,ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest,int offset,boolean equipment){
+            this.handle=handle;this.source=source;this.cell=cell;this.chest=chest;this.offset=offset;this.equipment=equipment;this.address=c1(SLOT_ADDRESS,handle);this.cleanup=CLEANER.register(this,ownership);
         }
         static SlotLink create(ContainerCell cell,net.minecraft.world.level.block.entity.NativeStockContainer chest,int index,int offset){return adopt(SLOT_CONTAINER_NEW,(handle,ownership)->new SlotLink(handle,ownership,null,cell,chest,offset),cell.handle,index);}
         static SlotLink create(Slots source,int index){return adopt(SLOT_NEW,(handle,ownership)->new SlotLink(handle,ownership,source),source.handle,index);}
+        /** Equipment row {@code row} (EquipmentSlot ordinal) of an inventory, at container index {@code row+offset}. */
+        static SlotLink createEquipment(Slots source,int row,int offset){return adopt(SLOT_EQUIPMENT_NEW,(handle,ownership)->new SlotLink(handle,ownership,source,null,null,offset,true),source.handle,row);}
+        public boolean isEquipment(){return this.equipment;}
         public int index(){try{return (int)COUNT.getOpaque(SCALAR_RAW,address);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
         /** The index in the slot's own container: the linked row plus the half offset. */
         public int containerIndex(){return this.index()+this.offset;}
-        public ItemStack stack(){return cell==null?source.readLinkedStack(this):chest.nativeSlotsForTransfer()==null?chest.getItem(index()):cell.stack(this);}
-        public int presence(){return cell==null?source.linkedPresence(this):chest.nativeSlotsForTransfer()==null?-1:cell.presence(this);}
+        public ItemStack stack(){if(equipment)throw new IllegalStateException("Equipment links do not read stacks");return cell==null?source.readLinkedStack(this):chest.nativeSlotsForTransfer()==null?chest.getItem(index()):cell.stack(this);}
+        public int presence(){return equipment?-1:cell==null?source.linkedPresence(this):chest.nativeSlotsForTransfer()==null?-1:cell.presence(this);}
         /** Exact native snapshot of the linked contents for a broadcast comparison (slots.rs broadcast_digest), or -1. */
         public long broadcastDigest(){
             if(cell!=null&&chest.nativeSlotsForTransfer()==null)return -1;
@@ -1195,6 +1202,7 @@ public final class NativeItemState {
          * null, and the caller performs the original read.
          */
         public ItemStack pendingBroadcastCopy(){
+            if(equipment)return null;
             Slots owner=cell==null?source:chest.nativeSlotsForTransfer() instanceof NativeItemSlots rows?rows.actualOwner():null;
             return owner==null?null:owner.pendingCopy(this.index());
         }
@@ -1204,6 +1212,11 @@ public final class NativeItemState {
         if(container!=null&&container.getClass()==net.minecraft.world.entity.player.Inventory.class&&index>=0&&index<36){
             var source=((net.minecraft.world.entity.player.Inventory)container).nativeMainSlotsForTransfer();
             if(source!=null)return source.bindMainSlot(index);
+        }else if(container!=null&&container.getClass()==net.minecraft.world.entity.player.Inventory.class&&index>=36&&index<=40){
+            // Equipment rows: a broadcast-only link to the bound native equipment row.
+            var inventory=(net.minecraft.world.entity.player.Inventory)container;
+            var slot=net.minecraft.world.entity.player.Inventory.EQUIPMENT_SLOT_MAPPING.get(index);
+            if(slot!=null&&inventory.nativeEquipmentRowsBound())return SlotLink.createEquipment(inventory.nativeMainSlotsForTransfer().actualOwner(),slot.ordinal(),index-slot.ordinal());
         }else if(net.minecraft.world.level.block.entity.NativeStockContainer.exact(container)&&index>=0&&index<27){
             var chest=(net.minecraft.world.level.block.entity.NativeStockContainer)container;return chest.nativeContainerForSlots().slot(chest,index,0);
         }else if(container!=null&&container.getClass()==net.minecraft.world.inventory.TransientCraftingContainer.class){

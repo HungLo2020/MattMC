@@ -441,6 +441,26 @@ Other sizes keep the original list and its exceptions, for example
 (`constructorBoundariesMatchTheOriginal`). `NativeCraftingGridTest` compares 400
 random container operations, with their notification order, against a subclass grid.
 
+## Broadcast-only slot links
+
+A menu row can carry a second, broadcast-only link (`MenuSlot::digest`, from
+`Slot.broadcastLinkForMenu`) that only the per-tick broadcast digests. Quick move
+and transfers never use it: they keep `nativeLinkForMenu`, which admits only
+exact `Slot`s. A slot subclass whose `getItem` is `Slot`'s own (`ArmorSlot` and
+the `InventoryMenu` offhand slot) gets this link, because the digest then equals
+what the broadcast reads, while overridden `mayPlace`, `mayPickup` and
+`setByPlayer` stay on the original path.
+
+Inventory indices 36–40 (armor and offhand) link to the inventory's bound
+native equipment row (`SlotContainer::Equipment`, `mattmc_item_slot_equipment_create`)
+only for an exact inventory whose `EntityEquipment` is exact and natively bound
+(`Inventory.nativeEquipmentRowsBound`). An absent row digests as `EMPTY`, and a
+null row is not digested. Every read, presence, pending-copy and transfer
+path treats an equipment link as unknown, so `Slot.getItem` still calls
+`Inventory.getItem`. `NativeBroadcastTest.playerMenuEquipmentBroadcastMatchesTheOriginal`
+compares 300 random armor, offhand, main-row and grid changes with an unlinked
+subclass inventory.
+
 ## Native component comparison
 
 `ItemStack.isSameItemSameComponents` (and therefore `ItemStack.matches`)

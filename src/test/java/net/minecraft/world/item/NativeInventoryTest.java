@@ -144,7 +144,12 @@ class NativeInventoryTest {
         var replacement=new ItemStack(Items.DIRT,9);inv.getNonEquipmentItems().set(7,replacement);assertSame(replacement,slot.getItem());
         int[] calls={0};var custom=new net.minecraft.world.inventory.Slot(inv,7,0,0){@Override public ItemStack getItem(){calls[0]++;return ItemStack.EMPTY;}};
         assertFalse(custom.hasItem());assertEquals(1,calls[0]);assertSame(replacement,slot.getItem());
-        assertNull(NativeItemState.bindStockSlot(inv,36));assertNull(NativeItemState.bindStockSlot(null,0));
+        // Equipment indices 36..40 get a broadcast-only equipment link (reads stay on the container);
+        // beyond the mapped equipment rows nothing links.
+        var feet=NativeItemState.bindStockSlot(inv,36);assertNotNull(feet);assertTrue(feet.isEquipment());assertEquals(36,feet.containerIndex());
+        var boots=new ItemStack(Items.DIAMOND_BOOTS);inv.setItem(36,boots);var feetSlot=new net.minecraft.world.inventory.Slot(inv,36,0,0);
+        assertSame(boots,feetSlot.getItem());assertTrue(feetSlot.hasItem());assertEquals(36,feetSlot.getContainerSlot());assertNull(feetSlot.nativeLinkForMenu());
+        assertNull(NativeItemState.bindStockSlot(inv,41));assertNull(NativeItemState.bindStockSlot(null,0));
         assertNull(NativeItemState.bindStockSlot(new Inventory(null,new EntityEquipment()){},7));
         assertThrows(NullPointerException.class,()->new net.minecraft.world.inventory.Slot(null,7,0,0).getItem());
     }

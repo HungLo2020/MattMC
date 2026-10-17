@@ -1078,6 +1078,11 @@ fn slot_link(handle:i64)->Option<Arc<super::menu::SlotLink>> {
     guard(||{let Some(owner)=inventory(inventory_handle) else{return BAD};let Ok(index)=i32::try_from(index) else{return BAD};
         super::menu::SlotLink::new(owner,index).map_or(BAD,|link|keep(Owner::SlotLink(Arc::new(link))))})
 }
+/// A broadcast-only link to an inventory's equipment row (EquipmentSlot ordinal).
+#[no_mangle] pub extern "C" fn mattmc_item_slot_equipment_create(inventory_handle:i64,row:i64)->i64 {
+    guard(||{let Some(owner)=inventory(inventory_handle) else{return BAD};let Ok(row)=i32::try_from(row) else{return BAD};
+        super::menu::SlotLink::for_equipment(owner,row).map_or(BAD,|link|keep(Owner::SlotLink(Arc::new(link))))})
+}
 #[no_mangle] pub extern "C" fn mattmc_item_slot_address(handle:i64)->i64 {guard(||slot_link(handle).map_or(BAD,|link|link.address() as i64))}
 #[no_mangle] pub extern "C" fn mattmc_item_slot_retain(handle:i64)->i64 {guard(||slot_link(handle).map_or(BAD,|link|keep(Owner::SlotLink(link))))}
 #[no_mangle] pub unsafe extern "C" fn mattmc_item_slot_read(address:i64,owner:i64,air:i64,mode:i64)->i64 {
@@ -1124,9 +1129,13 @@ fn menu(handle:i64)->Option<Arc<super::slots::BoundaryOwner<super::menu::Menu>>>
         let value=owner.lock().unwrap().get(index as usize).map_or(BAD,|slot|slot.facade);value})
 }
 /// 0=set,1=insert,2=remove. Resolve any retired Java facade BEFORE releasing its root.
-#[no_mangle] pub unsafe extern "C" fn mattmc_item_menu_edit(handle:i64,op:i64,index:i64,facade:i64,link:i64,retired:*mut i64)->i64 {
+/// `digest` is an optional broadcast-only link for the row (MenuSlot::digest).
+#[no_mangle] pub unsafe extern "C" fn mattmc_item_menu_edit(handle:i64,op:i64,index:i64,facade:i64,link:i64,digest:i64,retired:*mut i64)->i64 {
     guard(||{if retired.is_null()||index<0{return BAD;}retired.write(0);let Some(owner)=menu(handle) else{return BAD};
-        let next=if op==0||op==1 {if facade<=0{return BAD;}let link=if link==0{None}else{let Some(link)=slot_link(link) else{return BAD};Some(link)};Some(super::menu::MenuSlot{facade,link})}else{None};
+        let next=if op==0||op==1 {if facade<=0{return BAD;}
+            let link=if link==0{None}else{let Some(link)=slot_link(link) else{return BAD};Some(link)};
+            let digest=if digest==0{None}else{let Some(digest)=slot_link(digest) else{return BAD};Some(digest)};
+            Some(super::menu::MenuSlot{facade,link,digest})}else{None};
         let mut rows=owner.lock().unwrap();let old=match op{
             0=>rows.set(index as usize,next.unwrap()),
             1=>return if rows.insert(index as usize,next.unwrap()){0}else{BAD},

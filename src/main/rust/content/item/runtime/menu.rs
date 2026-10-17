@@ -1,12 +1,15 @@
 //! Actual private slot binding. Java keeps public UI identity/layout and effects.
 use std::sync::Arc;
 use super::{inventory::Inventory,container::Container,slots::BoundaryOwner};
-pub enum SlotContainer {Inventory(Arc<Inventory>),Container(Arc<BoundaryOwner<Container>>)}
+/// Equipment links (an inventory's equipment row, by EquipmentSlot ordinal) only
+/// digest for the broadcast; every read/transfer path treats them as unknown.
+pub enum SlotContainer {Inventory(Arc<Inventory>),Container(Arc<BoundaryOwner<Container>>),Equipment(Arc<Inventory>)}
 #[repr(C)]
 pub struct SlotLink {pub index:i32,pub container:SlotContainer}
 impl SlotLink {
     pub fn new(inventory:Arc<Inventory>,index:i32)->Option<Self>{(0..36).contains(&index).then_some(Self{index,container:SlotContainer::Inventory(inventory)})}
     pub fn for_container(container:Arc<BoundaryOwner<Container>>,index:i32)->Option<Self>{(0..27).contains(&index).then_some(Self{index,container:SlotContainer::Container(container)})}
+    pub fn for_equipment(inventory:Arc<Inventory>,row:i32)->Option<Self>{(0..64).contains(&row).then_some(Self{index:row,container:SlotContainer::Equipment(inventory)})}
     pub fn address(&self)->usize{self as *const Self as usize}
     /// Caller pins this allocation and holds its exact canonical inventory gate.
     /// No allocation, locking, registry lookup or callback is permitted here.
@@ -19,6 +22,14 @@ impl SlotLink {
     /// Regular broadcast snapshot (slots::broadcast_digest) of the linked row.
     /// Computed in place under the row gates: no VM call, allocation or blocking component lock.
     pub fn digest(&self)->i64 {
+        if let SlotContainer::Equipment(inventory)=&self.container {
+            // Absent reads as EntityEquipment's EMPTY default (digest 0); a null value is not snapshot.
+            let Some(equipment)=inventory.equipment.get() else{return -1};let rows=equipment.lock().unwrap();
+            return match rows.get(self.index as usize) {
+                Some(super::container::EquipmentValue::Stack(entry))=>super::slots::broadcast_digest(&entry.stack),
+                Some(super::container::EquipmentValue::Absent)=>0,_=>-1,
+            };
+        }
         if let SlotContainer::Inventory(inventory)=&self.container {
             let rows=inventory.slots.lock().unwrap();return rows.get(self.index as usize).map_or(-1,|entry|super::slots::broadcast_digest(&entry.stack));
         }
@@ -43,7 +54,9 @@ impl SlotLink {
 /// Actual menu roster and carried stack. Facade tokens resolve Java identities;
 /// links and entries retain the actual source/container/stack allocations.
 #[derive(Clone)]
-pub struct MenuSlot {pub facade:i64,pub link:Option<Arc<SlotLink>>}
+/// `digest` is a broadcast-only link (a slot subclass whose getItem is not
+/// overridden, or an equipment row); quick move and transfers never use it.
+pub struct MenuSlot {pub facade:i64,pub link:Option<Arc<SlotLink>>,pub digest:Option<Arc<SlotLink>>}
 #[repr(C)]
 pub struct Header {
     pub version:std::sync::atomic::AtomicI64,
@@ -62,7 +75,7 @@ impl Menu {
     pub fn get(&self,index:usize)->Option<&MenuSlot>{self.rows.get(index)}
     pub fn references(&self,facade:i64)->bool{self.rows.iter().any(|slot|slot.facade==facade)}
     /// Broadcast snapshots (SlotLink::digest) of every linked row, -1 otherwise.
-    pub fn digests(&self,from:usize,out:&mut [i64]){for (slot,value) in self.rows.iter().skip(from).zip(out.iter_mut().skip(from)){*value=slot.link.as_ref().map_or(-1,|link|link.digest());}}
+    pub fn digests(&self,from:usize,out:&mut [i64]){for (slot,value) in self.rows.iter().skip(from).zip(out.iter_mut().skip(from)){*value=slot.link.as_ref().or(slot.digest.as_ref()).map_or(-1,|link|link.digest());}}
     pub fn set(&mut self,index:usize,slot:MenuSlot)->Option<MenuSlot>{self.rows.get_mut(index).map(|old|std::mem::replace(old,slot))}
     pub fn insert(&mut self,index:usize,slot:MenuSlot)->bool{
         if index>self.rows.len()||self.rows.len()>=i32::MAX as usize{return false;}
@@ -85,6 +98,7 @@ impl Menu {
         let Some(slot)=self.rows.get(index as usize) else{return false};let Some(link)=&slot.link else{return false};
         match &link.container {
             SlotContainer::Inventory(inventory)=>{let rows=inventory.slots.lock().unwrap();rows.get(link.index as usize).is_some_and(|entry|super::slots::visible_count(&entry.stack,air)==0)},
+            SlotContainer::Equipment(_)=>false,
             SlotContainer::Container(container)=>{
                 if !clear_chest.is_some_and(|expected|Arc::ptr_eq(expected,container)){return false;}
                 let current=container.lock().unwrap();let Some(rows)=&current.slots else{return false};let rows=rows.lock().unwrap();
@@ -135,6 +149,7 @@ impl Menu {
                 let Some(rows)=inventory.slots.try_lock() else{return false};
                 rows.get(link.index as usize).is_some_and(|entry|super::slots::visible_count(&entry.stack,air)==0)
             }
+            SlotContainer::Equipment(_)=>false,
             SlotContainer::Container(container)=>{
                 if clear_chest!=container.address(){return false;}
                 let Some(current)=container.try_lock() else{return false};let Some(rows)=&current.slots else{return false};
@@ -217,6 +232,7 @@ impl SlotLink {
         }
         match &self.container {
             SlotContainer::Inventory(owner)=>{let Some(rows)=owner.slots.try_lock() else{return -1};value(rows.get(self.index as usize),air,presence)}
+            SlotContainer::Equipment(_)=>-1,
             SlotContainer::Container(owner)=>{
                 let Some(current)=owner.try_lock() else{return -1};let Some(rows)=&current.slots else{return -1};
                 match rows {
