@@ -438,3 +438,70 @@ pub unsafe extern "C" fn mattmc_chunk_generation_stage_statistics(output: *mut u
         output.add(index).write(value);
     }
 }
+
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_create(holder: u64, status: i32) -> u64 {
+    super::stage_binding::Binding::create(retain_holder(holder), status).map_or(0, |b| Arc::into_raw(b).expose_provenance() as u64)
+}
+pub(super) unsafe fn retain_stage_binding(id: u64) -> Arc<super::stage_binding::Binding> {
+    let pointer = std::ptr::with_exposed_provenance::<super::stage_binding::Binding>(id as usize);
+    Arc::increment_strong_count(pointer); Arc::from_raw(pointer)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_release(id: u64) {
+    if id != 0 { drop(Arc::from_raw(std::ptr::with_exposed_provenance::<super::stage_binding::Binding>(id as usize))); }
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_key(id: u64) -> u64 { retain_stage_binding(id).key }
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_publish(id: u64) { retain_stage_binding(id).publish(); }
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_future(id: u64, role: i32, hash: i32) { retain_stage_binding(id).bind_future(role as usize, hash as u32); }
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_status(holder_id: u64, status: i32) -> u64 {
+    super::stage_binding::Binding::status_key(holder(holder_id), status)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_claim(holder_id: u64, key: u64) -> u64 {
+    super::stage_binding::Binding::claim(holder(holder_id), key).map_or(0, |b| Arc::into_raw(b).expose_provenance() as u64)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_lookup(holder: u64, hash: i32) -> u64 {
+    super::stage_binding::lookup(retain_holder(holder), hash as u32).map_or(0, |d| Box::into_raw(Box::new(d)).expose_provenance() as u64)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_callback_create(binding: u64) -> u64 {
+    Arc::into_raw(super::stage_binding::Callback::create(retain_stage_binding(binding))).expose_provenance() as u64
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_callback_release(id: u64) {
+    if id != 0 { drop(Arc::from_raw(std::ptr::with_exposed_provenance::<super::stage_binding::Callback>(id as usize))); }
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_callback_driver(id: u64) -> u64 {
+    let pointer = std::ptr::with_exposed_provenance::<super::stage_binding::Callback>(id as usize);
+    Arc::increment_strong_count(pointer);
+    Box::into_raw(Box::new(super::stage_binding::completion(Arc::from_raw(pointer)))).expose_provenance() as u64
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_invoke(driver: u64, id: u64) {
+    let driver = &mut *std::ptr::with_exposed_provenance_mut::<super::TaskDriver>(driver as usize);
+    let binding = retain_stage_binding(id);
+    super::stage_binding::consume(&binding);
+    driver.stage_binding = Some(binding);
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_statistics(output: *mut u64) {
+    for (index, value) in super::stage_binding::statistics().into_iter().enumerate() { output.add(index).write(value); }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_chunk_generation_stage_binding_pin_task(task: u64, row: i32, driver: u64) {
+    let task = &*std::ptr::with_exposed_provenance::<Task>(task as usize);
+    let driver = &*std::ptr::with_exposed_provenance::<super::TaskDriver>(driver as usize);
+    if let Some(binding) = driver.stage_binding.clone() {
+        super::stage_binding::consume(&binding); super::stage_binding::pending();
+        task.lock().pending_bindings.insert(row as u32, binding);
+    }
+}

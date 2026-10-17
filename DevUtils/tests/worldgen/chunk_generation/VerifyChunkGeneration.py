@@ -113,6 +113,8 @@ spawn-protection=0
     command += getattr(args, 'extra_jvm_args', [])
     if side == 'current' and getattr(args, 'require_native_stage', False):
         command += ['-Dgeneration.requireNativeStageControl=true']
+    if side == 'current' and getattr(args, 'require_native_binding', False):
+        command += ['-Dgeneration.requireNativeStageBinding=true']
     native = args.pre_runtime / 'native' if side == 'pre' else args.foundation_runtime / 'native' if side == 'foundation' else ROOT / 'build/rust/native'
     if side != 'frozen':
         command += ['--enable-native-access=ALL-UNNAMED', '-Dmattmc.rust.natives.dir=' + str(native)]
@@ -180,6 +182,8 @@ def main():
     parser.add_argument('--skip-build', action='store_true')
     parser.add_argument('--require-native-stage', action='store_true',
                         help='require actual Current FULL requests to traverse multiple native-controlled stages')
+    parser.add_argument('--require-native-binding', action='store_true',
+                        help='require actual Current FULL requests to create, consume and retire native bindings')
     args = parser.parse_args()
     args.output = args.output.resolve(); args.pre_runtime = args.pre_runtime.resolve()
     if args.foundation_runtime: args.foundation_runtime = args.foundation_runtime.resolve()

@@ -297,6 +297,7 @@ public final class NativeChunkGeneration {
      * Every public virtual call still occurs; arbitrary user combinators retain
      * their existing CompletableFuture implementation and executor behavior. */
     private static final class ChunkFuture<T> extends CompletableFuture<T> {
+        volatile java.lang.ref.WeakReference<StageBinding> stageBinding;
         @Override public <U> CompletableFuture<U> newIncompleteFuture() { return newChunkFuture(); }
         @Override public <U, V> CompletableFuture<V> thenCombine(CompletionStage<? extends U> other,
                 BiFunction<? super T, ? super U, ? extends V> action) {
@@ -324,6 +325,213 @@ public final class NativeChunkGeneration {
         });
         return adapter;
     }
+
+    private static final class StageBindings {
+        static final MethodHandle CREATE = handle("stage_binding_create", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+        static final MethodHandle CLAIM = handle("stage_binding_claim", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
+        static final MethodHandle RELEASE = handle("stage_binding_release", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+        static final MethodHandle KEY = handle("stage_binding_key", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
+        static final MethodHandle PUBLISH = handle("stage_binding_publish", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+        static final MethodHandle FUTURE = handle("stage_binding_future", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+        static final MethodHandle STATUS = handle("stage_binding_status", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+        static final MethodHandle LOOKUP = handle("stage_binding_lookup", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+        static final MethodHandle CALLBACK = handle("stage_callback_create", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
+        static final MethodHandle CALLBACK_RELEASE = handle("stage_callback_release", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+        static final MethodHandle CALLBACK_DRIVER = handle("stage_callback_driver", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
+        static final MethodHandle INVOKE = handle("stage_binding_invoke", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
+        static final MethodHandle PIN_TASK = handle("stage_binding_pin_task", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
+        static final MethodHandle STATISTICS = handle("stage_binding_statistics", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    }
+    /** Native binding/callback/consumer counts, not allocator or process bytes. */
+    static long[] stageBindingStatistics() {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment output = arena.allocate(9L * Long.BYTES, Long.BYTES);
+            StageBindings.STATISTICS.invokeExact(output);
+            return output.toArray(ValueLayout.JAVA_LONG);
+        } catch (Throwable failure) { return raise(failure); }
+    }
+
+    /** Per-holder weak projections plus roots scoped to genuine active calls.
+     * No global registry, future truth cache or post-call task/map/cache root. */
+    private static final class StageRoots {
+        private final java.lang.ref.ReferenceQueue<StageProjection> queue = new java.lang.ref.ReferenceQueue<>();
+        private final java.util.Map<Long, StageRoot> roots = new java.util.HashMap<>();
+        private static final class StageRoot extends java.lang.ref.WeakReference<StageProjection> {
+            final long key;
+            StageRoot(StageBinding binding, java.lang.ref.ReferenceQueue<StageProjection> queue) {
+                super(binding.projection, queue); key = binding.key;
+            }
+        }
+        private void drain() {
+            StageRoot retired;
+            while ((retired = (StageRoot)queue.poll()) != null) roots.remove(retired.key, retired);
+        }
+        private TaskFrame captures;
+        synchronized void begin(TaskFrame frame) {
+            frame.captureNext = captures; captures = frame;
+        }
+        synchronized void end(TaskFrame frame) {
+            TaskFrame previous = null;
+            for (TaskFrame current = captures; current != null; current = current.captureNext) {
+                if (current == frame) {
+                    if (previous == null) captures = current.captureNext;
+                    else previous.captureNext = current.captureNext;
+                    frame.captureNext = null;
+                    if (frame.stageCandidates != null) frame.stageCandidates.clear();
+                    return;
+                }
+                previous = current;
+            }
+            throw new IllegalStateException("Missing native stage invocation roots");
+        }
+        synchronized void put(StageBinding binding) {
+            drain(); roots.put(binding.key, new StageRoot(binding, queue));
+            // VM projections must survive custom virtual code between admission
+            // and the actual task's capture of its returned future. No lock spans
+            // that code. Native pending custody takes over after exact capture.
+            for (TaskFrame frame = captures; frame != null; frame = frame.captureNext) {
+                if (frame.stageCandidates == null) frame.stageCandidates = new java.util.ArrayList<>();
+                frame.stageCandidates.add(binding);
+            }
+        }
+        synchronized StageProjection get(long key) { drain(); StageRoot root = roots.get(key); return root == null ? null : root.get(); }
+    }
+
+    /** Weak future identity projection. Actual pending VM rows retain this,
+     * while their native rows independently retain the binding Arc. Collection
+     * of a facade must not erase identities needed by a later native consumer. */
+    static final class StageProjection {
+        final long key;
+        volatile java.lang.ref.WeakReference<CompletableFuture<?>> work, slot;
+        private java.lang.ref.WeakReference<StageBinding> facade;
+        StageProjection(StageBinding binding) {
+            key = binding.key; facade = new java.lang.ref.WeakReference<>(binding);
+        }
+        synchronized StageBinding capture(Holder holder) {
+            StageBinding binding = facade.get();
+            if (binding != null) return binding;
+            Arena arena = Arena.ofAuto();
+            binding = new StageBinding(holder, this, arena);
+            if (binding.id == 0) return null;
+            holder.publishStageRoot(binding);
+            facade = new java.lang.ref.WeakReference<>(binding);
+            return binding;
+        }
+    }
+
+    /** Managed facade of one native binding; actual callback VM resources live
+     * in the callback itself. Holding this facade cannot retain its holder/step. */
+    static final class StageBinding {
+        final long id, key, holderId;
+        final MemorySegment owner;
+        final StageProjection projection;
+        StageBinding(Holder holder, ChunkStatus status) {
+            Arena arena = Arena.ofAuto();
+            holderId = holder.id;
+            long created;
+            try { created = (long)StageBindings.CREATE.invokeExact(holder.id, canonicalIndex(status)); }
+            catch (Throwable failure) { throw failure(failure); }
+            if (created == 0) throw new OutOfMemoryError("Native stage binding allocation failed");
+            id = created;
+            owner = adopt(created, 1, arena, StageBindings.RELEASE);
+            try {
+                key = (long)StageBindings.KEY.invokeExact(id);
+                projection = new StageProjection(this);
+                holder.publishStageRoot(this);
+                StageBindings.PUBLISH.invokeExact(id);
+            } catch (Throwable failure) { throw failure(failure); }
+            finally { Reference.reachabilityFence(holder); Reference.reachabilityFence(this); }
+        }
+        private StageBinding(Holder holder, StageProjection projection, Arena arena) {
+            holderId = holder.id; key = projection.key; this.projection = projection;
+            long claimed;
+            try { claimed = (long)StageBindings.CLAIM.invokeExact(holder.id, key); }
+            catch (Throwable failure) { throw failure(failure); }
+            finally { Reference.reachabilityFence(holder); }
+            id = claimed;
+            owner = claimed == 0 ? MemorySegment.NULL : adopt(claimed, 1, arena, StageBindings.RELEASE);
+        }
+        synchronized void bindFuture(CompletableFuture<?> future, int role) {
+            if (future == null) return;
+            var prior = role == 0 ? projection.work : projection.slot;
+            if (prior != null && prior.get() == future) return;
+            var root = new java.lang.ref.WeakReference<CompletableFuture<?>>(future);
+            if (role == 0) projection.work = root; else projection.slot = root;
+            try { StageBindings.FUTURE.invokeExact(id, role, System.identityHashCode(future)); }
+            catch (Throwable failure) { if (role == 0) projection.work = prior; else projection.slot = prior; NativeChunkGeneration.<RuntimeException,Object>raise(failure); }
+            finally { Reference.reachabilityFence(this); }
+            if (future instanceof ChunkFuture<?> owned) owned.stageBinding = new java.lang.ref.WeakReference<>(this);
+        }
+        synchronized boolean matches(CompletableFuture<?> future) {
+            var first = projection.work; var second = projection.slot;
+            return first != null && first.get() == future || second != null && second.get() == future;
+        }
+        StageCallback callback() { return new StageCallback(this); }
+        void bindInvocation(long driver) {
+            try { StageBindings.INVOKE.invokeExact(driver, id); }
+            catch (Throwable failure) { NativeChunkGeneration.<RuntimeException,Object>raise(failure); }
+            finally { Reference.reachabilityFence(this); }
+        }
+        static StageBinding capture(Holder holder, CompletableFuture<?> future) {
+            if (holder == null || future == null) return null;
+            if (future instanceof ChunkFuture<?> owned) {
+                var root = owned.stageBinding;
+                StageBinding binding = root == null ? null : root.get();
+                if (binding != null && binding.holderId == holder.id && binding.matches(future)) return binding;
+            }
+            StageRoots roots = holder.stageRoots;
+            if (roots == null) return null;
+            long driver = 0;
+            StageBinding candidate = null, selected = null;
+            try {
+                driver = (long)StageBindings.LOOKUP.invokeExact(holder.id, System.identityHashCode(future));
+                if (driver == 0) return null;
+                long response = 0;
+                while (stageNext(driver, response) == 1) {
+                    int operation = (int)stageCommand(driver);
+                    long key = readWord(driver, 24L, 16L);
+                    if (operation == 1) { StageProjection projection = roots.get(key); candidate = projection == null ? null : projection.capture(holder); response = candidate != null && candidate.matches(future) ? 1 : 0; }
+                    else if (operation == 2) { selected = candidate; response = 0; }
+                    else throw new IllegalStateException("Invalid native binding lookup effect " + operation);
+                }
+                return selected;
+            } catch (Throwable failure) { return raise(failure); }
+            finally { stageRelease(driver); Reference.reachabilityFence(holder); Reference.reachabilityFence(candidate); }
+        }
+    }
+    /** A real callable callback owns a separate native lease of its binding. */
+    static final class StageCallback {
+        final StageBinding binding;
+        final MemorySegment owner;
+        final long id;
+        StageCallback(StageBinding binding) {
+            this.binding = binding;
+            Arena arena = Arena.ofAuto();
+            long created;
+            try { created = (long)StageBindings.CALLBACK.invokeExact(binding.id); }
+            catch (Throwable failure) { throw failure(failure); }
+            if (created == 0) throw new OutOfMemoryError("Native stage callback allocation failed");
+            id = created; owner = adopt(created, 1, arena, StageBindings.CALLBACK_RELEASE);
+            Reference.reachabilityFence(binding);
+        }
+        long open() {
+            try {
+                long driver = (long)StageBindings.CALLBACK_DRIVER.invokeExact(id);
+                if (driver == 0) throw new OutOfMemoryError("Native stage completion invocation allocation failed");
+                return driver;
+            } catch (Throwable failure) { return raise(failure); }
+            finally { Reference.reachabilityFence(this); }
+        }
+    }
+    static int stageNext(long driver, long response) {
+        try {
+            int result = (int)TaskBindings.DRIVER_NEXT.invokeExact(driver, response);
+            if (result < 0) throw new IllegalStateException("Native stage invocation failed without a VM exception");
+            return result;
+        } catch (Throwable failure) { return raise(failure); }
+    }
+    static long stageCommand(long driver) { return readWord(driver, 24L, 0L); }
+    static void stageRelease(long driver) { if (driver != 0) releaseHandle(TaskBindings.DRIVER_RELEASE, driver); }
 
     private static final class StageStatistics {
         static final MethodHandle READ = handle("stage_statistics", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
@@ -477,6 +685,24 @@ public final class NativeChunkGeneration {
         private final Object[] references = new Object[FULL_STATUS_BASE + 2];
         private final long[] publicationTags = new long[FULL_STATUS_BASE];
         private volatile StatusReference startedReference;
+        private volatile StageRoots stageRoots;
+        private synchronized StageRoots stageRoots() {
+            if (stageRoots == null) stageRoots = new StageRoots();
+            return stageRoots;
+        }
+        private void publishStageRoot(StageBinding binding) { stageRoots().put(binding); }
+        void bindStageSlot(ChunkStatus status, CompletableFuture<?> future) {
+            StageRoots roots = stageRoots;
+            if (roots == null || future == null) return;
+            try {
+                long key = (long)StageBindings.STATUS.invokeExact(id, canonicalIndex(status));
+                StageProjection projection = roots.get(key);
+                StageBinding binding = projection == null ? null : projection.capture(this);
+                if (binding != null) binding.bindFuture(future, 1);
+            } catch (Throwable failure) { NativeChunkGeneration.<RuntimeException,Object>raise(failure); }
+            finally { Reference.reachabilityFence(this); }
+        }
+
 
         Holder() {
             Arena arena = Arena.ofAuto();
@@ -955,6 +1181,7 @@ public final class NativeChunkGeneration {
 
         GenerationChunkHolder center() { return cache.get(pos.x, pos.z); }
 
+        private record PendingStage(CompletableFuture<ChunkResult<ChunkAccess>> future, StageProjection projection) {}
         private synchronized void pin(int row, Object value) {
             if (row <= 0) throw new IllegalStateException("Invalid generation task reference");
             if (row > references.length) references = Arrays.copyOf(references, Math.max(row, references.length * 2));
@@ -964,9 +1191,16 @@ public final class NativeChunkGeneration {
 
         @SuppressWarnings("unchecked")
         private synchronized CompletableFuture<ChunkResult<ChunkAccess>> future(int row) {
-            return (CompletableFuture<ChunkResult<ChunkAccess>>)references[row - 1];
+            Object value = references[row - 1];
+            return value instanceof PendingStage stage ? stage.future : (CompletableFuture<ChunkResult<ChunkAccess>>)value;
         }
 
+        private synchronized Object pendingStage(int row) { return references[row - 1]; }
+        private void pinStageBinding(int row, long driver) {
+            try { StageBindings.PIN_TASK.invokeExact(id, row, driver); }
+            catch (Throwable failure) { NativeChunkGeneration.<RuntimeException,Object>raise(failure); }
+            finally { Reference.reachabilityFence(this); }
+        }
         private synchronized void unpin(int row) { references[row - 1] = null; }
 
         long cacheReleaseCount() {
@@ -981,6 +1215,7 @@ public final class NativeChunkGeneration {
             try {
                 driver = (long)TaskBindings.DRIVER_CREATE.invokeExact(id);
                 if (driver == 0) throw new OutOfMemoryError("Native generation task continuation allocation failed");
+                frame.driver = driver;
                 long response = 0;
                 while (true) {
                     int result = (int)TaskBindings.DRIVER_NEXT.invokeExact(driver, response);
@@ -1011,6 +1246,10 @@ public final class NativeChunkGeneration {
     private static final class TaskFrame {
         final Task owner;
         CompletableFuture<ChunkResult<ChunkAccess>> future;
+        long driver;
+        StageProjection stageProjection;
+        TaskFrame captureNext;
+        java.util.ArrayList<StageBinding> stageCandidates;
         ChunkResult<ChunkAccess> result;
         CompletableFuture<?> waiting;
         Throwable failure;
@@ -1042,24 +1281,46 @@ public final class NativeChunkGeneration {
             switch (op) {
                 case 1: {
                     var pyramid = token == 0 ? ChunkPyramid.LOADING_PYRAMID : ChunkPyramid.GENERATION_PYRAMID;
-                    CompletableFuture<ChunkResult<ChunkAccess>> completableFuture =
-                        frame.cell.applyStep(pyramid.getStepTo(STATUSES.get(a)), owner.map, owner.cache);
-                    frame.future = completableFuture;
+                    Holder holder = GenerationChunkHolder.generationOwner(frame.cell);
+                    StageRoots capture = holder == null ? null : holder.stageRoots();
+                    if (capture != null) capture.begin(frame);
+                    CompletableFuture<ChunkResult<ChunkAccess>> completableFuture;
+                    try {
+                        completableFuture = frame.cell.applyStep(pyramid.getStepTo(STATUSES.get(a)), owner.map, owner.cache);
+                        frame.future = completableFuture;
+                        StageBinding binding = StageBinding.capture(holder, completableFuture);
+                        frame.stageProjection = binding == null ? null : binding.projection;
+                        if (binding != null) binding.bindInvocation(frame.driver);
+                        binding = null; // native invocation owns the lease before any VM query
+                    } finally { if (capture != null) capture.end(frame); }
+                    // The native invocation now owns the actual Arc across these
+                    // genuine VM queries; the Java frame keeps only its projection.
                     ChunkResult<ChunkAccess> chunkResult = completableFuture.getNow(null);
                     frame.result = chunkResult;
-                    // The original immediate path has no task-state check or
-                    // mutation between these calls. Reentry gets its own frame;
-                    // keep these exact returned objects through every callback.
                     return chunkResult == null ? 0 : chunkResult.isSuccess() ? 1 : 2;
                 }
                 case 2: {
-                    if (token != 0) frame.future = owner.future((int)token);
+                    if (token != 0) {
+                        Object entry = owner.pendingStage((int)token);
+                        if (entry instanceof Task.PendingStage stage) {
+                            frame.future = stage.future; frame.stageProjection = stage.projection;
+                        } else {
+                            frame.future = (CompletableFuture<ChunkResult<ChunkAccess>>)entry; frame.stageProjection = null;
+                        }
+                    }
                     CompletableFuture<ChunkResult<ChunkAccess>> completableFuture = frame.future;
                     frame.result = completableFuture.getNow(null);
                     return frame.result == null ? 0 : 1;
                 }
                 case 3: return frame.result.isSuccess() ? 1 : 0;
-                case 4: owner.pin((int)token, frame.future); return 0;
+                case 4:
+                    if (frame.stageProjection == null) owner.pin((int)token, frame.future);
+                    else {
+                        owner.pin((int)token, new Task.PendingStage(frame.future, frame.stageProjection));
+                        try { owner.pinStageBinding((int)token, frame.driver); }
+                        catch (Throwable failure) { owner.unpin((int)token); throw failure; }
+                    }
+                    return 0;
                 case 5: owner.unpin((int)token); return 0;
                 // getNow may have reentered, removed the entry and reused its
                 // row. Return the strong future captured BEFORE that callback.

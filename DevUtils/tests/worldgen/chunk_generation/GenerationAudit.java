@@ -57,6 +57,14 @@ public final class GenerationAudit {
         } catch (ClassNotFoundException | NoSuchMethodException absentOnOriginal) { return new long[0]; }
     }
 
+    static long[] nativeBindingStats() throws Exception {
+        try {
+            var method = Class.forName("net.minecraft.server.level.NativeChunkGeneration").getDeclaredMethod("stageBindingStatistics");
+            method.setAccessible(true);
+            return (long[])method.invoke(null);
+        } catch (ClassNotFoundException | NoSuchMethodException absentOnOriginal) { return new long[0]; }
+    }
+
     static void consume(ChunkAccess chunk, ChunkPos pos) {
         if (!(chunk instanceof LevelChunk) || chunk.getPersistedStatus() != ChunkStatus.FULL || !chunk.getPos().equals(pos))
             throw new AssertionError("request returned a partial or wrong FULL chunk");
@@ -87,6 +95,7 @@ public final class GenerationAudit {
         var source = level.getChunkSource();
         long[] before = nativeStats();
         long[] stageBefore = nativeStageStats();
+        long[] bindingBefore = nativeBindingStats();
         long start = System.nanoTime();
         boolean orderedFeatures = Boolean.getBoolean("generation.orderedFeatures");
         if (orderedFeatures) FullGenAudit.decorateInOrder(server, level, List.of(pos));
@@ -168,6 +177,16 @@ public final class GenerationAudit {
         row.put("native_before", before);
         row.put("native_after", nativeStats());
         long[] stageAfter = nativeStageStats();
+        long[] bindingAfter = nativeBindingStats();
+        row.put("native_binding_before", bindingBefore);
+        row.put("native_binding_after", bindingAfter);
+        if (Boolean.getBoolean("generation.requireNativeStageBinding")) {
+            if (bindingBefore.length != 9 || bindingAfter.length != 9)
+                throw new AssertionError("actual server has no native stage binding owner");
+            if (bindingAfter[1] - bindingBefore[1] < 2 || bindingAfter[4] - bindingBefore[4] < 2
+                    || bindingAfter[6] - bindingBefore[6] < 2 || bindingAfter[7] - bindingBefore[7] < 2)
+                throw new AssertionError("actual FULL requests did not create, dispatch and consume native bindings");
+        }
         row.put("native_stage_before", stageBefore);
         row.put("native_stage_after", stageAfter);
         if (Boolean.getBoolean("generation.requireNativeStageControl")) {
@@ -193,8 +212,19 @@ public final class GenerationAudit {
         if (rows.size() != selected.size()) throw new AssertionError("requested dimension missing");
         if (!server.submit(() -> server.saveEverything(true, true, true)).get(120, TimeUnit.SECONDS))
             throw new AssertionError("save failed");
+        long[] bindingBeforeRetirement = nativeBindingStats();
+        long[] bindingRetired = bindingBeforeRetirement;
+        if (Boolean.getBoolean("generation.requireNativeStageBinding")) {
+            for (int i = 0; i < 100; i++) {
+                System.gc(); Thread.sleep(20);
+                bindingRetired = nativeBindingStats();
+                if (bindingRetired[2] > 0 && bindingRetired[5] > 0) break;
+            }
+            if (bindingRetired[2] == 0 || bindingRetired[5] == 0)
+                throw new AssertionError("actual server never retired native binding and callback resources");
+        }
         var gson = new GsonBuilder().setPrettyPrinting().create();
-        Files.writeString(OUTPUT.resolve("complete.json"), gson.toJson(Map.of("success", true, "rows", rows, "native_final", nativeStats())));
+        Files.writeString(OUTPUT.resolve("complete.json"), gson.toJson(Map.of("success", true, "rows", rows, "native_final", nativeStats(), "native_binding_before_retirement", bindingBeforeRetirement, "native_binding_after_retirement", bindingRetired)));
         System.out.println("GENERATION_PROBE_COMPLETE");
         server.halt(false);
     }

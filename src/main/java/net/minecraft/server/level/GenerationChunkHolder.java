@@ -46,16 +46,70 @@ public abstract class GenerationChunkHolder {
 
     CompletableFuture<ChunkResult<ChunkAccess>> applyStep(
             ChunkStep step, GeneratingChunkMap map, StaticCache2D<GenerationChunkHolder> cache) {
-        StageFrame frame = new StageFrame(step, map, cache, null, null);
+        StageAdmission frame = new StageAdmission(step, map, cache);
         this.generation.futureControl(8, frame);
         return frame.returned;
     }
 
-    private ChunkResult<ChunkAccess> completeStage(ChunkStep step, ChunkAccess chunk, Throwable failure) {
-        StageFrame frame = new StageFrame(step, null, null, chunk, failure);
-        this.generation.futureControl(9, frame);
-        return frame.returnedResult;
+    /** Actual callback roots are independent of task membership and cancellation. */
+    private static final class BoundStageCallback implements java.util.function.BiFunction<ChunkAccess, Throwable, ChunkResult<ChunkAccess>> {
+        final GenerationChunkHolder holder;
+        final ChunkStep step;
+        final NativeChunkGeneration.StageCallback binding;
+        BoundStageCallback(GenerationChunkHolder holder, ChunkStep step, NativeChunkGeneration.StageBinding binding) {
+            this.holder = holder; this.step = step; this.binding = binding.callback();
+        }
+        @Override public ChunkResult<ChunkAccess> apply(ChunkAccess chunk, Throwable failure) {
+            return holder.completeBoundStage(binding, step, chunk, failure);
+        }
     }
+
+    /** VM resources are invocation locals. Rust's callback lease selects the
+     * existing completion policy; repeated/concurrent calls never share locals. */
+    private ChunkResult<ChunkAccess> completeBoundStage(NativeChunkGeneration.StageCallback binding,
+            ChunkStep step, ChunkAccess chunk, Throwable failure) {
+        ChunkStatus requested = null;
+        ChunkResult<ChunkAccess> result = null, returnedResult = null;
+        CompletableFuture<ChunkResult<ChunkAccess>> current = null, candidate = null;
+        long driver = binding.open();
+        try {
+            long response = 0;
+            while (NativeChunkGeneration.stageNext(driver, response) == 1) {
+                long command = NativeChunkGeneration.stageCommand(driver);
+                int operation = (int)command, slot = (int)(command >>> 32);
+                response = 0;
+                switch (operation) {
+                    case 80: requested = step.targetStatus(); break;
+                    case 90: response = failure == null ? 0 : 1; break;
+                    case 91:
+                        CrashReport report = CrashReport.forThrowable(failure, "Exception chunk generation/loading");
+                        MinecraftServer.setFatalException(new ReportedException(report));
+                        break;
+                    case 92: result = ChunkResult.of(chunk); break;
+                    case 93: returnedResult = ChunkResult.of(chunk); break;
+                    case 2: response = requested.getIndex(); break;
+                    case 3:
+                        current = (CompletableFuture<ChunkResult<ChunkAccess>>)generation.future(slot);
+                        response = current == null ? 0 : 1; break;
+                    case 5:
+                        current = (CompletableFuture<ChunkResult<ChunkAccess>>)generation.compareFuture(slot, null, candidate);
+                        response = current == null ? 0 : 1; break;
+                    case 12: candidate = NativeChunkGeneration.completedChunkFuture(result); break;
+                    case 13: response = current.complete(result) ? 1 : 0; break;
+                    case 14: response = current.getNow(NOT_DONE_YET).isSuccess() ? 1 : 0; break;
+                    case 15: throw new IllegalStateException("Trying to complete a future but found it to be completed successfully already");
+                    case 16: Thread.yield(); break;
+                    default: throw new IllegalStateException("Invalid native stage completion effect " + operation);
+                }
+            }
+            return returnedResult;
+        } finally {
+            NativeChunkGeneration.stageRelease(driver);
+            java.lang.ref.Reference.reachabilityFence(binding);
+            java.lang.ref.Reference.reachabilityFence(this);
+        }
+    }
+
 
 	protected void updateHighestAllowedStatus(ChunkMap chunkMap) {
 		this.generation.futureControl(5, new FutureFrame(null, null, null, chunkMap));
@@ -170,20 +224,16 @@ public abstract class GenerationChunkHolder {
 
     /** Opaque invocation resources. Native control selects every stage branch;
      * the installed callback captures only its original holder and step. */
-    private final class StageFrame extends FutureFrame {
+    private final class StageAdmission extends FutureFrame {
         final ChunkStep step;
         GeneratingChunkMap engineMap;
         StaticCache2D<GenerationChunkHolder> cache;
         ChunkStatus parent, previous;
         CompletableFuture<ChunkAccess> engine;
-        final ChunkAccess chunk;
-        final Throwable failure;
-        ChunkResult<ChunkAccess> returnedResult;
-        StageFrame(ChunkStep step, GeneratingChunkMap map, StaticCache2D<GenerationChunkHolder> cache,
-                ChunkAccess chunk, Throwable failure) {
+        NativeChunkGeneration.StageBinding binding;
+        StageAdmission(ChunkStep step, GeneratingChunkMap map, StaticCache2D<GenerationChunkHolder> cache) {
             super(null, null, null);
             this.step = step; this.engineMap = map; this.cache = cache;
-            this.chunk = chunk; this.failure = failure;
         }
         @Override public long apply(int operation, int slot) {
             switch (operation) {
@@ -204,19 +254,13 @@ public abstract class GenerationChunkHolder {
                     engine = map.applyStep(GenerationChunkHolder.this, step, selectedCache);
                     break;
                 case 88:
-                    GenerationChunkHolder holder = GenerationChunkHolder.this;
-                    ChunkStep capturedStep = step;
                     CompletableFuture<ChunkAccess> actual = engine;
                     engine = null;
-                    returned = actual.handle((value, error) -> holder.completeStage(capturedStep, value, error));
+                    returned = actual.handle(new BoundStageCallback(GenerationChunkHolder.this, step, binding));
+                    binding.bindFuture(returned, 0);
                     break;
-                case 90: return failure == null ? 0 : 1;
-                case 91:
-                    CrashReport report = CrashReport.forThrowable(failure, "Exception chunk generation/loading");
-                    MinecraftServer.setFatalException(new ReportedException(report));
-                    break;
-                case 92: result = ChunkResult.of(chunk); break;
-                case 93: returnedResult = ChunkResult.of(chunk); break;
+                case 94: binding = new NativeChunkGeneration.StageBinding(generation, requested); break;
+                case 95: generation.bindStageSlot(requested, returned); break;
                 default: return super.apply(operation, slot);
             }
             return 0;

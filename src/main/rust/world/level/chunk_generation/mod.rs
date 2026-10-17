@@ -11,6 +11,7 @@ pub(crate) mod ffi;
 mod request;
 mod readiness;
 mod stage;
+mod stage_binding;
 
 use std::sync::{atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU64, Ordering}, Arc, Mutex};
 
@@ -136,6 +137,7 @@ pub(crate) struct Holder {
     fields: Box<[AtomicU64]>,
     reservations: Box<[AtomicU64]>,
     next_future_epoch: AtomicU64,
+    stage_bindings: Mutex<stage_binding::Bindings>,
 }
 
 impl Holder {
@@ -156,6 +158,7 @@ impl Holder {
             fields: fields.into_boxed_slice(),
             reservations: reservations.into_boxed_slice(),
             next_future_epoch: AtomicU64::new(1),
+            stage_bindings: Mutex::new(stage_binding::Bindings::default()),
         })
     }
 
@@ -222,10 +225,13 @@ struct TaskPolicy {
     foreign_radius: Option<i32>,
 }
 
+struct PendingStage { row: u32, binding: Option<Arc<stage_binding::Binding>> }
+
 struct TaskState {
     scheduled: i32,
     needs_generation: bool,
-    pending: Vec<u32>,
+    pending: Vec<PendingStage>,
+    pending_bindings: std::collections::HashMap<u32, Arc<stage_binding::Binding>>,
     pins: State,
 }
 
@@ -260,7 +266,7 @@ impl Task {
         Some(Self {
             target, x, z, cache_radius, policy,
             cancelled: AtomicBool::new(false),
-            state: Mutex::new(TaskState { scheduled: -1, needs_generation: false, pending: Vec::new(), pins }),
+            state: Mutex::new(TaskState { scheduled: -1, needs_generation: false, pending: Vec::new(), pending_bindings: std::collections::HashMap::new(), pins }),
             release_holders: None,
             cache_release_count: AtomicU64::new(0),
         })
@@ -274,8 +280,8 @@ impl Task {
 
     async fn pending(&self, effects: &mut impl TaskEffects) -> Result<bool, ()> {
         loop {
-            let token = self.lock().pending.last().copied();
-            let Some(token) = token else { return Ok(false); };
+            let selected = self.lock().pending.last().map(|pending| (pending.row, pending.binding.clone()));
+            let Some((token, _binding)) = selected else { return Ok(false); };
             if effects.call(2, 0, 0, 0, token as u64).await? == 0 {
                 effects.call(6, 0, 0, 0, token as u64).await?;
                 return Ok(true);
@@ -284,8 +290,8 @@ impl Task {
             // by a reentrant getNow. Do not replace it with pop-if-token-matches.
             let removed = self.lock().pending.pop();
             let Some(removed) = removed else { effects.call(13, 0, 0, 0, 0).await?; return Err(()); };
-            effects.call(5, 0, 0, 0, removed as u64).await?;
-            self.lock().pins.retire(removed);
+            effects.call(5, 0, 0, 0, removed.row as u64).await?;
+            self.lock().pins.retire(removed.row);
             if effects.call(3, 0, 0, 0, 0).await? == 0 { self.cancel(); }
         }
     }
@@ -309,14 +315,16 @@ impl Task {
     async fn retain_pending(&self, effects: &mut impl TaskEffects) -> Result<(), ()> {
         let row = {
             let mut state = self.lock();
-            if state.pending.try_reserve(1).is_err() { None } else { state.pins.allocate() }
+            if state.pending.try_reserve(1).is_err() || state.pending_bindings.try_reserve(1).is_err() { None } else { state.pins.allocate() }
         };
         let Some(row) = row else { effects.call(12, 0, 0, 0, 0).await?; return Err(()); };
         if effects.call(4, 0, 0, 0, row as u64).await.is_err() {
-            self.lock().pins.retire(row);
+            let retired = { let mut state = self.lock(); state.pins.retire(row); state.pending_bindings.remove(&row) };
+            drop(retired);
             return Err(());
         }
-        self.lock().pending.push(row);
+        let binding = self.lock().pending_bindings.remove(&row);
+        self.lock().pending.push(PendingStage { row, binding });
         Ok(())
     }
 
@@ -477,6 +485,7 @@ pub(crate) struct TaskDriver {
     exchange: Arc<DriverExchange>,
     awaiting: bool,
     terminal: Option<i32>,
+    stage_binding: Option<Arc<stage_binding::Binding>>,
 }
 
 impl TaskDriver {
@@ -491,7 +500,7 @@ impl TaskDriver {
     }
 
     fn from_future(future: std::pin::Pin<Box<dyn std::future::Future<Output = Result<bool, ()>> + Send>>, exchange: Arc<DriverExchange>) -> Self {
-        Self { header: std::array::from_fn(|_| AtomicU64::new(0)), future, exchange, awaiting: false, terminal: None }
+        Self { header: std::array::from_fn(|_| AtomicU64::new(0)), future, exchange, awaiting: false, terminal: None, stage_binding: None }
     }
 
     /// 1=command, 0=finished, 2=waiting, -1=engine failure. No lock/borrow of

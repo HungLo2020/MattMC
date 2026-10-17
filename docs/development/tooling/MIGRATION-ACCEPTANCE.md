@@ -1,87 +1,127 @@
-# Interim migration acceptance
+# Migration acceptance
 
-The owner's October 14, 2026 decisions update the migration workflow: move
-production ownership into Rust without letting temporary boundary costs or a
-separate client-validation queue stall independent work. Correctness remains
-mandatory. This policy applies prospectively; keep historical measurements,
-failed runs and the acceptance rules used for them intact. For interim work,
-this dated policy supersedes older blanket no-slowdown or per-slice client-signoff
-language; it does not retrospectively turn missing evidence into a pass.
+The owner's [October 16 delivery policy](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18984771)
+uses focused correctness and short regression/resource screens for intermediate
+migration increments. Full performance acceptance belongs at completed subsystem
+milestones and final goal acceptance. This supersedes conflicting per-increment
+performance and exception-turn requirements in older assignments and policy text.
+Correctness, save integrity and memory safety remain mandatory. Preserve original
+baselines, failed runs and the rules used for historical acceptance; a policy
+change does not turn missing evidence into a pass.
+
+## System ownership and checkpoints
+
+Assign a complete production subsystem outcome to one worker, with explicit
+cross-owner interfaces and reservations. The worker chooses its connected
+implementation order and internal milestones, and continues until that system
+is complete without asking for another small assignment. Move producers, owned
+state, actual consumers and lifetime together. A wrapper, counter, pooled frame
+or native helper around retained Java policy is not system completion.
+
+Publish coherent, tested checkpoints while retaining responsibility for the
+remaining system. Remove replaced Java implementation where correctness permits;
+keep the original baseline separately. Java may temporarily call a shared Rust
+runtime; the final Rust executable must call that same runtime. Do not create
+duplicate application implementations or a JVM sidecar and call it migration.
+External service dependencies must remain explicit. Subsystem completion does
+not establish the final application-wide no-JVM claim.
+
+Existing ownership fences remain binding until a verified release/handoff.
+Whole-system responsibility does not authorize concurrent writes to reserved
+interfaces, unrelated infrastructure changes or new account/security access.
 
 ## Performance comparisons
 
-Use matched **Frozen** comparisons for interim acceptance. Up to **10% slower**
-is acceptable for the specific migrated workload; up to **25% slower** is acceptable
-when the cost is attributable to the temporary Java/Rust boundary. These are
-alternative allowances, not additive budgets. State which applies and provide
-evidence for a boundary attribution rather than assuming every regression is
-bridge overhead. Record the metric, workload, direction of regression, matched
-configuration and source/native identities so the comparison is reproducible.
+### Intermediate increments
 
-Apply these limits to matched measurements of the **specific workload being
-changed**, not an aggregate whole-application budget. An application already
-40% slower than Frozen does not make a workload measured 10% slower than its
-Frozen equivalent a blocker. Conversely, a small whole-application effect does
-not prove that a workload meets its applicable limit. Track broader application
-regressions separately; do not impose them as an extra gate on an in-budget slice.
+Use a short, trustworthy representative regression/resource screen with actual
+workload and output identity. Record source/classes/native origins, configuration,
+warmup/work, measured latency and noise, memory/retention limits and temporary
+performance debt. Include real boundary/conversion and ownership costs. A noisy
+or inconclusive screen is not a pass; investigate the affected observation.
 
-Pre-change Current comparisons remain useful diagnostics for locating new
-costs; they are not an additional universal acceptance floor. Preserve and
-investigate demonstrated regressions beyond the applicable allowance. Do not
-change workloads, discard inconvenient failures or combine unlike measurements
-to manufacture a pass. Missing or noisy comparisons remain unverified.
+Exhaustive per-increment multi-rotation matrices, per-row causal attribution and
+a coordinator exception turn for ordinary temporary migration overhead are not
+publication prerequisites. Reuse valid unchanged screens with an impact record;
+do not rerun them to fill a new form. Stop remaining optional performance-only
+jobs at safe boundaries once the required screen is satisfied. Preserve completed
+and negative receipts, and do not interrupt valid correctness jobs.
 
-The [owner's October 16 delegation](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18978065)
-allows dot to approve documented, bounded temporary migration-overhead exceptions
-case by case before publication, even when a candidate is slower than pre-change
-Current (`master`). Improvement versus prior master is not an eligibility
-condition. Exceeding the applicable 10%/25% allowance triggers review, not an
-automatic waiver; workers cannot self-approve an exception. Record matched
-measured workloads, exact candidate and baseline SHAs/builds/configurations,
-measured deltas, affected scope, retained Frozen conversion/ownership debt,
-a responsible owner and an ownership-based exit path with verifiable criteria.
-Unrelated slowdowns or broader scope require a new decision. Poor native
-implementations and unexplained regressions still require investigation.
-Correctness/parity, memory safety, save integrity and mandatory validation remain
-strict requirements; historical evidence and Frozen behavior remain unchanged.
+Investigate material unexpected regressions, hangs, runaway allocation/retention
+or unusable behavior. Report the worker's judgement and supporting evidence;
+do not hide costs or label every regression unavoidable bridge overhead. Record
+the responsible owner and a connected ownership-based exit, then continue that
+work within the assigned system instead of polishing individual bridge getters.
 
-Resolve boundary debt by moving the actual producer, storage, consumers and
-lifetime into production Rust. Avoid spending the migration optimizing a
-transitional bridge while its Java owner remains. The allowances do not excuse
-behavior changes, lost content, broken saves or incorrect synchronization;
-retain documented intentional differences and exclusions. They also do not
-replace the separate final native distribution and hardware targets in the
-[accepted migration prompts](https://github.com/HungLo2020/MattMC/blob/master/NEW-MIGRATION-PROMPTS.md).
+### Completed subsystem milestones and final goals
+
+Use full matched **Frozen** performance acceptance at completed subsystem
+milestones and final goal acceptance. Preserve the original Frozen pin and
+hardware targets. Up to **10% slower** is the general workload allowance;
+up to **25% slower** applies when attributable to the temporary Java/Rust
+boundary. These are alternatives, never additive. State the applicable allowance
+and support boundary attribution instead of assuming it.
+
+Apply those thresholds to the specific changed workload, not an aggregate
+whole-application budget. Record matched workload, metric, source/build identities,
+configuration, repetitions, noise and relevant resource costs. A small aggregate
+effect does not establish a workload pass; an unrelated aggregate regression
+is not an extra gate on an in-budget workload. Pre-change Current remains a
+useful diagnostic comparison, not a universal speedup requirement.
+
+The [October 16 delegation](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18978065)
+retains dot's authority to review documented, bounded temporary migration-cost
+exceptions where milestone acceptance requires it. Workers cannot self-approve
+such exceptions. Record exact candidate/baseline identities, matched deltas,
+affected scope, retained Frozen conversion/ownership debt, responsible owner and
+verifiable ownership exit. Poor native implementations and unexplained material
+regressions still require investigation. An intermediate screen or exception
+does not waive correctness or the final native distribution/hardware targets in
+the [accepted migration prompts](https://github.com/HungLo2020/MattMC/blob/master/NEW-MIGRATION-PROMPTS.md).
+
+## Correctness and local publication
+
+Exercise dangerous producer/consumer contracts before freezing for broad final
+tiers: immediate and pending consumers, aliases, callbacks/reentry, error prefixes,
+failure/cancellation, save/reopen and retirement where applicable. A production
+witness must exercise real ownership, not an activity counter alone. Do not
+launch broad campaigns merely because a prototype compiles.
+
+Each worker runs applicable local correctness/subsystem checks, the required
+stable [test tiers](TESTING.md), and affected validation after reconciliation.
+No correctness, save-integrity or memory-safety gate is waived. Record actual
+passes, failures, skips, missing coverage and exact tested inputs. Reuse evidence
+only when scope, dependencies, configuration and fixtures are verified unchanged;
+never silently relabel an older runtime or erase its failed observations.
+
+Use the normal authorized fresh sync-and-push workflow: review the scoped
+checkpoint on current master, reconcile dependencies, run affected checks, make
+one reviewed commit, push without force, and verify the exact remote and required
+CI to a terminal result. No separate coordinator publication turn or unrelated
+device wait is required. Report the completed capability and concrete remaining
+work; continue the owned system after its checkpoint lands.
 
 ## Local publication and rolling client checks
 
-Each worker performs reasonable local correctness and subsystem validation,
-using the [test tiers](TESTING.md) and relevant owner guides. Record the exact
-scope, failed or skipped checks and pending coverage. Source inspection, a
-passing CPU fixture or a documentation build must not be reported as a passing
-rendered client or FPS run.
+The owner's desktop performs accumulated client-render/FPS validation during its
+own normal development tests; it is not a dedicated per-increment signoff queue.
+Locally verified scoped checkpoints may publish with pending client coverage
+explicitly identified. Investigate regressions found by those rolling checks.
+A CPU fixture or documentation build is not a rendered client/FPS pass.
 
-The owner's desktop is the actual client-render/FPS validation location. It
-checks accumulated upstream changes during its **own normal development tests**;
-it is not a dedicated QA queue. Locally verified, scoped slices may publish
-without a separate desktop client/FPS signoff for each slice. Keep independent
-migration work moving while client coverage is pending, and investigate
-regressions when those accumulated checks reveal them. Lack of a historical
-client fixture is a stated coverage limit, not an automatic block on every
-unrelated migration slice.
-
-This does not waive local correctness checks or automatically accept known
-over-limit regressions; those require dot's documented exception review above.
-Keep pending client, visual, streaming and long-session checks explicitly
-pending. Follow the [render verification protocols](../rendering/RENDER-VERIFICATION.md)
-when executing those checks; do not silently weaken their health or image
-assertions. A historical script's strict performance verdict can be reported
-alongside the applicable interim policy, with the original result preserved.
+Follow the [render verification protocols](../rendering/RENDER-VERIFICATION.md)
+when executing those checks. Do not weaken their health/image assertions or
+silently waive required hardware checks. Keep pending client, visual, streaming
+and long-session validation explicit. Original hardware targets remain part of
+completed subsystem/final acceptance.
 
 ## Decision record
 
-- [Workload-specific acceptance, without an aggregate application gate](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18933981)
-
-- [Interim Frozen comparison allowances](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18933044)
+- [October 16 intermediate screens and milestone performance policy](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18984771)
+- [Whole-system world-generation ownership and sole policy-document publisher](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18984776)
+- [Shared Rust runtime, thin temporary Java caller and final no-JVM application](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18985361)
+- [October 16 bounded-exception delegation](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18978065)
+- [Historical workload-specific acceptance without an aggregate application gate](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18933981)
+- [Historical interim Frozen allowances](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18933044)
 - [Desktop client-render/FPS ownership](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18933581)
-- [Rolling checks during the desktop's own development](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18933599)
+- [Rolling desktop development checks](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18933599)

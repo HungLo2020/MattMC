@@ -1,16 +1,19 @@
 # Retained chunk generation
 
-This records native request/holder/task integration; the broader migration
-remains open. S32 stage control passes correctness/runtime gates and has bounded temporary
-cost approval in [decision300](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18983480).
-Published S28 and S25 results remain separately identified below.
+This records native request/holder/task integration; whole world generation
+remains in progress under [assignment318](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18984776).
+The S33 checkpoint connects actual native invocation, pending-consumer and
+callback binding lifetimes. Its intermediate regression/resource screen follows
+[policy317](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18984771);
+completed-system performance acceptance remains required. Published S32, S28
+and S25 results remain separately identified below.
 Its scope is request → retained holder/task
 control → ordered stages → status and FULL publication, including holder readiness,
 visible snapshots and save/send dependencies. The request handoff
 joins the native ticket owner and its actual Ticket, counter and source resources.
 The [ticket storage integration](RUST-TICKET-STORAGE.md) covers live ticket and
-distance-source consumers. Lighting internals, stage algorithms,
-unload policy and save IO remain separate owners.
+distance-source consumers. Stage algorithms remain in their levelgen modules. Lighting internals, unload
+policy and save IO remain separate owners.
 
 [`chunk_generation/`](https://github.com/HungLo2020/MattMC/tree/master/src/main/rust/world/level/chunk_generation)
 owns holder admission, started status, future/task/save-fence membership,
@@ -20,8 +23,8 @@ It also owns pending-task pass order, persisted status, FULL effect ordering and
 the holder lifecycle controller in `request.rs`. Standalone, registered and
 detached holders use the same native incarnation for levels and readiness.
 [`NativeChunkGeneration`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/server/level/NativeChunkGeneration.java)
-and the holder invocation frames retain actual Java futures, status objects and
-engine bindings; they store no
+and its VM effect adapters/callback roots retain actual Java futures, status
+objects and original holder/step resources; they store no
 completion-result cache or second scheduler. The registry attaches the same
 native incarnation; a retained holder owns it independently of registry id reuse. Keep this control out
 of replaceable `NativeChunkInputs` captures.
@@ -187,6 +190,8 @@ Use the bundled JDK and build the intended native profile:
   --tests '*GenerationChunkHolderContractTest' \
   --tests '*ChunkGenerationTaskContractTest' \
   --tests '*ChunkStageInvocationContractTest' \
+  --tests '*ChunkStageBindingContractTest' \
+  --tests '*NativeStageBindingOwnerTest' \
   --tests '*ChunkPublicationContractTest' \
   --tests '*NativePendingGenerationTest' \
   --tests '*NativeGenerationSlotReadTest' \
@@ -410,6 +415,122 @@ is made. Retain invocation state across native producers and consumers through
 genuine VM observation/publication boundaries to remove this temporary churn;
 recheck the same complete workloads and lifetime/save contracts for that exit.
 
+### Native stage binding lifetimes
+
+S33 builds on published S32 `4199640e`/native `e2097036`. Native
+[`stage_binding.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk_generation/stage_binding.rs)
+creates one binding for an actual admitted stage. Registration, each callable
+callback lease, actual native task invocations and pending rows retain that same
+binding. The invocation keeps its Arc across real immediate `getNow`/`isSuccess`
+queries; a pending row takes a separate lease from that invocation. Completion
+opens an independent invocation through the callback lease and composes the
+existing native completion policy. It does not reconstruct a holder-only
+completion operation. Native identities never wrap or rebind after retirement.
+
+The actual Java callback strongly retains its original holder and step. Those
+managed roots survive task cancellation/release and repeated, nested or concurrent
+callback invocations. They do not retain the admission map/cache or engine/work
+future. Rust stores no Java pointers. Per-holder weak VM projections resolve
+native-selected identities against the actual returned futures; native task
+custody survives collection of a Java facade. A pending VM row retains the
+projection and actual future, independently of its native row's binding Arc.
+A later consumer claims that same live native identity and adopts its own
+facade lease; a retired identity cannot be resurrected. These resource bindings
+retain no completion-result cache: virtual `applyStep`, `handle`, `getNow`, `isDone`,
+`complete` and obtrusion retain their genuine objects and original boundaries.
+
+Scope temporary projection roots to the genuine virtual call, including
+collection before a custom override returns. Release those temporary roots after
+actual-future capture and native invocation adoption, before querying the future.
+Keep callback and pending-consumer leases independent.
+Publish a VM projection before native membership. Serialize only private alias
+metadata publication and identity matching, and restore the previous projection
+if its native commit fails. Never hold native table locks across VM effects.
+Retiring an old binding cannot clear a newer binding at the same status. Preserve
+constructor/adoption rollback and independently release callback and task leases;
+completion alone does not make a retained callback uncallable.
+
+Run `ChunkStageBindingContractTest` and `NativeStageBindingOwnerTest` with the
+focused Java suite above. The latter physically collects the callback and Java
+facade while the native pending task remains live, then checks last-use retirement.
+[`VerifyStageBindings.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/worldgen/chunk_generation/VerifyStageBindings.py)
+accepts the same five classpath/runtime/output options as `VerifyChunkStages.py`.
+It runs identical portable contracts on Frozen, complete published S32 and Current;
+its optional native requirement rejects old runtimes only after the actual task
+has run. Missing symbols and compilation failures are not intended controls.
+[`MutateStageBindings.py`](https://github.com/HungLo2020/MattMC/blob/master/DevUtils/tests/worldgen/chunk_generation/MutateStageBindings.py)
+takes `--classpath-file` and `--output`. Its disposable adapter copies exercise
+allocation/adoption failure, concurrent alias publication, rollback, release and
+VM-root retention. Omitting the native pending pin must fail the physical owner
+check after facade collection. Production sources and native images remain sealed.
+
+Add `--require-native-binding` alongside `--require-native-stage` to the real
+server `VerifyChunkGeneration.py` probe. Outside request timers it checks actual
+binding creation, callback dispatch, task consumption and retirement, including
+saved-world reopening. Nine binding statistics report live/created/retired
+bindings, live/created/retired callback leases, completion attempts, consumer
+lease adoptions and the pending-adoption subset. These count registered resource
+handoffs, not every Arc clone, byte totals or cached future truth. Existing stage statistics retain their separate four-word contract.
+
+The `c701b5fd` release image (production source `afba0faa`, Main classes
+`0f76496f`) passes 2,537 ordinary Java tests (six expected skips), 193 parity,
+11 slow and 3,098 Rust tests (nine ignored). Focused coverage passes 126 Java
+cases (four controlled skips), 49 Rust cases, six portable-runtime processes
+and 13 isolated controls: 25 adoption/root positive methods, two alias-positive
+cases and ten intended mutation kills. Real immediate `getNow` collection,
+virtual-return collection, later-consumer reuse, callback/task release and
+last-use retirement are physical ownership checks, not counter-only witnesses.
+
+Actual four-dimension fresh/reopen servers pass the native binding assertions.
+Fresh campaigns generate 648 straight and 648 resumed FULL chunks per runtime:
+Current/pre output is exact; standard Frozen dimensions match; original
+Primordial differences remain separately recorded. Failure rollback, actual
+cancellation, all six player initial/reopen runs, holder lifecycle, dependency
+publication, slot epochs and forced-create failure pass on this same image.
+These headless checks do not certify rendered-client/FPS behavior.
+
+The short representative screen uses the original Frozen `7a4d1817`, immutable
+complete published S32 `4199640e`/`e2097036`, and Current on `11346d05` plus this
+checkpoint. A later four-document sync to `1d9d657b` leaves all tested production
+source/classes/native unchanged. Each process uses 512 warmup requests, 45
+batches of 16 measured requests, 100,000 loaded iterations, 6 GiB heap and CPUs
+4–7. Original eligible Frozen/pre receipts and identical compiled observers are
+reused; earlier prototype Current pairs remain historical. Work/output and image
+seals match, and every cohort has at least five compilation/GC-quiet samples.
+
+| Workload | Current median | Current/Frozen | Current/published S32 |
+|---|---|---|---|
+| Fresh FULL | 2.935239 ms | 5.82338 | 1.28853 |
+| Disk-loaded FULL | 0.957482 ms | 1.61154 | 0.98260 |
+| Loaded request after fresh | 384.728 ns | 11.06555 | 0.98476 |
+| Loaded request after reopen | 386.011 ns | 11.22311 | 0.99831 |
+| Holder read after fresh | 6.06588 ns | 1.72827 | 1.03038 |
+| Holder read after reopen | 5.86257 ns | 1.75124 | 1.00162 |
+
+This records temporary debt, not a normal Frozen-budget pass. Under policy317,
+the sufficient intermediate screen replaces the queued extra 12 performance
+processes; no correctness job was interrupted. Current JVM swap is zero, peak
+RSS is 3.887 GB fresh/2.786 GB reopened, host swap-in is two/three pages and
+swap-out is zero. RSS is whole-process memory, not native allocation accounting.
+
+A bounded instrumented diagnostic retains the original unchanged pre pair and
+reruns only the affected Current pair. Both fresh counted 16-FULL windows make
+35,568 actual holder entries and 192 engine calls. FFM crossings are
+767,127→869,109 fresh and 186,408→186,651 reopened. Current still allocates one
+`StageAdmission` per holder attempt; the actual binding/projection/callback
+objects are created per admitted engine. Instrumented main-thread Java bytes/FULL
+are 323,368→330,028 fresh and 216,587→221,258 reopened; loaded requests remain
+240 bytes. These counts/CPU/allocation observations change code shape and are
+not acceptance timings or pure-FFI/native-allocation/synchronization shares.
+
+HungLoDE/Codex retains complete world-generation ownership. Continue connected
+producer/state/consumer migrations, including remaining Java compatibility and
+shared temperature/cache behavior, rather than treating this checkpoint as system
+completion. Server-owned region/effect and lighting reservations remain fenced.
+Original failed controls, source snapshots, full runtime receipts, screen and
+bounded diagnostic data remain under `build/chunk-generation/s33-*` and
+`build/full-generation/s33-*`; superseded images are not relabeled.
+
 ### Native task stage execution
 
 S32 starts from published S28 `a429c021`/native `53e7d890`. The private
@@ -504,16 +625,13 @@ allocation weights are estimates, not exact production totals or CPU shares.
 Native allocator/Arc/work/synchronization shares remain unresolved. No pure-FFI,
 hard-floor or optimality claim follows.
 
-HungLoDE/Codex owns the remaining invocation-binding debt under dot's routing:
-move retained task/VM-future resource producers, lifetime and consumers together,
-retire per-attempt frames/handoffs while preserving required/custom VM effects,
-then verify unchanged work/roots/save/failure contracts and remeasure these
-workloads. A frame pool alone does not complete that ownership exit. Exact raw
-results, source snapshots, noise and the supplemental baseline source metadata
-remain under `build/chunk-generation/s32-*` and `build/full-generation/s32-*`.
-The original pre manifest remains unchanged; its omitted eleven Java goal/target
-source metadata entries are supplemented separately, and all runtime classes
-were present. No old S28 FULL result is relabeled as this sealed pre execution.
+S32's recorded ownership exit was connected task/VM-future invocation binding
+creation, lifetime and consumers; S33 addresses that ownership above. The S32
+measurements and bounded approval remain historical and do not certify S33.
+Original results/source snapshots remain under `build/chunk-generation/s32-*`
+and `build/full-generation/s32-*`. Its immutable pre manifest's omitted eleven
+Java goal/target metadata entries have a separate supplement; all runtime classes
+were present, and no old FULL output is relabeled as that pre execution.
 
 ### Published S25 slice
 

@@ -86,9 +86,10 @@ column scan and rule loop, including its yields before external requests.
 `ffi.rs` owns the existing surface exports, including the compatibility adapter
 for biome column selection. On eligible chunks, `chunk.rs` evaluates columns
 and commits blocks over [shared native chunk storage](RUST-SURFACE-STORAGE.md);
-Rust also answers eligible gradient/noise/minimum-level requests there. Java
-retains the X/Z column loop, extension-biome lookup, temperature and unsupported
-condition answers, and the badlands/frozen-ocean extensions. Batched rule
+Rust also answers eligible gradient/noise/minimum-level requests there. Eligible storage also uses the native [column pass](RUST-SURFACE-STORAGE.md#column-pass)
+and badlands/frozen-ocean extensions. Compatibility paths retain Java traversal,
+temperature/cache answers and custom callbacks as described in the
+[surface guide](RUST-SURFACE.md). Batched rule
 programs are cached per surface system; extension/continuation programs remain
 per context. Compatibility paths retain Java block commits while using the
 native rule evaluator.
@@ -108,8 +109,13 @@ to Java before continuing.
 search and container replay; Java installs the containers and previous leaf.
 [Carving](carver/RUST-CARVERS.md) owns eligible cave/Nether-cave/canyon loops
 over `proto_chunk/` storage, with Java neighbour/configuration preparation and
-a top-material upcall. Java retains registries, chunk objects, lifecycle and
-later-stage orchestration. Each guide defines its compatibility gates.
+a top-material upcall. Java retains registry/chunk facades and genuine VM lifecycle effects.
+[Retained chunk generation](../chunk-loading/RUST-CHUNK-GENERATION.md) owns
+request/holder/task progression, stage admission/completion and native invocation,
+pending-consumer and callback binding leases. This is an intermediate connected
+checkpoint, not completion of world generation: Java compatibility algorithms,
+shared biome temperature/cache behavior and other documented generation
+dependencies remain. Each guide defines its actual ownership and gates.
 
 ### Heightmaps
 

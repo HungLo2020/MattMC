@@ -150,23 +150,24 @@ new assignment revision before changing shared interfaces or widening scope.
   checkout ownership and publication rules still apply. See the
   [owner clarification](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18962614).
 
-- Assign and migrate large end-to-end vertical slices per agent: actual owned
-  state, production/mutation and its consumers move together into Rust, rather
-  than getter-by-getter ports that preserve repeated call overhead. dot sets
-  non-overlapping ownership and interface boundaries; workers choose the
-  implementation within them. A larger slice does not authorize scope overlap.
-- Stop polishing a temporary bridge when repeated representative complete-cost
-  measurements show bridge/lifetime churn with no credible route to the applicable
-  budget. Finish the attribution needed to identify the ownership gap, then
-  promptly propose one broader, coherent, non-overlapping producer/state/consumer
-  assignment to dot instead of repeated representation or accessor microtuning.
-  Let evidence drive this decision, not an arbitrary experiment count. dot sets
-  the revised boundaries; workers remain autonomous within their active scope
-  and keep independent safe work moving while coordination is pending.
-  Preserve per-workload costs and retained ownership debt. This heuristic changes
-  what to migrate next, not acceptance: correctness stays strict, the existing
-  10%/25% allowances and bounded-exception conditions below remain unchanged,
-  and unexplained slowdowns or poor native algorithms receive no blanket waiver.
+- Assign complete production systems to workers, with explicit non-overlapping
+  interfaces and temporary reservations. Workers choose connected internal
+  milestones and continue to system completion without another mini-assignment.
+  Move actual producers, owned state, consumers and lifetime together into Rust;
+  wrappers, counters, pools and Java-owned policy behind callbacks are not done.
+  Publish coherent tested checkpoints without ending responsibility for the
+  unfinished system. Remove replaced Java implementation where correctness
+  permits, preserving baselines separately. A thin temporary Java caller and the
+  final Rust executable must use the same shared runtime, not duplicate apps or
+  a JVM sidecar. See [owner architecture322](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18985361).
+- Use representative regression/resource evidence to identify bridge/lifetime
+  churn and choose the next connected ownership move inside the assigned system,
+  rather than repeated getter/wrapper microtuning or another small scope request.
+  Preserve per-workload debt and investigate material unexpected regressions,
+  hangs, runaway retention/allocation or unusable behavior. Coordinate actual
+  cross-owner, shared-interface or permission conflicts; continue independent
+  safe owned work while decisions are pending. A reservation transfers only
+  after explicit preserved, verified release/handoff, never elapsed silence.
 - Exercise risky contracts in the first working slice, before broad happy-path
   migration: callbacks, reentry, aliases, custom dispatch and error-prefix
   behavior where applicable. Preserve their observable semantics and add
@@ -190,45 +191,47 @@ new assignment revision before changing shared interfaces or widening scope.
   Reuse exact existing evidence only with recorded impact checks establishing
   that its tested scope, dependencies, configuration and fixtures are unchanged;
   do not relabel an earlier run as testing a new candidate.
-- During development, use focused correctness checks and early representative
-  complete-cost measurements, including boundary/conversion and ownership costs.
-  Run required final validation tiers when the candidate is stable, rather than
-  repeating every expensive tier for each prototype. This sequencing does not
-  weaken any mandatory gate or excuse affected-check reruns after later changes.
-- Correctness regressions are unacceptable. Preserve behavior,
-  test failure/retry/cancellation paths where relevant, and compare performance
-  against the assigned baseline under comparable conditions. Record workload,
-  warmup/repetitions, settings, noise and relevant latency/resource metrics.
-  Noisy/inconclusive results are not a pass; do not trade correctness for speed.
-- Apply the normal [migration acceptance policy](../../../docs/development/tooling/MIGRATION-ACCEPTANCE.md).
-  Standard acceptance requires correctness and matched Frozen-relative results
-  within the applicable allowance: up to 10% slower generally, or up to 25%
-  slower when attributable to the temporary Java/Rust boundary. These allowances
-  are alternatives, never additive. An in-budget migration does not need to
-  improve performance versus Frozen or pre-change Current; pre-change Current
-  remains diagnostic, not an additional acceptance floor. Preserve the policy's
-  workload-specific comparisons, attribution and evidence requirements.
-  Under the [owner's October 16 delegation](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18978065),
-  dot may approve a documented, bounded temporary migration-overhead exception
-  case by case for work beyond the applicable allowance, even when the candidate
-  is slower than pre-change Current (`master`). Improvement versus prior master
-  is not an eligibility condition; pre-change Current remains diagnostic.
-  Only dot may approve this exception before publication; workers cannot
-  self-approve it. Preserve measured Frozen conversion/ownership debt,
-  correctness/parity, memory safety, save integrity and the measured Frozen baseline.
-  Record exact candidate and baseline SHAs/builds, matched workload, measured
-  deltas, affected scope,
-  responsible owner and an ownership-based exit path with verifiable criteria.
-  Exceeding the applicable 10%/25% allowance triggers review, never a blanket exemption;
-  unrelated slowdowns or broader scope need a new decision. This permission
-  does not allow Frozen behavior/performance changes or waived correctness.
-  Poor native implementations and unexplained regressions still require
-  investigation; mandatory validation remains unchanged.
+- Exercise real production ownership and dangerous contracts in focused checks
+  before freezing for broad final tiers, including immediate/pending/later
+  consumers, callbacks, aliases, reentry, failure and retirement. Do not launch
+  broad campaigns merely because a prototype compiles. Run required stable final
+  correctness tiers at coherent publication checkpoints; rerun affected checks
+  after changes/sync, reuse verified unchanged evidence and preserve failures.
+- Apply the [migration acceptance policy](../../../docs/development/tooling/MIGRATION-ACCEPTANCE.md)
+  and [owner policy317](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18984771).
+  **Intermediate increments** need a short trustworthy representative
+  latency/work/resource screen, actual workload/output identity, exact loaded
+  source/class/native origins and recorded temporary debt. Reuse valid existing
+  screens with an impact record. Exhaustive per-increment multi-rotation matrices,
+  per-row causal attribution and a coordinator exception turn for ordinary
+  temporary migration overhead are not publication prerequisites. Stop remaining
+  optional performance-only jobs at safe boundaries once the screen is adequate;
+  never interrupt valid correctness work or discard completed/negative evidence.
+  A noisy/inconclusive screen is not a pass. Investigate material unexpected
+  regressions, hangs, runaway allocation/retention and unusable behavior, recording
+  worker judgement and evidence rather than assuming all cost is unavoidable.
+- **Completed subsystem milestones and final goals** retain full matched Frozen
+  performance acceptance and original hardware targets. The general 10% and
+  attributable temporary Java/Rust boundary 25% allowances are alternatives, not
+  additive. Apply them to the specific workload; pre-change Current remains
+  diagnostic, not a speedup prerequisite. Under the
+  [October 16 delegation](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18978065),
+  dot reviews required bounded milestone exceptions; workers cannot self-approve
+  them. Record identities/configuration, matched deltas, affected scope, retained
+  debt, responsible owner and verifiable ownership exit. An intermediate screen
+  is not a final performance pass or a waiver of correctness, save integrity,
+  memory safety or mandatory/hardware validation. Historical gates/receipts and
+  Frozen behavior remain unchanged; policy317 supersedes older conflicting
+  intermediate performance/exception requirements.
 - Headless/unit checks do not certify gameplay, rendering or hardware-specific
   performance. State missing GPU/display/fixtures honestly and request a
   capability-matched verification assignment. Mandatory missing checks block
   publication; neither workers nor dot silently waive them.
-- A `RESULT` contains goal outcome, exact master base/candidate/published commit, changed scope,
+- A checkpoint reports its completed capability and concrete remaining work;
+  continue the owned system after publication without waiting for another task.
+  Claim system completion only when the actual assigned production outcome and
+  milestone/final acceptance are met. A `RESULT` contains goal outcome, exact master
+  base/candidate/published commit, changed scope,
   reproduction and verification table (pass/fail/not run), comparison evidence,
   limitations, dependencies and remaining decisions. Put the useful result first
   and link detailed artifacts. Do not call unrun tests passed or close/delete

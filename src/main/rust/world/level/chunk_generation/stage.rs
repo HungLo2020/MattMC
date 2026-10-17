@@ -33,11 +33,13 @@ pub(super) async fn admit(effects: &mut impl TaskEffects) -> Result<(), ()> {
         // The native started-status commit precedes both the engine call and
         // actual handle registration, including either synchronous failure.
         ENGINES.fetch_add(1, Ordering::Relaxed);
+        effects.call(94, 0, 0, 0, 0).await?;
         effects.call(87, 0, 0, 0, 0).await?;
         effects.call(88, 0, 0, 0, 0).await?;
     } else {
         effects.call(80, 0, 0, 0, 0).await?;
         super::readiness::get_or_create(effects).await?;
+        effects.call(95, 0, 0, 0, 0).await?;
     }
     Ok(())
 }
@@ -87,12 +89,12 @@ mod tests {
         assert_eq!(ready(admit(&mut e)), Ok(())); assert!(e.expected.is_empty());
     }
     #[test] fn admitted_stage_dispatches_before_actual_handle_registration() {
-        let mut e = Effects::new(&[(80,0),(1,0),(80,0),(81,1),(82,0),(84,1),(87,0),(88,0)]);
+        let mut e = Effects::new(&[(80,0),(1,0),(80,0),(81,1),(82,0),(84,1),(94,0),(87,0),(88,0)]);
         assert_eq!(ready(admit(&mut e)), Ok(())); assert!(e.expected.is_empty());
     }
     #[test] fn existing_stage_rereads_target_then_composes_live_future_request() {
         let mut e = Effects::new(&[(80,0),(1,0),(80,0),(81,0),(83,0),(84,3),(85,0),
-            (80,0),(1,0),(2,1),(3,1),(6,0)]);
+            (80,0),(1,0),(2,1),(3,1),(6,0),(95,0)]);
         assert_eq!(ready(admit(&mut e)), Ok(())); assert!(e.expected.is_empty());
     }
     #[test] fn supplied_engine_failure_reports_before_work_wrapper_without_slot_publication() {
@@ -104,7 +106,7 @@ mod tests {
         assert_eq!(ready(completed(&mut e)), Ok(())); assert!(e.expected.is_empty());
     }
     #[test] fn throwing_engine_keeps_the_admission_prefix_without_register_or_fatal() {
-        let mut e = Effects::new(&[(80,0),(1,0),(80,0),(81,1),(82,0),(84,1),(87,0)]);
+        let mut e = Effects::new(&[(80,0),(1,0),(80,0),(81,1),(82,0),(84,1),(94,0),(87,0)]);
         e.expected.back_mut().unwrap().1 = Err(());
         assert_eq!(ready(admit(&mut e)), Err(())); assert!(e.expected.is_empty());
     }
