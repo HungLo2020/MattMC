@@ -60,10 +60,9 @@ final class NativeLightRequests implements LevelLightEngine.LightRequest {
         }
     }
 
-    private static RuntimeException failed(Throwable failure) {
-        if (failure instanceof Error error) throw error;
-        if (failure instanceof RuntimeException error) return error;
-        return new IllegalStateException("Native lighting request failed", failure);
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> RuntimeException failed(Throwable failure) throws T {
+        throw (T)failure;
     }
 
     public void pre() { run(false); }

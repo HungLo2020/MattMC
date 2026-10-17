@@ -35,6 +35,13 @@ actual identity-resource context. Repeated queued imports can retain the same
 native entry across these producers. This connected handoff is under development;
 the historical map verification below does not certify it.
 
+The [idle-retirement continuation](../chunk/NATIVE-RECLAIMER.md#lighting-idle-retirement-continuation)
+also discharges a finite captured pending set after actual map release on the
+existing reclaimer thread. Its cleanup holds the VM pins weakly, so an idle live
+engine can release retired layers and a custom layer-to-engine cycle can collect.
+Normal scalar reads retain their bounded 64-slot drain; the late-release
+continuation has separate original-Frozen failure and corrected-image evidence.
+
 ## Contracts
 
 - Public constructors supplied with Java maps retain their original aliases,
@@ -71,7 +78,7 @@ the historical map verification below does not certify it.
 - All handles are CPU owners in the existing Rust library. Preserve original
   caller exclusion and publication sequencing; this adds no GPU ownership path.
 
-The unpublished lighting/save continuation retains actual removed layer entries
+The published save-custody continuation (`43f3c309`) retains actual removed layer entries
 for serialization when a neighbor retires their propagation section before the
 active column saves. The cache lives in the native coordinator, shares actual
 entry identity, including newer COW writes, rather than copying bytes early.

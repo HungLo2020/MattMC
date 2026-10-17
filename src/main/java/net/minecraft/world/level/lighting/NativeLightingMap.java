@@ -123,6 +123,16 @@ final class NativeLightingMap {
         // reachability slot, and it is removed when the last slot clears.
         private final java.util.IdentityHashMap<DataLayer,Identity> identities=new java.util.IdentityHashMap<>();
         private ReservationBatch reservationBatch;
+        // The global reclaimer may keep this action alive. It must not keep
+        // pins, custom layers, an engine or a map alive through that action.
+        private static final class RetirementCleanup extends java.lang.ref.WeakReference<IdentityPins> implements Runnable {
+            RetirementCleanup(IdentityPins pins) { super(pins); }
+            public void run() {
+                IdentityPins pins = get();
+                if (pins != null) pins.drainRetiredSnapshot();
+            }
+        }
+        final Runnable retirementCleanup = new RetirementCleanup(this);
         // Cursor/metadata are CPU binding transport only. Native cells own all
         // ready/claimed/cancelled reservation state; no map policy is mirrored.
         private static final class ReservationBatch {
@@ -206,16 +216,32 @@ final class NativeLightingMap {
         private void drain() {
             if((int)INT.getAcquire(pending,0L)==0)return;
             synchronized(this) {
-                try {
-                    int count=(int)bindings.retired.invokeExact(owner,drain,64);
-                    if(count<0)throw new IllegalStateException("Invalid light identity retirement");
-                    for(int i=0;i<count;i++) {
-                        int slot=drain.getAtIndex(ValueLayout.JAVA_INT,i);
-                        put(slot,null);
-                    }
-                    if((int)bindings.ack.invokeExact(owner,drain,count)!=0)throw new IllegalStateException("Invalid light identity acknowledgement");
-                } catch(Throwable error){throw failure(error);}
-                finally {Reference.reachabilityFence(this);}
+                drainBatch();
+            }
+        }
+        private int drainBatch() {
+            try {
+                int count=(int)bindings.retired.invokeExact(owner,drain,64);
+                if(count<0)throw new IllegalStateException("Invalid light identity retirement");
+                for(int i=0;i<count;i++) {
+                    int slot=drain.getAtIndex(ValueLayout.JAVA_INT,i);
+                    put(slot,null);
+                }
+                if((int)bindings.ack.invokeExact(owner,drain,count)!=0)throw new IllegalStateException("Invalid light identity acknowledgement");
+                return count;
+            } catch(Throwable error){throw failure(error);}
+            finally {Reference.reachabilityFence(this);}
+        }
+        /** Discharge the pending set observed after actual native release.
+         * New concurrent work cannot extend this cleanup without bound. */
+        private void drainRetiredSnapshot() {
+            synchronized(this) {
+                long remaining=Integer.toUnsignedLong((int)INT.getAcquire(pending,0L));
+                while(remaining>0) {
+                    int count=drainBatch();
+                    if(count==0)break;
+                    remaining-=count;
+                }
             }
         }
     }
@@ -242,7 +268,7 @@ final class NativeLightingMap {
             // map, which is the existing reclaimer's sole registration referent.
             owner=created.reinterpret(1).asReadOnly();
             metadata=header.reinterpret(2L*Integer.BYTES).asReadOnly();
-            NativeLightBindings.registerMapOwner(this,created);
+            NativeLightBindings.registerMapOwner(this,created,pins.retirementCleanup);
         } catch(Throwable error){
             rollback(bindings.release,created,error);
             throw failure(error);

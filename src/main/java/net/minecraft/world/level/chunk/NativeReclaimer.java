@@ -72,7 +72,7 @@ public final class NativeReclaimer {
     private static final Semaphore GC_REQUEST = new Semaphore(0);
     private static volatile int gcMark = GC_STEP;
 
-    static final class Owner extends PhantomReference<Object> {
+    static class Owner extends PhantomReference<Object> {
         final long address;
         final byte kind;
         final Owner leader;
@@ -96,6 +96,27 @@ public final class NativeReclaimer {
                 LIVE.remove(this);
                 return true;
             }
+        }
+    }
+    /** Additional state belongs only to lighting registrations. The action must
+     * refer weakly to its domain resources, never to this record's referent. */
+    static final class LightOwner extends Owner {
+        private final Runnable cleanup;
+        private boolean notified;
+
+        LightOwner(Object referent, long address, byte kind, Owner leader, Runnable cleanup) {
+            super(referent, address, kind, leader);
+            this.cleanup = cleanup;
+        }
+
+        void released() {
+            synchronized (leader) {
+                if (notified) return;
+                notified = true;
+            }
+            // Both registration and native release have finished before VM
+            // effects run; reentry must not acquire an already-held gate.
+            cleanup.run();
         }
     }
     /** Package-private modeled failure ordering seam; absent in production. */
@@ -180,14 +201,37 @@ public final class NativeReclaimer {
         registerLightMap(map,owner,view,null);
     }
     static void registerLightMap(Object map, MemorySegment owner, MemorySegment view, RegistrationProbe probe) {
+        registerLightMap(map, owner, view, null, probe);
+    }
+    /** Register a paired legacy light map with a weak domain cleanup action.
+     * Each successfully released record notifies, even across batch boundaries. */
+    public static void registerLightMapCleanup(Object map, MemorySegment owner, MemorySegment view, Runnable cleanup) {
+        registerLightMap(map, owner, view, java.util.Objects.requireNonNull(cleanup), null);
+    }
+    static void registerLightMap(Object map, MemorySegment owner, MemorySegment view, Runnable cleanup, RegistrationProbe probe) {
         try {
             validate(map,owner,LIGHT_MAP); validate(map,view,LIGHT_MAP_VIEW);
-            Owner first = new Owner(map,owner.address(),LIGHT_MAP);
-            Owner second = new Owner(map,view.address(),LIGHT_MAP_VIEW,first);
+            Owner first = cleanup == null ? new Owner(map,owner.address(),LIGHT_MAP)
+                : new LightOwner(map,owner.address(),LIGHT_MAP,null,cleanup);
+            Owner second = cleanup == null ? new Owner(map,view.address(),LIGHT_MAP_VIEW,first)
+                : new LightOwner(map,view.address(),LIGHT_MAP_VIEW,first,cleanup);
             registerRecords(first,second,probe);
         } finally {
             Reference.reachabilityFence(map); Reference.reachabilityFence(owner); Reference.reachabilityFence(view);
         }
+    }
+
+    /** The current light-map root owns its borrowed metadata, so it registers
+     * once. Its cleanup action must hold only weak domain references. */
+    public static void registerLightMapOwner(Object map, MemorySegment owner, Runnable cleanup) {
+        registerLightMapOwner(map, owner, cleanup, null);
+    }
+    static void registerLightMapOwner(Object map, MemorySegment owner, Runnable cleanup, RegistrationProbe probe) {
+        try {
+            validate(map, owner, LIGHT_MAP);
+            registerRecords(new LightOwner(map, owner.address(), LIGHT_MAP, null,
+                java.util.Objects.requireNonNull(cleanup)), null, probe);
+        } finally { Reference.reachabilityFence(map); Reference.reachabilityFence(owner); }
     }
 
     /** Registrations not yet released, and releases so far (diagnostics and tests). */
@@ -199,6 +243,7 @@ public final class NativeReclaimer {
         // Thread-confined scratch, allocated once for the process.
         MemorySegment kinds = Arena.global().allocate(BATCH);
         MemorySegment pointers = Arena.global().allocate(ValueLayout.ADDRESS, BATCH);
+        LightOwner[] lighting = new LightOwner[BATCH];
         while (true) {
             try {
                 int count = 0;
@@ -207,23 +252,45 @@ public final class NativeReclaimer {
                     if (owner.claim()) {
                         kinds.set(ValueLayout.JAVA_BYTE, count, owner.kind);
                         pointers.setAtIndex(ValueLayout.JAVA_LONG, count, owner.address);
+                        lighting[count] = owner instanceof LightOwner light ? light : null;
                         if (++count == BATCH) break;
                     }
                     owner = (Owner)QUEUE.poll();
                 }
                 if (count == 0) continue;
-                int released = (int)RELEASE_BATCH.invokeExact(kinds, pointers, count);
-                RELEASED.addAndGet(released);
-                if (released != count) {
-                    LOGGER.error("Native reclaimer stopped at unknown kind {}; {} pointers leaked", kinds.get(ValueLayout.JAVA_BYTE, released), count - released);
-                }
+                releaseBatch(kinds, pointers, count, lighting, RELEASE_BATCH);
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 return;
             } catch (Throwable failure) {
                 LOGGER.error("Native reclaimer batch failed", failure);
+            } finally {
+                // Also discard notification records after a failed downcall;
+                // without a returned prefix no release may be assumed.
+                java.util.Arrays.fill(lighting, null);
             }
         }
+    }
+
+    /** The returned native prefix is the sole authority for notifications.
+     * The handle parameter lets focused tests model partial/failed release
+     * without ever sending their fake addresses to native destruction. */
+    static int releaseBatch(MemorySegment kinds, MemorySegment pointers, int count,
+                            LightOwner[] lighting, MethodHandle release) throws Throwable {
+        int released = (int)release.invokeExact(kinds, pointers, count);
+        if (released < 0 || released > count) throw new IllegalStateException("Invalid native release prefix: " + released);
+        RELEASED.addAndGet(released);
+        for (int i = 0; i < released; i++) {
+            LightOwner owner = lighting[i];
+            if (owner != null) {
+                try { owner.released(); }
+                catch (Throwable failure) { LOGGER.error("Native lighting retirement cleanup failed", failure); }
+            }
+        }
+        if (released != count) {
+            LOGGER.error("Native reclaimer stopped at unknown kind {}; {} pointers leaked", kinds.get(ValueLayout.JAVA_BYTE, released), count - released);
+        }
+        return released;
     }
 
     /**

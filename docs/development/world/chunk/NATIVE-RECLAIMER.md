@@ -53,6 +53,93 @@ releases dead objects in batches of up to 1,024 per downcall.
   chunk biome inputs, light map, light map view. An unknown kind stops the
   batch, and Java logs the leaked count.
 
+## Lighting idle-retirement continuation
+
+A late map release can occur after the live engine's last operation. The
+published `5e933129` bridge then leaves retired VM identity roots pending until
+a later lighting operation. Controlled original-Frozen comparisons reproduce
+this for one layer and for 128 layers in a held prior publication. A single
+64-slot drain does not clear the larger pending set. These negatives remain
+separate from the continuation's verification.
+
+The lighting registration variants add a post-release action only to lighting
+records. `registerLightMapOwner` covers the current root with borrowed metadata;
+`registerLightMapCleanup` covers a paired map/view. Existing registrations retain
+their previous state and allocation shape. The existing reclaimer thread runs
+each action only after the native call reports that record in its completed
+prefix, outside native and registration locks. Map/view order and a pair split
+across the 1,024-record boundary must both work. A failed call or unprocessed
+suffix does not establish release; one throwing action must not suppress other
+completed notifications or cause native pointers to be freed again.
+
+[`NativeLightingMap`](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/lighting/NativeLightingMap.java)
+provides an action holding only a weak reference to its identity pins. A strong
+bound action could root a custom layer that points back to its engine, making
+the entire engine/map cycle immortal. After a successful release, lighting
+captures the current native pending count and clears that finite set in bounded
+transport batches. Native records retain authority over retirement and reuse;
+new concurrent work cannot extend this cleanup indefinitely.
+
+Before broad validation, compile the three `VerifyNativeReclaimer*.java`
+observers in `DevUtils/tests/lighting/coordinator/` against the candidate and run
+their `net.minecraft.world.level.chunk` main classes. Registration/release tests
+use modeled addresses without native destruction; `VerifyNativeReclaimerNativeRelease`
+separately exercises real map/view/counter destruction and partial prefixes.
+Compile `VerifyDelayedLightMapRetirement.java`,
+`VerifyDelayedLightMapBatchRetirement.java` and `VerifyLightMapCleanupCycle.java`
+from `DevUtils/tests/lighting/lifecycle/` once against original Frozen. Run the
+same bytecode on complete preserved images, passing `128` to the batch observer.
+Passing idle rows must collect without the observers' diagnostic explicit drain
+and without increasing the original five-second window. Retain the original
+weak-retirement failure, paired outcomes and pre-bootstrap observer error.
+Keep focused lifetime evidence separate from full save/runtime, resource and
+whole-lighting acceptance.
+
+The `ac11e032` plus continuation image passed the real single-layer and
+128-layer idle checks within the original deadline, without a caller drain.
+Modeled split batches, cancellation, callback failure/reentry and real native
+mixed releases passed separately. The original checked exception objects and
+committed effect prefixes match original Frozen. Saved-byte ordering, custody
+omission controls and 125 fresh chunks with their own reopen passed their
+candidate checks. The 25 known Primordial Frozen differences remain separate.
+
+After the Java-only menu update, `34279686` plus the same continuation passed
+346 focused checks and 2,719 ordinary Java tests with
+10 skips, 193 parity tests and
+11 slow tests. All reports came from actual executed
+tasks and fresh XML. The earlier ordinary failure used a process-wide noise-leaf
+counter that can change when unrelated leaves retire. Its original failure and
+deterministic interference reproduction remain preserved. The corrected scoped
+lifetime assertions rejected actual leaked-builder and premature-vector faults,
+and passed a real unrelated-retirement positive and this full ordinary run. An
+isolated retry alone did not clear the gate.
+
+Both latest images use exactly the same native library. Its actual `ac11e032`
+full native run retained 3,135 passes, 57 exact historical host failures and nine
+ignored tests; it is not green. Source, class, configuration, fixture and dependency
+impact records preserve earlier image scopes instead of relabeling old receipts.
+The original 44/1 weak-retirement run and separate paired 45-pass runs remain
+historical evidence. Detailed raw records are under
+`build/lighting/s0031-idle-map-*` and the corresponding scoped-lifetime folders.
+Whole lighting, source ownership and final performance acceptance remain unfinished.
+
+The intermediate empty-map copy screen first measured 49.926 / 158.916 /
+164.375 ns per copy for original Frozen / published `5e933129` / first hook
+prototype, with 584 / 304 / 312 Java bytes. A fresh `35308d18` plus continuation
+row reused the exact observer bytecode and measured 163.555 ns and 312 Java bytes
+per copy, with ten JIT/GC-quiet samples. Each row made 256 real copies and null
+reads; native rows registered and released 256 roots, all weak roots collected,
+final native-owner delta was zero and swap stayed zero. Its ratios to the original
+published and Frozen rows were 1.029 and 3.276. These retain their actual image
+identities; no new timing is claimed after later unrelated runtime updates.
+
+Only copying is timed; GC/release validation is untimed, and empty maps have no
+pending VM identities. This screen does not measure the large pending-root
+cleanup, unrelated-kind throughput, gameplay or final performance. Frozen cost
+debt remains open. `BenchmarkLightMapRetirement 256` in
+`DevUtils/tests/lighting/lifecycle/` reproduces the workload; preserve its matched
+JVM no-inline boundaries for the untimed release helper and final run lifetime.
+
 ## Chunk slabs
 
 `ChunkAccess.replaceMissingSections` creates a chunk's missing fresh sections

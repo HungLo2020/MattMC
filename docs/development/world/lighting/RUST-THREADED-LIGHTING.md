@@ -99,6 +99,10 @@ transport/lifetime churn remain owned lighting work.
   entry and the unfinished suffix. A nested POST pass can remove the outer
   entry before its removal; the original outer `IndexOutOfBoundsException`
   remains observable. Do not detach a batch or remove entries before callbacks.
+- Preserve the actual `Throwable` object from virtual PRE, propagation and POST
+  effects, including checked exceptions thrown through an unchecked signature.
+  Wrapping a checked object changes the original future cause or direct failure;
+  pending entries and already committed effects must keep their original retry state.
 - Scheduled admission resets only after normal execution. Submission rejection
   or a throwing scheduled runnable leaves it true. Do not add a `finally` reset.
 - Each native call ends before Java effects. There is no native queue borrow or
@@ -130,6 +134,16 @@ transport/lifetime churn remain owned lighting work.
   the resource drain to request completion changes observable weak lifetimes.
 
 ## Verification
+
+`DevUtils/tests/lighting/coordinator/VerifyCheckedLightingEffects.java` observes
+actual level lookup/notification failures and request PRE height/POST
+`setLightCorrect` failures, their effect prefixes and successful retries. Compile
+it once against original Frozen together with the existing threaded observer
+helpers, then run the same bytecode on each complete preserved image with
+`level-lookup`, `level-notify`, `request-pre` and `request-post`. Compare all
+`CHECKED_` rows and verify the loaded native library. The original baseline
+reproduces checked-object wrapping on both published `4c27ffce` and `5e933129`;
+keep those negative receipts separate from validation of the rethrow fix.
 
 The capture/timing runners currently target Linux x64. Use JDK25 and a native
 release build. Build before running the capture or timing

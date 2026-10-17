@@ -9,13 +9,11 @@ import net.minecraft.world.level.chunk.NativeReclaimer;
 /** Actual JVM/native resource handoffs; contains no light policy or membership. */
 final class NativeLightBindings {
     private static final MethodHandle REGISTER;
-    private static final byte MAP_KIND;
     static {
         try {
             var lookup = MethodHandles.privateLookupIn(NativeReclaimer.class, MethodHandles.lookup());
-            REGISTER = lookup.findStatic(NativeReclaimer.class, "register",
-                MethodType.methodType(void.class, Object.class, MemorySegment.class, byte.class));
-            MAP_KIND = (byte)lookup.findStaticGetter(NativeReclaimer.class, "LIGHT_MAP", byte.class).invokeExact();
+            REGISTER = lookup.findStatic(NativeReclaimer.class, "registerLightMapOwner",
+                MethodType.methodType(void.class, Object.class, MemorySegment.class, Runnable.class));
         } catch (Throwable failure) {
             throw new ExceptionInInitializerError(failure);
         }
@@ -27,8 +25,8 @@ final class NativeLightBindings {
 
     NativeLightingMap newMap() { return new NativeLightingMap(this.pins); }
 
-    static void registerMapOwner(Object referent, MemorySegment owner) {
-        try { REGISTER.invokeExact(referent, owner, MAP_KIND); }
+    static void registerMapOwner(Object referent, MemorySegment owner, Runnable cleanup) {
+        try { REGISTER.invokeExact(referent, owner, cleanup); }
         catch (RuntimeException | Error failure) { throw failure; }
         catch (Throwable failure) { throw new IllegalStateException("Native light-map registration failed", failure); }
     }

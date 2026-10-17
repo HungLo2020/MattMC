@@ -78,10 +78,9 @@ final class NativeLevelLighting {
             return (int)command(3,0,false);
         }finally{Reference.reachabilityFence(this);}
     }
-    private static RuntimeException failed(Throwable failure){
-        if(failure instanceof Error error)throw error;
-        if(failure instanceof RuntimeException error)return error;
-        return new IllegalStateException("Native level-light effect failed",failure);
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> RuntimeException failed(Throwable failure) throws T {
+        throw (T)failure;
     }
     void updateStatus(long key,boolean empty){
         command(0,key,empty);

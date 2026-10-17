@@ -257,6 +257,10 @@ not relabel an older Current run as the new candidate.
   layer and source overrides in controls.
 - Source admission rejects incompatible inputs before mutation. Each completed
   native section publishes its queued prefix before later fallible COW work.
+- Level and engine virtual effects preserve the original exception object,
+  including checked exceptions. The level lookup/notification cases in
+  `VerifyCheckedLightingEffects.java` also check committed notification prefixes,
+  pending work and retry behavior against original Frozen.
 - Reentry observes current state. Rejected propagation cannot overwrite callback
   additions with an earlier snapshot. Earlier committed effects survive failure.
 - Empty-update eligibility and public pending work are distinct projections.
