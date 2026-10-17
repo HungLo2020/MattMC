@@ -69,6 +69,8 @@ public final class NativeItemState {
         FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG),java.lang.foreign.Linker.Option.critical(false));
     private static final MethodHandle SLOTS_FACADE_BOUNDED=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_slots_facade_bounded",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG),java.lang.foreign.Linker.Option.critical(false));
+    private static final MethodHandle SLOTS_FACADES_BOUNDED=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_slots_facades_bounded",
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG),java.lang.foreign.Linker.Option.critical(true));
     private static final MethodHandle MENU_EMPTY_BOUNDED=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_item_menu_empty_source_bounded",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG),java.lang.foreign.Linker.Option.critical(false));
     public abstract static class MenuActionEffects {
@@ -1546,6 +1548,32 @@ public final class NativeItemState {
                 value=raw2(SLOTS_GET,this.handle,index);if(value<-1&&!isPending(value))throw new IllegalStateException("Native item owner rejected call: "+value);return value;}
             catch(Throwable failure){throw failed(failure);}
             finally{java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        /** Reused bulk token buffer; only read before any per-index fallback can reenter. */
+        private long[] facadeTokens;
+        /**
+         * Every row in one bounded native read. The first pending or unbound row (and
+         * every later one) takes the original per-index get, so materialization order
+         * and any effect it runs observe exactly the sequential reads.
+         */
+        @Override public synchronized Object[] toArray() {
+            int size=this.capacity;Object[] result=new Object[size];int index=0;
+            if(size>0&&size<=64){
+                long[] tokens=this.facadeTokens;if(tokens==null)this.facadeTokens=tokens=new long[size];
+                long read;
+                try{read=(long)SLOTS_FACADES_BOUNDED.invokeExact(this.ownerAddress,MemorySegment.ofArray(tokens),(long)size);}
+                catch(Throwable failure){throw failed(failure);}
+                finally{java.lang.ref.Reference.reachabilityFence(this);}
+                if(read==size){
+                    for(;index<size;index++){
+                        long token=tokens[index];if(token<0)break;
+                        ItemStack root=this.roots.get(token);if(root==null)break;
+                        result[index]=root;
+                    }
+                }
+            }
+            for(;index<size;index++)result[index]=this.get(index);
+            return result;
         }
         @Override public synchronized ItemStack get(int index) {
             this.checkIndex(index); long token = this.facade(index);

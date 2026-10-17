@@ -30,17 +30,57 @@ class NativeCraftingGridTest {
         var items = List.of(Items.STICK, Items.DIRT, Items.DIAMOND_SWORD, Items.OAK_PLANKS);
         for (int step = 0; step < 400; step++) {
             int slot = random.nextInt(10); // 9 is out of range for getItem
-            switch (random.nextInt(7)) {
+            switch (random.nextInt(8)) {
                 case 0 -> { var item = items.get(random.nextInt(items.size())); grid.setItem(slot % 9, new ItemStack(item, 1 + random.nextInt(new ItemStack(item).getMaxStackSize()))); events.add("set " + slot % 9); }
                 case 1 -> { var taken = grid.removeItem(slot % 9, 1 + random.nextInt(8)); events.add("remove " + taken.getItem() + "x" + taken.getCount()); }
                 case 2 -> { var taken = grid.removeItemNoUpdate(slot % 9); events.add("take " + taken.getItem() + "x" + taken.getCount()); }
                 case 3 -> { var stack = grid.getItem(slot); events.add("get " + slot + " " + stack.getItem() + "x" + stack.getCount()); }
                 case 4 -> events.add("empty " + grid.isEmpty() + " items " + grid.getItems().stream().map(s -> s.getItem() + "x" + s.getCount()).toList());
                 case 5 -> { var contents = new StackedItemContents(); grid.fillStackedContents(contents); events.add("stacked"); }
+                case 6 -> events.add(positioned(grid.asPositionedCraftInput()));
                 default -> { if (random.nextInt(8) == 0) { grid.clearContent(); events.add("clear"); } }
             }
         }
         return events;
+    }
+
+    static String positioned(net.minecraft.world.item.crafting.CraftingInput.Positioned positioned) {
+        var input = positioned.input();
+        return "positioned " + (positioned == net.minecraft.world.item.crafting.CraftingInput.Positioned.EMPTY) + " " + positioned.left() + "," + positioned.top()
+            + " " + input.width() + "x" + input.height() + " n" + input.ingredientCount() + " " + input.items().getClass().getSimpleName()
+            + " " + input.items().stream().map(s -> s.getItem() + "x" + s.getCount()).toList();
+    }
+
+    /** Every shape the native grid admits crops exactly like the original scan, reading the same stacks. */
+    @Test void positionedInputMatchesTheOriginalScan() {
+        AbstractContainerMenu menu = mock(AbstractContainerMenu.class);
+        int[][] shapes = {{1, 1}, {1, 3}, {3, 1}, {2, 2}, {3, 3}, {3, 2}, {2, 3}, {9, 3}, {3, 9}, {27, 1}, {1, 27}};
+        var random = new java.util.Random(31);
+        for (int[] shape : shapes) {
+            int w = shape[0], h = shape[1];
+            for (int trial = 0; trial < 300; trial++) {
+                var exact = new TransientCraftingContainer(menu, w, h);
+                TransientCraftingContainer original = new TransientCraftingContainer(menu, w, h) {};
+                assertNotNull(exact.nativeSlotsForTransfer());
+                int density = random.nextInt(4);
+                for (int i = 0; i < w * h; i++) {
+                    if (density > 0 && random.nextInt(density + 1) == 0) {
+                        var stack = random.nextInt(6) == 0 ? new ItemStack(Items.STICK, 0) : new ItemStack(Items.OAK_PLANKS, 1 + random.nextInt(64));
+                        exact.setItem(i, stack);
+                        original.setItem(i, stack.copy());
+                    }
+                }
+                var native_ = exact.asPositionedCraftInput();
+                var expected = original.asPositionedCraftInput();
+                assertEquals(positioned(expected), positioned(native_), w + "x" + h + " trial " + trial);
+                assertEquals(expected.input(), native_.input());
+                for (int r = 0; r < native_.input().height(); r++) {
+                    for (int c = 0; c < native_.input().width(); c++) {
+                        assertSame(exact.getItem(c + native_.left() + (r + native_.top()) * w), native_.input().getItem(c, r));
+                    }
+                }
+            }
+        }
     }
 
     @Test void nativeGridMatchesTheOriginalContainer() {

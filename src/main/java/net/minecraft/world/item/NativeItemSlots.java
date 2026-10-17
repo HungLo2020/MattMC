@@ -13,6 +13,8 @@ public final class NativeItemSlots extends NonNullList<ItemStack> {
     NativeItemState.Slots actualOwner() { return this.owner; }
     NativeItemState.SlotLink bindMainSlot(int index) { return NativeItemState.SlotLink.create(this.owner,index); }
     @Override public void clear() { this.owner.clearAll(); }
+    /** One bounded native read of every row (List.copyOf, ArrayList copies); see Slots.toArray. */
+    @Override public Object[] toArray() { return this.owner.toArray(); }
     /** {@link #set} whose caller discards the previous contents; unobserved native contents stay unmaterialized. */
     public void replace(int index, ItemStack value) { java.util.Objects.requireNonNull(value); this.owner.replace(index, value); }
     public void bindEquipment(net.minecraft.world.entity.EntityEquipment equipment){

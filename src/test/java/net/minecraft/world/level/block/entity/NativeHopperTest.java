@@ -89,6 +89,26 @@ class NativeHopperTest {
         scenario("nearly full merge", pair -> { pair.source.setItem(2, new ItemStack(Items.STICK, 1)); pair.target.setItem(3, new ItemStack(Items.STICK, 63)); }, 2);
     }
 
+    // A bulk read (toArray, as List.copyOf uses) returns every bound row's facade and
+    // materializes a pending row exactly as the sequential gets do, once.
+    @Test void bulkReadMaterializesAPendingRowBetweenBoundRows() throws Exception {
+        Pair pair = pair(true); pair.source.setItem(0, new ItemStack(Items.STICK, 3));
+        for (int i = 0; i < 2; i++) pair.target.setItem(i, new ItemStack(Items.DIRT, 64));
+        pair.target.setItem(3, new ItemStack(Items.DIAMOND, 5));
+        ItemStack[] before = {pair.target.getItem(0), pair.target.getItem(1), null, pair.target.getItem(3), pair.target.getItem(4)};
+        assertTrue(eject(pair));
+        var rows = (net.minecraft.world.item.NativeItemSlots)pair.target.getItems();
+        var pendingForTest = net.minecraft.world.item.NativeItemSlots.class.getDeclaredMethod("pendingForTest"); pendingForTest.setAccessible(true);
+        assertEquals(1, (int)pendingForTest.invoke(rows), "the placed copy is pending in row 2");
+        Object[] all = rows.toArray();
+        assertEquals(0, (int)pendingForTest.invoke(rows), "the bulk read materialized it");
+        assertEquals(5, all.length);
+        for (int i = 0; i < 5; i++) if (i != 2) assertSame(before[i], all[i], "row " + i);
+        assertSame(pair.target.getItem(2), all[2]); assertEquals(Items.STICK, ((ItemStack)all[2]).getItem()); assertEquals(1, ((ItemStack)all[2]).getCount());
+        Object[] again = rows.toArray(); var copy = java.util.List.copyOf(rows);
+        for (int i = 0; i < 5; i++) { assertSame(all[i], again[i]); assertSame(all[i], copy.get(i)); }
+    }
+
     @Test void nativeEjectLeavesThePlacedCopyPendingUntilRead() throws Exception {
         Pair pair = pair(true); pair.source.setItem(0, new ItemStack(Items.STICK, 3));
         assertTrue(eject(pair));

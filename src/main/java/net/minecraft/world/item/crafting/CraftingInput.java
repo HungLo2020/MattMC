@@ -81,6 +81,46 @@ public class CraftingInput implements RecipeInput {
 		}
 	}
 
+	/**
+	 * ofPositioned for a native grid whose non-empty rows are already known (bit
+	 * p + o * i of the occupancy mask). Only the cropped cells are read; a full
+	 * bounding box keeps the original immutable copy of every cell.
+	 */
+	public static CraftingInput.Positioned ofOccupied(int i, int j, long occupied, List<ItemStack> list) {
+		int k = i - 1;
+		int l = 0;
+		int m = j - 1;
+		int n = 0;
+
+		for (int o = 0; o < j; o++) {
+			long row = occupied >>> (o * i) & (1L << i) - 1;
+			if (row != 0) {
+				k = Math.min(k, Long.numberOfTrailingZeros(row));
+				l = Math.max(l, 63 - Long.numberOfLeadingZeros(row));
+				m = Math.min(m, o);
+				n = Math.max(n, o);
+			}
+		}
+
+		int o = l - k + 1;
+		int q = n - m + 1;
+		if (o <= 0 || q <= 0) {
+			return CraftingInput.Positioned.EMPTY;
+		} else if (o == i && q == j) {
+			return new CraftingInput.Positioned(new CraftingInput(i, j, List.copyOf(list)), k, m);
+		} else {
+			List<ItemStack> list2 = new ArrayList(o * q);
+
+			for (int r = 0; r < q; r++) {
+				for (int s = 0; s < o; s++) {
+					list2.add((ItemStack)list.get(s + k + (r + m) * i));
+				}
+			}
+
+			return new CraftingInput.Positioned(new CraftingInput(o, q, list2), k, m);
+		}
+	}
+
 	@Override
 	public ItemStack getItem(int i) {
 		return (ItemStack)this.items.get(i);

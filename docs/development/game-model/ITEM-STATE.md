@@ -434,8 +434,12 @@ those rows (`NativeItemState.bindStockSlot`). So menu reads and the per-tick
 broadcast of grid slots are native. The list is never replaced. Every original
 container method and its `menu.slotsChanged` notification is unchanged, so
 recipe lookup, `ResultSlot.onTake` and the recipe book still run the original
-Java code over the same contents. A subclass grid keeps a plain list and
-unlinked slots. Only grid sizes 1–27 (the original int product) get native rows.
+Java code over the same contents. The positioned recipe input that `CraftingMenu`
+builds on every grid change, and `ResultSlot` on every take, crops from the rows'
+native occupancy mask (`CraftingInput.ofOccupied`) and reads only the cropped
+cells. A full bounding box keeps the original immutable copy of every cell, and an
+empty 1×1 grid keeps its original non-empty input. A subclass grid keeps a plain
+list, the original `getItems` scan and unlinked slots. Only grid sizes 1–27 (the original int product) get native rows.
 Other sizes keep the original list and its exceptions, for example
 `NegativeArraySizeException` for a negative or wrapped-negative product
 (`constructorBoundariesMatchTheOriginal`). `NativeCraftingGridTest` compares 400
@@ -448,6 +452,18 @@ Every method is unchanged. `ResultSlot` keeps `Slot.getItem`, so the result slot
 gets a broadcast-only link while its quick move, `remove` and `onTake` stay on
 the original path. `NativeCraftingGridTest.nativeResultContainerMatchesTheOriginal`
 compares 300 random operations, at indices -1 to 2, against a subclass container.
+
+## Bulk row reads
+
+`toArray` on native rows (what `List.copyOf` and `ArrayList` copies call) reads
+every row's facade token in one bounded native call
+(`mattmc_item_slots_facades_bounded`, at most 64 rows, a non-blocking gate). At
+the first pending or unbound row it falls back to the original per-index `get`
+for that row and every later one. Materialization order and any effect it runs
+therefore match the sequential reads, and the reused token buffer is never read
+after a fallback could reenter.
+`NativeHopperTest.bulkReadMaterializesAPendingRowBetweenBoundRows` covers a
+pending row between bound rows.
 
 ## Broadcast-only slot links
 

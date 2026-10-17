@@ -209,6 +209,33 @@ Debt: a changed player broadcast is 4× Frozen. Ten player-menu slots (armor,
 offhand, crafting grid and result) are `Slot` subclasses without native links,
 so each tick reads them through Java.
 
+### Crafting input and bulk row reads
+
+`--workload crafting-input` (`CraftingInputTimingReference.java`) times one
+complete `asPositionedCraftInput` on an exact grid, including `CraftingInput`
+construction: two planks in one 3×3 column (cropped), a full 3×3 grid, and one
+item in the 2×2 player grid. The run is `build/s34-v28/crafting-input`, on
+`a9e2ae14` plus occupancy cropping and bulk row reads, with release library
+`ffc0f59a…`. Quiet medians:
+
+| Mode | Frozen ns | Pre ns | Current ns | C/Frozen |
+|---|---:|---:|---:|---:|
+| craft_input_3x3_column | 733 | 238 | no quiet sample (399–1852) | — |
+| craft_input_3x3_full | 223 | 335 | 376 | 1.69 |
+| craft_input_2x2_one | 129 | 148 | 168 | 1.30 |
+
+The screen is noisy: Frozen's column case ranged 692–1715 ns, and repeated
+screens moved several modes 2–4×. A release-profile scratch attribution
+(`CraftAttr`, 16 grids, best of 7) is steadier. Copying a native 3×3 grid
+(`List.copyOf`) went from 275 ns, with nine per-row native reads, to 86 ns with
+the bulk read, against 111 ns for a list grid. The cropped column input takes
+167 ns, against 211 ns for the original scan over native rows and 229 ns for a
+list grid.
+
+Debt: a full grid is still 1.7× Frozen. What remains is the per-stack generic
+access in `CraftingInput` (`isEmpty`, count and item-holder reads), which is
+covered by the accepted generic access envelope, not by grid storage.
+
 ### Copy churn and the owner table
 
 `copy_churn` (in `--workload equality`) times `ItemStack.copy` of a damaged

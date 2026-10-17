@@ -1537,6 +1537,20 @@ impl super::menu::QuickMoveEffects for MenuEffects {
     let owner=&*(address as *const super::slots::BoundaryOwner<super::slots::Slots>);
     let Some(rows)=owner.try_lock() else{return BAD};rows.get(index).map_or(BAD,|entry|entry.facade)
 }
+/// Rows a bulk facade read may copy in one bounded call.
+pub const BULK_FACADES:usize=64;
+/// Private fixed-work bulk facade read (toArray): every row's facade token into
+/// out[0..len], len the exact row count and at most BULK_FACADES. The VM caller
+/// holds the binding-bag monitor and fences the owner lease; BAD resumes the
+/// regular per-index reads.
+#[no_mangle] pub unsafe extern "C" fn mattmc_item_slots_facades_bounded(address:i64,out:*mut i64,len:i64)->i64 {
+    if address==0||out.is_null(){return BAD;}let Ok(len)=usize::try_from(len) else{return BAD};
+    if len>BULK_FACADES{return BAD;}
+    let owner=&*(address as *const super::slots::BoundaryOwner<super::slots::Slots>);
+    let Some(rows)=owner.try_lock() else{return BAD};if rows.len()!=len{return BAD;}
+    for index in 0..len{let Some(entry)=rows.get(index) else{return BAD};*out.add(index)=entry.facade;}
+    len as i64
+}
 
 /// Caller fences the actual SlotLink lease, which retains its nested owners.
 #[no_mangle] pub unsafe extern "C" fn mattmc_item_slot_read_bounded(address:i64,air:i64,mode:i64)->i64 {

@@ -105,6 +105,15 @@ public class TransientCraftingContainer implements CraftingContainer, net.minecr
 		return List.copyOf(this.items);
 	}
 
+	/** Exact native grids crop from their native occupancy; subclasses keep the original getItems scan. */
+	@Override
+	public net.minecraft.world.item.crafting.CraftingInput.Positioned asPositionedCraftInput() {
+		long occupied = this.nativeContainer != null && this.items instanceof net.minecraft.world.item.NativeItemSlots rows ? rows.occupiedMask() : -2;
+		return occupied < 0
+			? CraftingContainer.super.asPositionedCraftInput()
+			: net.minecraft.world.item.crafting.CraftingInput.ofOccupied(this.width, this.height, occupied, this.items);
+	}
+
 	@Override
 	public net.minecraft.world.item.NativeItemSlots nativeSlotsForTransfer() {
 		return this.nativeContainer != null && this.items instanceof net.minecraft.world.item.NativeItemSlots rows ? rows : null;
