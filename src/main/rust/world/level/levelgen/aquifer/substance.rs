@@ -7,9 +7,10 @@
 //! borrowed for the call; all are pure memos.
 use super::super::router::{Binding, Program};
 use super::super::synth::{noise_eval, State};
-use super::locations::fill_cell_locations;
+use super::locations::fill_cell_locations_owned;
 use super::{cell, decision, fluid, nearest};
-use crate::world::level::levelgen::random::Positional;
+use crate::world::level::levelgen::owned_positional::Factory;
+use std::sync::Arc;
 
 pub(crate) struct Substance<'a> {
     pub grid: &'a mut [i64],
@@ -17,7 +18,7 @@ pub(crate) struct Substance<'a> {
     pub shape: [i32; 5],
     /// Per grid index [fluid level, state id, kind (1 water, 2 lava)]; id -1 when absent.
     pub cache: &'a mut [i32],
-    pub random: Positional,
+    pub random: Arc<Factory>,
     pub skip_y: i32,
     /// `AquiferFluidPicker`: [lava level, lava id, fluid level, fluid id,
     /// fluid is air, generation disabled, disabled level, air id].
@@ -88,7 +89,7 @@ impl Substance<'_> {
             return Ok((self.lava, false));
         }
         // NativeAquifer.scalar: the twelve centres, ranked; then the decision.
-        if !fill_cell_locations(self.grid, &self.shape, self.random, x, y, z, 1, 1) {
+        if !fill_cell_locations_owned(self.grid, &self.shape, &self.random, x, y, z, 1, 1) {
             return Err(-3);
         }
         let mut points = [[0; 4]; 12];
@@ -130,7 +131,7 @@ pub(crate) struct OwnedAquifer {
     pub grid: Vec<i64>,
     pub shape: [i32; 5],
     pub cache: Vec<i32>,
-    pub random: Positional,
+    pub random: Arc<Factory>,
     pub skip_y: i32,
     pub policy: [i32; 8],
     pub surface_rect: [i32; 4],
@@ -155,7 +156,7 @@ pub(crate) struct OwnedAquifer {
 
 impl OwnedAquifer {
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn new(grid: Vec<i64>, shape: [i32; 5], cache: Vec<i32>, random: Positional, skip_y: i32, policy: [i32; 8], surface_rect: [i32; 4],
+    pub(crate) fn new(grid: Vec<i64>, shape: [i32; 5], cache: Vec<i32>, random: Arc<Factory>, skip_y: i32, policy: [i32; 8], surface_rect: [i32; 4],
         surface: Vec<i32>, sources: *const Program, levels: *const Program, flat: [i32; 3], memo: Vec<f64>, present: Vec<u8>,
         barrier: *const State, barrier_xz: f64, barrier_y: f64, water: i32, lava: i32, way_below: i32) -> Self {
         OwnedAquifer { grid, shape, cache, random, skip_y, policy, surface_rect, surface, sources, levels, flat, memo, present, barrier, barrier_xz,
@@ -168,7 +169,7 @@ impl OwnedAquifer {
             grid: &mut self.grid,
             shape: self.shape,
             cache: &mut self.cache,
-            random: self.random,
+            random: self.random.clone(),
             skip_y: self.skip_y,
             policy: self.policy,
             surface_rect: self.surface_rect,
@@ -189,7 +190,7 @@ impl OwnedAquifer {
     /// `width` x `width` x `height` with its densities: (state, schedule) per
     /// block into `out`, statuses computed natively instead of asked of Java.
     pub(crate) fn cell_materials(&mut self, x: i32, y: i32, z: i32, width: i32, height: i32, density: &[f64], out: &mut [i32]) -> Result<(), i32> {
-        if !fill_cell_locations(&mut self.grid, &self.shape, self.random, x, y, z, width, height) {
+        if !fill_cell_locations_owned(&mut self.grid, &self.shape, &self.random, x, y, z, width, height) {
             return Err(-3);
         }
         let p = self.policy;

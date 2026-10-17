@@ -1,7 +1,7 @@
 package net.minecraft.world.level.levelgen;
 
 import java.lang.foreign.FunctionDescriptor;
-import java.lang.foreign.Linker;
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
@@ -29,13 +29,13 @@ import org.jetbrains.annotations.Nullable;
  * each chunk's router and aquifer for the queries around it. Other
  * generators, settings and predicates keep Java's one-cell noise chunk. */
 final class NativeColumns {
-    private static final MethodHandle CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_noise_columns_create",
-        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS), Linker.Option.critical(true));
+    private static final MethodHandle CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_noise_columns_create_owned",
+        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     private static final MethodHandle RELEASE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_noise_columns_release",
         FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
     private static final MethodHandle HEIGHT = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_noise_columns_height",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
-            ValueLayout.ADDRESS, ValueLayout.JAVA_INT), Linker.Option.critical(true));
+            ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     static final int UNHANDLED = Integer.MIN_VALUE + 1;
     private static final int NO_MATCH = Integer.MIN_VALUE;
     private static final Cleaner CLEANER = Cleaner.create();
@@ -116,8 +116,10 @@ final class NativeColumns {
         int[] states = columns.matches(types);
         if (states == null) return UNHANDLED;
         int result;
-        try {
-            result = (int)HEIGHT.invokeExact(columns.handle, columns.noise.cellProgram.memory(), x, z, MemorySegment.ofArray(states), states.length);
+        try (Arena query=Arena.ofConfined()) {
+            var accepted=query.allocate(Math.max(4L,states.length*4L),4);
+            MemorySegment.copy(states,0,accepted,ValueLayout.JAVA_INT,0,states.length);
+            result = (int)HEIGHT.invokeExact(columns.handle, columns.noise.cellProgram.memory(), x, z, accepted, states.length);
         } catch (Throwable error) {
             throw new IllegalStateException("Native base height failed", error);
         } finally {
@@ -165,6 +167,7 @@ final class NativeColumns {
         long[] longs = new long[7];
         double[] doubles = new double[2];
         int aquifer = 0, randomKind = 0;
+        NativePositionalFactory factoryOwner=null;
         List<Object> keep = new ArrayList<>(List.of(chunkNoise));
         if (settings.isAquifersEnabled()) {
             NativeFluidSources sources = random.nativeFluidSources();
@@ -175,14 +178,14 @@ final class NativeColumns {
             if (factory.getClass() == XoroshiroRandomSource.XoroshiroPositionalRandomFactory.class) {
                 var xoroshiro = (XoroshiroRandomSource.XoroshiroPositionalRandomFactory)factory;
                 randomKind = 1;
-                longs[2] = xoroshiro.seedLo();
-                longs[3] = xoroshiro.seedHi();
+                factoryOwner=xoroshiro.nativeFactory();
             } else if (factory.getClass() == LegacyRandomSource.LegacyPositionalRandomFactory.class) {
                 randomKind = 2;
-                longs[2] = ((LegacyRandomSource.LegacyPositionalRandomFactory)factory).seed();
+                factoryOwner=((LegacyRandomSource.LegacyPositionalRandomFactory)factory).nativeFactory();
             } else {
                 return null;
             }
+            longs[2]=factoryOwner.handle();
             var barrierNoise = barrier.noise().noise();
             var state = barrierNoise == null ? null : barrierNoise.nativeState();
             if (barrierNoise != null && (state == null || !state.state().isNative())) return null;
@@ -206,11 +209,12 @@ final class NativeColumns {
         ints[18] = id(Blocks.LAVA.defaultBlockState());
         ints[19] = DimensionType.WAY_BELOW_MIN_Y;
         long handle;
-        try {
-            handle = (long)CREATE.invokeExact(MemorySegment.ofArray(ints), MemorySegment.ofArray(longs), MemorySegment.ofArray(doubles));
+        try (Arena admission=Arena.ofConfined()) {
+            handle = (long)CREATE.invokeExact(admission.allocateFrom(ValueLayout.JAVA_INT,ints),
+                admission.allocateFrom(ValueLayout.JAVA_LONG,longs),admission.allocateFrom(ValueLayout.JAVA_DOUBLE,doubles));
         } catch (Throwable error) {
             throw new IllegalStateException("Cannot create native columns", error);
-        }
+        } finally { Reference.reachabilityFence(factoryOwner); }
         if (handle == 0) return null;
         // Candidates a column can hold: the default block, air, the aquifer's fluids, then the ore vein states.
         List<Integer> candidates = new ArrayList<>(List.of(defaultBlock, id(Blocks.AIR.defaultBlockState()), id(Blocks.WATER.defaultBlockState()),

@@ -30,9 +30,9 @@ import org.jetbrains.annotations.Nullable;
  * counters, both world-generation heightmaps and fluid post-processing marks,
  * which Java installs once. Chunks outside the gate keep the Java loop. */
 final class NativeNoiseFill {
-    // Copies its configuration from borrowed heap arrays; one small allocation.
-    private static final MethodHandle CREATE = bind("create", true, FunctionDescriptor.of(ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    // Ordinary off-heap admission; the kernel captures the actual factory owner.
+    private static final MethodHandle CREATE = bind("create_owned", false, FunctionDescriptor.of(ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
     private static final MethodHandle RELEASE = bind("release", false, FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
     // Bounded to one cell; borrows heap arrays for that call only.
     private static final MethodHandle CELL = bind("cell", true, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
@@ -55,7 +55,7 @@ final class NativeNoiseFill {
         ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
     // A whole column of cells: an ordinary downcall with off-heap buffers.
     // The traversal takes the aquifer's state once and returns its caches after the fill.
-    private static final MethodHandle AQUIFER = bind("aquifer", true, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
+    private static final MethodHandle AQUIFER = bind("aquifer_owned", false, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
         ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
         ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
     private static final MethodHandle AQUIFER_CACHES = bind("aquifer_caches", true, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
@@ -113,7 +113,7 @@ final class NativeNoiseFill {
     @Nullable
     private final NativeNoiseState gap;
     private final int[] ints = new int[25];
-    private final long[] longs = new long[2];
+    private NativePositionalFactory oreFactory;
     private final double[] doubles = new double[4];
     private final double[] corners = new double[24];
     // The program memory BIND gave Rust: Rust keeps only its address, so the
@@ -241,11 +241,10 @@ final class NativeNoiseFill {
         if (random.getClass() == XoroshiroRandomSource.XoroshiroPositionalRandomFactory.class) {
             var factory = (XoroshiroRandomSource.XoroshiroPositionalRandomFactory)random;
             fill.ints[15] = 1;
-            fill.longs[0] = factory.seedLo();
-            fill.longs[1] = factory.seedHi();
+            fill.oreFactory = factory.nativeFactory();
         } else if (random.getClass() == LegacyRandomSource.LegacyPositionalRandomFactory.class) {
             fill.ints[15] = 2;
-            fill.longs[0] = ((LegacyRandomSource.LegacyPositionalRandomFactory)random).seed();
+            fill.oreFactory = ((LegacyRandomSource.LegacyPositionalRandomFactory)random).nativeFactory();
         } else {
             return null;
         }
@@ -267,11 +266,12 @@ final class NativeNoiseFill {
     /** doFill's cell loop with every block decided and written natively. */
     void run(int minCellY, int cellCountY) {
         long handle;
-        try {
-            handle = (long)CREATE.invokeExact(MemorySegment.ofArray(this.ints), MemorySegment.ofArray(this.longs), MemorySegment.ofArray(this.doubles));
+        try (Arena admission=Arena.ofConfined()) {
+            handle = (long)CREATE.invokeExact(admission.allocateFrom(ValueLayout.JAVA_INT,this.ints),
+                admission.allocateFrom(ValueLayout.JAVA_DOUBLE,this.doubles),this.oreFactory==null?0L:this.oreFactory.handle());
         } catch (Throwable error) {
             throw new IllegalStateException("Cannot start native noise fill", error);
-        }
+        } finally { Reference.reachabilityFence(this.oreFactory); }
         if (handle == 0) throw new IllegalStateException("Native noise fill rejected its configuration");
         NativeNoiseRouter router = null;
         try {
@@ -443,11 +443,19 @@ final class NativeNoiseFill {
         ints[22] = net.minecraft.world.level.dimension.DimensionType.WAY_BELOW_MIN_Y;
         ints[23] = Block.getId(Blocks.WATER.defaultBlockState());
         ints[24] = Block.getId(Blocks.LAVA.defaultBlockState());
-        long[] longs = {binding.seedA(), binding.seedB(), Double.doubleToRawLongBits(binding.barrierXz()), Double.doubleToRawLongBits(binding.barrierY())};
-        int status = (int)AQUIFER.invokeExact(handle, MemorySegment.ofArray(ints), ints.length, MemorySegment.ofArray(longs),
-            MemorySegment.ofArray(binding.locations()), binding.locations().length, MemorySegment.ofArray(binding.cache()),
-            MemorySegment.ofArray(binding.surface()), binding.surface().length, MemorySegment.ofArray(binding.memo()), MemorySegment.ofArray(binding.present()),
-            binding.memo().length, binding.sources().handle(), binding.levels().handle(), binding.barrierState());
+        long[] longs = {binding.factory().handle(), 0, Double.doubleToRawLongBits(binding.barrierXz()), Double.doubleToRawLongBits(binding.barrierY())};
+        int status;
+        try(Arena admission=Arena.ofConfined()) {
+            var memo=admission.allocate(Math.max(8L,binding.memo().length*8L),8);
+            var present=admission.allocate(Math.max(1,binding.present().length),1);
+            MemorySegment.copy(binding.memo(),0,memo,ValueLayout.JAVA_DOUBLE,0,binding.memo().length);
+            MemorySegment.copy(binding.present(),0,present,ValueLayout.JAVA_BYTE,0,binding.present().length);
+            status=(int)AQUIFER.invokeExact(handle,admission.allocateFrom(ValueLayout.JAVA_INT,ints),ints.length,
+                admission.allocateFrom(ValueLayout.JAVA_LONG,longs),admission.allocateFrom(ValueLayout.JAVA_LONG,binding.locations()),
+                binding.locations().length,admission.allocateFrom(ValueLayout.JAVA_INT,binding.cache()),
+                admission.allocateFrom(ValueLayout.JAVA_INT,binding.surface()),binding.surface().length,memo,present,
+                binding.memo().length,binding.sources().handle(),binding.levels().handle(),binding.barrierState());
+        } finally { Reference.reachabilityFence(binding.factory()); }
         if (status != 0) throw new IllegalStateException("Native noise fill aquifer rejected: " + status);
         AQUIFER_FILLS.incrementAndGet();
         return binding;

@@ -10,6 +10,16 @@ custom factories keep Java's `location()`. Java owns density-graph bindings and
 block-state identity. The [native NOISE fill](RUST-NOISE-FILL.md) owns chunk
 writes for eligible chunks; the remaining Java loop keeps them otherwise.
 
+Built-in factories expose their canonical native allocation to these consumers.
+NOISE aquifers, column caches and carver substance evaluators retain that actual
+`Factory` Arc instead of copying seeds through Java. Local centre draws read its
+immutable data directly; they do not allocate a VM random-source facade. Scalar
+centre preparation borrows the factory synchronously and pins its VM owner.
+Factory admission and column-height calls use ordinary FFM with off-heap
+transport. Scalar preparation copies locations back even on a failed call to
+preserve the filled prefix. Custom factory subclasses retain the original
+ordered Java callbacks.
+
 For the built-in fluid picker and known pure density sources, Rust consumes the
 already-filled density cell and returns block choices plus update flags. Material calls
 process at most 128 positions before yielding. Missing aquifer statuses are
@@ -74,6 +84,10 @@ and `NoiseChunk` subclasses retain eager updates.
   floating-point operation order, NaN behavior, and signed zero.
 - Preserve conditional noise sampling, fluid-source calls, random draws, and
   fluid-update flags. Matching block states alone is insufficient.
+- Propagate the original checked `Throwable` object from a custom factory,
+  random draw or density callback. Native-call adapters must not wrap these
+  genuine VM effects in a new exception. Preserve partial cache writes and
+  the original retry/reentry prefix as well as the final value.
 - Batch eligibility must reject unknown callbacks, including ore callbacks that
   interleave with aquifer decisions. Cell results expire at the next cell epoch.
 - Keep chunk writes, heightmap changes, and postprocessing entries in their
@@ -82,6 +96,35 @@ and `NoiseChunk` subclasses retain eager updates.
   the factory seeds and `nextInt(10)`, `nextInt(9)`, `nextInt(10)` in that order.
 
 ## Verification
+
+Before changing positional-factory consumers, compare the actual public aquifer
+effects against original Frozen with a complete immutable pre-change runtime:
+
+```sh
+python3 DevUtils/tests/worldgen/random_source/VerifyAquiferFactoryEffects.py \
+  --pre-runtime build/worldgen/factory-consumers/pre-2c-runtime \
+  --output build/worldgen/<new-aquifer-effects-directory> --controls
+```
+
+This compiles its observer once against original Frozen and runs those same
+bytes on Frozen, pre-change and Current. Its 22 rows cover real custom factories,
+built-in factory subclasses, ordered bounded draws, cache retries, reentry and
+checked exception identity. Only surface/context resources use a test fixture;
+the aquifer, its caches and its callbacks are production. Both safe VM overlays
+restore an actual faulty exception wrapper and must fail the original comparison.
+The guarded Objenesis jar is test support, not a production dependency.
+
+The initial published `2c3bbc299` baseline differs from Frozen in three checked
+exception rows, wrapping the original object. The working correction passes all
+22 original rows, with two aquifer and seven NOISE-fill checks passing. The
+pre-change mismatch remains diagnostic; it is not regenerated from Current.
+See `build/worldgen/factory-consumers/{original-effects-2,effects-fix-focused,
+effects-fix-original-2}`. The earlier control harness expected only two failures
+from the outer wrapper; its actual three-row rejection and failed receipt are
+retained. The corrected controls reject three outer-wrapper and one fluid-wrapper
+row without changing observer traces. These historical checks predate native
+factory retention; they do not verify the later owner integration or establish
+a performance result.
 
 ```sh
 # Focused integration and Rust world-generation tests:

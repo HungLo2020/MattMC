@@ -6,14 +6,14 @@
 //! substance with that density answer it, all owned by Rust and cached per chunk.
 use crate::world::level::levelgen::aquifer::substance::{picked, OwnedAquifer};
 use crate::world::level::levelgen::density::cell::density_cell;
-use crate::world::level::levelgen::random::Positional;
+use crate::world::level::levelgen::owned_positional::{Factory,ffi::retain as retain_factory};
 use crate::world::level::levelgen::router::{with_frame, Geometry, Program, Router};
 use crate::world::level::levelgen::synth::State;
-use std::sync::Mutex;
+use std::sync::{Mutex,Arc};
 
 /// The aquifer inputs a RandomState's chunks share.
 pub(crate) struct AquiferConfig {
-    pub random: Positional,
+    pub random: Arc<Factory>,
     /// `AquiferFluidPicker` policy as `OwnedAquifer` reads it.
     pub policy: [i32; 8],
     pub sources: *const Program,
@@ -176,7 +176,7 @@ impl Columns {
         let sources = unsafe { &*c.sources };
         let flat_size = (16 >> 2) + 1;
         let memo = sources.point_slots() * (flat_size * flat_size) as usize;
-        Some(OwnedAquifer::new(vec![i64::MAX; cells], shape, cache, c.random, skip_y, c.policy, surface_rect, surface, c.sources, c.levels,
+        Some(OwnedAquifer::new(vec![i64::MAX; cells], shape, cache, c.random.clone(), skip_y, c.policy, surface_rect, surface, c.sources, c.levels,
             [min_x >> 2, min_z >> 2, flat_size], vec![0.0; memo], vec![0u8; memo], c.barrier, c.barrier_xz, c.barrier_y, c.water, c.lava, c.way_below))
     }
 
@@ -286,7 +286,7 @@ impl Columns {
 /// Creates a column source. `ints`: [interpolators, cell inputs, cell width,
 /// cell height, min Y, height, default block, aquifer (0 disabled, 1 noise
 /// based), random kind (1 Xoroshiro, 2 Legacy), policy (8), water, lava, way
-/// below]; `longs`: [template, flats, random seed A, seed B, sources, levels,
+/// below]; `longs`: [template, flats, actual factory handle, reserved, sources, levels,
 /// barrier noise state]; `doubles`: [barrier XZ scale, barrier Y scale].
 /// Returns 0 when invalid. Released with `mattmc_noise_columns_release`.
 ///
@@ -294,7 +294,7 @@ impl Columns {
 /// `ints` holds 20 i32s, `longs` 7 i64s, `doubles` 2 f64s. Every program and
 /// state addressed stays alive and unchanged until release.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_noise_columns_create(ints: *const i32, longs: *const i64, doubles: *const f64) -> u64 {
+pub unsafe extern "C" fn mattmc_noise_columns_create_owned(ints: *const i32, longs: *const i64, doubles: *const f64) -> u64 {
     if ints.is_null() || longs.is_null() || doubles.is_null() {
         return 0;
     }
@@ -306,7 +306,9 @@ pub unsafe extern "C" fn mattmc_noise_columns_create(ints: *const i32, longs: *c
     let aquifer = match i[7] {
         0 => Err(policy),
         1 => {
-            let Some(random) = Positional::from_abi(i[8], l[2], l[3]) else { return 0 };
+            if l[2] == 0 { return 0; }
+            let random = unsafe { retain_factory(l[2] as u64) };
+            if random.kind() != i[8] { return 0; }
             if l[4] == 0 || l[5] == 0 {
                 return 0;
             }

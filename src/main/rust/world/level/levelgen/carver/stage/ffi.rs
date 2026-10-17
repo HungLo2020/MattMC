@@ -1,7 +1,7 @@
 use super::{CanyonShape, CaveShape, ChunkAquifer, Config, Error, FloatProvider, Ids, Kind, Stage};
 use crate::world::level::levelgen::aquifer::substance::Substance;
 use crate::world::level::levelgen::proto_chunk::{ffi::storage, ProtoStorage};
-use crate::world::level::levelgen::random::Positional;
+use crate::world::level::levelgen::owned_positional::ffi::retain as retain_factory;
 use crate::world::level::levelgen::router::{Binding, Program};
 use crate::world::level::levelgen::surface::scalar::ScalarSurface;
 use crate::world::level::levelgen::synth::State;
@@ -66,8 +66,7 @@ const MEMO: usize = 10;
 const PRESENT: usize = 11;
 const MEMO_LEN: usize = 12;
 const BARRIER: usize = 13;
-const SEED_A: usize = 14;
-const SEED_B: usize = 15;
+const FACTORY: usize = 14;
 const BARRIER_XZ: usize = 16;
 const BARRIER_Y: usize = 17;
 /// The RandomState sampler's climate point program (0: every neighbour's settings are given).
@@ -395,7 +394,9 @@ pub unsafe extern "C" fn mattmc_carvers_run(storage_handle: u64, pointers: *cons
 /// # Safety
 /// As `mattmc_carvers_run`.
 unsafe fn substance<'a>(p: &[i64], i: &[i32]) -> Option<Substance<'a>> {
-    let random = Positional::from_abi(i[14], p[SEED_A], p[SEED_B])?;
+    if p[FACTORY] == 0 { return None; }
+    let random = unsafe { retain_factory(p[FACTORY] as u64) };
+    if random.kind() != i[14] { return None; }
     let (grid_len, surface_len, memo_len) = (usize::try_from(p[GRID_LEN]).ok()?, usize::try_from(p[SURFACE_LEN]).ok()?, usize::try_from(p[MEMO_LEN]).ok()?);
     let shape = [i[15], i[16], i[17], i[18], i[19]];
     let rect = [i[20], i[21], i[22], i[23]];

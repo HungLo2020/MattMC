@@ -521,8 +521,8 @@ final class NativeCarvers {
                     pointers[11] = present.address();
                     pointers[12] = binding.memo().length;
                     pointers[13] = binding.barrierState().address();
-                    pointers[14] = binding.seedA();
-                    pointers[15] = binding.seedB();
+                    pointers[14] = binding.factory().handle();
+                    pointers[15] = 0;
                     pointers[16] = Double.doubleToRawLongBits(binding.barrierXz());
                     pointers[17] = Double.doubleToRawLongBits(binding.barrierY());
                 }

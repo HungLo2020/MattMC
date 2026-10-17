@@ -1,7 +1,8 @@
 //! `NoiseBasedAquifer.location`/`cellLocations` with native positional
 //! randomness: the random aquifer centre of each grid cell, packed as Java's
 //! `BlockPos.asLong`. Entries already present are reused, as the Java cache is.
-use crate::world::level::levelgen::random::Positional;
+use crate::world::level::levelgen::random::{Positional, Random};
+use crate::world::level::levelgen::owned_positional::Factory;
 
 /// `BlockPos.asLong`: 26-bit x at 38, 26-bit z at 12, 12-bit y at 0.
 pub(crate) fn block_pos_long(x: i32, y: i32, z: i32) -> i64 {
@@ -21,6 +22,16 @@ pub(crate) fn fill_cell_locations(
     width: i32,
     height: i32,
 ) -> bool {
+    fill_with(grid,shape,|x,y,z|random.at(x,y,z),x,y,z,width,height)
+}
+
+pub(crate) fn fill_cell_locations_owned(grid:&mut[i64],shape:&[i32],random:&Factory,
+    x:i32,y:i32,z:i32,width:i32,height:i32)->bool {
+    fill_with(grid,shape,|x,y,z|random.at_native(x,y,z),x,y,z,width,height)
+}
+
+fn fill_with(grid:&mut[i64],shape:&[i32],mut at:impl FnMut(i32,i32,i32)->Random,
+    x:i32,y:i32,z:i32,width:i32,height:i32)->bool {
     let grid_x = |value: i32| value >> 4;
     let grid_y = |value: i32| value.div_euclid(12);
     for gx in grid_x(x.wrapping_sub(5))..=grid_x(x.wrapping_add(width).wrapping_sub(6)).wrapping_add(1) {
@@ -36,7 +47,7 @@ pub(crate) fn fill_cell_locations(
                 let slot = &mut grid[index as usize];
                 if *slot == i64::MAX {
                     // location(): nextInt(10), nextInt(9), nextInt(10) in that order.
-                    let mut draw = random.at(gx, gy, gz);
+                    let mut draw = at(gx, gy, gz);
                     let cx = (gx << 4).wrapping_add(draw.next_int_bound(10));
                     let cy = gy.wrapping_mul(12).wrapping_add(draw.next_int_bound(9));
                     let cz = (gz << 4).wrapping_add(draw.next_int_bound(10));

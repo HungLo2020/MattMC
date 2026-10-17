@@ -641,9 +641,60 @@ eight lighting Rust files; all 843 worldgen classes remain exact. Earlier broad
 Java tiers and resource screens retain their original image identities with
 these impact and affected-check records, rather than being relabeled.
 
-The checkpoint still leaves actual factory retention in native aquifer and
-noise-fill kernels open. Those consumers currently copy seeds through Java;
-connect their real pending owners to the native factory allocation next, preserving
-custom factory callbacks, checked failure order, reentry and last-use lifetime.
+That historical checkpoint left factory retention in native aquifer and
+noise-fill kernels open. The subsequent consumer integration passes the actual
+canonical factory to ore kernels, aquifer bindings, column caches and carver
+evaluators. Each pending native consumer retains its `Factory` Arc through its
+last use; local coordinate draws avoid allocating derived Source facades.
+Custom factory subclasses retain Java dispatch, and aquifer adapters propagate
+the original checked callback object and effect prefix.
+
+After building a matched whole Root native/Main runtime, verify the actual ore
+kernel's pending ownership, VM facade/segment/arena retirement, output and final
+release against a complete immutable pre-change runtime:
+
+```sh
+python3 DevUtils/tests/worldgen/random_source/VerifyFactoryKernelOwnership.py \
+  --pre-runtime build/worldgen/factory-consumers/pre-2c-runtime \
+  --output build/worldgen/<new-factory-kernel-directory> --controls
+```
+
+The observer compiles once against the pre-change image and runs those same
+bytes on both images. Four scenes cover both random families, including zero
+and extreme seeds. Safe ABI controls delegate computation to the exact native
+library but admit an independent factory or leak the real kernel; the actual
+canonical weak-reference assertions must reject them. These controls do not
+free memory early. The [aquifer effects driver](RUST-AQUIFER.md#verification)
+separately checks original Frozen callback order, reentry and checked failures.
+
+The October 17 bounded consumer batch was reconciled with lighting checkpoint
+`66d9690ea`. Its matching Root native `85e61b60` and Main runtime pass 85 focused
+Java checks, all four real kernel lifetime/output scenes and both safe controls,
+and all 22 original Frozen aquifer effect rows with both wrapper controls.
+The actual combined native suite passes 3,227 checks with nine explicit ignores.
+Fresh FULL and CARVERS-resume runs each save 648 chunks: every retained Current
+reference region and the standard Frozen dimensions match, with the historical
+Primordial qualification retained. Receipts are under
+`build/worldgen/factory-consumers/combined-*`; earlier `batch-*` results retain
+their actual pre-reconciliation image identities.
+
+Failure rollback, cancellation, stock shutdown/reopen and player pending-save/
+reopen also pass on that combined image. The subsequent item-only checkpoint
+`8341a0b66` leaves all worldgen and lighting sources and classes unchanged. The
+fresh matching native `03a33455` passes 97 affected Java checks, the same kernel
+and original-effect controls, all 15 original item contracts and 16 real hopper
+save checks on each of Frozen, pre-change and Current. The larger earlier gates
+remain scoped to `85e61b60`, supported by `final-impact.json`; they are not
+relabeled as runs on the final library. The known custom-height lighting callback
+differences reported by S31 remain outside this batch's completion claim.
+
+A short diagnostic NOISE screen on the earlier matching `2926f7ef` image measures
+26.9 → 24.6 ms per eight Overworld fills and 22.4 → 22.9 ms for Amplified, with
+similar peak process RSS. It uses one pre-change/candidate pair per setting,
+12 samples after at least five seconds of warmup. The unchanged NOISE source
+and classes support reusing that screen after the lighting reconciliation;
+it is not relabeled as a measurement of `85e61b60`, a native allocator result,
+or a final Frozen performance pass. See `batch-screen-3` and `combined-impact.json`.
+
 Final performance, rendered-client/FPS and whole native worldgen acceptance remain
 open; the measured factory-hash and Source transport slowdowns are not waived.

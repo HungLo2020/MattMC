@@ -315,3 +315,20 @@ pub unsafe extern "C" fn mattmc_aquifer_locations(
         -1
     }
 }
+
+/// Ordinary FFM admission over off-heap transport. The VM pins the canonical
+/// factory through this synchronous, callback-free borrow; pending enclosing
+/// aquifer/NOISE kernels retain their own actual Factory Arc instead.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_aquifer_locations_owned(
+    grid:*mut i64,len:i32,shape:*const i32,factory:u64,
+    x:i32,y:i32,z:i32,width:i32,height:i32,
+)->i32 {
+    if factory==0 || grid.is_null() || shape.is_null() || !(1..=65536).contains(&len)
+        || !(1..=16).contains(&width) || !(1..=32).contains(&height) { return -1; }
+    let grid=unsafe{std::slice::from_raw_parts_mut(grid,len as usize)};
+    let shape=unsafe{std::slice::from_raw_parts(shape,5)};
+    if !valid_shape(shape,len) { return -1; }
+    let factory=unsafe{crate::world::level::levelgen::owned_positional::ffi::factory(factory)};
+    if super::locations::fill_cell_locations_owned(grid,shape,factory,x,y,z,width,height){0}else{-1}
+}

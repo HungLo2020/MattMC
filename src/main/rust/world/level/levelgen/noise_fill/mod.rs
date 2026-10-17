@@ -13,7 +13,8 @@ mod tests;
 
 use super::density::evaluator::density_noise;
 use super::density::math::{math, needs_right};
-use super::random::Positional;
+use super::owned_positional::Factory;
+use std::sync::Arc;
 use super::synth::State;
 use section::Section;
 use std::sync::OnceLock;
@@ -104,9 +105,9 @@ pub(crate) enum Substance {
 }
 
 /// `OreVeinifier` with the vanilla router shape the Java gate matched.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct OreVeins {
-    pub random: Positional,
+    pub random: Arc<Factory>,
     /// copper ore, raw copper block, granite, deepslate iron ore, raw iron block, tuff.
     pub states: [i32; 6],
     /// `MulOrAdd` constant of `veinRidged`.
@@ -117,7 +118,7 @@ pub(crate) struct OreVeins {
     pub gap_y_scale: f64,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Config {
     pub min_y: i32,
     pub height: i32,
@@ -205,10 +206,11 @@ pub(crate) struct NoiseFill<'a> {
 
 impl<'a> NoiseFill<'a> {
     pub fn new(config: Config, flags: &'a [u8]) -> Self {
+        let sections = (0..config.section_count).map(|_| None).collect();
         Self {
             config,
             flags,
-            sections: (0..config.section_count).map(|_| None).collect(),
+            sections,
             ocean_floor: [0; 256],
             world_surface: [0; 256],
             post_process: Vec::new(),
@@ -276,8 +278,8 @@ impl<'a> NoiseFill<'a> {
         if substance.is_some() {
             return (substance, schedule);
         }
-        let ore = match self.config.ore {
-            Some(ore) => self.ore(&ore, cell, x, y, z, d),
+        let ore = match &self.config.ore {
+            Some(ore) => self.ore(ore, cell, x, y, z, d),
             None => None,
         };
         (ore, schedule)
@@ -302,7 +304,7 @@ impl<'a> NoiseFill<'a> {
         if e + edge < 0.4_f32 as f64 {
             return None;
         }
-        let mut random = ore.random.at(x, y, z);
+        let mut random = ore.random.at_native(x, y, z);
         if random.next_float() > 0.7_f32 {
             return None;
         }

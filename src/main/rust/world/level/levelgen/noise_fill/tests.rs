@@ -104,6 +104,44 @@ fn config(substance: Substance) -> Config {
 }
 
 #[test]
+fn actual_ore_kernel_owns_canonical_factory_through_draws_and_last_release() {
+    for kind in [1,2] {
+        let factory=Factory::new(kind,123,456).unwrap();
+        let weak=Arc::downgrade(&factory);
+        let flags=[FLAG_AIR,FLAG_BLOCKS_MOTION,FLAG_BLOCKS_MOTION,FLAG_BLOCKS_MOTION,
+            FLAG_BLOCKS_MOTION,FLAG_BLOCKS_MOTION,FLAG_BLOCKS_MOTION,FLAG_BLOCKS_MOTION];
+        let mut c=config(Substance::Disabled(Picker{lava_below:-54,lava_level:-54,lava:3,fluid_level:63,fluid:2}));
+        c.ore=Some(OreVeins{random:factory.clone(),states:[2,3,4,5,6,7],ridged_constant:-1.0,ridged_bound:0.0,gap_xz_scale:1.0,gap_y_scale:1.0});
+        let mut fill=NoiseFill::new(c,&flags);
+        assert_eq!(weak.strong_count(),2);
+        drop(factory);
+        assert_eq!(weak.strong_count(),1);
+        let density=[1.0;128];
+        for (x,y,z) in [(0,16,0),(4,16,4),(8,24,8),(12,24,12)] {
+            fill.fill_cell(&Cell{x,y,z,density:&density,materials:&[],toggle:Corners([0.6;8]),
+                ridged_a:Corners([0.0;8]),ridged_b:Corners([0.0;8]),gap:std::ptr::null()}).unwrap();
+        }
+        let section=fill.section(5).unwrap();
+        assert_eq!(section.non_empty,512);
+        let independent=values(section);
+        assert!(independent.iter().any(|&state|(2..=7).contains(&state)),"Actual positional ore producer must run");
+        drop(fill);
+        assert_eq!(weak.strong_count(),0,"Actual kernel release is the final canonical-factory use");
+        assert_eq!(independent.iter().filter(|&&state|state!=0).count(),512);
+    }
+}
+
+#[test]
+fn abandoned_ore_kernel_drops_the_actual_factory_without_consumption() {
+    let factory=Factory::new(1,11,13).unwrap();let weak=Arc::downgrade(&factory);
+    let flags=[FLAG_AIR,FLAG_BLOCKS_MOTION];
+    let mut c=config(Substance::Disabled(Picker{lava_below:-54,lava_level:-54,lava:1,fluid_level:63,fluid:1}));
+    c.ore=Some(OreVeins{random:factory.clone(),states:[1;6],ridged_constant:-1.0,ridged_bound:0.0,gap_xz_scale:1.0,gap_y_scale:1.0});
+    let fill=NoiseFill::new(c,&flags);drop(factory);assert_eq!(weak.strong_count(),1);
+    drop(fill);assert_eq!(weak.strong_count(),0);
+}
+
+#[test]
 fn disabled_substance_fills_fluid_below_levels_and_tracks_heights_and_counts() {
     // 0 air, 1 stone (blocks motion), 2 water (fluid), 3 lava (fluid).
     let flags = [FLAG_AIR, FLAG_BLOCKS_MOTION, FLAG_FLUID, FLAG_FLUID | FLAG_RANDOM_TICKS];

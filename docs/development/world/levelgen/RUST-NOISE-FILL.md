@@ -8,6 +8,13 @@ vein rule with native positional randomness, the default block, section palette
 writes and counters, both world-generation heightmaps and fluid post-processing
 marks. Java installs the sections, heightmaps and marks once.
 
+Ore kernels and native aquifer bindings retain the canonical positional
+`Factory` Arc through their last draw and release. Java passes that actual
+owner with ordinary FFM admission and pins it through the call; it no longer
+copies factory seeds into a second kernel configuration. Local native draws
+read immutable factory data without allocating a Java facade or derived
+native Source. See [factory ownership verification](RUST-RANDOM-SOURCES.md).
+
 The [noise router](RUST-NOISE-ROUTER.md) fills the interpolation slices and,
 when the cell traversal is native (below), Rust also walks every cell and, for
 aquifers on the native route, prepares their cell materials too. Java owns the

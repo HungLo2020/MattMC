@@ -8,7 +8,7 @@ use super::{Cell, Config, Corners, NoiseFill, OreVeins, Picker, Substance};
 use crate::world::level::levelgen::density::validation::density_validate;
 use crate::world::level::levelgen::aquifer::substance::OwnedAquifer;
 use crate::world::level::levelgen::router::{Program, Router};
-use crate::world::level::levelgen::random::Positional;
+use crate::world::level::levelgen::owned_positional::ffi::retain as retain_factory;
 use crate::world::level::levelgen::synth::State;
 
 struct Handle {
@@ -20,24 +20,24 @@ struct Handle {
 /// `ints`: [minY, height, minSection, sectionCount, cellWidth, cellHeight, air,
 /// defaultBlock, globalBits, substance (1 aquifer batch, 2 disabled), lavaBelow,
 /// lavaLevel, lava, fluidLevel, fluid, oreKind (0 none, 1 Xoroshiro, 2 Legacy),
-/// 6 ore states, skipSamplingAboveY, fluidIsLava, lavaDefault]. `longs`: ore
-/// factory seeds. `doubles`: ridged constant, ridged bound, gap xz scale, gap y
+/// 6 ore states, skipSamplingAboveY, fluidIsLava, lavaDefault]. `factory` is
+/// the actual canonical owner (zero without ore). `doubles`: ridged constant, ridged bound, gap xz scale, gap y
 /// scale. Returns 0 for invalid arguments.
 /// # Safety
-/// `ints` has 25 i32s, `longs` 2 i64s, `doubles` 4 f64s (borrowed). State
+/// Ordinary FFM; `ints` has 25 i32s and `doubles` 4 f64s in off-heap transport.
+/// The VM pins `factory` through capture; the actual ore kernel retains its Arc. State
 /// flags come from the installed block registry; 0 when it is not installed.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_noise_fill_create(
+pub unsafe extern "C" fn mattmc_noise_fill_create_owned(
     ints: *const i32,
-    longs: *const i64,
     doubles: *const f64,
+    factory: u64,
 ) -> u64 {
-    if ints.is_null() || longs.is_null() || doubles.is_null() {
+    if ints.is_null() || doubles.is_null() {
         return 0;
     }
     let Some(flags) = super::installed_state_flags() else { return 0 };
     let i = unsafe { std::slice::from_raw_parts(ints, 25) };
-    let l = unsafe { std::slice::from_raw_parts(longs, 2) };
     let d = unsafe { std::slice::from_raw_parts(doubles, 4) };
     let (width, height) = (i[4], i[5]);
     if !(1..=16).contains(&width) || 16 % width != 0 || !(1..=32).contains(&height) || width * width * height > 2048
@@ -54,7 +54,9 @@ pub unsafe extern "C" fn mattmc_noise_fill_create(
     let ore = if i[15] == 0 {
         None
     } else {
-        let Some(random) = Positional::from_abi(i[15], l[0], l[1]) else { return 0 };
+        if factory == 0 { return 0; }
+        let random = unsafe { retain_factory(factory) };
+        if random.kind() != i[15] { return 0; }
         Some(OreVeins {
             random,
             states: [i[16], i[17], i[18], i[19], i[20], i[21]],
@@ -420,7 +422,7 @@ pub unsafe extern "C" fn mattmc_noise_fill_beardifier(id: u64, geometry: *const 
 /// Hands the chunk's aquifer state to the bound traversal, which then prepares
 /// cell materials itself. `ints`: [shape (5), skipY, location kind (1
 /// Xoroshiro, 2 Legacy), policy (8), surface rect (4), FlatCache grid (3),
-/// wayBelow, water id, lava id]; `longs` [seed a, seed b, barrier xz scale and
+/// wayBelow, water id, lava id]; `longs` [actual factory handle, reserved, barrier xz scale and
 /// y scale as raw bits]; the caches are copied (`grid` and `cache` with
 /// `grid_len` entries, `cache` three per entry). Returns 0 or negative.
 /// # Safety
@@ -428,7 +430,7 @@ pub unsafe extern "C" fn mattmc_noise_fill_beardifier(id: u64, geometry: *const 
 /// are programs and `barrier` null or a noise state that Java keeps alive for
 /// the fill.
 #[no_mangle]
-pub unsafe extern "C" fn mattmc_noise_fill_aquifer(id: u64, ints: *const i32, int_count: i32, longs: *const i64, grid: *const i64, grid_len: i32,
+pub unsafe extern "C" fn mattmc_noise_fill_aquifer_owned(id: u64, ints: *const i32, int_count: i32, longs: *const i64, grid: *const i64, grid_len: i32,
     cache: *const i32, surface: *const i32, surface_len: i32, memo: *const f64, present: *const u8, memo_len: i32, sources: u64, levels: u64,
     barrier: *const State) -> i32 {
     let Some(traversal) = unsafe { handle(id) }.traversal.as_mut() else { return -1 };
@@ -439,7 +441,9 @@ pub unsafe extern "C" fn mattmc_noise_fill_aquifer(id: u64, ints: *const i32, in
     }
     let i = unsafe { std::slice::from_raw_parts(ints, 27) };
     let l = unsafe { std::slice::from_raw_parts(longs, 4) };
-    let Some(random) = Positional::from_abi(i[6], l[0], l[1]) else { return -1 };
+    if l[0] == 0 { return -1; }
+    let random = unsafe { retain_factory(l[0] as u64) };
+    if random.kind() != i[6] { return -1; }
     let shape = [i[0], i[1], i[2], i[3], i[4]];
     let rect = [i[15], i[16], i[17], i[18]];
     let flat = [i[19], i[20], i[21]];

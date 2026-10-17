@@ -5,6 +5,7 @@ static LIVE: AtomicU64 = AtomicU64::new(0);
 static CREATED: AtomicU64 = AtomicU64::new(0);
 static RETIRED: AtomicU64 = AtomicU64::new(0);
 
+#[derive(Debug)]
 pub(crate) struct Factory { data: Positional }
 pub(crate) enum Source {
     Legacy(Arc<owned_legacy::Source>),
@@ -23,6 +24,10 @@ impl Factory {
         }
     }
     pub(crate) fn kind(&self)->i32 {match self.data{Positional::Xoroshiro{..}=>1,Positional::Legacy{..}=>2}}
+    /// A native consumer draws directly from this canonical immutable factory.
+    /// Its enclosing kernel retains the real Factory Arc; no VM source facade
+    /// or heap-allocated derived Source is needed for these local draws.
+    pub(crate) fn at_native(&self,x:i32,y:i32,z:i32)->super::random::Random { self.data.at(x,y,z) }
     pub(crate) fn at(&self,x:i32,y:i32,z:i32)->Source {
         let position=position_seed(x,y,z);
         match self.data {
@@ -113,7 +118,8 @@ pub(crate) mod ffi {
         let ptr=std::ptr::with_exposed_provenance::<Factory>(id as usize);
         Arc::increment_strong_count(ptr);Arc::from_raw(ptr)
     }
-    unsafe fn factory<'a>(id:u64)->&'a Factory{&*std::ptr::with_exposed_provenance::<Factory>(id as usize)}
+    /// A synchronous native borrow; the caller pins the actual owner for its duration.
+    pub(crate) unsafe fn factory<'a>(id:u64)->&'a Factory{&*std::ptr::with_exposed_provenance::<Factory>(id as usize)}
     #[no_mangle]pub extern "C" fn mattmc_positional_new(kind:i32,a:i64,b:i64)->u64 {
         Factory::new(kind,a,b).map_or(0,|value|Arc::into_raw(value).expose_provenance()as u64)
     }

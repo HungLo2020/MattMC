@@ -1,5 +1,6 @@
 package net.minecraft.world.level.levelgen;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
@@ -35,8 +36,8 @@ final class NativeAquifer {
         ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,
         ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,
         ValueLayout.JAVA_DOUBLE,ValueLayout.JAVA_DOUBLE));
-    private static final MethodHandle LOCATIONS = bind("locations",FunctionDescriptor.of(ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.JAVA_LONG,ValueLayout.JAVA_LONG,
+    private static final MethodHandle LOCATIONS = NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_aquifer_locations_owned",FunctionDescriptor.of(ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.JAVA_LONG,
         ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT,ValueLayout.JAVA_INT));
     private static MethodHandle bind(String suffix, FunctionDescriptor descriptor) {
         return NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_aquifer_"+suffix,descriptor,Linker.Option.critical(true));
@@ -81,18 +82,25 @@ final class NativeAquifer {
 
     // Built-in positional factories draw aquifer centres natively: 1 Xoroshiro, 2 Legacy, 0 Java.
     private final int locationKind;
-    private final long locationSeedA,locationSeedB;
+    private final NativePositionalFactory locationFactory;
+    private LocationScratch locationScratch;
+    private static final class LocationScratch {
+        final MemorySegment locations,shape;
+        LocationScratch(int size) {
+            var arena=Arena.ofAuto();locations=arena.allocate((long)size*8,8);shape=arena.allocate(20,4);
+        }
+    }
 
     NativeAquifer(Aquifer.NoiseBasedAquifer owner, NoiseChunk chunk, long[] locations,int[] shape,
                   Aquifer.FluidPicker picker,DensityFunction barrier,int skipY,PositionalRandomFactory random) {
         this.owner=owner;this.chunk=chunk;this.locations=locations;this.shape=shape;
         if(random.getClass()==XoroshiroRandomSource.XoroshiroPositionalRandomFactory.class) {
             var factory=(XoroshiroRandomSource.XoroshiroPositionalRandomFactory)random;
-            locationKind=1;locationSeedA=factory.seedLo();locationSeedB=factory.seedHi();
+            locationKind=1;locationFactory=factory.nativeFactory();
         } else if(random.getClass()==LegacyRandomSource.LegacyPositionalRandomFactory.class) {
-            locationKind=2;locationSeedA=((LegacyRandomSource.LegacyPositionalRandomFactory)random).seed();locationSeedB=0;
+            locationKind=2;locationFactory=((LegacyRandomSource.LegacyPositionalRandomFactory)random).nativeFactory();
         } else {
-            locationKind=0;locationSeedA=0;locationSeedB=0;
+            locationKind=0;locationFactory=null;
         }
         boolean pureRandom=locationKind!=0;
         cache=new int[locations.length*3];
@@ -131,6 +139,8 @@ final class NativeAquifer {
     private BlockState decode(int id) {return id<=-2?extraStates.get(-2-id):Block.stateById(id);}
 
     private static void check(int status) { if(status<0)throw new IllegalStateException("Native aquifer: "+status); }
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> RuntimeException originalFailure(Throwable failure) throws T { throw (T)failure; }
     private void nearest(DensityFunction.FunctionContext context,int x,int y,int z) throws Throwable {
         if(batch && context==chunk && chunk.interpolating && !chunk.fillingCell
                 && chunk.inCellX>=0 && chunk.inCellX<chunk.cellWidth && chunk.inCellY>=0 && chunk.inCellY<chunk.cellHeight
@@ -158,7 +168,7 @@ final class NativeAquifer {
             }
             return scalar(context,density,x,y,z);
         } catch(RuntimeException | Error e) { throw e; }
-        catch(Throwable t) { throw new IllegalStateException("Native aquifer call failed",t); }
+        catch(Throwable t) { throw originalFailure(t); }
     }
     private BlockState scalar(DensityFunction.FunctionContext context,double density,int x,int y,int z) throws Throwable {
         int[] savedFrame=null,savedCenters=null;double[] savedValues=null;
@@ -236,8 +246,19 @@ final class NativeAquifer {
     /** The aquifer centres a cell batch reads, drawn natively for built-in factories. */
     void cellLocations(int sx,int sy,int sz) throws Throwable {
         if(locationKind==0) { owner.cellLocations(sx,sy,sz,chunk.cellWidth,chunk.cellHeight); return; }
-        check((int)LOCATIONS.invokeExact(locationsMemory,locations.length,shapeMemory,locationKind,locationSeedA,locationSeedB,
-            sx,sy,sz,chunk.cellWidth,chunk.cellHeight));
+        if(locationScratch==null)locationScratch=new LocationScratch(locations.length);
+        var scratch=locationScratch;
+        MemorySegment.copy(locations,0,scratch.locations,ValueLayout.JAVA_LONG,0,locations.length);
+        MemorySegment.copy(shape,0,scratch.shape,ValueLayout.JAVA_INT,0,shape.length);
+        int status;
+        try { status=(int)LOCATIONS.invokeExact(scratch.locations,locations.length,scratch.shape,locationFactory.handle(),
+            sx,sy,sz,chunk.cellWidth,chunk.cellHeight); }
+        finally {
+            // An invalid later coordinate must retain the original filled prefix.
+            MemorySegment.copy(scratch.locations,ValueLayout.JAVA_LONG,0,locations,0,locations.length);
+            Reference.reachabilityFence(locationFactory);
+        }
+        check(status);
     }
 
     /** Whether the native NOISE fill can take this aquifer's per-cell material batch. */
@@ -283,13 +304,13 @@ final class NativeAquifer {
             sourceGrid=new int[]{chunk.firstNoiseX,chunk.firstNoiseZ,size};
             sourceMemo=new double[sources.slots()*size*size];sourcePresent=new byte[sourceMemo.length];
         }
-        return new NativeBinding(locations,shape,cache,locationKind,locationSeedA,locationSeedB,skipY,fluidPolicy,
+        return new NativeBinding(locations,shape,cache,locationKind,locationFactory,skipY,fluidPolicy,
             new int[]{surfaceMinX,surfaceMinZ,surfaceWidth,surfaceHeight},surfaceCache,sources,levels,sourceGrid,sourceMemo,sourcePresent,
             noise==null?MemorySegment.NULL:noise.state(),barrier.xzScale(),barrier.yScale(),noise);
     }
 
     /** Arrays are this aquifer's live caches; {@code noise} keeps the barrier state reachable. */
-    record NativeBinding(long[] locations,int[] shape,int[] cache,int locationKind,long seedA,long seedB,int skipY,int[] policy,
+    record NativeBinding(long[] locations,int[] shape,int[] cache,int locationKind,NativePositionalFactory factory,int skipY,int[] policy,
                          int[] surfaceRect,int[] surface,NativeFluidSources sources,NativeSurfaceLevel levels,int[] grid,double[] memo,byte[] present,
                          MemorySegment barrierState,double barrierXz,double barrierY,@org.jetbrains.annotations.Nullable NativeNoiseState noise) {}
 
@@ -343,6 +364,6 @@ final class NativeAquifer {
                 }
             }
         } catch(RuntimeException | Error e) { throw e; }
-        catch(Throwable t) { throw new IllegalStateException("Native aquifer fluid source failed",t); }
+        catch(Throwable t) { throw originalFailure(t); }
     }
 }
