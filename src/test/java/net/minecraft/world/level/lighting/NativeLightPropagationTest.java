@@ -149,9 +149,10 @@ class NativeLightPropagationTest {
         System.out.println("LIGHT_PROPAGATION_PARITY world=nether,wrapped,amplified rust_passes=" + passes);
     }
 
-    @Test void inputJavaRejectsIsHandedBackUntouched() {
+    @Test void inputJavaRejectsKeepsTheOriginalFailureAndConsumedPrefix() {
         // Sources queued for a chunk whose sections were never initialized: Java
-        // throws reading unstored light; Rust must hand the pass back unchanged.
+        // throws reading unstored light. The Rust effect path must keep that
+        // failure and the consumed prefix without speculative callbacks or replay.
         var chunks = LightTerrainFixtures.grid(NoiseGeneratorSettings.NETHER, 3L, 0, 0, 1);
         var world = new World(chunks);
         var chunk = chunks.getFirst();
@@ -171,7 +172,13 @@ class NativeLightPropagationTest {
         assertNotNull(a, "the original must reject this input");
         assertNotNull(b);
         assertEquals(a.getClass(), b.getClass());
-        assertEquals(rejected + 1, NativeLightPropagation.REJECTED.get());
+        var javaWork = ((BlockLightEngine)java.engine().getLayerListener(net.minecraft.world.level.LightLayer.BLOCK)).lightWork;
+        var rustWork = ((BlockLightEngine)rust.engine().getLayerListener(net.minecraft.world.level.LightLayer.BLOCK)).lightWork;
+        assertEquals(javaWork.size(0), rustWork.size(0), "same consumed decrease prefix");
+        assertEquals(javaWork.size(1), rustWork.size(1), "same consumed increase prefix");
+        assertEquals(rejected, NativeLightPropagation.REJECTED.get(), "no speculative bulk rejection/replay on an effectful getter");
+        assertTrue(List.of(b.getStackTrace()).stream().anyMatch(frame -> frame.getClassName().equals(NativeBlockPropagation.class.getName())),
+            "the original failure must come from the actual native consumer's VM leaf");
     }
 
     @Test void lightPropertyTablesMatchEveryStateAndFacePair() throws Throwable {

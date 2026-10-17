@@ -103,6 +103,33 @@ public final class NativeLightBlocks {
         return 0;
     }
 
+    /** Bulk propagation may only snapshot silent, canonical section inputs. */
+    public static int blocksForPropagation(@Nullable LightChunk chunk,int x,int y,int z,MemorySegment buffer,Lease lease)throws Throwable {
+        if(chunk==null)return blocks(null,x,y,z,buffer,lease);
+        if(chunk.getClass()==ImposterProtoChunk.class)chunk=((ImposterProtoChunk)chunk).getWrapped();
+        if(chunk.getClass()!=ProtoChunk.class && chunk.getClass()!=LevelChunk.class)return -1;
+        ChunkAccess access=(ChunkAccess)chunk;
+        var height=NativeSkySourceSections.pureAccessor(access);
+        if(height==null)return -1;
+        if(chunk.getClass()==LevelChunk.class){
+            var level=((LevelChunk)chunk).getLevel();
+            if((level.getClass()!=net.minecraft.server.level.ServerLevel.class
+                && level.getClass()!=net.minecraft.client.multiplayer.ClientLevel.class)||level.isDebug())return -1;
+        }
+        var sections=access.getSectionsForRead();int min=height.getMinY();
+        if((min&15)!=0 || sections.length*16!=height.getHeight())return -1;
+        int index=y-(min>>4);
+        if(index>=0 && index<sections.length){
+            var section=sections[index];
+            if(section==null || section.getClass()!=LevelChunkSection.class)return -1;
+            if(!section.hasOnlyAir()){
+                var states=section.getStates();
+                if(states.getClass()!=PalettedContainer.class || states.nativeLiveBlocks()==null)return -1;
+            }
+        }
+        return blocks(chunk,x,y,z,buffer,lease);
+    }
+
     /** Header [kind, uniform state or bits, palette size] plus palette states,
      * packed words or one state per block. Kinds: 0 uniform, 1 local palette,
      * 2 global state ids, 3 full. The leased overload also supplies kind 4:

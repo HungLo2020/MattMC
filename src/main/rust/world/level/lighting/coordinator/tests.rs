@@ -1109,3 +1109,44 @@ mod source_input_forwarding {
         }
     }
 }
+
+mod propagation_scalar_storage {
+    use super::super::*;
+    fn actual_map(layer:Arc<Layer>)->Arc<LightMap>{unsafe{
+        let registry=super::super::super::maps::ffi::mattmc_light_map_registry_create();
+        let map=Arc::from_raw(super::super::super::maps::ffi::mattmc_light_map_create(registry));
+        super::super::super::maps::ffi::mattmc_light_map_registry_release(registry);
+        let entry=map.native_entry(layer).unwrap();map.set(0,Some(entry));map
+    }}
+    #[test]
+    fn retained_actual_storage_runs_existing_cow_policy_after_base_drop_then_retires_only_new_generation(){
+        let original=Arc::new(Layer::new(0));let map=actual_map(original.clone());let published=map.snapshot();
+        let weak=Arc::downgrade(&map);let input=super::super::ffi::connected_test_input(&map);
+        let pos=propagation::block_pos(8,8,8);assert_eq!(input.stored_section(0),Some(true));assert_eq!(input.stored_read(pos).unwrap(),Some(0));
+        let(ids,_)=input.stored_write(pos,7).unwrap().expect("Actual canonical storage must use the retained native policy");
+        let current=map.raw(0).unwrap();assert_eq!(ids,vec![current.id]);assert_eq!(current.layer.as_ref().unwrap().view().get(2184).unwrap(),7);
+        assert_eq!(published.raw(0).unwrap().layer.as_ref().unwrap().view().get(2184).unwrap(),0,"Actual published generation stays independent");
+        let new_entry=Arc::downgrade(&current);let new_layer=Arc::downgrade(current.layer.as_ref().unwrap());drop(current);drop(map);
+        assert_eq!(weak.strong_count(),1,"Only the actual retained storage input keeps the live map");
+        assert_eq!(input.stored_read(pos).unwrap(),Some(7));drop(input);assert_eq!(weak.strong_count(),0);assert_eq!(new_entry.strong_count(),0,"Actual new entry retires with its retained consumer");
+        assert_eq!(new_layer.strong_count(),1,"Existing pending identity slot keeps the native layer until registry retirement; do not bypass VM acknowledgement");
+        drop(published);assert_eq!(new_layer.strong_count(),0,"Last original snapshot releases the actual registry and its pending custody");
+        assert_eq!(original.view().get(2184).unwrap(),0);
+    }
+    #[test]
+    fn unsupported_actual_layer_declines_before_changed_membership_then_observes_live_replacement(){
+        let unsupported=Arc::new(Layer::new(0));unsupported.invalidate();let map=actual_map(unsupported);let before=map.snapshot();
+        let input=super::super::ffi::connected_test_input(&map);let pos=propagation::block_pos(8,8,8);
+        assert!(input.stored_read(pos).unwrap().is_none());assert!(input.stored_write(pos,9).unwrap().is_none());
+        let replacement=Arc::new(Layer::new(0));let entry=map.native_entry(replacement.clone()).unwrap();map.set(0,Some(entry));map.clear_cache(false);let retained=map.snapshot();
+        assert_eq!(input.stored_read(pos).unwrap(),Some(0));assert!(input.stored_write(pos,9).unwrap().is_some());
+        assert_eq!(replacement.view().get(2184).unwrap(),0,"Declining the original input must not pre-mark CHANGED and suppress the real later COW");
+        assert_eq!(retained.raw(0).unwrap().layer.as_ref().unwrap().view().get(2184).unwrap(),0);assert_eq!(map.raw(0).unwrap().layer.as_ref().unwrap().view().get(2184).unwrap(),9);
+        drop(before);
+    }
+    #[test]
+    fn missing_actual_layer_remains_original_vm_null_failure_without_installing_storage(){
+        let layer=Arc::new(Layer::new(0));let map=actual_map(layer);let retained=map.snapshot();map.set(0,None);map.clear_cache(false);
+        let input=super::super::ffi::connected_test_input(&map);assert_eq!(input.stored_section(0),Some(false));assert!(input.stored_read(0).unwrap().is_none());assert!(input.stored_write(0,1).unwrap().is_none());assert!(map.raw(0).is_none());drop(retained);
+    }
+}

@@ -5,8 +5,11 @@ description: Join MattMC's dot-coordinated GitHub swarm from a Codex or Claude s
 
 # Attach to swarm
 
-Coordinate through the [MattMC swarm board](https://github.com/HungLo2020/MattMC/discussions/888),
-using protocol `mattmc-swarm/v2`. **dot is the sole coordinator.** This is the
+Start at [the permanent swarm bootstrap/archive](https://github.com/HungLo2020/MattMC/discussions/888)
+and follow its active-board redirect. The current operational board is
+[#890](https://github.com/HungLo2020/MattMC/discussions/890), using `mattmc-swarm/v3`;
+follow subsequent linked rollovers instead of continuing an archived queue.
+**dot is the sole coordinator.** This is the
 one shared swarm skill, not a background service or a replacement for repository
 instructions. Codex uses `$attach-to-swarm`; Claude Code uses `/attach-to-swarm`
 through the existing `.claude/skills -> ../.agents/skills` symlink.
@@ -44,7 +47,7 @@ or credential changes.
   the board's dashboard or another session's messages.
 - The bootstrap coordinator is `dot-20261014-swarm-01`, posting as `HungLo2020`.
   Coordinator event headers are
-  `[SWARM v2][COORDINATOR][agent=dot][host=<actual-hostname>][session=dot-20261014-swarm-01][seq=N]`.
+  `[SWARM v3][COORDINATOR][agent=dot][host=<actual-hostname>][session=dot-20261014-swarm-01][seq=N]`.
   Match the active coordinator agent/hostname/session, monotonic sequence, exact
   assignment revision, assigned worker and permalink against the board dashboard.
   A coordinator rotation requires a linked handoff from the established
@@ -239,17 +242,27 @@ new assignment revision before changing shared interfaces or widening scope.
 
 ## Low-noise messages and polling
 
-Use **top-level comments for all operational events**, linking the related
-assignment/request. Replies under old comments are not part of the operational
-queue; if one contains a decision, dot posts a top-level linked event before
-acting on it. Keep event history append-only: correct with a new event that
-names the earlier message. The current dashboard is a compact mutable index.
+Use one editable top-level rolling status per continuing worker on the active
+board. Keep it under 120 words, with actual session/host, assignment, monotonic
+revision, updated UTC, current commit, concise result/blocker/next step and
+links to detailed evidence. Edit it for routine progress and READY/PUSH/CI stages.
+Read other workers' status edits as well as new comments.
+
+New immutable top-level comments are for consequential failures, actual
+requests/decisions, assignment or ownership changes, releases/fencing, and one
+compact completed-publication receipt. Link the related assignment/request.
+Replies under old comments are not the operational queue. Preserve substantive
+events and status edit history; correct immutable evidence with a linked event.
+Never edit another worker's status or the coordinator's dashboard. Keep each
+board below 100 messages, including replies; dot prepares rollover at 80 and
+completes it by 90. Preserve the archive and follow the linked active-board
+handoff without restarting assignments or posting duplicate registrations.
 
 Every message starts with a header containing the actual agent identity,
 actual execution-system hostname and unique session ID, for example:
 
 ```text
-[SWARM v2][WORKER][agent=Codex][host=<actual-hostname>][session=<unique-session>][event=PROGRESS]
+[SWARM v3][WORKER][agent=Codex][host=<actual-hostname>][session=<unique-session>][event=PROGRESS]
 message-id: <session>/0002
 utc: <ISO-8601 UTC time>
 assignment: S0001/r1
@@ -260,9 +273,9 @@ registered hostname/capabilities if the executor changes; never treat hostname
 alone as identity. Include the event type and exact assignment revision where
 applicable. Worker types include `REGISTER`, `ACK`, `PROGRESS`, `REQUEST`, `BLOCKED`,
 `READY_TO_PUSH`, `PUBLISHED`, `RESULT`, `RELEASED`, `DETACH`.
-Deduplicate by message ID and GitHub comment ID/permalink; never post an unchanged
-heartbeat on every read. Report material progress/blockers promptly and check in
-at the assigned time, normally every 30 minutes even during a long run.
+Deduplicate by message ID and GitHub comment ID/permalink. Report material
+progress/blockers promptly and update the rolling status at the assigned time;
+never append unchanged heartbeats or duplicate READY/PUSH/CI events.
 
 Requests are queued and asynchronous; an instant reply is not guaranteed. During
 coordinator gaps, continue only the already assigned safe scope and check the board
@@ -282,7 +295,11 @@ it. Report the blocker and next possible check; a stopped runner cannot promise
 indefinite monitoring, and a blocker does not release an active assignment.
 
 For an already-authorized GraphQL client, resolve `repository(owner:"HungLo2020",
-name:"MattMC").discussion(number:888)` and use these bounded reads:
+name:"MattMC").discussion(number:888)` for the permanent bootstrap, follow its
+active-board redirect, then use `discussion(number:$activeBoard)` for these bounded
+operational reads. Keep each board's cursor separate; a rollover needs a recorded
+bootstrap boundary on the new board, while old assignments/evidence keep their
+original permalinks:
 
 - **Bootstrap/recovery:** read the current dashboard (`body`, `updatedAt`), its
   active assignment links and `comments(last:50)`, including
@@ -330,6 +347,32 @@ Apply the same unknown/minimized-message and recovery rules. Neither a comment
 nor this skill wakes a stopped agent; monitoring exists only while a real
 supported runner is active.
 
+## Continuing storage responsibility
+
+Each worker continuously owns its machine's repo-associated generated disk usage,
+including `/tmp` test/runtime copies. Audit before heavy builds/tests, after
+publication, at handoff/exit and at least hourly during long campaigns. Inventory
+allocated bytes and filesystem free space for the checkout/`.git`, caches,
+worlds/runtime images and owned temporary/recovery outputs; identify large items
+and active readers/writers before touching them.
+
+Prune obsolete reproducible caches and generated outputs at safe boundaries.
+Preserve compact manifests, hashes, commands and results; reuse immutable verified
+inputs instead of duplicating complete runtimes/worlds. Retain a bounded current
+baseline/candidate set. Give each extra comparison image a reason and expiry
+checkpoint. Aim below 50 GiB of regenerable outputs per machine; exceeding it
+requires immediate bounded cleanup and an explicit retention plan. Before a
+large build, require free space for measured expected growth plus headroom.
+Do not interrupt valid tests just to clean.
+
+Protect source/history, user saves, settings/prototypes, unrelated projects,
+existing stashes, unfinished WIP/recovery and required immutable reference or
+unresolved failure evidence. No broad/glob purge or deletion of unique or ambiguous
+data; retain and report uncertainty for a decision. Edit the rolling status with
+before/after allocated and free GiB, reclaimed GiB, retained large items/reasons
+and next cleanup point. Shared-storage aggregate cap remains 25 GB; every new
+transfer still needs a bounded reservation before writing.
+
 ## Stop, reclaim, and resume safely
 
 An overdue check-in marks a worker **possibly stalled**, not cancelled and not
@@ -357,10 +400,9 @@ validation, assignment stops or shared-checkout/resource ownership constraints.
 
 1. Read the current dashboard and events before publication; confirm your
    assignment is still active and resolve any actual dependency or correctness
-   hold affecting your candidate. Post `READY_TO_PUSH` with agent/hostname/session,
-   assignment revision, current local/remote master SHAs, scoped diff summary and
-   local verification evidence. This is a status notice, not a request for a turn;
-   proceed without waiting for dot or an unrelated worker.
+   hold affecting your candidate. Record READY in your rolling status with current
+   local/remote master SHAs, scoped diff and verification links. Proceed without
+   waiting for dot or an unrelated worker; this is not a publication-turn request.
 2. Load and follow `sync-and-push`: preserve pending work, fetch the current remote
    master, integrate/reconcile both sides, inspect interactions even without
    conflicts and rerun affected tests/performance gates on the exact candidate:
@@ -383,11 +425,11 @@ validation, assignment stops or shared-checkout/resource ownership constraints.
    any additional history-changing authorization; do not improvise a second
    commit, merge or rewrite. Independent publication does not override Git's
    protections or make a failed push successful.
-5. Verify the remote contains the exact published SHA; report `PUBLISHED` with
-   its parent/base, reconciliation and test evidence. Track required CI for that
-   exact SHA to a terminal result. Claim completion only when mandatory checks
-   pass; report any failures or unrun hardware gates honestly. Later edits repeat
-   this workflow within the active authorized assignment.
+5. Verify the remote contains the exact published SHA and track its required CI
+   to a terminal result. Put interim push/CI progress in the rolling status; post
+   one compact completed-publication receipt with parent/base, reconciliation,
+   verification and limits after closure. Report failures and unrun hardware gates
+   honestly. Later edits repeat this workflow within the active assignment.
 
 The designated dot coordinator polls registrations, requests and results, keeps
 scope/dependency ownership clear, and routes decisions. Keep the dashboard's

@@ -21,9 +21,10 @@ import org.jetbrains.annotations.Nullable;
 /** Rust propagation for {@link LightEngine#runLightUpdates()}: the decrease
  * then increase queues of a {@link BlockLightEngine} or {@link SkyLightEngine}
  * run in {@code world/level/lighting/propagation/}. Sections reach Rust
- * through a callback on first use; written layers install once at the end
- * with the original copy-on-write. Input Rust rejects leaves storage and
- * queues untouched for the Java propagation. */
+ * through a callback on first use on the silent bulk route. Effectful block
+ * inputs instead use the actual live queue and retained storage policy, with
+ * original VM leaves and immediate committed prefixes. Sky compatibility keeps
+ * its existing input journal and Java replay. */
 final class NativeLightPropagation {
     private static final MethodHandle TABLES_CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_tables_create",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG));
@@ -239,6 +240,12 @@ final class NativeLightPropagation {
     int run(LayerLightSectionStorage<?> storage, NativeLightQueues queues) {
         if (this.running || !enabled || Tables.HANDLE == 0) return -1;
         if (queues.isEmpty(0) && queues.isEmpty(1)) return 0;
+        if (!this.sky && this.engine.chunkSource.getClass()!=net.minecraft.server.level.ServerChunkCache.class
+            && this.engine.chunkSource.getClass()!=net.minecraft.client.multiplayer.ClientChunkCache.class) {
+            int result=NativeBlockPropagation.run((BlockLightEngine)this.engine,queues);
+            PASSES.incrementAndGet();
+            return result;
+        }
         if (storage.getClass() != (this.sky ? SkyLightSectionStorage.class : BlockLightSectionStorage.class)) return -1;
         NativeLightPropagation previous = CURRENT.get();
         this.running = true;
@@ -276,6 +283,11 @@ final class NativeLightPropagation {
             if (status == -1) throw new IllegalStateException("Native light propagation rejected its input");
             // Rust restores original inputs after any callback additions before replay.
             REJECTED.incrementAndGet();
+            if(!this.sky){
+                int processed=NativeBlockPropagation.run((BlockLightEngine)this.engine,queues);
+                PASSES.incrementAndGet();
+                return processed;
+            }
             return -1;
         }
         long processed = this.out.getAtIndex(ValueLayout.JAVA_LONG, 0);
@@ -351,8 +363,9 @@ final class NativeLightPropagation {
                 return layer == null ? 0 : NativeLightBlocks.layer(layer, storage.lightOnInSection(section), buffer);
             }
             int x = SectionPos.x(section), z = SectionPos.z(section);
-            return NativeLightBlocks.blocks(current.engine.chunkSource.getChunkForLighting(x, z), x, SectionPos.y(section), z, buffer,
-                current.borrowedBlocks);
+            var chunk=current.engine.chunkSource.getChunkForLighting(x,z);
+            return current.sky?NativeLightBlocks.blocks(chunk,x,SectionPos.y(section),z,buffer,current.borrowedBlocks):
+                NativeLightBlocks.blocksForPropagation(chunk,x,SectionPos.y(section),z,buffer,current.borrowedBlocks);
         } catch (Throwable error) {
             return -2;
         }

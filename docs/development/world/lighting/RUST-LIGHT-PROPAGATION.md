@@ -34,6 +34,137 @@ Server PRE/propagation/POST batch policy and scheduled admission belong to the
 [native threaded coordinator](RUST-THREADED-LIGHTING.md); S0026's per-engine owner
 handles the connected stock section and publication policy.
 
+## Effectful block propagation under development
+
+The bulk section path does not preserve observable custom height-provider calls.
+A new observer, `DevUtils/tests/lighting/coordinator/PropagationHeightEffects.java`,
+separates a real node check from subsequent queued propagation. Its original
+Frozen value case makes 13,504 height calls; preserved `172ef018` and published
+`66d9690e` make nine. A checked failure calls the original provider once but
+those native paths call it twice through replay. Their selected light values
+and work counts match; callback behavior does not. These results predate the
+block-node input checkpoint and remain failures.
+
+The local correction is a Rust block-pass policy over the actual pending queue
+owner, with Java supplying the original state, opacity, emission, shape and
+storage calls. Queue guards end before every effect. Successful writes and
+consumed inputs remain committed when a VM call fails; the adapter retains and
+rethrows that exact throwable without replaying it. Invocation-local VM state
+references serve the original callbacks and clear at their policy boundary.
+Unknown contextual getters take this path; the bulk route requires a stock
+chunk source and silent admission of its actual chunks, height providers and
+sections. The sky path retains its existing implementation.
+
+Compile the observer once against original Frozen with
+`VerifyThreadedLighting.java` and `VerifyBlockInputEffects.java`, then run the
+same classes on complete preserved and matching Current runtimes. Compare every
+`PROPAGATION_HEIGHT` row, including call count, hash, prefix, checked identity,
+work, pending state and light values. `PropagationGetterEffects.java` adds fifteen
+lookup/state failure and reentry cases across direct, level and threaded entry
+points, including complete updating-layer hashes. The published `66d9690e` image
+differs in all fifteen traces and in three reentrant lookup layer hashes.
+
+The first local `8341a0b6` plus owned policy runtime matches all three height and
+fifteen getter cases, using the unchanged original Frozen observer bytes. Three
+native tests also exercise the actual queue/layer, committed failure prefix,
+live callback additions and release after consumption or abandonment. These
+focused results do not certify a later integration. On the coupled `03f1df23`
+image, all eighteen original rows, four real VM queue/arena retirement cases and
+the genuine retained-base omission control pass. Full affected and save gates
+remain pending for this correction. The first resource screen fails its unchanged warmup
+bound: repeated coordinator frame adapters allocate about 6.8 MB per 64-edit
+cycle and prevent the required quiet window. Its raw failure remains; no heap,
+deadline or quiet criterion was relaxed.
+
+The next local version retains the actual native coordinator binding alongside
+the queues. Canonical reads use its live layer owners, and writes run the same
+existing COW/write/affected policy directly in Rust. Metadata refresh and pending
+VM retirement still finish before the next observable effect. Missing, custom,
+escaped or pending-binding inputs keep the original VM calls. Three real native
+storage tests and the original eighteen cases plus queue lifetime controls pass
+on the matching local `03f1df23` image. Its resource screen completes with eight
+quiet samples and matching output: Java allocation falls to 127,398 bytes per
+cycle, but latency remains 55.12 ms, about 10.62 times original Frozen. Publication
+remains held; this measurement is not a performance acceptance.
+
+The next local slice connects each admitted state's actual primary section to
+that consumer. It reuses the node-input admission rules and original contextual
+lookup, reads the live owner after the VM borrow ends, and retires that input
+before the property consumer or later VM effects. The existing native block
+registry supplies opacity, emission, empty-shape and face policy. Mixed/custom
+shapes reconstruct only canonical registry facades alongside the original custom
+state. Registry-owned states are permanent roots; custom states still clear at
+their original VM boundary.
+
+Admission can succeed before `PalettedContainer.onResize()` materializes the
+Java storage and invalidates the actual primary owner. The consumer must drop
+that captured owner and use the original state fallback. It reads the chunk
+selected by the preceding contextual lookup, using that lookup's cached key
+and the same mutable position; a getter can change the position while returning
+a different chunk. Resetting the position or deriving a new chunk key changes
+the original result. `PropagationAdmissionEffects.java` reproduces this with a
+delegating capture shim and real container materialization. Its once-Frozen-
+compiled observer completes on original Frozen and forced Java; the pre-fix
+native image throws `IllegalStateException` after committing the source write.
+The companion `DevUtils/tests/lighting/coordinator/PropagationAdmissionEffects.c`
+delegates capture to the actual library selected by the `RUNTIME` compiler macro.
+Build it as a shared library linked to that same native image. For the native
+observer run, point `mattmc.rust.natives.dir` at the shim directory and set
+process-local `LD_PRELOAD` to the real library so its existing SONAME resolves.
+Keep the same once-Frozen-compiled Java observer for all three runs; compare
+`PROPAGATION_ADMISSION` rows and require `ADMISSION_HOOKS 1` on native, along with
+actual class/library origins and input hashes.
+The corrected local `37848c3a` image matches that original observation. The
+integrated `a648afd7` image repeats the pass with the same observer bytes,
+verified class/native origins and one actual admission hook. Five native
+primary-input tests cover live reads, abandonment, initial decline, mixed
+properties and late invalidation/unsupported state, including retirement before
+fallback and its failure path. Both images also pass the original eighteen
+callback rows, four actual primary-input and four queue-input VM cases, and the
+two genuine base-retention omission controls. The failed baseline remains
+recorded; integrated gate results follow below.
+
+The matching local Root4 image passes four native primary-input tests, all
+original eighteen rows, four actual primary-input VM cases and four actual queue
+VM cases, with both genuine omission controls. Its unchanged screen completes
+with eight quiet samples, matching work/full state and zero swap: 31.23 ms and
+127,438 Java bytes per 64-edit cycle, about 6.02 times original Frozen latency.
+This is sufficient for intermediate correctness/save validation under the
+[migration policy](../../tooling/MIGRATION-ACCEPTANCE.md); it is not final
+performance acceptance. S31 retains this
+debt and the connected next step: move the contextual state/chunk-cache producer
+and live-input consumers together while preserving original lookup, reentry,
+custom dispatch and mutable-position behavior.
+
+After the late-invalidation correction and `a648afd7` integration, the same
+screen matches work/full state with eight quiet samples and zero swap, but
+latency rises to 42.20 ms, about 8.13 times original Frozen; Java allocation is
+unchanged. A delegating diagnostic observes 11,952,333 actual admissions and no
+late-fallback calls, excluding repeated fallback as the cause. The additional
+latency remains unresolved debt, with the same connected ownership exit above.
+The integrated image passes 493 focused Java tests. Its full native suite is
+**3,182 passed, 57 failed, nine ignored**, with all required controls passing.
+The separate [bounded source-coordinate qualification](https://github.com/HungLo2020/MattMC/discussions/890#discussioncomment-19007417)
+matches the historical failures; the raw run and strict comparison stay failed.
+The full Java tiers pass with fresh XML and intact guards: ordinary has 2,821
+passes and ten skips, parity 193 passes, and slow eleven passes. Original legacy
+traces and the portable Source corpus (252 rows plus two genuine leak controls)
+also pass. Saved-light order, custody and 125 fresh serialized chunk/entity cases
+plus their own save/reopen checks pass with intact guards. Current matches the
+guarded pre-change image and its own reopen exactly. The same 25 Primordial
+differences from Frozen remain byte-for-byte in the comparison report; full
+Frozen equality remains false. These are intermediate correctness results; the
+whole lighting migration and its performance/hardware acceptance remain open.
+
+`VerifyPropagationStateInput.java` exercises the actual native capture slot and
+live primary mutation, real VM collection within five seconds, checked-failure
+prefix and release before a later state callback. When calling the private
+native entry point directly, initialize `NativeBlockRegistry.ready()` first, as
+`NativeLightPropagation.run()` does through its table admission. Its original
+fixture omitted this precondition; the preserved failure does not establish a
+production failure. Keep the real base-close omission and caller-held controls;
+do not replace them with counters or extend their collection deadline.
+
 ## How a pass works
 
 1. Producers append position/entry pairs to retained Rust pending queues.

@@ -106,6 +106,12 @@ final class NativeLightCoordinator {
     }
     NativeLightCoordinator forEngine(LightEngine<?,?> engine){return new NativeLightCoordinator(this,engine);}
     MemorySegment bindingForPropagation(){return binding;}
+    void refreshPropagationEntries(long address,long count){
+        try{
+            var entries=MemorySegment.ofAddress(address).reinterpret(count*Integer.BYTES);
+            for(long i=0;i<count;i++)map.refreshForCoordinator(entries.getAtIndex(ValueLayout.JAVA_INT,i));
+        }finally{map.drainForCoordinator();Reference.reachabilityFence(this);}
+    }
     static long liveForVerification(){try{return(long)LIVE.invokeExact();}catch(Throwable error){throw failure(error);}}
     int enginesForVerification(){try{return(int)ENGINES.invokeExact(owner);}catch(Throwable error){throw failure(error);}finally{Reference.reachabilityFence(this);}}
     int size(int table){

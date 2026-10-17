@@ -1,10 +1,13 @@
 # Direct Rust light-section inputs
 
-Ordinary light propagation now captures block states directly from the primary
+Silent bulk propagation captures block states directly from the primary
 [Rust live section owner](../chunk/RUST-LIVE-SECTIONS.md). Java supplies a bounded
 CPU-owner descriptor and a synchronous lifetime pin. Rust maps palette state IDs
 to light types and captures packed words directly into the existing pass snapshot.
 There is no intermediate packed-state callback payload on this route.
+The [effectful block path](RUST-LIGHT-PROPAGATION.md#effectful-block-propagation-under-development)
+captures selected live states separately; the snapshot rules below describe the
+bulk route.
 
 Implementation: [live packed reader](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/chunk/live/mod.rs),
 [propagation consumer](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/world/level/lighting/propagation/mod.rs)
@@ -26,8 +29,9 @@ and [temporary bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main
   still reject through the established input-journal/replay protocol.
 - Legacy packed/full CPU payloads remain compatibility inputs. No GPU resources,
   renderer/presenter ownership or native GPU handles are involved.
-- Java still owns check-node orchestration and contextual chunk callbacks. This
-  producer/consumer migration is part of continuing Java removal.
+- The native coordinator owns stock node policy; Java supplies contextual chunk
+  callbacks. Effectful block propagation is being corrected separately; see the
+  [current propagation work](RUST-LIGHT-PROPAGATION.md#effectful-block-propagation-under-development).
 
 ## Verify changes
 

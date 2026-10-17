@@ -637,6 +637,45 @@ impl PropagationInput {
         owner.state.lock().unwrap().retain_engine(binding.id).ok()?;
         Some(Self { owner, engine: binding.id, projection:Arc::clone(&binding.projection),levels:Arc::clone(&binding.levels) })
     }
+    pub(in crate::world::level::lighting) fn light_enabled(&self,key:i64)->bool {
+        self.owner.state.lock().unwrap().enabled(key)
+    }
+    pub(in crate::world::level::lighting) fn matches_block_queues(&self,queues:*const Queues)->bool {
+        let state=self.owner.state.lock().unwrap();
+        state.engines.get(&self.engine).is_some_and(|engine|engine.kind==0&&Arc::as_ptr(&engine.queues)==queues)
+    }
+    pub(in crate::world::level::lighting) fn stored_section(&self,key:i64)->Option<bool> {
+        let state=self.owner.state.lock().unwrap();
+        if state.updating.binding_pending(){return None;}
+        Some(state.updating.get(key).is_some())
+    }
+    pub(in crate::world::level::lighting) fn stored_read(&self,pos:i64)->Result<Option<i32>,(i32,[i64;2])> {
+        let state=self.owner.state.lock().unwrap();
+        if state.updating.binding_pending(){return Ok(None);}
+        let Some(entry)=state.updating.get(section(pos))else{return Ok(None);};
+        let Some(layer)=entry.layer.as_ref().filter(|layer|layer.is_valid())else{return Ok(None);};
+        layer.view().get(index(pos)).map(Some).map_err(|error|{
+            let mut args=[0;2];let status=failure(Error::Table(Fault::ArrayIndex(error.0,2048)),&mut args);(status,args)
+        })
+    }
+    /// Reuse the actual coordinator COW/write/affected policy. Admission has no
+    /// mutation; unsupported layers still perform their original VM effects.
+    pub(in crate::world::level::lighting) fn stored_write(&self,pos:i64,value:i32)->Result<Option<(Vec<u32>,bool)>,(i32,[i64;2])> {
+        let mut state=self.owner.state.lock().unwrap();
+        if state.updating.binding_pending(){return Ok(None);}
+        if !state.updating.raw(section(pos)).as_ref().and_then(|entry|entry.layer.as_ref()).is_some_and(|layer|layer.is_valid()){return Ok(None);}
+        let result=(||->Result<(Vec<u32>,bool),Error>{
+            let frame=state.begin_retained(Op::WriteStored(pos,value),self.engine)?;
+            let stepped=state.step(frame,0,None);
+            let ids=state.refreshed.iter().map(|entry|entry.id).collect();
+            let ended=state.end(frame);
+            if !matches!(stepped?,Effect::Done(_)){return Err(Error::Unsupported);}
+            ended?;
+            Ok((ids,state.updating.binding_pending()))
+        })();
+        publish(&self.owner,&mut state);
+        result.map(Some).map_err(|error|{let mut args=[0;2];let status=failure(error,&mut args);(status,args)})
+    }
     pub(in crate::world::level::lighting) fn layer(&self, key: i64, output: &mut [u8; 2048]) -> Result<LayerInput, propagation::Error> {
         let state = self.owner.state.lock().unwrap();
         // Same actual cache lookup before enabled/default decisions. The extra

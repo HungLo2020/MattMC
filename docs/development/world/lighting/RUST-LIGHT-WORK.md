@@ -4,7 +4,9 @@
 append a complete position/entry pair in one ordinary downcall; the canonical
 sky-source producer appends directly in Rust. The propagation consumer takes
 the pending deques without copying them into Java buffers or rebuilding them
-in a second native deque. This extends the existing
+in a second native deque. The effectful block-pass correction instead consumes
+those same live queues one pair at a time, so callback additions and consumed
+failure prefixes follow the original order. This extends the existing
 [propagation policy](RUST-LIGHT-PROPAGATION.md); it does not move the whole light
 engine or world simulation out of Java.
 
@@ -17,23 +19,31 @@ engine or world simulation out of Java.
   the mutable propagation engine. A mutex covers only queue operations; it is
   released before any Java callback. Atomic word counts supply Java's empty
   checks without a downcall.
-- Successful admission clears and reuses input capacity. A rejected section
-  callback restores original inputs after callback additions, matching the
-  previous bridge's refill order. Generated pass-local work is discarded.
-  Earlier callback effects and later result-install failures are not rolled back.
+- The bulk snapshot route clears and reuses input capacity on success. Its
+  rejected section input restores the journal. The
+  [effectful block correction](RUST-LIGHT-PROPAGATION.md#effectful-block-propagation-under-development)
+  uses the actual queue and canonical storage owners directly; it preserves
+  immediate writes, live additions and the consumed prefix without replaying a
+  failed VM effect. Its pending primary-state extension captures a real section
+  owner per selected state, reads it after the callback and drops it before
+  consuming the canonical registry's properties. Custom state/shape effects
+  retain their VM boundary. This correction is still under verification.
 - Canonical sky seeding updates native light bytes and enqueues native work
   directly. Escaped arrays retain the bounded compatibility export. Stateful
   queue calls use ordinary FFM downcalls and native scratch spans.
-- Java owner bindings lease CPU memory and fence synchronous borrows. Same-handle
-  nested native propagation is excluded. The original single-thread caller
-  contract remains; this does not certify arbitrary concurrent or reentrant use.
+- Java owner bindings lease CPU memory and fence synchronous borrows. The bulk
+  snapshot handle excludes nested use. Effectful invocations retain independent
+  native inputs and release queue/state guards before VM callbacks. The original
+  single-thread caller contract remains; this does not certify arbitrary
+  concurrent use.
 
 The connected [light coordinator](RUST-LIGHT-COORDINATOR.md) now owns stock node
 membership, section admission, columns and publication. Java retains genuine
 world/object callbacks and compatibility paths. Stock block/sky source seeding
-uses Rust; custom readers and mixed or escaped layers still have Java source
-loops that remain part of the unfinished lighting migration. Rust owns their
-pending queues as well. The server's outer batch/scheduling and request policy
+uses Rust; custom readers and mixed or escaped layers retain their original
+Java leaf calls while Rust selects the sky-source traversal. The effectful block
+correction likewise runs its live queue policy in Rust; bulk sky rejection still
+uses Java propagation loops. Rust owns those pending queues as well. The server's outer batch/scheduling and request policy
 has its separate [threaded coordinator](RUST-THREADED-LIGHTING.md). No GPU
 resource, presenter or rendering boundary is involved.
 
@@ -67,6 +77,10 @@ assertions; the full release-profile suite contains a lightmap-cache test that
 expects its debug-only same-generation check.
 
 ## Current verification
+
+The figures below describe the historical `ca8bf37a` queue-owner checkpoint.
+See [effectful block propagation](RUST-LIGHT-PROPAGATION.md#effectful-block-propagation-under-development)
+for the current correction, verification and outstanding performance debt.
 
 Candidate `ca8bf37a` matches Frozen for 492 passes and 437,089 state rows, with
 source/native/class guards intact. Queue growth/wrapping and the existing Java
