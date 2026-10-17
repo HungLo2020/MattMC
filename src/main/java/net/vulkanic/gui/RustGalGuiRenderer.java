@@ -1263,7 +1263,10 @@ public final class RustGalGuiRenderer {
 			} catch (RuntimeException error) {
 				return null;
 			}
-			if (itemResults.isEmpty()) return null;
+			if (itemResults.isEmpty()) {
+				recordTextRouteDiagnostic("entity-pip-item-dropped");
+				continue;
+			}
 			for (GuiModelPipSemanticCollector.Result itemResult : itemResults) {
 				layerResults.add(new EntityPipLayerResult(itemResult, layerItem.layerOrder()));
 			}
@@ -1402,6 +1405,11 @@ public final class RustGalGuiRenderer {
 			return new EntityPipLayerCapture(root, order);
 		}
 
+		@Override
+		public boolean capturesItemLayersDirectly() {
+			return true;
+		}
+
 		private void copy(EntityPipLayerModel model) {
 			// Finish bounded geometry extraction before the producer can mutate
 			// its reusable model/state. No model or state escapes this callback.
@@ -1505,6 +1513,33 @@ public final class RustGalGuiRenderer {
 				new Matrix4f(poseStack.last().pose()), authoredOrder, tint, () -> {}, materialMode, sourcePose -> {}));
 		}
 
+		/*
+		 * SubmitNodeCollection's semantic item and model-part callbacks queue
+		 * world-owned Rust meshes. Held item layers reach this capture through
+		 * them, so copy them into the preview instead.
+		 */
+		@Override
+		public void submitItemSemantic(PoseStack poseStack, net.minecraft.world.item.ItemDisplayContext displayContext,
+			int light, int overlay, int outlineColor, int[] tintLayers, List<net.minecraft.client.renderer.block.model.BakedQuad> quads,
+			RenderType renderType, ItemStackRenderState.FoilType foilType) {
+			submitItem(poseStack, displayContext, light, overlay, outlineColor, tintLayers, quads, renderType, foilType);
+		}
+
+		@Override
+		public void submitModelPartSemantic(net.minecraft.client.model.geom.ModelPart modelPart, PoseStack poseStack,
+			RenderType renderType, int light, int overlay, @Nullable TextureAtlasSprite sprite, boolean affectsCrumbling,
+			boolean foil, int tint, @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay, int outlineColor) {
+			// Special item renderers (shields, banner patterns) submit atlas-sprite
+			// parts. Copy them like any sprite model; a foil glint is not part of
+			// the preview's sprite-model contract and is left out.
+			if (modelPart == null) {
+				root.unsupported = true;
+				return;
+			}
+			submitModel(new Model.Simple(modelPart, RenderType::entitySolid), net.minecraft.util.Unit.INSTANCE, poseStack,
+				renderType, light, overlay, tint, sprite, outlineColor, crumblingOverlay);
+		}
+
 		/* Keep GUI capture isolated from SubmitNodeCollection's world storage. */
 		@Override
 		public void submitBlock(PoseStack poseStack, net.minecraft.world.level.block.state.BlockState blockState,
@@ -1581,7 +1616,10 @@ public final class RustGalGuiRenderer {
 				|| renderType == null || materialMode < 0 || foilType == null
 				|| items.size() >= 32 || quads.size() > 256
 				|| root.itemQuadCount > MAX_ENTITY_PIP_ITEM_QUADS - quads.size()) {
-				root.unsupported = true;
+				// An item layer outside the bounded copy contract is left out of
+				// the preview (as every held item was before item layers reached
+				// this capture); the entity itself still renders.
+				recordTextRouteDiagnostic("entity-pip-item-dropped");
 				return;
 			}
 			root.itemQuadCount += quads.size();

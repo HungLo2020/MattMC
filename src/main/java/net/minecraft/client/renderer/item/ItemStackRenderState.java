@@ -440,7 +440,8 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 			boolean indexedItemScope = RustGalWorldPrimitiveRenderer.isIndexedItemSubmissionActive();
 			// Text/coverage traversals replay the same producer callbacks, but their
 			// collectors must receive semantics without a second native submission.
-			if (!submitNodeCollector.isSemanticCoverageOnly()) {
+			// Direct GUI captures (entity previews) copy the layer themselves below.
+			if (!submitNodeCollector.isSemanticCoverageOnly() && !submitNodeCollector.capturesItemLayersDirectly()) {
 				WorldRenderRoutePolicy.Route ownership = ItemEntityRenderOwnershipPolicy.currentOwnershipRoute();
 				if (!ownership.usesRustWholeFrameVulkan()) {
 					throw new IllegalStateException(
@@ -619,6 +620,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 				// Fabric Rendering API support (from ItemLayerRenderStateMixin redirect)
 				if (ItemStackRenderState.this.displayContext != ItemDisplayContext.GUI
 					&& this.hasMutableMesh()
+					&& !submitNodeCollector.capturesItemLayersDirectly()
 					&& submitNodeCollector instanceof OrderedSubmitNodeCollectorExtension access) {
 					// We don't have to copy the mesh here because vanilla doesn't copy the tint array or quad list either.
 					access.fabric_submitItem(poseStack, ItemStackRenderState.this.displayContext, i, j, k, this.tintLayers, this.quads, this.renderType, this.foilType, this.mutableMesh);

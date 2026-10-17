@@ -45,6 +45,11 @@ GPU resources, passes, submission and presentation remain owned by Rust/GAL.
   Java admission counts expanded batches, vertices and indices; native preflight
   counts expanded batches and geometry bytes before allocating the expanded output.
   Invalid dynamic inputs leave the destination and its payload counter unchanged.
+- Every copied GUI vertex needs a non-zero normal. Rust rejects a zero normal
+  and fails the whole frame. Java drops zero-area quads before copying them
+  (`GuiItemMeshSemanticCollector.isZeroAreaQuad`); the rasterizer would draw
+  nothing for them. Example: edge-on faces of flat model elements, such as the
+  flytrap's.
 - Owned frontend requests keep geometry alive after template release. Copy-on-write
   storage prevents later source mutation from changing captured geometry.
 - Native geometry identities include a non-reused generation; caller cache

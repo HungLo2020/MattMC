@@ -30,6 +30,13 @@ renderer,
 - Count-only collectors (`isSemanticCoverageOnly()`) must get no TaCZ
   submissions. Those replays revisit item layers that the real pass already
   queued, and any submission is counted as unadmitted work.
+- The inventory player preview is a direct capture
+  (`SubmitNodeCollector.capturesItemLayersDirectly()`). Held item layers submit
+  to it, not to the world queue. A held gun's model is copied into the preview
+  mesh, with no world-mesh receipt check. Preview vertices carry sprite-local UVs
+  and normals transformed into preview space. A held item the preview cannot
+  copy is left out of it; the preview itself still draws. Long handheld items
+  (swords, sticks, tools) are copied but do not yet appear.
 - GUI items: the bounds passed to Rust GUI meshes are pose-local, because the
   composite shader applies the item pose. Use `GuiItemRenderState.oversizedItemBounds()`
   or the 16×16 slot, never `bounds()`, which is already transformed. Otherwise a

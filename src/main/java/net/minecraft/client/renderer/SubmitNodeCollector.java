@@ -23,6 +23,16 @@ public interface SubmitNodeCollector extends OrderedSubmitNodeCollector {
 	}
 
 	/**
+	 * A self-contained GUI capture (the inventory entity preview) copies item
+	 * layers from its own item and model callbacks into one GUI mesh. Item
+	 * layers submit to it directly and must not queue world-owned Rust meshes
+	 * or expect a world-mesh receipt.
+	 */
+	default boolean capturesItemLayersDirectly() {
+		return false;
+	}
+
+	/**
 	 * Records copied text semantics without requiring every specialized collector
 	 * to expose a second callback. Rust-owned collectors override this entrypoint;
 	 * compatibility collectors inherit the ordinary storage callback.

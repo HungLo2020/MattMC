@@ -190,10 +190,12 @@ public final class GuiItemMeshSemanticCollector {
 
 		List<GuiItemMeshQuad> quads = new ArrayList<>(layer.quads().size());
 		for (BakedQuad quad : layer.quads()) {
+			if (isZeroAreaQuad(quad)) continue;
 			GuiItemMeshQuad copied = copyQuad(quad, layer.tintLayers(), sources, atlasUses);
 			if (copied == null) return "unsupported-quad";
 			quads.add(copied);
 		}
+		if (quads.isEmpty()) return null;
 		float[] modelTransform = layer.nativeTransform() == null ? layer.modelTransform() : null;
 		int sourceFoilType = layer.foilType() == ItemStackRenderState.FoilType.STANDARD ? 1 : 0;
 		output.add(new GuiItemMeshLayer(mode, layer.usesBlockLight(), modelTransform, quads, null, sourceFoilType, layer.nativeTransform()));
@@ -315,6 +317,21 @@ public final class GuiItemMeshSemanticCollector {
 			assetId, spriteIdentity.toString(), positions, atlasUvs, localUvs, colors, normals,
 			quad.getLightFace().get3DDataValue(), quad.hasShade()
 		);
+	}
+
+	/**
+	 * Zero-area quads (faces of a flat model element seen edge-on, such as the
+	 * flytrap's) rasterize nothing in Java, but have no surface normal: Rust's
+	 * GUI mesh preparation rejects their zero normal and fails the whole frame.
+	 * Drop them before copying, as the rasterizer would.
+	 */
+	static boolean isZeroAreaQuad(BakedQuad bakedQuad) {
+		if (!(bakedQuad instanceof net.sodium.client.model.quad.BakedQuadView quad)) return false;
+		float ax = quad.getX(2) - quad.getX(0), ay = quad.getY(2) - quad.getY(0), az = quad.getZ(2) - quad.getZ(0);
+		float bx = quad.getX(3) - quad.getX(1), by = quad.getY(3) - quad.getY(1), bz = quad.getZ(3) - quad.getZ(1);
+		float cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+		float lengthSquared = cx * cx + cy * cy + cz * cz;
+		return Float.isFinite(lengthSquared) && lengthSquared <= 1.0e-12F;
 	}
 
 	private static int itemTint(BakedQuad quad, int[] tintLayers) {

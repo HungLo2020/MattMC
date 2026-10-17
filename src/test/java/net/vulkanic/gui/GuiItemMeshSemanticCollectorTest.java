@@ -268,6 +268,32 @@ class GuiItemMeshSemanticCollectorTest {
 			"resource reload must retire flat topology before new atlas identities are used");
 	}
 
+	@Test
+	void zeroAreaQuadsAreDroppedButOrdinaryFacesAreKept() {
+		// An edge-on face of the flytrap's flat elements: corners coincide pairwise.
+		var edgeOn = quad(new float[] {
+			0.21875F, 1.2102475F, 0.19064078F, 0.21875F, 0.85669416F, 0.54419416F,
+			0.21875F, 0.85669416F, 0.54419416F, 0.21875F, 1.2102475F, 0.19064078F});
+		var face = quad(new float[] {0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0});
+		var sliver = quad(new float[] {0, 0, 0, 1, 0, 0, 1, 0.01F, 0, 0, 0.01F, 0});
+		assertTrue(GuiItemMeshSemanticCollector.isZeroAreaQuad(edgeOn));
+		assertFalse(GuiItemMeshSemanticCollector.isZeroAreaQuad(face));
+		assertFalse(GuiItemMeshSemanticCollector.isZeroAreaQuad(sliver), "thin but real faces still draw");
+	}
+
+	private static net.minecraft.client.renderer.block.model.BakedQuad quad(float[] corners) {
+		int stride = net.sodium.api.util.ModelQuadUtil.VERTEX_SIZE;
+		int[] vertices = new int[4 * stride];
+		for (int vertex = 0; vertex < 4; vertex++) {
+			for (int axis = 0; axis < 3; axis++) {
+				vertices[vertex * stride + net.sodium.api.util.ModelQuadUtil.POSITION_INDEX + axis] =
+					Float.floatToRawIntBits(corners[vertex * 3 + axis]);
+			}
+		}
+		return new net.minecraft.client.renderer.block.model.BakedQuad(
+			vertices, -1, net.minecraft.core.Direction.UP, null, true, 0);
+	}
+
 	private static float[] identityMatrix() {
 		return new float[] {
 			1.0F, 0.0F, 0.0F, 0.0F,

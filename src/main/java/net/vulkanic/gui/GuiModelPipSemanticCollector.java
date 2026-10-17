@@ -183,8 +183,12 @@ final class GuiModelPipSemanticCollector {
             glint = RustGalGuiRawImageAssets.resolve(ItemRenderer.ENCHANTED_GLINT_ITEM);
             if (glint == null) return List.of();
         }
+        // Positions are copied in preview space, so normals must be too (Rust
+        // reconciles each quad's winding against them): inverse-transpose basis.
+        Matrix3f normalMatrix = new Matrix3f(pose.last().pose()).invert().transpose();
         List<Result> results = new ArrayList<>(quads.size());
         for (BakedQuad quad : quads) {
+            if (GuiItemMeshSemanticCollector.isZeroAreaQuad(quad)) continue;
             if (!(quad instanceof net.sodium.client.model.quad.BakedQuadView view) || view.getSprite() == null) return List.of();
 			RustGalGuiRawImageAssets.Asset baseAsset = view.getSprite().contents().isAnimated()
 				? RustGalGuiRawImageAssets.resolveAnimatedSprite(view.getSprite())
@@ -192,9 +196,21 @@ final class GuiModelPipSemanticCollector {
             if (baseAsset == null) return List.of();
             long assetId = baseAsset.assetId();
             List<VulkanicGalBridge.GuiMeshVertexRecord> vertices = new ArrayList<>(4);
+            int[] previewNormals = new int[4];
+            for (int index = 0; index < 4; index++) {
+                int modelNormal = view.getAccurateNormal(index);
+                Vector3f normal = normalMatrix.transform(NormI8.unpackX(modelNormal), NormI8.unpackY(modelNormal),
+                    NormI8.unpackZ(modelNormal), new Vector3f());
+                if (normal.lengthSquared() <= 1.0e-12F || !normal.isFinite()) return List.of();
+                previewNormals[index] = NormI8.pack(normal.normalize());
+            }
             for (int index = 0; index < 4; index++) {
                 Vector3f position = pose.last().pose().transformPosition(view.getX(index), view.getY(index), view.getZ(index), new Vector3f());
-                float u = view.getTexU(index), v = view.getTexV(index);
+                // The copied asset is the quad's own sprite image, so sample it with
+                // sprite-local UVs rather than block-atlas coordinates.
+                var sprite = view.getSprite();
+                float u = RustGalGuiItemRenderer.itemLocalUv(view.getTexU(index), sprite.getU0(), sprite.getU1());
+                float v = RustGalGuiItemRenderer.itemLocalUv(view.getTexV(index), sprite.getV0(), sprite.getV1());
                 if (!Float.isFinite(position.x()) || !Float.isFinite(position.y()) || !Float.isFinite(position.z())
                     || !Float.isFinite(u) || !Float.isFinite(v)) return List.of();
                 int tint = !quad.isTinted() || quad.tintIndex() < 0 || quad.tintIndex() >= tintLayers.length
@@ -202,7 +218,7 @@ final class GuiModelPipSemanticCollector {
                 if (tint == -1) tint = 0xffffffff;
                 vertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(
                     new float[] {position.x(), position.y(), position.z()}, new float[] {u, v}, new float[] {u, v},
-                    tint, view.getVertexNormal(index)));
+                    tint, previewNormals[index]));
             }
             int clipMode = clip == null ? 0 : 1;
             VulkanicGalBridge.GuiMeshBatchRecord batch = new VulkanicGalBridge.GuiMeshBatchRecord(
@@ -230,9 +246,9 @@ final class GuiModelPipSemanticCollector {
                         Matrix3f inverseNormal = new Matrix3f(pose.last().pose()).invert();
                         Vector3f projected = inversePose.transformPosition(view.getX(index), view.getY(index), view.getZ(index), new Vector3f());
                         Vector3f normal = inverseNormal.transform(new Vector3f(
-                            (byte)(view.getVertexNormal(index) & 0xff) / 127.0F,
-                            (byte)((view.getVertexNormal(index) >>> 8) & 0xff) / 127.0F,
-                            (byte)((view.getVertexNormal(index) >>> 16) & 0xff) / 127.0F), new Vector3f());
+                            (byte)(previewNormals[index] & 0xff) / 127.0F,
+                            (byte)((previewNormals[index] >>> 8) & 0xff) / 127.0F,
+                            (byte)((previewNormals[index] >>> 16) & 0xff) / 127.0F), new Vector3f());
                         Direction direction = Direction.getApproximateNearest(normal.x(), normal.y(), normal.z());
                         projected.rotateY((float)Math.PI).rotateX((float)(-Math.PI / 2.0)).rotate(direction.getRotation());
                         gu = -projected.x() * ItemRenderer.SPECIAL_FOIL_TEXTURE_SCALE;
@@ -244,7 +260,7 @@ final class GuiModelPipSemanticCollector {
                     Vector3f position = pose.last().pose().transformPosition(view.getX(index), view.getY(index), view.getZ(index), new Vector3f());
                     glintVertices.add(new VulkanicGalBridge.GuiMeshVertexRecord(
                         new float[] {position.x(), position.y(), position.z()}, new float[] {gu, gv}, new float[] {gu, gv},
-                        glintColor, view.getVertexNormal(index)));
+                        glintColor, previewNormals[index]));
                 }
                 VulkanicGalBridge.GuiMeshBatchRecord glintBatch = new VulkanicGalBridge.GuiMeshBatchRecord(
                     GuiRenderStratum.GUI_ITEM.order(), 1, 4, 2, glint.assetId(), 0L, 0.0F,
