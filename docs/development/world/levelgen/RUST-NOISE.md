@@ -9,21 +9,26 @@ alternate Java sampling algorithm and cannot switch to one when native loading
 fails. The native library is required.
 
 Rust also constructs the Improved and Simplex leaf offsets and permutations.
-A native invocation requests the original three `RandomSource.nextDouble`
+Custom-source invocations request the original three `RandomSource.nextDouble`
 calls and descending 256 bounded integer draws. Java performs those genuine
 VM effects on the actual source, preserving custom dispatch, reentry and
-exception prefixes. Rust owns the shuffle and compact immutable leaf state;
+exception prefixes. Exact default Xoroshiro sources consume their canonical
+native state directly through the same builder; see
+[random-source ownership](RUST-RANDOM-SOURCES.md). Rust owns the shuffle and compact immutable leaf state;
 Java retains the public offset fields and an arena-managed native owner.
 
 The landedc8 [Perlin graph/factory increment](RUST-PERLIN.md) moves its
 modern/legacy decisions, frequency factors, bounds and ordered amplitude readers
 into Rust. Its verification is separate from the published leaf evidence below.
 The same publishedc8 [Normal producer and paired readers](RUST-NORMAL.md) complete that family’s
-constructor policy and mutable-tail validation. The next
+constructor policy and mutable-tail validation. The published `0f2b4976`
 [Blended/Perlin-Simplex producers](RUST-COMPOSITE-PRODUCERS.md) move their
-constructor state, actual children and snapshot writers into Rust, with combined
-verification pending. Random-source state/consumption algorithms, codecs and
-remaining public integration still use Java. These increments do not complete
+constructor state, actual children and snapshot writers into Rust. That guide
+records the exact combined verification and inherited image scopes. The
+connected [Xoroshiro source owner](RUST-RANDOM-SOURCES.md) also owns default
+state, seeding and scalar draws, with real native leaf consumers. Codecs remain
+VM projections; Gaussian, Legacy and remaining public orchestration still need
+connected ownership work. These increments do not complete
 noise construction or world generation. The unused Java Simplex gradient
 table and dot-product helper have been removed.
 

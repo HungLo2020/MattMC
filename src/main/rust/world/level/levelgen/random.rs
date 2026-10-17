@@ -4,6 +4,36 @@
 //! callers use are provided (world generation, and client audio's shared
 //! level random); Java keeps every other caller.
 
+pub(crate) fn xoroshiro_bound(bound: i32, mut next: impl FnMut() -> i32) -> i32 {
+    debug_assert!(bound > 0);
+    let bound64 = bound as i64;
+    let mut l = next() as u32 as i64;
+    let mut m = l * bound64;
+    let mut n = m & 0xffff_ffff;
+    if n < bound64 {
+        let j = ((!bound).wrapping_add(1) as u32 % bound as u32) as i64;
+        while n < j {
+            l = next() as u32 as i64;
+            m = l * bound64;
+            n = m & 0xffff_ffff;
+        }
+    }
+    (m >> 32) as i32
+}
+/// `RandomSupport.mixStafford13`.
+pub(crate) fn mix_stafford13(mut seed: i64) -> i64 {
+    seed = (seed ^ ((seed as u64) >> 30) as i64).wrapping_mul(-4_658_895_280_553_007_687);
+    seed = (seed ^ ((seed as u64) >> 27) as i64).wrapping_mul(-7_723_592_293_110_705_685);
+    seed ^ ((seed as u64) >> 31) as i64
+}
+
+/// The original single-seed upgrade, shared by sources and decoration.
+pub(crate) fn upgrade_seed(seed: i64) -> (i64, i64) {
+    let lo = seed ^ 7_640_891_576_956_012_809;
+    let hi = lo.wrapping_add(-7_046_029_254_386_353_131);
+    (mix_stafford13(lo), mix_stafford13(hi))
+}
+
 pub(crate) use crate::core::math::position_seed;
 
 /// `XoroshiroRandomSource`.
@@ -16,10 +46,18 @@ impl Xoroshiro {
     /// `Xoroshiro128PlusPlus(long, long)`, including its all-zero replacement.
     pub fn new(lo: i64, hi: i64) -> Self {
         if (lo | hi) == 0 {
-            Self { lo: -7_046_029_254_386_353_131, hi: 7_640_891_576_956_012_809 }
+            Self {
+                lo: -7_046_029_254_386_353_131,
+                hi: 7_640_891_576_956_012_809,
+            }
         } else {
             Self { lo, hi }
         }
+    }
+
+    /// Continue exact raw state; unlike public construction, rawzero is legal.
+    pub fn from_raw(lo: i64, hi: i64) -> Self {
+        Self { lo, hi }
     }
 
     /// `(seedLo, seedHi)`.
@@ -43,20 +81,7 @@ impl Xoroshiro {
 
     /// `XoroshiroRandomSource.nextInt(int)`: unsigned multiply-high with rejection.
     pub fn next_int_bound(&mut self, bound: i32) -> i32 {
-        debug_assert!(bound > 0);
-        let bound64 = bound as i64;
-        let mut l = self.next_int() as u32 as i64;
-        let mut m = l * bound64;
-        let mut n = m & 0xffff_ffff;
-        if n < bound64 {
-            let j = ((!bound).wrapping_add(1) as u32 % bound as u32) as i64;
-            while n < j {
-                l = self.next_int() as u32 as i64;
-                m = l * bound64;
-                n = m & 0xffff_ffff;
-            }
-        }
-        (m >> 32) as i32
+        xoroshiro_bound(bound, || self.next_int())
     }
 
     pub fn next_float(&mut self) -> f32 {
@@ -81,7 +106,9 @@ const MASK: i64 = (1 << 48) - 1;
 
 impl Legacy {
     pub fn new(seed: i64) -> Self {
-        Self { seed: (seed ^ MULTIPLIER) & MASK }
+        Self {
+            seed: (seed ^ MULTIPLIER) & MASK,
+        }
     }
 
     pub fn next(&mut self, bits: u32) -> i32 {

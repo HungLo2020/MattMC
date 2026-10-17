@@ -96,6 +96,43 @@ impl Builder {
         }))
     }
 }
+fn from_draws(simplex: bool, mut draw: impl FnMut(u64, u64) -> u64) -> Arc<Leaf> {
+    let mut builder = Builder::new(simplex);
+    let mut response = 0;
+    loop {
+        let status = builder.next(response);
+        if status == 0 {
+            break;
+        }
+        assert_eq!(status, 1);
+        response = draw(builder.header[0], builder.header[1]);
+    }
+    builder.take().unwrap()
+}
+
+fn from_xoroshiro(
+    source: std::sync::Arc<crate::world::level::levelgen::owned_xoroshiro::OwnedXoroshiro>,
+    simplex: bool,
+) -> Arc<Leaf> {
+    from_draws(simplex, |op, arg| match op {
+        1 => source.next_double().to_bits(),
+        2 => source.next_int_bound(arg as i32) as u64,
+        _ => unreachable!(),
+    })
+}
+fn from_source(
+    source: std::sync::Arc<crate::world::level::levelgen::owned_source::Source>,
+    simplex: bool,
+) -> Arc<Leaf> {
+    source.with(|data| {
+        from_draws(simplex, |op, arg| match op {
+            1 => data.double().to_bits(),
+            2 => data.bounded(arg as i32) as u64,
+            _ => unreachable!(),
+        })
+    })
+}
+
 impl Drop for Builder {
     fn drop(&mut self) {
         FRAMES.fetch_sub(1, Ordering::Relaxed);
@@ -126,6 +163,16 @@ pub(super) mod ffi {
         let pointer = std::ptr::with_exposed_provenance::<Leaf>(id as usize);
         Arc::increment_strong_count(pointer);
         Arc::from_raw(pointer)
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn mattmc_noise_seed_from_xoroshiro(id: u64, simplex: i32) -> u64 {
+        let source = crate::world::level::levelgen::owned_xoroshiro::ffi::retain(id);
+        Arc::into_raw(from_xoroshiro(source, simplex != 0)).expose_provenance() as u64
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn mattmc_noise_seed_from_xoroshiro_source(id: u64, simplex: i32) -> u64 {
+        let source = crate::world::level::levelgen::owned_source::ffi::retain(id);
+        Arc::into_raw(from_source(source, simplex != 0)).expose_provenance() as u64
     }
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_noise_seed_builder(simplex: i32) -> u64 {
@@ -282,5 +329,24 @@ pub(super) mod tests {
         assert_eq!(octave.p[0], 1);
         assert_eq!(octave.p[1], 0);
         assert_eq!(octave.p32[0], 1 | (1 << 8));
+    }
+    #[test]
+    fn actual_fused_leaf_does_not_keep_source_after_its_last_draw() {
+        let _lock = SERIAL.lock().unwrap();
+        let source = crate::world::level::levelgen::owned_xoroshiro::OwnedXoroshiro::new(1, 2);
+        let weak = Arc::downgrade(&source);
+        let leaf = from_xoroshiro(source, false);
+        assert!(weak.upgrade().is_none());
+        assert_eq!(leaf.permutation.len(), 256);
+        assert!(leaf.offsets.iter().all(|v| *v >= 0. && *v < 256.));
+    }
+    #[test]
+    fn actual_leaf_does_not_keep_source_owner_after_last_draw() {
+        let _lock = SERIAL.lock().unwrap();
+        let source = crate::world::level::levelgen::owned_source::Source::seeded(42);
+        let weak = Arc::downgrade(&source);
+        let leaf = from_source(source, false);
+        assert!(weak.upgrade().is_none());
+        assert_eq!(leaf.permutation.len(), 256);
     }
 }

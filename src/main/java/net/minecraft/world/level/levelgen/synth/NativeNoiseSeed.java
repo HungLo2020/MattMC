@@ -43,6 +43,8 @@ final class NativeNoiseSeed {
         Arena arena=Arena.ofAuto();
         long builder=0;
         try {
+            long produced=net.minecraft.world.level.levelgen.XoroshiroRandomSource.nativeNoiseLeaf(randomSource,simplex);
+            if(produced==0){
             builder=(long)BUILDER.invokeExact(simplex?1:0);
             if(builder==0)throw new OutOfMemoryError("Native noise seed builder allocation failed");
             MemorySegment words=MemorySegment.ofAddress(builder).reinterpret(32).asReadOnly();
@@ -59,8 +61,10 @@ final class NativeNoiseSeed {
                     default -> throw new IllegalStateException("Unknown native noise seed effect " + command);
                 };
             }
-            id=(long)TAKE.invokeExact(builder);
-            if(id==0)throw new IllegalStateException("Native noise seed was not completed");
+            produced=(long)TAKE.invokeExact(builder);
+            if(produced==0)throw new IllegalStateException("Native noise seed was not completed");
+            }
+            id=produced;
             Release cleanup;
             try { cleanup=new Release(id); }
             catch(Throwable failure) { release(RELEASE,id); throw failure; }

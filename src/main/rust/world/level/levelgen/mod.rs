@@ -11,6 +11,8 @@ pub(crate) mod heightmap;
 pub(crate) mod math;
 pub(crate) mod noise_fill;
 pub(crate) mod proto_chunk;
+pub(crate) mod owned_source;
+pub(crate) mod owned_xoroshiro;
 pub(crate) mod random;
 pub(crate) mod router;
 pub(crate) mod structure;

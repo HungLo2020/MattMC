@@ -109,15 +109,7 @@ unsafe extern "C" fn callback(op: i32, args: *mut i64, length: i32) -> i32 {
 
 enum Counter { Local(i32), Shared(Rc<Invocation>) }
 
-const GOLDEN_RATIO_64: i64 = -7_046_029_254_386_353_131;
-const SILVER_RATIO_64: i64 = 7_640_891_576_956_012_809;
 
-/// `RandomSupport.mixStafford13`.
-pub(crate) fn mix_stafford13(mut seed: i64) -> i64 {
-    seed = (seed ^ ((seed as u64) >> 30) as i64).wrapping_mul(-4_658_895_280_553_007_687);
-    seed = (seed ^ ((seed as u64) >> 27) as i64).wrapping_mul(-7_723_592_293_110_705_685);
-    seed ^ ((seed as u64) >> 31) as i64
-}
 
 pub(crate) struct WorldgenRandom {
     source: Xoroshiro,
@@ -153,9 +145,8 @@ impl WorldgenRandom {
 
     /// `XoroshiroRandomSource.setSeed`: `upgradeSeedTo128bit`, then mixed.
     pub(crate) fn set_seed(&mut self, seed: i64) {
-        let lo = seed ^ SILVER_RATIO_64;
-        let hi = lo.wrapping_add(GOLDEN_RATIO_64);
-        self.source = Xoroshiro::new(mix_stafford13(lo), mix_stafford13(hi));
+        let (lo, hi) = super::super::random::upgrade_seed(seed);
+        self.source = Xoroshiro::new(lo, hi);
     }
 
     /// `WorldgenRandom.setDecorationSeed`; returns the seed it installs.

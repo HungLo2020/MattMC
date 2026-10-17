@@ -143,3 +143,8 @@ are the connected exit; per-draw VM callbacks remain in this checkpoint. Use
 `--kind 2` to investigate only the Legacy Perlin-Simplex row; retain the original
 full screen and its source identities. Local receipts are under
 `build/worldgen/noise-final/producer-screen` and `producer-screen-row2`.
+
+The connected [random-source owner](RUST-RANDOM-SOURCES.md) consumes canonical
+Xoroshiro state directly in the existing native leaf producer. Its guide records
+the later integrated RNG checks and resource screen. The measurements above
+remain the original published `0f2b4976` checkpoint evidence.
