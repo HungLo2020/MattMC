@@ -12,6 +12,7 @@ pub(crate) mod math;
 pub(crate) mod noise_fill;
 pub(crate) mod proto_chunk;
 pub(crate) mod owned_gaussian;
+pub(crate) mod owned_legacy;
 pub(crate) mod owned_source;
 pub(crate) mod owned_xoroshiro;
 pub(crate) mod random;

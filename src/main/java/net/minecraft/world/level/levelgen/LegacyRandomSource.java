@@ -1,18 +1,12 @@
 package net.minecraft.world.level.levelgen;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
-import net.minecraft.util.ThreadingDetector;
 
 public class LegacyRandomSource implements BitRandomSource {
-	private static final int MODULUS_BITS = 48;
-	private static final long MODULUS_MASK = 281474976710655L;
-	private static final long MULTIPLIER = 25214903917L;
-	private static final long INCREMENT = 11L;
-	private final AtomicLong seed = new AtomicLong();
-	private final MarsagliaPolarGaussian gaussianSource = new MarsagliaPolarGaussian(this);
+	private final NativeLegacySource nativeSource = new NativeLegacySource();
+	private final MarsagliaPolarGaussian gaussianSource = MarsagliaPolarGaussian.nativeSource(this, this.nativeSource);
 
 	public LegacyRandomSource(long l) {
 		this.setSeed(l);
@@ -29,33 +23,32 @@ public class LegacyRandomSource implements BitRandomSource {
 	}
 
 	@Override
-	public void setSeed(long l) {
-		if (!this.seed.compareAndSet(this.seed.get(), (l ^ 25214903917L) & 281474976710655L)) {
-			throw ThreadingDetector.makeThreadingException("LegacyRandomSource", null);
-		} else {
-			this.gaussianSource.reset();
-		}
+	public void setSeed(long seed) {
+		boolean embedded = this.gaussianSource != null && this.gaussianSource.nativeUsesSourceCache(this.nativeSource);
+		this.nativeSource.seed(seed, embedded);
+		if (!embedded) this.gaussianSource.reset();
 	}
 
 	@Override
-	public int next(int i) {
-		long l = this.seed.get();
-		long m = l * 25214903917L + 11L & 281474976710655L;
-		if (!this.seed.compareAndSet(l, m)) {
-			throw ThreadingDetector.makeThreadingException("LegacyRandomSource", null);
-		} else {
-			return (int)(m >> 48 - i);
-		}
+	public int next(int bits) { return this.nativeSource.next(bits); }
+
+	static NativeLegacySource nativeGaussianProducer(RandomSource source) {
+		return source != null && source.getClass() == LegacyRandomSource.class ? ((LegacyRandomSource)source).nativeSource : null;
+	}
+
+	public static long nativeNoiseLeaf(RandomSource source, boolean simplex) {
+		var owner = nativeGaussianProducer(source);
+		return owner == null ? 0 : owner.leaf(simplex);
 	}
 
 	/** The scrambled 48-bit state, for native code that continues this sequence. */
 	public long rawSeed() {
-		return this.seed.get();
+		return this.nativeSource.raw();
 	}
 
 	/** Continues from a scrambled state written back by native code (the Gaussian cache is untouched). */
 	public void setRawSeed(long l) {
-		this.seed.set(l & 281474976710655L);
+		this.nativeSource.raw(l);
 	}
 
 	/** Native decoration: this source's gaussian cache (a {@code WorldgenRandom} keeps its own). */

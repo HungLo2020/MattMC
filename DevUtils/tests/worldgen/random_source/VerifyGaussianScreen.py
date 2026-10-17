@@ -17,7 +17,7 @@ def main():
     parser.add_argument('--current-runtime',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--smoke',action='store_true',help='small functional check; not a performance result')
-    parser.add_argument('--kind',type=int,choices=range(5),help='one row only: 0 XoroGaussian32+word, 1 LegacyGaussian32+word, 2 standaloneXoroGaussian32+word, 3 preparedcached+word, 4 createSource+Gaussian3+word')
+    parser.add_argument('--kind',type=int,choices=range(6),help='one row only: 0 XoroGaussian32+word, 1 LegacyGaussian32+word, 2 standaloneXoroGaussian32+word, 3 preparedcached+word, 4 createXoro+Gaussian3+word, 5 createLegacy+Gaussian3+word')
     args=parser.parse_args()
     probe=portable.probe;root=probe.ROOT;pre=args.pre_runtime.resolve();current=args.current_runtime.resolve();out=args.output.resolve()
     if not out.is_relative_to(root/'build'):raise ValueError('output must be below build/')
@@ -38,7 +38,7 @@ def main():
         if side=='current' and probe.full.sha(native/'mattmc_rust-linux-x64.so')not in row['native_mappings'].values():raise RuntimeError('actual native mapping missing')
         rows[side]=row;(out/'rows.json').write_text(json.dumps(rows,indent=2)+'\n');print(side,'screen completed',flush=True)
     summary=[]
-    for kind in (range(5) if args.kind is None else [args.kind]):
+    for kind in (range(6) if args.kind is None else [args.kind]):
         selected={side:[s for s in row['samples']if s['kind']==kind and s['accepted']]for side,row in rows.items()}
         if any(len(s)!=(1 if args.smoke else 6) for s in selected.values()):raise RuntimeError('insufficient quiet samples')
         outputs={s['sum']for samples in selected.values()for s in samples}
@@ -46,7 +46,7 @@ def main():
         medians={side:{'ns_per_call':statistics.median(s['elapsed_ns']/s['count']for s in samples),'min_ns_per_call':min(s['elapsed_ns']/s['count']for s in samples),'max_ns_per_call':max(s['elapsed_ns']/s['count']for s in samples),'java_bytes_per_call':statistics.median(s['java_bytes']/s['count']for s in samples)}for side,samples in selected.items()}
         summary.append({'kind':kind,'sum':outputs.pop(),'medians':medians,'current_pre_ratio':medians['current']['ns_per_call']/medians['pre']['ns_per_call'],'current_frozen_ratio':medians['current']['ns_per_call']/medians['frozen']['ns_per_call']})
     assert before==probe.end.inputs(root),'Current runtime changed';assert frozen==probe.end.inputs(probe.FROZEN),'Frozen changed';probe.verify_pre(pre);probe.verify_pre(current);assert source_hash==probe.full.sha(source)and driver_hash==probe.full.sha(Path(__file__)),'observer changed'
-    (out/'screen-summary.json').write_text(json.dumps({'rows':summary,'resources':{side:{k:row[k]for k in ['sampled_peak_rss_bytes','max_swap_bytes']}for side,row in rows.items()},'scope':'intermediate actual Gaussian groups; ns per group (0:XoroGaussian32+word;1:LegacyGaussian32+word;2:standaloneXoroGaussian32+word;3:preparedcached+word;4:createSource+Gaussian3+word). Caller arrays prepared outside timer; row4 includes source construction, row2/Legacy include actual lazy native cache materialization. Real owner/frame creation+retirement and output identity; no finalbudget/nativeallocator/FPS claim'},indent=2)+'\n')
+    (out/'screen-summary.json').write_text(json.dumps({'rows':summary,'resources':{side:{k:row[k]for k in ['sampled_peak_rss_bytes','max_swap_bytes']}for side,row in rows.items()},'scope':'intermediate actual Gaussian groups; ns per group (0:XoroGaussian32+word;1:LegacyGaussian32+word;2:standaloneXoroGaussian32+word;3:preparedcached+word;4:createXoro+Gaussian3+word;5:createLegacy+Gaussian3+word). Caller arrays prepared outside timer; rows4/5 include source construction, row2/Legacy include actual lazy native cache materialization. Real owner/frame creation+retirement and output identity; no finalbudget/nativeallocator/FPS claim'},indent=2)+'\n')
     (out/'result.json').write_text(json.dumps({'passed':True,'before':before,'after':probe.end.inputs(root),'frozen':frozen,'pre_head':reference['source_head'],'sealed_current_manifest_sha256':probe.full.sha(current/'manifest.json'),'sealed_current_native':current_ref['native'],'observer_sha256':source_hash,'driver_sha256':driver_hash,'rows':rows,'performance_budget_pass':False,'smoke_only':args.smoke,'selected_kind':args.kind},indent=2)+'\n')
 
 

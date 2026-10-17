@@ -59,9 +59,15 @@ class NativeMonumentRegenerationTest {
 		Direction drawn = Direction.Plane.HORIZONTAL.getRandomDirection(random);
 		Direction direction = first.getOrientation() == null ? drawn : first.getOrientation();
 		new OceanMonumentPieces.MonumentBuilding(random, first.getBoundingBox().minX(), first.getBoundingBox().minZ(), direction);
-		var field = LegacyRandomSource.class.getDeclaredField("seed");
-		field.setAccessible(true);
-		return ((AtomicLong)field.get(source)).get();
+		// Read the actual owned source on Current; the original Frozen fixture has
+		// only its private AtomicLong. Neither path advances or resets the source.
+		try {
+			return (long)LegacyRandomSource.class.getMethod("rawSeed").invoke(source);
+		} catch (NoSuchMethodException originalFrozen) {
+			var field = LegacyRandomSource.class.getDeclaredField("seed");
+			field.setAccessible(true);
+			return ((AtomicLong)field.get(source)).get();
+		}
 	}
 
 	/** Every field of the building and its pieces, recursively: room definitions by

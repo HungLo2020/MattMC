@@ -47,9 +47,9 @@ and [leaf builder](https://github.com/HungLo2020/MattMC/blob/master/src/main/rus
 
 ## Remaining ownership and verification
 
-This is a working slice, not a completed random subsystem. Legacy sources,
-positional/fork orchestration and decoration state handoffs still need connected
-ownership work. The thin
+This is a working slice, not a completed random subsystem. Scalar VM-facing
+orchestration, wrapper count/delegation, positional/fork policy and decoration
+state handoffs still need connected ownership work. The thin
 Java facade and final Rust caller must share the same runtime.
 
 Original Frozen state/codec/sequence and leaf-data baselines are preserved.
@@ -194,6 +194,72 @@ substantial latency and264–268 Java bytes for first native-cache materializati
 Source creation plus three Gaussian draws remains variable and slower. Outputs,
 actual owner/frame creation and retirement match; sampled RSS was136/271/263MB
 Frozen/pre/Current with no swap. Process RSS is not native allocator attribution.
-The owner retains this debt. Connected Legacy source ownership and native
-producer/consumer fusion remove remaining bridge/frame and lazy-cache costs;
-repeated scalar getter tuning is not the system exit.
+The owner retains this debt. The connected Legacy ownership below removes
+its default lazy cache owner; wrapper/derived-source production and further
+native consumer fusion remain the exit for bridge/frame and factory costs.
+Repeated scalar getter tuning is not the system exit.
+
+## Legacy source ownership
+
+Legacy's actual 48-bit atomic state and default Gaussian cache live in a native
+source with native Gaussian and leaf consumers. The Java AtomicLong state and
+LCG arithmetic are removed.
+Keep Java's single-attempt CAS failure and genuine threading-exception effect;
+a retry loop or mutex would change that observable contract. Construction starts
+with raw state zero before the real virtual `setSeed` hook, including the
+`WorldgenRandom` superclass call. Custom bit/double/bounded draws and reset
+callbacks retain their original order, reentry and committed error prefixes.
+Java masks long shifts even for unusual public `next(int)` counts.
+
+Ten public contracts first passed on original Frozen, complete published
+`ce394a9a` and Current before implementation. Expanded public contracts pass15
+Frozen/18 pre/18 Current; three raw bridge cases are absent from Frozen. The
+paired working release (`522e52d1`) passes245 focused Java and63 actual native
+checks, plus three safe raw-import/CAS/base-owner leak controls. Real pending
+Legacy cache/source consumers survive facade and actual arena-anchor GC, then
+retire at their final native use. RNG, raw leaf, Gaussian and full noise
+contracts/corpora match their original references. The complete pre-runtime is
+`build/worldgen/legacy-source/pre-ce394-runtime`; use `VerifyLegacySources.py`
+with `--pre-runtime` and a fresh `--output` below `build/`.
+
+A real creation probe found an unnecessary native superclass owner in delegating
+`WorldgenRandom` instances. Their separate raw-zero/cache state now materializes
+only on a genuine inherited use; ordinary Legacy construction still initializes
+its canonical owner through the real seed hook. The handle publishes one owner
+with automatic cleanup, without Java seed/cache mirrors. Wrapper Gaussian cache
+independence across delegated reseeds remains an original-baseline contract.
+
+Short resource screens preserve material debt. Legacy32-Gaussian groups have
+zero timed Java allocation, but timing overlaps pre-change and is inconclusive.
+Source creation plus three Gaussian draws measured494–1042ns versus pre330–343ns
+in the corrected run: a latency regression, not a pass. Java allocation is296B
+versus312B pre and80B Frozen. The actual Simplex producer's allocation fell from
+2652B to2432B after removing the unused owner; pre is2192B. Its16.72–18.92µs
+range overlaps pre15.93–18.36µs, so it is also inconclusive. Frozen latency debt
+remains. Actual work, creation and retirement checks pass; process RSS/swap does
+not attribute native allocator memory. Preserve original negative screens and
+`resource-assessment.json` under `build/worldgen/legacy-source/`. The connected
+exit is native wrapper count/delegation and default derived-source production,
+removing Java factory/arena/FFM costs. This is no final performance acceptance.
+The safe `ce394a9a` plus Legacy image passed2,722 ordinary Java tests with six
+skips,193 parity,11 slow and3,188 native tests with nine ignored. Fresh FULL
+and CARVERS-resume each generated and saved648 chunks per runtime. All eight
+regions match published pre; standard dimensions match Frozen, retaining162
+original Primordial differences. Failure/cancellation, stock fresh/reopen and
+player pending-shutdown/own-save/reopen also pass, with their earlier rollback,
+status and permitted cancellation-difference constraints preserved.
+
+Reconciliation with corrected item-comparison commit `35308d18` changes only
+five item sources and24 NativeItemState-family classes; all13,907 other Main
+classes and all generation/RNG sources remain byte-exact. The paired release
+(`cc5f25f6`) passes261 focused Java checks,73 item-native checks including real
+held-lock and shape-budget controls, and a fresh full native suite of3,192
+passes with nine ignored. Legacy, RNG, Gaussian and noise contracts/corpora
+match all references on this combined image. All15 item observer groups,16 real hopper transfer/save checks per runtime,
+stock fresh/reopen and player pending-shutdown/own-save/reopen also pass on the
+combined image. Earlier broad Java, world and resource receipts retain their actual
+safe-image scope; they are reused by the recorded unchanged-source/class and
+dependency impact, not relabeled as new combined aggregates. See
+`build/worldgen/legacy-source/35308-impact/after.json` and the `combined-*`
+receipts. The separately owned skylight callback/lifecycle work remains outside
+this checkpoint; no whole-worldgen or final performance completion is claimed.

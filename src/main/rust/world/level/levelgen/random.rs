@@ -113,22 +113,12 @@ impl Legacy {
 
     pub fn next(&mut self, bits: u32) -> i32 {
         self.seed = self.seed.wrapping_mul(MULTIPLIER).wrapping_add(11) & MASK;
-        (self.seed >> (48 - bits)) as i32
+        (self.seed >> (48_u32.wrapping_sub(bits) & 63)) as i32
     }
 
-    /// `BitRandomSource.nextInt(int)`.
+    /// `BitRandomSource.nextInt(int)`, sharing policy with the atomic owner.
     pub fn next_int_bound(&mut self, bound: i32) -> i32 {
-        debug_assert!(bound > 0);
-        if bound & (bound - 1) == 0 {
-            return ((bound as i64 * self.next(31) as i64) >> 31) as i32;
-        }
-        loop {
-            let j = self.next(31);
-            let k = j % bound;
-            if j.wrapping_sub(k).wrapping_add(bound - 1) >= 0 {
-                return k;
-            }
-        }
+        legacy_bounded(bound, |bits| Ok::<_, std::convert::Infallible>(self.next(bits as u32))).unwrap()
     }
 
     pub fn next_float(&mut self) -> f32 {
@@ -138,9 +128,7 @@ impl Legacy {
     /// `BitRandomSource.nextDouble`: `long * 1.110223E-16F` is float
     /// arithmetic in Java, so the result has float precision.
     pub fn next_double(&mut self) -> f64 {
-        let high = self.next(26) as i64;
-        let low = self.next(27) as i64;
-        f64::from(((high << 27) + low) as f32 * 1.110_223e-16_f32)
+        legacy_double(self.next(26), self.next(27))
     }
 
     /// A source continuing from an already scrambled 48-bit state, as read
@@ -178,6 +166,17 @@ impl Legacy {
         let low = self.next(32) as i64;
         (high << 32).wrapping_add(low)
     }
+}
+
+/// Java's original float rounding applies after combining both bit draws.
+pub(crate) fn legacy_double(high: i32, low: i32) -> f64 {
+    f64::from((((high as i64) << 27) + low as i64) as f32 * 1.110_223e-16_f32)
+}
+/// Share rejection arithmetic while preserving each producer's actual draw/CAS.
+pub(crate) fn legacy_bounded<E>(bound: i32, mut next: impl FnMut(i32) -> Result<i32, E>) -> Result<i32,E> {
+    debug_assert!(bound > 0);
+    if bound & (bound - 1) == 0 { return Ok(((bound as i64 * next(31)? as i64) >> 31) as i32); }
+    loop { let j=next(31)?; let k=j%bound; if j.wrapping_sub(k).wrapping_add(bound-1)>=0 { return Ok(k); } }
 }
 
 pub(crate) enum Random {

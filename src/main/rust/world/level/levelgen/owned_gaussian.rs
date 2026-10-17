@@ -217,12 +217,14 @@ impl Gaussian {
 enum Owner {
     Detached(Arc<Gaussian>),
     Source(Arc<Source>),
+    Legacy(Arc<super::owned_legacy::Source>),
 }
 impl Owner {
     fn cache(&self) -> &Gaussian {
         match self {
             Self::Detached(owner) => owner,
             Self::Source(owner) => &owner.gaussian,
+            Self::Legacy(owner) => &owner.gaussian,
         }
     }
     fn take(&self) -> Option<u64> {
@@ -258,6 +260,7 @@ pub(crate) mod ffi {
     enum Watch {
         Detached(std::sync::Weak<Gaussian>),
         Source(std::sync::Weak<Source>),
+        Legacy(std::sync::Weak<super::super::owned_legacy::Source>),
     }
     unsafe fn owner<'a>(id: u64, kind: i32) -> Option<&'a Gaussian> {
         if id == 0 {
@@ -266,6 +269,7 @@ pub(crate) mod ffi {
         match kind {
             0 => Some(&*std::ptr::with_exposed_provenance::<Gaussian>(id as usize)),
             1 => Some(&(*std::ptr::with_exposed_provenance::<Source>(id as usize)).gaussian),
+            2 => Some(&(*std::ptr::with_exposed_provenance::<super::super::owned_legacy::Source>(id as usize)).gaussian),
             _ => None,
         }
     }
@@ -282,6 +286,7 @@ pub(crate) mod ffi {
             1 => Some(Owner::Source(
                 crate::world::level::levelgen::owned_source::ffi::retain(id),
             )),
+            2 => Some(Owner::Legacy(super::super::owned_legacy::ffi::retain(id))),
             _ => None,
         }
     }
@@ -293,6 +298,7 @@ pub(crate) mod ffi {
         let watch = match &owner {
             Owner::Detached(owner) => Watch::Detached(Arc::downgrade(owner)),
             Owner::Source(owner) => Watch::Source(Arc::downgrade(owner)),
+            Owner::Legacy(owner) => Watch::Legacy(Arc::downgrade(owner)),
         };
         Box::into_raw(Box::new(watch)).expose_provenance() as u64
     }
@@ -301,6 +307,7 @@ pub(crate) mod ffi {
         match &*std::ptr::with_exposed_provenance::<Watch>(id as usize) {
             Watch::Detached(owner) => owner.strong_count() as u64,
             Watch::Source(owner) => owner.strong_count() as u64,
+            Watch::Legacy(owner) => owner.strong_count() as u64,
         }
     }
     #[no_mangle]
@@ -366,24 +373,21 @@ pub(crate) mod ffi {
     }
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_gaussian_draw_new(id: u64, kind: i32, source: u64) -> u64 {
-        let Some(cache) = owner(id, kind) else {
-            return 0;
+        mattmc_gaussian_draw_new_source(id, kind, source, 1)
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn mattmc_gaussian_draw_new_source(id: u64, kind: i32, source: u64, source_kind: i32) -> u64 {
+        let Some(cache) = owner(id, kind) else { return 0; };
+        if cache.take().is_some() { return 0; }
+        let Some(owner) = retain(id, kind) else { return 0; };
+        let source = if source == 0 { None } else {
+            Some(match source_kind {
+                1 => Producer::Xoroshiro(super::super::owned_source::ffi::retain(source)),
+                2 => Producer::Legacy(super::super::owned_legacy::ffi::retain(source)),
+                _ => return 0,
+            })
         };
-        if cache.take().is_some() {
-            return 0;
-        }
-        // A genuine miss now needs pending ownership; the take is not replayed.
-        let Some(owner) = retain(id, kind) else {
-            return 0;
-        };
-        let source = if source == 0 {
-            None
-        } else {
-            Some(crate::world::level::levelgen::owned_source::ffi::retain(
-                source,
-            ))
-        };
-        let mut draw = Draw::with_owner(owner, source);
+        let mut draw = Draw::with_producer(owner, source);
         draw.stage = Stage::UncachedStart;
         Box::into_raw(Box::new(Pending::new(draw))).expose_provenance() as u64
     }
@@ -393,6 +397,7 @@ pub(crate) mod ffi {
         let frame = &mut *std::ptr::with_exposed_provenance_mut::<Pending>(id as usize);
         let (op, value) = match frame.draw.advance(response) {
             Effect::DrawDouble => (1, 0),
+            Effect::LegacyCollision => (3, 0),
             Effect::JavaLog(value) => (2, value.to_bits()),
             Effect::Complete(bits) => (0, bits),
         };
@@ -427,6 +432,27 @@ pub(crate) mod ffi {
     #[cfg(test)]
     mod tests {
         use super::*;
+        #[test]
+        fn actual_legacy_cache_and_producer_keep_data_until_the_final_commit() {
+            unsafe {
+                use super::super::super::owned_legacy::ffi as legacy;
+                let id = legacy::mattmc_random_source_legacy_new();
+                assert_eq!(legacy::mattmc_random_source_legacy_seed(id,42,1),1);
+                let watch = mattmc_gaussian_weak_new(id,2);
+                let frame = mattmc_gaussian_draw_new_source(id,2,id,2);
+                legacy::mattmc_random_source_legacy_release(id);
+                assert!(mattmc_gaussian_weak_count(watch)>0);
+                assert_eq!(mattmc_gaussian_draw_next(frame,0),1);
+                let words=std::ptr::with_exposed_provenance::<[u64;2]>(frame as usize).read();
+                assert_eq!(words[0],2);
+                assert_eq!(mattmc_gaussian_weak_count(watch),1);
+                assert_eq!(mattmc_gaussian_draw_next(frame,f64::from_bits(words[1]).ln().to_bits()),0);
+                assert_eq!(mattmc_gaussian_has(id,2),1);
+                mattmc_gaussian_draw_release(frame);
+                assert_eq!(mattmc_gaussian_weak_count(watch),0);
+                mattmc_gaussian_weak_release(watch);
+            }
+        }
         #[test]
         fn cached_ffi_path_preserves_all_bits_without_a_pending_frame() {
             unsafe {
@@ -584,6 +610,7 @@ pub(crate) mod ffi {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Effect {
     DrawDouble,
+    LegacyCollision,
     JavaLog(f64),
     Complete(u64),
 }
@@ -597,9 +624,22 @@ enum Stage {
     Done(u64),
 }
 
+enum Producer {
+    Xoroshiro(Arc<Source>),
+    Legacy(Arc<super::owned_legacy::Source>),
+}
+impl Producer {
+    fn double(&self) -> Result<f64, ()> {
+        match self {
+            Self::Xoroshiro(source) => Ok(source.with(|data| data.double())),
+            Self::Legacy(source) => source.double(),
+        }
+    }
+}
+
 pub(crate) struct Draw {
     gaussian: Owner,
-    source: Option<Arc<Source>>,
+    source: Option<Producer>,
     stage: Stage,
     d: f64,
     e: f64,
@@ -611,6 +651,9 @@ impl Draw {
         Self::with_owner(Owner::Detached(gaussian), source)
     }
     fn with_owner(gaussian: Owner, source: Option<Arc<Source>>) -> Self {
+        Self::with_producer(gaussian, source.map(Producer::Xoroshiro))
+    }
+    fn with_producer(gaussian: Owner, source: Option<Producer>) -> Self {
         Self {
             gaussian,
             source,
@@ -662,7 +705,10 @@ impl Draw {
             // Only genuine exact-default sources may supply this owned native path.
             // Custom source/generator dispatch remains an actual VM draw effect.
             if let Some(source) = self.source.as_ref() {
-                response = source.with(|data| data.double()).to_bits();
+                match source.double() {
+                    Ok(value) => response = value.to_bits(),
+                    Err(()) => return Effect::LegacyCollision,
+                }
             } else {
                 return Effect::DrawDouble;
             }

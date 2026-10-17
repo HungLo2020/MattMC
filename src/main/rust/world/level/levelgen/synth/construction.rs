@@ -96,18 +96,26 @@ impl Builder {
         }))
     }
 }
-fn from_draws(simplex: bool, mut draw: impl FnMut(u64, u64) -> u64) -> Arc<Leaf> {
+fn try_from_draws(simplex: bool, mut draw: impl FnMut(u64, u64) -> Result<u64, ()>) -> Result<Arc<Leaf>, ()> {
     let mut builder = Builder::new(simplex);
     let mut response = 0;
     loop {
         let status = builder.next(response);
-        if status == 0 {
-            break;
-        }
+        if status == 0 { break; }
         assert_eq!(status, 1);
-        response = draw(builder.header[0], builder.header[1]);
+        response = draw(builder.header[0], builder.header[1])?;
     }
-    builder.take().unwrap()
+    Ok(builder.take().unwrap())
+}
+fn from_draws(simplex: bool, mut draw: impl FnMut(u64, u64) -> u64) -> Arc<Leaf> {
+    try_from_draws(simplex, |op,arg| Ok(draw(op,arg))).unwrap()
+}
+fn from_legacy(source: Arc<crate::world::level::levelgen::owned_legacy::Source>, simplex: bool) -> Result<Arc<Leaf>, ()> {
+    try_from_draws(simplex, |op,arg| match op {
+        1 => source.double().map(f64::to_bits),
+        2 => source.bounded(arg as i32).map(|value| value as u64),
+        _ => unreachable!(),
+    })
 }
 
 fn from_xoroshiro(
@@ -173,6 +181,11 @@ pub(super) mod ffi {
     pub unsafe extern "C" fn mattmc_noise_seed_from_xoroshiro_source(id: u64, simplex: i32) -> u64 {
         let source = crate::world::level::levelgen::owned_source::ffi::retain(id);
         Arc::into_raw(from_source(source, simplex != 0)).expose_provenance() as u64
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn mattmc_noise_seed_from_legacy_source(id: u64, simplex: i32) -> u64 {
+        let source = crate::world::level::levelgen::owned_legacy::ffi::retain(id);
+        from_legacy(source, simplex != 0).map_or(0, |leaf| Arc::into_raw(leaf).expose_provenance() as u64)
     }
     #[no_mangle]
     pub unsafe extern "C" fn mattmc_noise_seed_builder(simplex: i32) -> u64 {
@@ -348,5 +361,28 @@ pub(super) mod tests {
         let leaf = from_source(source, false);
         assert!(weak.upgrade().is_none());
         assert_eq!(leaf.permutation.len(), 256);
+    }
+    #[test]
+    fn actual_legacy_leaf_releases_its_producer_at_the_last_draw() {
+        let source = crate::world::level::levelgen::owned_legacy::Source::raw_initial();
+        source.reseed(42,true).unwrap();
+        let weak=Arc::downgrade(&source);
+        let leaf=from_legacy(source,false).unwrap();
+        assert!(weak.upgrade().is_none());
+        assert_eq!(leaf.permutation.len(),256);
+        let mut control=crate::world::level::levelgen::random::Legacy::new(42);
+        assert_eq!(leaf.offsets[0],control.next_double()*256.);
+    }
+    #[test]
+    fn failed_real_leaf_draw_releases_its_builder_and_actual_producer() {
+        let source = crate::world::level::levelgen::owned_legacy::Source::raw_initial();
+        let weak=Arc::downgrade(&source);
+        let mut calls=0;
+        let result=try_from_draws(false,move |op,arg| {
+            calls+=1;
+            if calls==5 { return Err(()); }
+            match op { 1=>source.double().map(f64::to_bits),2=>source.bounded(arg as i32).map(|v|v as u64),_=>unreachable!() }
+        });
+        assert!(result.is_err());assert!(weak.upgrade().is_none());
     }
 }

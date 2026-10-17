@@ -27,7 +27,7 @@ final class NativeGaussian {
     private static final MethodHandle VALUE = fixed("value", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
     private static final MethodHandle RESET = fixed("reset", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
     private static final MethodHandle SET = fixed("set", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
-    private static final MethodHandle START = handle("draw_new", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
+    private static final MethodHandle START = handle("draw_new_source", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
     private static final MethodHandle NEXT = handle("draw_next", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
     private static final MethodHandle END = handle("draw_release", FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
     private static final MethodHandle STATS = handle("statistics", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
@@ -60,6 +60,12 @@ final class NativeGaussian {
             catch (Throwable failure) { cleanup.accept(MemorySegment.NULL); throw failure; }
         } catch (Throwable failure) { throw propagate(failure); }
     }
+
+    static boolean has(NativeLegacySource source) { return has(source.handle(), 2, source); }
+    static double value(NativeLegacySource source) { return value(source.handle(), 2, source); }
+    static void reset(NativeLegacySource source) { reset(source.handle(), 2, source); }
+    static void set(NativeLegacySource source, boolean has, double value) { set(source.handle(), 2, source, has, value); }
+    static double draw(NativeLegacySource cache, MarsagliaPolarGaussian caller, NativeXoroshiroSource producer) { return draw(cache.handle(), 2, cache, caller, producer); }
 
     boolean has() { return has(id, 0, this); }
     static boolean has(NativeXoroshiroSource source) { return has(source.handle(), 1, source); }
@@ -99,9 +105,10 @@ final class NativeGaussian {
     }
     private static double draw(long id, int kind, Object cache, MarsagliaPolarGaussian caller, NativeXoroshiroSource producer) {
         long frame = 0;
+        NativeLegacySource legacyProducer = LegacyRandomSource.nativeGaussianProducer(caller.randomSource);
         try {
-            long source = producer == null ? 0 : producer.handle();
-            frame = (long) START.invokeExact(id, kind, source);
+            long source = legacyProducer != null ? legacyProducer.handle() : producer == null ? 0 : producer.handle();
+            frame = (long) START.invokeExact(id, kind, source, legacyProducer != null ? 2 : 1);
             if (frame == 0) return Double.longBitsToDouble((long) VALUE.invokeExact(id, kind));
             MemorySegment words = MemorySegment.ofAddress(frame).reinterpret(16).asReadOnly();
             long response = 0;
@@ -110,6 +117,7 @@ final class NativeGaussian {
                 response = switch ((int) op) {
                     case 1 -> Double.doubleToRawLongBits(caller.nativeGaussianNextDouble());
                     case 2 -> Double.doubleToRawLongBits(Math.log(Double.longBitsToDouble(words.getAtIndex(ValueLayout.JAVA_LONG, 1))));
+                    case 3 -> throw NativeLegacySource.collision();
                     default -> throw new IllegalStateException("Unknown Gaussian effect " + op);
                 };
             }
@@ -119,6 +127,7 @@ final class NativeGaussian {
             try { if (frame != 0) END.invokeExact(frame); }
             catch (Throwable failure) { throw propagate(failure); }
             finally {
+                Reference.reachabilityFence(legacyProducer);
                 Reference.reachabilityFence(producer);
                 Reference.reachabilityFence(caller);
                 Reference.reachabilityFence(cache);

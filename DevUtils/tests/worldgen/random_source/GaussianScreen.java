@@ -10,7 +10,7 @@ public final class GaussianScreen {
     static volatile Object retained;
     static volatile long sink;
     record Batch(RandomSource[] sources, MarsagliaPolarGaussian[] gaussians) {}
-    record Owners(long[] roots, long[] sources, long[] gaussian) {}
+    record Owners(long[] roots, long[] sources, long[] gaussian, long[] legacy) {}
     static long[] stats(String name) throws Exception {
         try {
             var type = Class.forName("net.minecraft.world.level.levelgen." + name);
@@ -19,13 +19,14 @@ public final class GaussianScreen {
         } catch (ClassNotFoundException absent) { return new long[0]; }
     }
     static Owners owners() throws Exception {
-        return new Owners(stats("NativeRandomBits"), stats("NativeXoroshiroSource"), stats("NativeGaussian"));
+        return new Owners(stats("NativeRandomBits"), stats("NativeXoroshiroSource"), stats("NativeGaussian"), stats("NativeLegacySource"));
     }
     static boolean retired(Owners value, Owners initial) {
         return (value.roots.length == 0 || value.roots[0] <= initial.roots[0])
             && (value.sources.length == 0 || value.sources[0] <= initial.sources[0])
             && (value.gaussian.length == 0 || value.gaussian[0] <= initial.gaussian[0]
-                && value.gaussian[3] <= initial.gaussian[3]);
+                && value.gaussian[3] <= initial.gaussian[3])
+            && (value.legacy.length == 0 || value.legacy[0] <= initial.legacy[0]);
     }
     static void settle() throws Exception {
         retained = null;
@@ -40,7 +41,7 @@ public final class GaussianScreen {
     }
     static Batch prepare(int kind, int count) {
         var data = new Batch(new RandomSource[count], new MarsagliaPolarGaussian[count]);
-        if (kind != 4) for (int i = 0; i < count; i++) {
+        if (kind != 4 && kind != 5) for (int i = 0; i < count; i++) {
             data.sources[i] = kind == 1 ? new LegacyRandomSource(1234567L + i) : new XoroshiroRandomSource(1234567L + i);
             if (kind == 2) data.gaussians[i] = new MarsagliaPolarGaussian(data.sources[i]);
             if (kind == 3) data.sources[i].nextGaussian();
@@ -51,8 +52,9 @@ public final class GaussianScreen {
         long sum = 0;
         for (int i = 0; i < data.sources.length; i++) {
             if (kind == 4) data.sources[i] = new XoroshiroRandomSource(1234567L + i);
+            if (kind == 5) data.sources[i] = new LegacyRandomSource(1234567L + i);
             var source = data.sources[i];
-            int draws = kind == 3 ? 1 : kind == 4 ? 3 : 32;
+            int draws = kind == 3 ? 1 : kind >= 4 ? 3 : 32;
             for (int j = 0; j < draws; j++) {
                 double value = kind == 2 ? data.gaussians[i].nextGaussian() : source.nextGaussian();
                 sum = Long.rotateLeft(sum, 7) ^ Double.doubleToRawLongBits(value);
@@ -86,7 +88,7 @@ public final class GaussianScreen {
         thread.setThreadAllocatedMemoryEnabled(true);
         if (!thread.isThreadCpuTimeEnabled()) thread.setThreadCpuTimeEnabled(true);
         long tid = Thread.currentThread().threadId();
-        for (int kind = 0; kind < 5; kind++) {
+        for (int kind = 0; kind < 6; kind++) {
             if (only >= 0 && kind != only) continue;
             settle(); var initial = owners(); int accepted = 0;
             int count = smoke ? 16 : kind == 3 ? 262144 : 4096;
@@ -101,23 +103,25 @@ public final class GaussianScreen {
                 long jitDelta = compiler.getTotalCompilationTime() - jit, gcDelta = gc() - collections;
                 var after = owners();
                 long roots = created(before.roots, after.roots, 1), sources = created(before.sources, after.sources, 1);
+                long legacy = created(before.legacy, after.legacy, 1);
                 long caches = created(before.gaussian, after.gaussian, 1), frames = created(before.gaussian, after.gaussian, 4);
                 if (roots >= 0 && roots != 0) throw new AssertionError("unexpected generator projection");
                 if (sources >= 0 && sources != (kind == 4 ? count : 0)) throw new AssertionError("source creation work");
-                if (caches >= 0 && caches != (kind == 1 || kind == 2 || kind == 4 ? count : 0)) throw new AssertionError("cache creation work");
-                if (frames >= 0 && frames != (kind == 3 ? 0 : kind == 4 ? 2L * count : 16L * count)) throw new AssertionError("frame creation work");
+                if (legacy >= 0 && legacy != (kind == 5 ? count : 0)) throw new AssertionError("Legacy source creation work");
+                if (caches >= 0 && caches != (kind == 1 && before.legacy.length == 0 || kind == 2 || kind >= 4 ? count : 0)) throw new AssertionError("cache creation work");
+                if (frames >= 0 && frames != (kind == 3 ? 0 : kind >= 4 ? 2L * count : 16L * count)) throw new AssertionError("frame creation work");
                 if (after.gaussian.length != 0 && after.gaussian[3] != before.gaussian[3]) throw new AssertionError("live draw frame after call");
                 boolean quiet = batch >= warmup && jitDelta == 0 && gcDelta == 0;
                 if (quiet) accepted++;
                 System.out.println("PRODUCER_SCREEN {\"kind\":" + kind + ",\"batch\":" + batch + ",\"accepted\":" + quiet
                     + ",\"count\":" + count + ",\"elapsed_ns\":" + elapsed + ",\"cpu_ns\":" + cpu + ",\"java_bytes\":" + allocated
                     + ",\"jit_ms\":" + jitDelta + ",\"gc\":" + gcDelta + ",\"sum\":" + sum + ",\"root_created\":" + roots
-                    + ",\"source_created\":" + sources + ",\"cache_created\":" + caches + ",\"frame_created\":" + frames + "}");
+                    + ",\"source_created\":" + sources + ",\"legacy_created\":" + legacy + ",\"cache_created\":" + caches + ",\"frame_created\":" + frames + "}");
             }
             if (accepted != target) throw new AssertionError("insufficient quiet samples");
             drain(initial); var end = owners();
             System.out.println("PRODUCER_RETIREMENT " + kind + " roots=" + Arrays.toString(end.roots)
-                + " sources=" + Arrays.toString(end.sources) + " cache/frame=" + Arrays.toString(end.gaussian));
+                + " sources=" + Arrays.toString(end.sources) + " legacy=" + Arrays.toString(end.legacy) + " cache/frame=" + Arrays.toString(end.gaussian));
         }
         Thread.sleep(250);
     }
