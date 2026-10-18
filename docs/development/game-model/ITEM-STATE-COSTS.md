@@ -251,9 +251,21 @@ on the timed path. Release library `c650d427…`; quiet medians:
 | `build/s34-v30/furnace`, same change on `03f1df23` (release `cd37e286…`) | 106 | 340 | 33 | 3.21 |
 
 The two template runs disagree: Frozen measured 274 ns in one and 106 ns in the
-other. No ratio from this screen is treated as stable. Frozen allocates 40 B per tick. Debt: a tick is still 1.9× Frozen. The rest is
-per-stack generic access (`isEmpty`, count and maximum-size reads) and the native
-component comparison of the result slot.
+other. Frozen allocates 40 B per tick. Debt: the template runs measured 1.86× and
+3.21× Frozen, and the variation between them is unresolved, so no single ratio is
+established. The remaining cost is per-stack generic access (`isEmpty`, count and
+maximum-size reads) and the native component comparison of the result slot.
+
+Native furnace owner and tick (`build/s34-furnace-s3-{1,2}`, release `eb1c9c49…`):
+Current 598 and 436 ns against Frozen 100 and 95 ns, 33 B per tick. A same-JVM
+scratch comparison (`FurnAttr`, three runs) gives 408–508 ns for the native tick
+against 346–440 ns for the Java tick over plain lists, about 18% slower. Native slot
+reads (about 29 ns against 14 ns, needed for the recipe input), the step call and
+Rust component locks cost more than the Java `canBurn`.
+[Decision 404](https://github.com/HungLo2020/MattMC/discussions/890#discussioncomment-19007930)
+accepts this as bounded intermediate debt of the ownership move, not a final
+acceptance. A JFR profile of the Java tick put `getMaxStackSize` (via
+`DefaultMap.find`) at 48% of it, which led to the default-component read view.
 
 ### Copy churn and the owner table
 

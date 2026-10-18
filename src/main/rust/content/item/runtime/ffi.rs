@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 const BAD: i64 = -2;
 const PANIC: i64 = -3;
 #[derive(Clone)]
-enum Owner { EnchantmentSplit(Arc<super::components::EnchantmentSplit>), EnchantmentCursor(Arc<super::components::EnchantmentCursor>), Enchantments(Arc<super::components::Enchantments>), EnchantmentTable(Arc<super::components::EnchantmentTable>), Menu(Arc<super::slots::BoundaryOwner<super::menu::Menu>>), Container(Arc<super::slots::BoundaryOwner<super::container::Container>>), SlotLink(Arc<super::menu::SlotLink>), Equipment(Arc<super::slots::BoundaryOwner<super::container::Equipment>>), Inventory(Arc<super::inventory::Inventory>), Defaults(Arc<super::slots::BoundaryOwner<super::patch::defaults::Store>>), DefaultCursor(Arc<Mutex<DefaultCursorOwner>>), Patch(Patch), Overlay(Arc<Mutex<Overlay>>), Stack(Arc<super::stack::Stack>), Slots(Arc<super::slots::BoundaryOwner<super::slots::Slots>>), AtomicAccess(Arc<super::patch::AtomicAccess>), AccessPatch(super::patch::CanonicalPatch), AccessOverlay(Arc<Mutex<super::patch::CanonicalOverlay>>), Cell(Arc<super::patch::CanonicalCell>) }
+enum Owner { EnchantmentSplit(Arc<super::components::EnchantmentSplit>), EnchantmentCursor(Arc<super::components::EnchantmentCursor>), Enchantments(Arc<super::components::Enchantments>), EnchantmentTable(Arc<super::components::EnchantmentTable>), Menu(Arc<super::slots::BoundaryOwner<super::menu::Menu>>), Container(Arc<super::slots::BoundaryOwner<super::container::Container>>), SlotLink(Arc<super::menu::SlotLink>), Equipment(Arc<super::slots::BoundaryOwner<super::container::Equipment>>), Inventory(Arc<super::inventory::Inventory>), Defaults(Arc<super::slots::BoundaryOwner<super::patch::defaults::Store>>), DefaultCursor(Arc<Mutex<DefaultCursorOwner>>), Patch(Patch), Overlay(Arc<Mutex<Overlay>>), Stack(Arc<super::stack::Stack>), Slots(Arc<super::slots::BoundaryOwner<super::slots::Slots>>), AtomicAccess(Arc<super::patch::AtomicAccess>), AccessPatch(super::patch::CanonicalPatch), AccessOverlay(Arc<Mutex<super::patch::CanonicalOverlay>>), Cell(Arc<super::patch::CanonicalCell>), Furnace(Arc<super::furnace::Furnace>) }
 fn owners() -> &'static Mutex<HashMap<i64, Owner>> {
     static OWNERS: OnceLock<Mutex<HashMap<i64, Owner>>> = OnceLock::new();
     OWNERS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -1537,6 +1537,35 @@ impl super::menu::QuickMoveEffects for MenuEffects {
     let owner=&*(address as *const super::slots::BoundaryOwner<super::slots::Slots>);
     let Some(rows)=owner.try_lock() else{return BAD};rows.get(index).map_or(BAD,|entry|entry.facade)
 }
+fn furnace_rows(handle:i64)->Result<Option<Arc<super::slots::BoundaryOwner<super::slots::Slots>>>,()> {
+    if handle==0{return Ok(None);}
+    match slots(handle){Some(SlotsLease::Separate(rows))=>Ok(Some(rows)),_=>Err(())}
+}
+/// An exact stock furnace's owner over its (optional) three native rows.
+#[no_mangle] pub extern "C" fn mattmc_item_furnace_create(rows:i64)->i64 {
+    guard(||{let Ok(rows)=furnace_rows(rows) else{return BAD};keep(Owner::Furnace(Arc::new(super::furnace::Furnace::new(rows))))})
+}
+#[no_mangle] pub extern "C" fn mattmc_item_furnace_address(handle:i64)->i64 {
+    guard(||match owners().lock().unwrap().get(&handle){Some(Owner::Furnace(furnace))=>Arc::as_ptr(furnace) as i64,_=>BAD})
+}
+#[no_mangle] pub extern "C" fn mattmc_item_furnace_timers(handle:i64)->i64 {
+    guard(||match owners().lock().unwrap().get(&handle){Some(Owner::Furnace(furnace))=>furnace.timers_address() as i64,_=>BAD})
+}
+/// Rebinds the rows (0 unbinds: every later tick runs in Java).
+#[no_mangle] pub extern "C" fn mattmc_item_furnace_bind(handle:i64,rows:i64)->i64 {
+    guard(||{let Ok(rows)=furnace_rows(rows) else{return BAD};
+        let furnace=match owners().lock().unwrap().get(&handle){Some(Owner::Furnace(furnace))=>furnace.clone(),_=>return BAD};
+        furnace.bind(rows);0})
+}
+/// One tick step (furnace::Furnace::step). The caller fences the furnace owner
+/// lease and the template stack's owner; `template` 0 means no recipe result.
+#[no_mangle] pub unsafe extern "C" fn mattmc_item_furnace_step(address:i64,phase:i64,template:i64,arg:i64,air:i64)->i64 {
+    guard(||{if address<=0||template<0{return BAD;}
+        let furnace=&*(address as *const super::furnace::Furnace);
+        let template=if template==0{None}else{Some(&*(template as *const super::stack::Stack))};
+        furnace.step(phase,template,arg,air as u64)})
+}
+
 /// Rows a bulk facade read may copy in one bounded call.
 pub const BULK_FACADES:usize=64;
 /// Private fixed-work bulk facade read (toArray): every row's facade token into

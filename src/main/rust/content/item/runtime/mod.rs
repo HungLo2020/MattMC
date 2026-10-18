@@ -13,5 +13,7 @@ pub mod container;
 
 pub mod menu;
 
+pub mod furnace;
+
 pub mod components;
 pub mod jvm_roots;

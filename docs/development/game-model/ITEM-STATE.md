@@ -453,19 +453,45 @@ gets a broadcast-only link while its quick move, `remove` and `onTake` stay on
 the original path. `NativeCraftingGridTest.nativeResultContainerMatchesTheOriginal`
 compares 300 random operations, at indices -1 to 2, against a subclass container.
 
-## Furnace results
+## Furnaces
 
-Every furnace tick checks whether its smelting result fits (`canBurn`, up to twice
-a tick), and the original called `recipe.assemble`, a copy of the result, just to
-compare it. `SingleItemRecipe.resultIfPlainCopy` returns the result itself for the
-stock cooking recipe classes (`SmeltingRecipe`, `BlastingRecipe`, `SmokingRecipe`,
-`CampfireCookingRecipe`). Their `assemble` is exactly that copy, and the result's
-copy runs no item code. Furnaces compare that template instead and, on a burn,
-copy it once (the original copied its transient copy). A recipe subclass, another
-recipe type or an impure result item keeps the original `assemble` path. Furnace
-contents stay in their Java list: native rows would make each per-tick slot read
-dearer. `NativeFurnaceTest` compares 2000 random ticks of the template path with a
-recipe subclass that assembles.
+An exact `FurnaceBlockEntity`, `BlastFurnaceBlockEntity` or `SmokerBlockEntity`
+keeps its three slots in native rows and its four timers (lit, lit total, cook,
+cook total) in one native owner (`NativeItemState.Furnace`, Rust
+[`furnace.rs`](https://github.com/HungLo2020/MattMC/blob/master/src/main/rust/content/item/runtime/furnace.rs)).
+Java reads and writes the timers in place, without a native call, everywhere the
+original used the fields: the tick, `dataAccess`, save/load and `setItem`. Load and
+`setItems` rebind the rows. A list other than three native rows unbinds them, and
+every later tick runs in Java. Subclasses keep the original list and fields.
+
+Each tick begins with the original code: the lit decrement, both slot reads, the
+recipe lookup and `getMaxStackSize`. One native step then decides both `canBurn`
+checks and the cook timer. The rare lighting branch (fuel duration, fuel shrink,
+crafting remainder) and burn branch (cook time, `burn`, recipe used) still run the
+original Java code, with one more step after lighting. When only Java can decide
+(foreign component equality, an unknown maximum size, pending or unbound rows), the
+step returns before it changes anything, and Java continues the original segment.
+
+`SingleItemRecipe.resultIfPlainCopy` returns the result itself for the stock
+cooking recipe classes (`SmeltingRecipe`, `BlastingRecipe`, `SmokingRecipe`,
+`CampfireCookingRecipe`), whose `assemble` is exactly a copy of it, when that copy
+runs no item code. `canBurn` compares that template instead of a transient copy, and
+`burn` copies it once. A recipe subclass, another recipe type or an impure result
+keeps the original `assemble` path, and the tick runs its Java segments.
+
+`NativeFurnaceTest` runs 2000 random ticks with save/load round trips, `setItems`
+rebinding and `dataAccess` reads. It compares the exact and subclass furnaces with
+stock and subclass recipes, and asserts that most stock-recipe ticks are decided
+natively. It also covers a deterministic cool-down and the Cleaner retirement of a
+dropped furnace's owner.
+
+## Default component reads
+
+`DefaultMap.get` and `containsKey` read a Java view of the native rows' current
+bindings (the same value objects) instead of probing the native rows on every call.
+`getMaxStackSize` alone was about half of a furnace tick. The view is built on the
+first read and dropped by every membership change (`put`, `remove`, `clear`,
+iterator `remove`), all of which go through `DefaultMap`.
 
 ## Bulk row reads
 

@@ -397,6 +397,12 @@ public final class NativeItemState {
         private boolean semanticRolesReady = defaultRoleKeys != null;
         private final Entries entries = new Entries();
         private final Keys keys = new Keys();
+        /**
+         * A read-only Java view of the native rows' current bindings (same value
+         * objects), so get/containsKey skip the native probe. Built on first read and
+         * dropped by every membership change, all of which go through this class.
+         */
+        private volatile it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap<Object, Object> readView;
         private DefaultMap(long handle, Release ownership) {
             this.handle = handle; this.ownerAddress = c1(DEFAULT_OWNER_ADDRESS, handle); this.header = leaseView(c1(DEFAULT_ADDRESS, handle), 32, ownership).asReadOnly();
         }
@@ -435,12 +441,33 @@ public final class NativeItemState {
             for (int i=0;i<n;i++) { if(this.row(pos,8)==0)return -1; if(this.row(pos,0)==token)return pos; pos=(pos+1)&mask; } return -1;
         }
         @Override public synchronized int size() { try { return Math.toIntExact(this.field(8)); } finally { java.lang.ref.Reference.reachabilityFence(this.header); } }
-        @Override public synchronized boolean containsKey(Object key) { try {return this.find(key)>=0;} finally {java.lang.ref.Reference.reachabilityFence(this.header);} }
-        @Override public synchronized Object get(Object key) {
-            try {int index=this.find(key);return index<0?this.defRetValue:this.binding(this.row(index,8)).value();}
-            finally {java.lang.ref.Reference.reachabilityFence(this.header);}
+        private it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap<Object, Object> readView() {
+            var view = this.readView;
+            if (view != null) return view;
+            synchronized (this) {
+                if ((view = this.readView) != null) return view;
+                try {
+                    view = new it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap<>();
+                    int bound = this.hashed() ? this.capacity() + 1 : this.size();
+                    for (int i = 0; i < bound; i++) {
+                        long leaf = this.row(i, 8); if (leaf == 0) continue;
+                        var binding = this.binding(leaf); view.put(binding.type(), binding.value());
+                    }
+                    this.readView = view; return view;
+                } finally { java.lang.ref.Reference.reachabilityFence(this.header); }
+            }
+        }
+        @Override public boolean containsKey(Object key) {
+            if (key != null && !(key instanceof DataComponentType<?>)) return false;
+            return this.readView().containsKey(key);
+        }
+        @Override public Object get(Object key) {
+            if (key != null && !(key instanceof DataComponentType<?>)) return this.defRetValue;
+            var view = this.readView(); Object value = view.get(key);
+            return value != null || view.containsKey(key) ? value : this.defRetValue;
         }
         @Override public synchronized Object put(DataComponentType<?> key,Object value) {
+            this.readView=null;
             long leaf=this.next++; this.bindings.put(leaf,new DefaultBinding(key,value));
             int kind=defaultRole(key,value);
             long hashKind=Integer.toUnsignedLong(System.identityHashCode(key)) | ((long)kind<<32);
@@ -453,10 +480,11 @@ public final class NativeItemState {
         }
         @Override public synchronized Object remove(Object key) {
             if(key!=null && !(key instanceof DataComponentType<?>))return this.defRetValue;
+            this.readView=null;
             try {long old=c3(DEFAULT_REMOVE,this.handle,Identities.of(key),System.identityHashCode(key));DefaultBinding previous=this.bindings.remove(old);return previous==null?this.defRetValue:previous.value();}
             finally {java.lang.ref.Reference.reachabilityFence(this.header);}
         }
-        @Override public synchronized void clear() { try {c1(DEFAULT_CLEAR,this.handle);this.bindings.clear();} finally {java.lang.ref.Reference.reachabilityFence(this.header);} }
+        @Override public synchronized void clear() { this.readView=null; try {c1(DEFAULT_CLEAR,this.handle);this.bindings.clear();} finally {java.lang.ref.Reference.reachabilityFence(this.header);} }
         private synchronized DefaultBinding at(int index) {try{return this.binding(this.row(index,8));}finally{java.lang.ref.Reference.reachabilityFence(this.header);}}
         @Override public int hashCode() {
             if (!this.hashed()) return super.hashCode();
@@ -502,7 +530,7 @@ public final class NativeItemState {
             }
             @Override public boolean hasNext(){synchronized(DefaultMap.this){return c2(DEFAULT_CURSOR_OP,this.cursor,0)!=0;}}
             @Override public DefaultEntry next(){synchronized(DefaultMap.this){return this.read(1);}}
-            @Override public void remove(){synchronized(DefaultMap.this){long leaf=c2(DEFAULT_CURSOR_OP,this.cursor,2);if(leaf<0){this.nativeFailure();throw new IllegalStateException();}DefaultMap.this.bindings.remove(leaf);if(this.live&&this.reusable==null&&this.lastReturned!=null)((HashEntry)this.lastReturned).index=-1;}}
+            @Override public void remove(){synchronized(DefaultMap.this){DefaultMap.this.readView=null;long leaf=c2(DEFAULT_CURSOR_OP,this.cursor,2);if(leaf<0){this.nativeFailure();throw new IllegalStateException();}DefaultMap.this.bindings.remove(leaf);if(this.live&&this.reusable==null&&this.lastReturned!=null)((HashEntry)this.lastReturned).index=-1;}}
             @Override public void forEachRemaining(java.util.function.Consumer<? super it.unimi.dsi.fastutil.objects.Reference2ObjectMap.Entry<DataComponentType<?>,Object>> action) {
                 boolean hashed=DefaultMap.this.hashed();int end=DefaultMap.this.size();
                 while(hashed?this.hasNext():c2(DEFAULT_CURSOR_OP,this.cursor,7)<end) {
@@ -1136,6 +1164,39 @@ public final class NativeItemState {
 
     private record ContainerBinding(long token,net.minecraft.core.NonNullList<ItemStack> facade) {}
     /** One opaque identity anchor for the backing selected by the actual native cell. */
+    private static final MethodHandle FURNACE_NEW=call("furnace_create",1),FURNACE_ADDRESS=call("furnace_address",1),FURNACE_TIMERS=call("furnace_timers",1),FURNACE_BIND=call("furnace_bind",2);
+    private static final MethodHandle FURNACE_STEP=call("furnace_step",5);
+    /**
+     * An exact stock furnace's native owner: its three rows and four timers
+     * (lit, lit total, cook, cook total), and the per-tick decisions of
+     * AbstractFurnaceBlockEntity.serverTick (see furnace.rs for the step codes).
+     * Timers are read and written in place, without a native call.
+     */
+    public static final class Furnace {
+        private final long handle,address,timers;
+        private final Cleaner.Cleanable cleanup;
+        private boolean bound;
+        private Furnace(long handle,Release release,boolean bound){
+            this.handle=handle;this.address=c1(FURNACE_ADDRESS,handle);this.timers=c1(FURNACE_TIMERS,handle);this.bound=bound;this.cleanup=CLEANER.register(this,release);
+        }
+        private static long rows(net.minecraft.core.NonNullList<ItemStack> items){return items instanceof NativeItemSlots rows&&rows.size()==3?rows.actualOwner().handle:0;}
+        public static Furnace create(net.minecraft.core.NonNullList<ItemStack> items){long rows=rows(items);return adopt(FURNACE_NEW,(handle,release)->new Furnace(handle,release,rows!=0),rows);}
+        /** Rebinds the native tick to these rows; any other list runs every later tick in Java. */
+        public synchronized void bind(net.minecraft.core.NonNullList<ItemStack> items){
+            long rows=rows(items);try{c2(FURNACE_BIND,this.handle,rows);this.bound=rows!=0;}finally{java.lang.ref.Reference.reachabilityFence(this);}
+        }
+        public boolean bound(){return this.bound;}
+        public int timer(int index){try{return (int)COUNT.getOpaque(SCALAR_RAW,this.timers+4L*index);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
+        public void timer(int index,int value){try{COUNT.setOpaque(SCALAR_RAW,this.timers+4L*index,value);}finally{java.lang.ref.Reference.reachabilityFence(this);}}
+        /** One tick step; {@code template} is the stock recipe result, or null. */
+        public long step(int phase,@org.jetbrains.annotations.Nullable ItemStack template,long arg){
+            try{
+                long result=(long)FURNACE_STEP.invokeExact(this.address,(long)phase,template==null?0L:stackOwner(template.state).checkBound(),arg,TransferIds.AIR);
+                if(result<0)throw new IllegalStateException("Native furnace step failed: "+result);return result;
+            }catch(Throwable failure){if(failure instanceof IllegalStateException state)throw state;throw failed(failure);}
+            finally{java.lang.ref.Reference.reachabilityFence(template);java.lang.ref.Reference.reachabilityFence(this);}
+        }
+    }
     public static final class ContainerCell {
         private final long handle,address,ownerAddress;
         private final Cleaner.Cleanable cleanup;
