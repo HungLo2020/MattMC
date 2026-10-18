@@ -53,7 +53,8 @@ rethrows that exact throwable without replaying it. Invocation-local VM state
 references serve the original callbacks and clear at their policy boundary.
 Unknown contextual getters take this path; the bulk route requires a stock
 chunk source and silent admission of its actual chunks, height providers and
-sections. The sky path retains its existing implementation.
+sections. That block checkpoint retained the existing sky implementation; the
+effectful sky correction is described below.
 
 Compile the observer once against original Frozen with
 `VerifyThreadedLighting.java` and `VerifyBlockInputEffects.java`, then run the
@@ -165,14 +166,102 @@ fixture omitted this precondition; the preserved failure does not establish a
 production failure. Keep the real base-close omission and caller-held controls;
 do not replace them with counters or extend their collection deadline.
 
+## Effectful sky propagation under development
+
+A subsequent diagnostic on published `659319cf` finds 19,331 contextual lookups
+on original Frozen and forced Java over four 64-edit cycles, but 19,185 natively,
+with identical final state. The unwrapped native library reproduces the count;
+disabling sky gives 18,125 calls on all three runtimes. The controlled fixture
+only adds a lookup counter; these are correctness observations, not timings.
+
+`SkyPropagationEffects.java` isolates the existing sky snapshot/replay issue.
+A one-neighbor increase makes two original callbacks after the committed source
+write. Native instead snapshots 4,096 states before that write. Checked lookup
+and state failures are replayed twice. The same once-Frozen-compiled observer
+matches forced Java; all three native rows fail their original callback traces.
+Those raw failures and the earlier block checkpoint's actual scope remain.
+
+The local correction extends the actual Rust queue/storage/state consumer to
+sky, including counting empty sections below a border and propagating across
+their original descending cells. It uses the actual retained sky binding and
+live lowest-section metadata, releases guards before VM leaves, and preserves
+completed writes and callback additions on failure. The shared VM adapter keeps
+the sky engine's original mutable position and selected chunk. Both block and
+sky bulk admission now require silent canonical inputs; decline resumes the
+effectful consumer. Eleven focused native tests pass, including the original
+primary/queue controls and actual sky failure prefixes, descending border writes
+and generated work. A separate retained sky-binding test passes live metadata
+mutation and real map/queue retirement after base drop. The matching local
+`111db911` native image restores all three original callback/failure rows and the
+19,331-lookups full-cycle observation. Five new original-Frozen border controls
+also match, including write order, partial checked-write failure, remaining work,
+lookup/state reentry and complete layer hashes. Four actual sky primary-input
+and four sky queue VM cases pass with both genuine omission controls; the
+original block cases, physical controls and late-invalidation regression repeat
+successfully on the shared image. Fresh affected Java checks pass all 493 cases.
+The already-started serial native suite finishes with 3,186 passes, the same 57
+historical host failures and nine ignored tests; all twenty required critical
+controls pass. The raw suite remains failed. Its separate source-coordinate
+qualification applies only the previously approved `worldrender/tests.rs`
+67-line insertion; no failure payload or additional mismatch is waived.
+
+The representative screen on that image measures 54.84 ms and 126,106 Java
+bytes per 64-edit cycle, with nine quiet samples, matching work/state and zero
+swap. This is 10.57 times original Frozen and roughly 30% slower than the prior
+block checkpoint's screen. A separate counts-only diagnostic observes 207,225
+block and 7,911 sky state callbacks, 201,694 actual primary admissions and zero
+fallbacks across four cycles. It restores the original 19,331 contextual lookups;
+these counts do not explain the measured latency increase. The substantial debt
+remains with S0031's connected cache producer and consuming policy work. This
+stable, bounded intermediate screen permits focused correctness work; it does
+not pass final performance acceptance.
+
+Under [owner-scoped validation policy406](https://github.com/HungLo2020/MattMC/discussions/890#discussioncomment-19008322),
+this correction uses affected engine/source contracts, dangerous ownership and
+callback cases, and saved-light integrity checks. Full ordinary Java, parity
+and slow tiers are not rerun for this increment; their earlier `659319cf`
+results retain their original scope. Twelve affected legacy batches and the
+252-row source-owner corpus plus both release controls pass. Incoming `c20a382f`
+changes only GUI code: the matching integrated image keeps native `111db911`
+and every lighting, chunk, server, world-generation and utility class unchanged.
+Resource and dependency hashes also match. This explicit boundary comparison
+qualifies reuse of the earlier lighting results; 26 fresh incoming GUI tests
+pass on the integrated image.
+
+Fresh saved-light early/unload checks match the original sampled bytes, with
+snapshot/write/disk equality and no nonzero loss before the actual save. Seven
+custody cases pass, the genuine publication omission fails as expected, and
+512 retention cycles finish with zero native-owner growth. All 125 fresh chunks
+match the guarded pre-change image and their own reopen exactly. The same 25
+Primordial differences from original Frozen remain unchanged; full Frozen
+comparison stays false. These results qualify this intermediate correction,
+with whole-lighting performance and hardware acceptance still open. The older block
+retirement omission control first hit its unchanged 60-second process limit
+after seven of eight expected negative rows. One unchanged rerun completed all
+eight in 55.82 seconds; both attempts retain their original five-second
+collection deadlines, and the first remains incomplete.
+
+For sky callback regressions, compile `SkyPropagationEffects.java` once against
+original Frozen alongside `VerifyThreadedLighting.java` and
+`VerifyBlockInputEffects.java`; add `SkyBorderEffects.java` for border writes
+and reentry. Reuse those exact observer classes across original, forced-Java
+and native runtimes. `VerifySkyPropagationStateInput.java` and
+`VerifySkyPropagationLifetime.java` exercise the current native ownership API,
+so compile them against the compatible Current API. Keep their actual base
+release, caller-held and omission controls. Their historical property prefixes
+remain `propagationInput` and `blockPropagation`; changing a class name does not
+change those switches. Direct primary-capture probes initialize
+`NativeBlockRegistry.ready()` before entering the private native pass.
+
 ## How a pass works
 
 1. Producers append position/entry pairs to retained Rust pending queues.
    Rust takes those queues directly and runs every decrease, then every
-   increase. Original inputs remain in a transaction journal until admission
-   succeeds; there is no Java drain buffer or native input copy. See
+   increase. The silent bulk route keeps an input journal until admission
+   succeeds; the effectful route consumes the actual queues directly. See
    [work ownership and verification](RUST-LIGHT-WORK.md).
-2. One callback function supplies two separately cached snapshots per section:
+2. On the silent bulk route, one callback supplies two separately cached
+   snapshots per section:
    the updating `DataLayer` (a pinned native CPU owner for canonical layers;
    bytes or a lazy default for compatibility layers) and
    `lightOnInSection` on the first layer request, then block states only when
@@ -180,21 +269,20 @@ do not replace them with counters or extend their collection deadline.
    words, or one state ID per block for chunk kinds the bridge does not model;
    Rust maps state IDs to light types in place. A section needing both
    snapshots makes two callback invocations.
-3. Rust writes levels into its own pass copies. S0026's canonical coordinator
+3. Bulk propagation writes levels into Rust pass copies. S0026's canonical coordinator
    consumes ordered results, selects COW targets and installs native bytes using
    typed owners. Custom or mutable-array targets remain explicit Java effects.
    The legacy bridge without a coordinator receives ordered keys, selects the
    first-write COW target in Java and adds affected-section entries. In both
    paths, earlier installation effects remain committed if a later effect fails.
-4. Unsupported input or a failed section callback returns before propagation
-   writes are installed. Rust restores the original inputs after any new
-   callback additions, matching the former Java refill order. Java runs the
-   compatibility loops, which may complete or throw. This is a
-   boundary around propagation writes, not a rollback of earlier `checkNode`
-   work or callback side effects. Invalid ABI input (`-1`), downcall failures
-   and result-transfer failures throw instead of replaying in Java; see the
-   [current bridge status handling](https://github.com/HungLo2020/MattMC/blob/4246f4e7bfc1f3ab7862272ebba5f1f38aa16953/src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java#L204-L259).
-   An installation error does not roll back sections already installed.
+4. Unsupported bulk input restores the original queue inputs after callback
+   additions, before installing bulk propagation writes. Both block and sky
+   then continue through the effectful Rust consumer described above; a failed
+   effectful VM call is never replayed. Earlier `checkNode` effects and installed
+   writes remain committed. Disabled, reentrant or unavailable-table admission
+   can still select the original Java path before starting this consumer.
+   Invalid ABI input, downcall and result-transfer failures throw; see
+   [the current bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main/java/net/minecraft/world/level/lighting/NativeLightPropagation.java).
 
 The S0026 stock source producer captures bounded source inputs in an owned native
 frame. Rust admits the actual typed layers before mutation, then owns the whole

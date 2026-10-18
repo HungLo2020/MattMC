@@ -1119,6 +1119,15 @@ mod propagation_scalar_storage {
         let entry=map.native_entry(layer).unwrap();map.set(0,Some(entry));map
     }}
     #[test]
+    fn retained_actual_sky_binding_reads_live_lowest_metadata_and_retires_its_real_map_and_queue(){
+        let map=actual_map(Arc::new(Layer::new(0)));map.set_lowest(-4);
+        let work=Arc::new(Queues::default());let queue=Arc::downgrade(&work);let weak=Arc::downgrade(&map);let pointer=Arc::as_ptr(&work);
+        let input=super::super::ffi::connected_sky_test_input(&map,&work);
+        assert!(input.matches_queues(pointer,1));assert!(!input.matches_block_queues(pointer));assert!(!input.matches_queues(std::ptr::null(),1));
+        assert!(input.has_data_at_or_below(-4));assert!(!input.has_data_at_or_below(-5));map.set_lowest(-6);assert!(input.has_data_at_or_below(-5),"Read the actual current metadata, not an admission snapshot");
+        drop(work);drop(map);assert_eq!(queue.strong_count(),1);assert_eq!(weak.strong_count(),1);assert!(input.has_data_at_or_below(-6));drop(input);assert_eq!(queue.strong_count(),0);assert_eq!(weak.strong_count(),0);
+    }
+    #[test]
     fn retained_actual_storage_runs_existing_cow_policy_after_base_drop_then_retires_only_new_generation(){
         let original=Arc::new(Layer::new(0));let map=actual_map(original.clone());let published=map.snapshot();
         let weak=Arc::downgrade(&map);let input=super::super::ffi::connected_test_input(&map);

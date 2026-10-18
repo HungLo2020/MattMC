@@ -45,6 +45,20 @@ public final class SkyLightEngine extends LightEngine<SkyLightSectionStorage.Sky
 
     int sourceForNativeNode(int x,int z,int missing) { return this.getLowestSourceY(x,z,missing); }
 
+    BlockState stateForNativePropagation(long pos) { return this.getState(this.mutablePos.set(pos)); }
+
+    BlockState stateForNativeNode(long pos,net.minecraft.world.level.chunk.NativeLightBlocks.NodeLease input)throws Throwable {
+        this.mutablePos.set(pos);
+        LightChunk chunk=this.getChunk(SectionPos.blockToSectionCoord(this.mutablePos.getX()),SectionPos.blockToSectionCoord(this.mutablePos.getZ()));
+        return input.acquire(chunk,this.mutablePos)?null:input.compatibility();
+    }
+
+    BlockState stateAfterNativeInvalidation(long originalPos) {
+        // Reuse the selected chunk key and the position after lookup reentry.
+        LightChunk chunk=this.getChunk(SectionPos.blockToSectionCoord(BlockPos.getX(originalPos)),SectionPos.blockToSectionCoord(BlockPos.getZ(originalPos)));
+        return chunk==null?Blocks.BEDROCK.defaultBlockState():chunk.getBlockState(this.mutablePos);
+    }
+
     /** Original contextual lookup only; the native query owns canonical consumption. */
     @Nullable ChunkSkyLightSources sourceInputForNative(int x,int z,boolean highest) {
         if(highest)return Objects.requireNonNullElse(this.getChunkSources(x,z),this.emptyChunkSources);

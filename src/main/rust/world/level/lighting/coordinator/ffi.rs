@@ -560,6 +560,15 @@ pub(in crate::world::level::lighting) fn connected_test_input(map: &Arc<LightMap
         input
     }
 }
+#[cfg(test)]
+pub(in crate::world::level::lighting) fn connected_sky_test_input(map:&Arc<LightMap>,work:&Arc<Queues>)->PropagationInput{
+    unsafe{
+        let owner=mattmc_light_coordinator_create(Arc::as_ptr(map),1);
+        let binding=mattmc_light_coordinator_bind(owner,Arc::as_ptr(work),1);
+        let input=PropagationInput::retain(binding.cast()).unwrap();
+        mattmc_light_coordinator_bind_release(binding);mattmc_light_coordinator_release(owner);input
+    }
+}
 impl Drop for PropagationInput {
     fn drop(&mut self) { self.owner.state.lock().unwrap().release_engine(self.engine); }
 }
@@ -641,8 +650,14 @@ impl PropagationInput {
         self.owner.state.lock().unwrap().enabled(key)
     }
     pub(in crate::world::level::lighting) fn matches_block_queues(&self,queues:*const Queues)->bool {
+        self.matches_queues(queues,0)
+    }
+    pub(in crate::world::level::lighting) fn matches_queues(&self,queues:*const Queues,kind:i32)->bool {
         let state=self.owner.state.lock().unwrap();
-        state.engines.get(&self.engine).is_some_and(|engine|engine.kind==0&&Arc::as_ptr(&engine.queues)==queues)
+        state.engines.get(&self.engine).is_some_and(|engine|engine.kind==kind&&Arc::as_ptr(&engine.queues)==queues)
+    }
+    pub(in crate::world::level::lighting) fn has_data_at_or_below(&self,section:i32)->bool {
+        section>=self.owner.state.lock().unwrap().updating.lowest()
     }
     pub(in crate::world::level::lighting) fn stored_section(&self,key:i64)->Option<bool> {
         let state=self.owner.state.lock().unwrap();

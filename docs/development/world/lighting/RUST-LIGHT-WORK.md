@@ -42,8 +42,11 @@ membership, section admission, columns and publication. Java retains genuine
 world/object callbacks and compatibility paths. Stock block/sky source seeding
 uses Rust; custom readers and mixed or escaped layers retain their original
 Java leaf calls while Rust selects the sky-source traversal. The effectful block
-correction likewise runs its live queue policy in Rust; bulk sky rejection still
-uses Java propagation loops. Rust owns those pending queues as well. The server's outer batch/scheduling and request policy
+correction likewise runs its live queue policy in Rust. The pending effectful
+sky correction extends that consumer with the original empty-section traversal;
+its snapshot/replay failures and validation status are recorded in
+[propagation development](RUST-LIGHT-PROPAGATION.md#effectful-sky-propagation-under-development).
+Rust owns those pending queues as well. The server's outer batch/scheduling and request policy
 has its separate [threaded coordinator](RUST-THREADED-LIGHTING.md). No GPU
 resource, presenter or rendering boundary is involved.
 

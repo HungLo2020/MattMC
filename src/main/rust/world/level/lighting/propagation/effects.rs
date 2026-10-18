@@ -1,4 +1,4 @@
-//! Original block propagation order over the actual pending queues. VM leaves
+//! Original block/sky propagation order over the actual pending queues. VM leaves
 //! execute after queue guards have dropped; failures keep the consumed/write prefix.
 use super::{block_pos,block_x,block_y,block_z,section_pos,work::Queues,DIRECTIONS,FROM_EMPTY_SHAPE,FROM_EMISSION,OFFSETS};
 use crate::world::level::lighting::coordinator::ffi::PropagationInput;
@@ -8,6 +8,7 @@ const READ:i32=0; const WRITE:i32=1; const STORED:i32=2; const STATE:i32=3;
 const OPACITY:i32=4; const EMISSION:i32=5; const EMPTY:i32=6; const OCCLUDES:i32=7;
 const CLEAR:i32=8; const AIR:i32=9; const MISSING:i32=10; const REFRESH:i32=11; const STORAGE_ERROR:i32=12;
 const STATE_FALLBACK:i32=13;
+const HAS_BELOW:i32=14;
 trait Leaves { fn call(&mut self,action:i32,a:i64,b:i64,c:i64)->Result<i64,()>; }
 #[derive(Clone,Copy)]
 struct NativeState {id:u16,light:super::Type}
@@ -39,7 +40,7 @@ pub unsafe extern "C" fn mattmc_light_block_capture_state(slot:*mut std::ffi::c_
   i32::from((*(slot as *mut StateCapture<'_>)).capture(owner,index as usize))
  })).unwrap_or(-99)
 }
-struct Pass<'a,L> {queues:Arc<Queues>,leaves:&'a mut L,input:Option<PropagationInput>,tables:Option<&'a super::Tables>,states:[Option<NativeState>;2]}
+struct Pass<'a,L> {queues:Arc<Queues>,leaves:&'a mut L,input:Option<PropagationInput>,tables:Option<&'a super::Tables>,states:[Option<NativeState>;2],sky:bool}
 impl<L:Leaves> Pass<'_,L> {
  fn call(&mut self,action:i32,a:i64,b:i64)->Result<i32,()>{
   if let Some(tables)=self.tables{
@@ -83,6 +84,7 @@ impl<L:Leaves> Pass<'_,L> {
    let result=match action{
     READ=>input.stored_read(a),
     STORED=>Ok(input.stored_section(a).map(i32::from)),
+    HAS_BELOW=>Ok(Some(i32::from(input.has_data_at_or_below(a as i32)))),
     WRITE=>match input.stored_write(a,b as i32){
      Ok(Some((ids,pending)))=>{
       if !ids.is_empty()||pending{self.leaves.call(REFRESH,ids.as_ptr()as i64,ids.len()as i64,0)?;}
@@ -108,7 +110,53 @@ impl<L:Leaves> Pass<'_,L> {
  fn enqueue(&self,side:i32,position:i64,entry:u64)->Result<(),()>{if self.queues.enqueue(side,position,entry as i64)==0{Ok(())}else{Err(())}}
  fn neighbor(position:i64,direction:usize)->i64{let(x,y,z)=OFFSETS[direction];block_pos(block_x(position).wrapping_add(x),block_y(position).wrapping_add(y),block_z(position).wrapping_add(z))}
  fn stored(&mut self,position:i64)->Result<bool,()>{self.call(STORED,section_pos(block_x(position)>>4,block_y(position)>>4,block_z(position)>>4),0).map(|v|v!=0)}
+ fn empty_below(&mut self,position:i64)->Result<i32,()>{
+  let(x,y,z)=(block_x(position),block_y(position),block_z(position));
+  if y&15!=0 || (x&15!=0&&x&15!=15&&z&15!=0&&z&15!=15){return Ok(0);}
+  let mut count=0i32;
+  loop{
+   let below=(y>>4).wrapping_sub(count).wrapping_sub(1);
+   if self.call(STORED,section_pos(x>>4,below,z>>4),0)?!=0 || self.call(HAS_BELOW,below as i64,0)?==0{return Ok(count);}
+   count=count.wrapping_add(1);
+  }
+ }
+ fn from_empty(&mut self,position:i64,direction:usize,value:i32,increase:bool,count:i32)->Result<(),()>{
+  if count==0{return Ok(());}
+  let(x,y,z)=(block_x(position),block_y(position),block_z(position));
+  let crossed=match direction{2=>z&15==15,3=>z&15==0,4=>x&15==15,5=>x&15==0,_=>false};
+  if !crossed{return Ok(());}
+  let mut section=(y>>4).wrapping_sub(1);let last=section.wrapping_sub(count).wrapping_add(1);
+  while section>=last{
+   if self.call(STORED,section_pos(x>>4,section,z>>4),0)?!=0{
+    let bottom=section.wrapping_shl(4);
+    for relative in (0..16).rev(){
+     let next=block_pos(x,bottom.wrapping_add(relative),z);
+     self.call(WRITE,next,if increase{value as i64}else{0})?;
+     if increase{
+      if value>1{self.enqueue(1,next,(DIRECTIONS&!(16<<(direction^1)))|FROM_EMPTY_SHAPE|((value as u64)&15))?;}
+     }else{self.enqueue(0,next,(DIRECTIONS&!(16<<(direction^1)))|((value as u64)&15))?;}
+    }
+   }
+   section=section.wrapping_sub(1);
+  }
+  Ok(())
+ }
+ fn decrease_sky(&mut self,position:i64,entry:u64)->Result<(),()>{
+  let below=self.empty_below(position)?;let from=(entry&15)as i32;
+  for direction in 0..6{
+   if entry&(16<<direction)==0{continue;}
+   let next=Self::neighbor(position,direction);if !self.stored(next)?{continue;}
+   let stored=self.call(READ,next,0)?;if stored==0{continue;}
+   if stored<=from.wrapping_sub(1){
+    self.call(WRITE,next,0)?;
+    self.enqueue(0,next,(DIRECTIONS&!(16<<(direction^1)))|((stored as u64)&15))?;
+    self.from_empty(next,direction,stored,false,below)?;
+   }else{self.enqueue(1,next,(16<<(direction^1))|((stored as u64)&15))?;}
+  }
+  Ok(())
+ }
  fn decrease(&mut self,position:i64,entry:u64)->Result<(),()>{
+  if self.sky{return self.decrease_sky(position,entry);}
   let from=(entry&15)as i32;
   for direction in 0..6{
    if entry&(16<<direction)==0{continue;}
@@ -129,6 +177,7 @@ impl<L:Leaves> Pass<'_,L> {
  }
  fn increase(&mut self,position:i64,entry:u64,from:i32)->Result<(),()>{
   let mut source=false;
+  let below=if self.sky{self.empty_below(position)?}else{0};
   for direction in 0..6{
    if entry&(16<<direction)==0{continue;}
    let next=Self::neighbor(position,direction);
@@ -142,6 +191,7 @@ impl<L:Leaves> Pass<'_,L> {
     if self.call(OCCLUDES,direction as i64,0)?==0{
      self.call(WRITE,next,target as i64)?;
      if target>1{let empty=self.call(EMPTY,1,0)?!=0;self.enqueue(1,next,(DIRECTIONS&!(16<<(direction^1)))|if empty{FROM_EMPTY_SHAPE}else{0}|((target as u64)&15))?;}
+     if self.sky{self.from_empty(next,direction,target,true,below)?;}
     }
    }
    self.call(CLEAR,1,0)?;
@@ -168,7 +218,7 @@ impl Leaves for Vm{fn call(&mut self,action:i32,a:i64,b:i64,c:i64)->Result<i64,(
 pub unsafe extern "C" fn mattmc_light_block_run_effects(queues:*const Queues,callback:Option<Callback>,output:*mut i64)->i32{
  if queues.is_null()||output.is_null(){return -1;}
  let Some(callback)=callback else{return -1;};
- catch_unwind(AssertUnwindSafe(||{Arc::increment_strong_count(queues);let queues=Arc::from_raw(queues);let mut leaves=Vm(callback);let mut pass=Pass{queues,leaves:&mut leaves,input:None,tables:None,states:[None;2]};match pass.run(){Ok(count)=>{*output=count as i64;0},Err(())=>-2}})).unwrap_or(-99)
+ catch_unwind(AssertUnwindSafe(||{Arc::increment_strong_count(queues);let queues=Arc::from_raw(queues);let mut leaves=Vm(callback);let mut pass=Pass{queues,leaves:&mut leaves,input:None,tables:None,states:[None;2],sky:false};match pass.run(){Ok(count)=>{*output=count as i64;0},Err(())=>-2}})).unwrap_or(-99)
 }
 
 /// Retain the actual storage binding and its existing policy; VM effects run
@@ -182,7 +232,28 @@ pub unsafe extern "C" fn mattmc_light_block_run_connected_effects(queues:*const 
   let Some(input)=PropagationInput::retain(binding)else{return -1;};
   if !input.matches_block_queues(queues){return -1;}
   Arc::increment_strong_count(queues);let queues=Arc::from_raw(queues);let mut leaves=Vm(callback);
-  let mut pass=Pass{queues,leaves:&mut leaves,input:Some(input),tables:super::installed_tables(),states:[None;2]};
+  let mut pass=Pass{queues,leaves:&mut leaves,input:Some(input),tables:super::installed_tables(),states:[None;2],sky:false};
+  match pass.run(){Ok(count)=>{*output=count as i64;0},Err(())=>-2}
+ })).unwrap_or(-99)
+}
+
+/// Sky uses the same actual queue/storage/state ownership and original VM
+/// effects, with its own empty-section traversal and decrease policy.
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_sky_run_effects(queues:*const Queues,callback:Option<Callback>,output:*mut i64)->i32{
+ if queues.is_null()||output.is_null(){return -1;}
+ let Some(callback)=callback else{return -1;};
+ catch_unwind(AssertUnwindSafe(||{Arc::increment_strong_count(queues);let queues=Arc::from_raw(queues);let mut leaves=Vm(callback);let mut pass=Pass{queues,leaves:&mut leaves,input:None,tables:None,states:[None;2],sky:true};match pass.run(){Ok(count)=>{*output=count as i64;0},Err(())=>-2}})).unwrap_or(-99)
+}
+#[no_mangle]
+pub unsafe extern "C" fn mattmc_light_sky_run_connected_effects(queues:*const Queues,binding:*const std::ffi::c_void,callback:Option<Callback>,output:*mut i64)->i32{
+ if queues.is_null()||binding.is_null()||output.is_null(){return -1;}
+ let Some(callback)=callback else{return -1;};
+ catch_unwind(AssertUnwindSafe(||{
+  let Some(input)=PropagationInput::retain(binding)else{return -1;};
+  if !input.matches_queues(queues,1){return -1;}
+  Arc::increment_strong_count(queues);let queues=Arc::from_raw(queues);let mut leaves=Vm(callback);
+  let mut pass=Pass{queues,leaves:&mut leaves,input:Some(input),tables:super::installed_tables(),states:[None;2],sky:true};
   match pass.run(){Ok(count)=>{*output=count as i64;0},Err(())=>-2}
  })).unwrap_or(-99)
 }
@@ -211,7 +282,7 @@ mod tests {
  fn actual_queue_and_layer_keep_consumed_write_prefix_and_callback_addition_without_replay(){
   let queue=Arc::new(Queues::default());let weak=Arc::downgrade(&queue);let position=block_pos(8,8,8);assert_eq!(queue.enqueue(1,position,(DIRECTIONS|FROM_EMISSION|FROM_EMPTY_SHAPE|15)as i64),0);
   let mut leaves=ActualLeaves{queue:weak.clone(),layer:Layer::new(0),calls:vec![],fail_state:true};
-  let mut pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:None,states:[None;2]};assert_eq!(pass.run(),Err(()));
+  let mut pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:None,states:[None;2],sky:false};assert_eq!(pass.run(),Err(()));
   assert_eq!(pass.leaves.layer.view().get(index(position)).unwrap(),15,"Actual emitted write stays committed after the custom state failure");
   assert_eq!(pass.queues.data.lock().unwrap()[1].iter().copied().collect::<Vec<_>>(),vec![block_pos(12,8,8),17],"Actual callback addition survives and consumed original is never replayed");
   assert_eq!(pass.leaves.calls.iter().filter(|(action,_,_)|*action==STATE).count(),1);
@@ -220,11 +291,56 @@ mod tests {
  #[test]
  fn actual_queue_survives_base_drop_through_each_leaf_and_retires_after_complete_consumer(){
   let queue=Arc::new(Queues::default());let weak=Arc::downgrade(&queue);let position=block_pos(8,8,8);assert_eq!(queue.enqueue(1,position,(DIRECTIONS|FROM_EMISSION|FROM_EMPTY_SHAPE|1)as i64),0);
-  let mut leaves=ActualLeaves{queue:weak.clone(),layer:Layer::new(0),calls:vec![],fail_state:false};let mut pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:None,states:[None;2]};assert_eq!(pass.run(),Ok(1));assert_eq!(pass.leaves.layer.view().get(index(position)).unwrap(),1);assert!(pass.queues.data.lock().unwrap().iter().all(|queue|queue.is_empty()));drop(pass);assert_eq!(weak.strong_count(),0);
+  let mut leaves=ActualLeaves{queue:weak.clone(),layer:Layer::new(0),calls:vec![],fail_state:false};let mut pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:None,states:[None;2],sky:false};assert_eq!(pass.run(),Ok(1));assert_eq!(pass.leaves.layer.view().get(index(position)).unwrap(),1);assert!(pass.queues.data.lock().unwrap().iter().all(|queue|queue.is_empty()));drop(pass);assert_eq!(weak.strong_count(),0);
  }
  #[test]
  fn abandoned_actual_pass_drops_its_only_queue_owner_without_a_vm_leaf(){
-  let queue=Arc::new(Queues::default());let weak=Arc::downgrade(&queue);assert_eq!(queue.enqueue(0,block_pos(8,8,8),15),0);let mut leaves=ActualLeaves{queue:weak.clone(),layer:Layer::new(0),calls:vec![],fail_state:false};let pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:None,states:[None;2]};assert_eq!(weak.strong_count(),1);drop(pass);assert_eq!(weak.strong_count(),0);assert!(leaves.calls.is_empty());
+  let queue=Arc::new(Queues::default());let weak=Arc::downgrade(&queue);assert_eq!(queue.enqueue(0,block_pos(8,8,8),15),0);let mut leaves=ActualLeaves{queue:weak.clone(),layer:Layer::new(0),calls:vec![],fail_state:false};let pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:None,states:[None;2],sky:false};assert_eq!(weak.strong_count(),1);drop(pass);assert_eq!(weak.strong_count(),0);assert!(leaves.calls.is_empty());
+ }
+ #[test]
+ fn actual_sky_failure_keeps_emitted_write_and_live_callback_queue_without_replay(){
+  let queue=Arc::new(Queues::default());let weak=Arc::downgrade(&queue);let position=block_pos(8,24,8);
+  assert_eq!(queue.enqueue(1,position,(512|FROM_EMISSION|FROM_EMPTY_SHAPE|2)as i64),0);
+  let mut leaves=ActualLeaves{queue:weak.clone(),layer:Layer::new(0),calls:vec![],fail_state:true};
+  let mut pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:None,states:[None;2],sky:true};
+  assert_eq!(pass.run(),Err(()));assert_eq!(pass.leaves.layer.view().get(index(position)).unwrap(),2);assert_eq!(pass.leaves.layer.view().get(index(block_pos(9,24,8))).unwrap(),0);
+  assert_eq!(pass.leaves.calls.iter().filter(|(action,_,_)|*action==STATE).count(),1);
+  assert_eq!(pass.queues.data.lock().unwrap()[1].iter().copied().collect::<Vec<_>>(),vec![block_pos(12,8,8),17]);
+  drop(pass);assert_eq!(weak.strong_count(),0,"Actual sky queue retires after the failed original consumer");
+ }
+ struct SkyLayers{queue:Weak<Queues>,layers:std::collections::HashMap<i64,Layer>,writes:Vec<(i64,i32)>}
+ impl Leaves for SkyLayers{
+  fn call(&mut self,action:i32,a:i64,b:i64,_:i64)->Result<i64,()>{
+   assert_eq!(self.queue.strong_count(),1);
+   let key=section_pos(block_x(a)>>4,block_y(a)>>4,block_z(a)>>4);
+   match action{
+    STORED=>Ok(i64::from(self.layers.contains_key(&a))),HAS_BELOW=>Ok(i64::from(a>=0)),
+    READ=>Ok(self.layers.get(&key).unwrap().view().get(index(a)).unwrap()as i64),
+    WRITE=>{self.layers.get(&key).unwrap().set(index(a),b as i32).unwrap();self.writes.push((a,b as i32));Ok(0)},
+    STATE|CLEAR|AIR|OCCLUDES=>Ok(0),OPACITY|EMPTY=>Ok(1),_=>panic!("Unexpected actual sky leaf {action}")
+   }
+  }
+ }
+ fn sky_layers(queue:Weak<Queues>)->SkyLayers{
+  let mut layers=std::collections::HashMap::new();for(x,y,z)in[(0,2,0),(0,0,0),(1,2,0),(1,1,0)]{layers.insert(section_pos(x,y,z),Layer::new(0));}
+  SkyLayers{queue,layers,writes:vec![]}
+ }
+ #[test]
+ fn actual_sky_empty_border_increase_writes_original_descending_cells_and_retires_queue(){
+  let queue=Arc::new(Queues::default());let weak=Arc::downgrade(&queue);let position=block_pos(15,32,8);
+  assert_eq!(queue.enqueue(1,position,(512|FROM_EMISSION|FROM_EMPTY_SHAPE|2)as i64),0);
+  let mut leaves=sky_layers(weak.clone());let mut pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:None,states:[None;2],sky:true};assert_eq!(pass.run(),Ok(1));
+  let expected:Vec<_>=std::iter::once((position,2)).chain(std::iter::once((block_pos(16,32,8),1))).chain((16..32).rev().map(|y|(block_pos(16,y,8),1))).collect();assert_eq!(pass.leaves.writes,expected);
+  let layer=&pass.leaves.layers[&section_pos(1,1,0)];for y in 0..16{assert_eq!(layer.view().get((y<<8)|(8<<4)).unwrap(),1);}
+  drop(pass);assert_eq!(weak.strong_count(),0);
+ }
+ #[test]
+ fn actual_sky_empty_border_decrease_consumes_generated_work_after_original_write_prefix(){
+  let queue=Arc::new(Queues::default());let weak=Arc::downgrade(&queue);let position=block_pos(15,32,8);assert_eq!(queue.enqueue(0,position,512|5),0);
+  let mut leaves=sky_layers(weak.clone());leaves.layers[&section_pos(1,2,0)].set(index(block_pos(16,32,8)),3).unwrap();
+  let mut pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:None,states:[None;2],sky:true};assert_eq!(pass.run(),Ok(18));
+  let expected:Vec<_>=std::iter::once((block_pos(16,32,8),0)).chain((16..32).rev().map(|y|(block_pos(16,y,8),0))).collect();assert_eq!(pass.leaves.writes,expected);assert!(pass.queues.data.lock().unwrap().iter().all(|q|q.is_empty()));
+  drop(pass);assert_eq!(weak.strong_count(),0);
  }
 }
 
@@ -297,7 +413,7 @@ mod primary_state_inputs {
   for invalid in [false,true]{for fail in [false,true]{
    let owner=section();let weak=Arc::downgrade(&owner);
    let mut leaves=Effects{owner:Some(owner),weak:weak.clone(),invalid,fail,calls:vec![]};
-   let mut pass=Pass{queues:Arc::new(Queues::default()),leaves:&mut leaves,input:None,tables:Some(&tables),states:[None;2]};
+   let mut pass=Pass{queues:Arc::new(Queues::default()),leaves:&mut leaves,input:None,tables:Some(&tables),states:[None;2],sky:false};
    assert_eq!(pass.call(STATE,12345,1),if fail{Err(())}else{Ok(0)});
    assert_eq!(pass.leaves.calls,vec![STATE,STATE_FALLBACK],"Never replay the contextual state producer");
    assert_eq!(weak.strong_count(),0);
@@ -308,7 +424,7 @@ mod primary_state_inputs {
  fn native_property_consumer_keeps_original_mixed_shape_facades_and_custom_retirement(){
   struct Effects(Vec<(i32,i64,i64,i64)>);
   impl Leaves for Effects{fn call(&mut self,action:i32,a:i64,b:i64,c:i64)->Result<i64,()>{self.0.push((action,a,b,c));Ok(0)}}
-  let tables=tables();let mut leaves=Effects(vec![]);let queue=Arc::new(Queues::default());let mut pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:Some(&tables),states:[NativeState::from_id(&tables,1),NativeState::from_id(&tables,0)]};
+  let tables=tables();let mut leaves=Effects(vec![]);let queue=Arc::new(Queues::default());let mut pass=Pass{queues:queue,leaves:&mut leaves,input:None,tables:Some(&tables),states:[NativeState::from_id(&tables,1),NativeState::from_id(&tables,0)],sky:false};
   assert_eq!(pass.call(OPACITY,1,0),Ok(1));assert_eq!(pass.call(EMPTY,1,0),Ok(1));assert_eq!(pass.call(EMISSION,0,1),Ok(0));assert_eq!(pass.call(OCCLUDES,2,0),Ok(0));assert!(pass.leaves.0.is_empty());
   pass.states[1]=None;assert_eq!(pass.call(OCCLUDES,3,0),Ok(0));assert_eq!(pass.leaves.0,vec![(OCCLUDES,3,2,0)],"Only the real registered source facade is reconstructed alongside the original custom target");
   pass.call(CLEAR,0,0).unwrap();pass.call(CLEAR,1,0).unwrap();assert_eq!(pass.leaves.0.last(),Some(&(CLEAR,1,0,0)),"Custom states still retire at their original VM boundary");assert_eq!(pass.leaves.0.len(),2);

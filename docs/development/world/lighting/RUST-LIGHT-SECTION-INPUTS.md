@@ -26,12 +26,12 @@ and [temporary bridge](https://github.com/HungLo2020/MattMC/blob/master/src/main
 - Admission remains the existing exact standard section/container/native-owner
   route. Air-counter shortcuts, missing chunks, out-of-height reads and custom
   chunk/palette traversal retain their existing behavior. Unsupported light types
-  still reject through the established input-journal/replay protocol.
+  decline through the input journal before the effectful consumer resumes.
 - Legacy packed/full CPU payloads remain compatibility inputs. No GPU resources,
   renderer/presenter ownership or native GPU handles are involved.
 - The native coordinator owns stock node policy; Java supplies contextual chunk
-  callbacks. Effectful block propagation is being corrected separately; see the
-  [current propagation work](RUST-LIGHT-PROPAGATION.md#effectful-block-propagation-under-development).
+  callbacks. Effectful block and sky propagation are tracked in the
+  [current propagation work](RUST-LIGHT-PROPAGATION.md).
 
 ## Verify changes
 

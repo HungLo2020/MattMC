@@ -10,11 +10,15 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.NativeLightBlocks;
 
-/** Original VM leaves; Rust owns the complete queue/direction/commit policy. */
+/** Original VM leaves for the native block and sky queue policies. */
 final class NativeBlockPropagation {
     private static final MethodHandle RUN=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_light_block_run_effects",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final MethodHandle CONNECTED=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_light_block_run_connected_effects",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+    private static final MethodHandle SKY_RUN=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_light_sky_run_effects",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
+    private static final MethodHandle SKY_CONNECTED=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_light_sky_run_connected_effects",
         FunctionDescriptor.of(ValueLayout.JAVA_INT,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS,ValueLayout.ADDRESS));
     private static final ThreadLocal<Invocation> CURRENT=new ThreadLocal<>();
     private static final MethodHandle CAPTURE=NativeLibraryLoader.downcallHandle("mattmc_rust","mattmc_light_block_capture_state",
@@ -27,19 +31,21 @@ final class NativeBlockPropagation {
         }catch(ReflectiveOperationException failure){throw new ExceptionInInitializerError(failure);}
     }
     private static final class Invocation {
-        final BlockLightEngine engine;final BlockState[] states=new BlockState[2];Throwable failure;
+        final LightEngine<?,?> engine;final BlockState[] states=new BlockState[2];Throwable failure;
         final NativeLightBlocks.NodeLease input=new NativeLightBlocks.NodeLease();
-        Invocation(BlockLightEngine engine){this.engine=engine;}
+        Invocation(LightEngine<?,?> engine){this.engine=engine;}
     }
     @SuppressWarnings("unchecked")private static <T extends Throwable> RuntimeException exact(Throwable failure)throws T{throw(T)failure;}
-    static int run(BlockLightEngine engine,NativeLightQueues queues){
+    static int run(LightEngine<?,?> engine,NativeLightQueues queues){
         var call=new Invocation(engine);var previous=CURRENT.get();CURRENT.set(call);
         try(Arena arena=Arena.ofConfined()){
             var output=arena.allocate(ValueLayout.JAVA_LONG);int status;
-            try{status=engine.lightCoordinator==null?(int)RUN.invokeExact(queues.ownerForNativeCall(),LEAF,output):
-                (int)CONNECTED.invokeExact(queues.ownerForNativeCall(),engine.lightCoordinator.bindingForPropagation(),LEAF,output);}catch(Throwable failure){throw exact(failure);}
+            boolean sky=engine instanceof SkyLightEngine;
+            MethodHandle run=sky?SKY_RUN:RUN,connected=sky?SKY_CONNECTED:CONNECTED;
+            try{status=engine.lightCoordinator==null?(int)run.invokeExact(queues.ownerForNativeCall(),LEAF,output):
+                (int)connected.invokeExact(queues.ownerForNativeCall(),engine.lightCoordinator.bindingForPropagation(),LEAF,output);}catch(Throwable failure){throw exact(failure);}
             if(call.failure!=null)throw exact(call.failure);
-            if(status!=0)throw new IllegalStateException("Native block propagation effects failed: "+status);
+            if(status!=0)throw new IllegalStateException("Native light propagation effects failed: "+status);
             return(int)output.get(ValueLayout.JAVA_LONG,0);
         }finally{call.states[0]=null;call.states[1]=null;if(previous==null)CURRENT.remove();else CURRENT.set(previous);Reference.reachabilityFence(queues);Reference.reachabilityFence(engine);}
     }
@@ -55,7 +61,7 @@ final class NativeBlockPropagation {
                     BlockState state;
                     if(c!=0){
                         try{
-                            state=engine.stateForNativeNode(a,call.input);
+                            state=engine instanceof BlockLightEngine block?block.stateForNativeNode(a,call.input):((SkyLightEngine)engine).stateForNativeNode(a,call.input);
                             if(call.input.hasOwner()){
                                 int captured=(int)CAPTURE.invokeExact(MemorySegment.ofAddress(c),call.input.pointer(),call.input.index());
                                 if(captured==1){call.states[(int)b]=null;yield -1;}
@@ -63,7 +69,7 @@ final class NativeBlockPropagation {
                                 state=call.input.compatibility();
                             }
                         }finally{call.input.clear();}
-                    }else state=engine.stateForNativePropagation(a);
+                    }else state=engine instanceof BlockLightEngine block?block.stateForNativePropagation(a):((SkyLightEngine)engine).stateForNativePropagation(a);
                     call.states[(int)b]=state;
                     yield state!=null&&state.getClass()==BlockState.class?Block.BLOCK_STATE_REGISTRY.getId(state):-1;
                 }
@@ -83,10 +89,11 @@ final class NativeBlockPropagation {
                 case 11->{engine.lightCoordinator.refreshPropagationEntries(a,b);yield 0;}
                 case 12->{NativeLightCoordinator.checkEffectStatus((int)a,MemorySegment.ofArray(new long[]{b,c}));throw new AssertionError("Missing native storage error");}
                 case 13->{
-                    BlockState state=engine.stateAfterNativeInvalidation(a);
+                    BlockState state=engine instanceof BlockLightEngine block?block.stateAfterNativeInvalidation(a):((SkyLightEngine)engine).stateAfterNativeInvalidation(a);
                     call.states[(int)b]=state;
                     yield state.getClass()==BlockState.class?Block.BLOCK_STATE_REGISTRY.getId(state):-1;
                 }
+                case 14->((SkyLightEngine)engine).storage.hasLightDataAtOrBelow((int)a)?1:0;
                 default->throw new IllegalStateException("Unknown native block propagation leaf: "+action);
             };
         }catch(Throwable failure){call.failure=failure;return Long.MIN_VALUE;}

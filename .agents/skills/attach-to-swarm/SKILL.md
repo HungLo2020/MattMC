@@ -194,12 +194,20 @@ new assignment revision before changing shared interfaces or widening scope.
   Reuse exact existing evidence only with recorded impact checks establishing
   that its tested scope, dependencies, configuration and fixtures are unchanged;
   do not relabel an earlier run as testing a new candidate.
-- Exercise real production ownership and dangerous contracts in focused checks
-  before freezing for broad final tiers, including immediate/pending/later
-  consumers, callbacks, aliases, reentry, failure and retirement. Do not launch
-  broad campaigns merely because a prototype compiles. Run required stable final
-  correctness tiers at coherent publication checkpoints; rerun affected checks
-  after changes/sync, reuse verified unchanged evidence and preserve failures.
+- Apply [owner-scoped validation policy406](https://github.com/HungLo2020/MattMC/discussions/890#discussioncomment-19008322)
+  to normal coherent checkpoints: test touched behavior and dependents, actual
+  ownership, callbacks, aliases, reentry, errors, retirement and save integrity
+  where affected; include shared item observers and hopper/integration checks
+  when relevant, plus one representative resource screen. Aim for a focused
+  15–20 minute cycle; elapsed time is not a pass and necessary correctness
+  evidence cannot be skipped to meet it. Record exact tested identities, impact
+  analysis, results and NOTRUN tiers with reasons. Reuse demonstrably unchanged
+  evidence and rerun affected checks after fixes or sync.
+  Reserve full Rust/Java/parity/slow suites for deliberate major integration
+  points, final subsystem acceptance, or demonstrated cross-system risk. Do not
+  classify every commit as major integration. Stop obsolete routine broad
+  campaigns safely, preserving partial and negative results. This policy keeps
+  known correctness holds and final Frozen/hardware targets intact.
 - Apply the [migration acceptance policy](../../../docs/development/tooling/MIGRATION-ACCEPTANCE.md)
   and [owner policy317](https://github.com/HungLo2020/MattMC/discussions/888#discussioncomment-18984771).
   **Intermediate increments** need a short trustworthy representative
@@ -209,7 +217,8 @@ new assignment revision before changing shared interfaces or widening scope.
   per-row causal attribution and a coordinator exception turn for ordinary
   temporary migration overhead are not publication prerequisites. Stop remaining
   optional performance-only jobs at safe boundaries once the screen is adequate;
-  never interrupt valid correctness work or discard completed/negative evidence.
+  preserve necessary correctness work and all completed/negative evidence;
+  policy406 permits safely stopping obsolete routine broad campaigns.
   A noisy/inconclusive screen is not a pass. Investigate material unexpected
   regressions, hangs, runaway allocation/retention and unusable behavior, recording
   worker judgement and evidence rather than assuming all cost is unavoidable.

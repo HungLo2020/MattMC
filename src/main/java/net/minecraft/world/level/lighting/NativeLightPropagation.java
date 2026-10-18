@@ -23,8 +23,8 @@ import org.jetbrains.annotations.Nullable;
  * run in {@code world/level/lighting/propagation/}. Sections reach Rust
  * through a callback on first use on the silent bulk route. Effectful block
  * inputs instead use the actual live queue and retained storage policy, with
- * original VM leaves and immediate committed prefixes. Sky compatibility keeps
- * its existing input journal and Java replay. */
+ * original VM leaves and immediate committed prefixes. Effectful sky inputs
+ * use that ownership with the original empty-section traversal. */
 final class NativeLightPropagation {
     private static final MethodHandle TABLES_CREATE = NativeLibraryLoader.downcallHandle("mattmc_rust", "mattmc_light_tables_create",
         FunctionDescriptor.of(ValueLayout.JAVA_LONG));
@@ -240,9 +240,9 @@ final class NativeLightPropagation {
     int run(LayerLightSectionStorage<?> storage, NativeLightQueues queues) {
         if (this.running || !enabled || Tables.HANDLE == 0) return -1;
         if (queues.isEmpty(0) && queues.isEmpty(1)) return 0;
-        if (!this.sky && this.engine.chunkSource.getClass()!=net.minecraft.server.level.ServerChunkCache.class
+        if (this.engine.chunkSource.getClass()!=net.minecraft.server.level.ServerChunkCache.class
             && this.engine.chunkSource.getClass()!=net.minecraft.client.multiplayer.ClientChunkCache.class) {
-            int result=NativeBlockPropagation.run((BlockLightEngine)this.engine,queues);
+            int result=NativeBlockPropagation.run(this.engine,queues);
             PASSES.incrementAndGet();
             return result;
         }
@@ -283,12 +283,9 @@ final class NativeLightPropagation {
             if (status == -1) throw new IllegalStateException("Native light propagation rejected its input");
             // Rust restores original inputs after any callback additions before replay.
             REJECTED.incrementAndGet();
-            if(!this.sky){
-                int processed=NativeBlockPropagation.run((BlockLightEngine)this.engine,queues);
-                PASSES.incrementAndGet();
-                return processed;
-            }
-            return -1;
+            int processed=NativeBlockPropagation.run(this.engine,queues);
+            PASSES.incrementAndGet();
+            return processed;
         }
         long processed = this.out.getAtIndex(ValueLayout.JAVA_LONG, 0);
         int written = (int)this.out.getAtIndex(ValueLayout.JAVA_LONG, 1);
@@ -364,8 +361,7 @@ final class NativeLightPropagation {
             }
             int x = SectionPos.x(section), z = SectionPos.z(section);
             var chunk=current.engine.chunkSource.getChunkForLighting(x,z);
-            return current.sky?NativeLightBlocks.blocks(chunk,x,SectionPos.y(section),z,buffer,current.borrowedBlocks):
-                NativeLightBlocks.blocksForPropagation(chunk,x,SectionPos.y(section),z,buffer,current.borrowedBlocks);
+            return NativeLightBlocks.blocksForPropagation(chunk,x,SectionPos.y(section),z,buffer,current.borrowedBlocks);
         } catch (Throwable error) {
             return -2;
         }
