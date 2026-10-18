@@ -1439,9 +1439,9 @@ tasks.register('clientDist') {
         // Note: No run/mods directory needed - everything in ONE JAR!
         // Note: No run/assets directory needed - assets loaded from JAR!
         
-        // Create directory structure for server
-        file("${distDir}/server").mkdirs()
-        file("${distDir}/server/run").mkdirs()
+        // The dedicated server's working directory (world, server.properties)
+        // is persistent runtime data, so it lives under run/ with the rest.
+        file("${distDir}/run/server").mkdirs()
         
         // Copy the ONE JAR containing everything
         copy {
@@ -1516,8 +1516,8 @@ tasks.register('clientDist') {
                 
                 // Determine if this is a client or server script
                 if (scriptFile.name.startsWith('run-server')) {
-                    // Server script - place in server directory
-                    def linuxScript = file("${distDir}/server/${scriptFile.name}")
+                    // Server script - place in the server's run/server working directory
+                    def linuxScript = file("${distDir}/run/server/${scriptFile.name}")
                     linuxScript.text = linuxScriptTemplate
                         .replace('@VERSION@', version)
                     linuxScript.setExecutable(true)
@@ -1534,8 +1534,8 @@ tasks.register('clientDist') {
                 
                 // Determine if this is a client or server script
                 if (scriptFile.name.startsWith('run-server')) {
-                    // Server script - place in server directory
-                    def windowsScript = file("${distDir}/server/${scriptFile.name}")
+                    // Server script - place in the server's run/server working directory
+                    def windowsScript = file("${distDir}/run/server/${scriptFile.name}")
                     windowsScript.text = windowsScriptTemplate
                         .replace('@VERSION@', version)
                 } else {
@@ -1556,7 +1556,7 @@ tasks.register('clientDist') {
                 if (scriptFile.name == 'SERVER-README.md') {
                     copy {
                         from scriptFile
-                        into "${distDir}/server"
+                        into "${distDir}/run/server"
                         rename { 'README.md' }
                     }
                 } else {
@@ -1568,7 +1568,7 @@ tasks.register('clientDist') {
             }
         }
         
-        println "✅ Server files created in ${distDir}/server"
+        println "✅ Server files created in ${distDir}/run/server"
     }
 }
 

@@ -10,5 +10,6 @@ for commands and prerequisites.
 - [Interim migration acceptance](MIGRATION-ACCEPTANCE.md): Frozen comparison allowances, local correctness and rolling desktop client checks.
 - [Running tests quickly](TESTING.md): affected-test runs, Rust `suite` profile, Java `test`/`parityTest`/`slowTest` tiers, forks, cached Rust tests and memory-protected runs.
 - [Native builds and running clients](NATIVE-BUILDS.md): atomic library staging, shared-build constraints and isolated verification.
+- [Packaged install](PACKAGING.md): release layout, update/install rules, run/-only sync, backup and the packaging script test.
 - [Shared Agent Skills](AGENT-SKILLS.md): skill locations, invocation, and maintaining shared skills.
 - [DH task admission and cancellation](DH-TASK-SCHEDULING.md): rejected-task retries, completion ownership, shutdown and native-resource cleanup.

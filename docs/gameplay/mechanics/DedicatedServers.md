@@ -5,9 +5,9 @@ Use a dedicated server when the world should run in its own process. For sharing
 ## Choose an existing launch route
 
 - **Prepared development checkout:** from the repository root, use `./gradlew runServer`, or `gradlew.bat runServer` on Windows. It opens the headless dedicated server with console input. Project preparation belongs in the [README Quick Start][quick-start]; `DevUtils/RunDev.py` launches the client. [Development task][dev-launch] · [RunDev target][run-dev]
-- **Already exported distribution:** its server launchers are `MattMC/server/run-server.sh` and `MattMC/server/run-server.bat`. They start the headless server and depend on the matching bundled JDK, libraries and natives elsewhere in the same MattMC folder. Keep that distribution together. The scripts do not forward extra arguments supplied after their names. [Distribution layout][dist-layout] · [Launcher placement][dist-scripts] · [Shell launcher][shell-launch] · [Windows launcher][windows-launch]
+- **Installed or exported game:** its server launchers are `MattMC/run/server/run-server.sh` and `MattMC/run/server/run-server.bat`. They start the headless server and depend on the bundled JDK in `MattMC/run/jdk/` and the libraries and natives in the same MattMC folder. Keep that folder together. The scripts do not forward extra arguments supplied after their names. [Distribution layout][dist-layout] · [Launcher placement][dist-scripts] · [Shell launcher][shell-launch] · [Windows launcher][windows-launch]
 
-These routes are verified from source definitions; no built distribution was inspected or launched for this guide. The Java-based packaging is transitional. The [architecture target](../../development/PROJECT-ARCHITECTURE.md) is one Rust executable supporting client and dedicated-server modes, at most one separately loaded Rust library, and no Java. [Target definition][architecture]
+These routes are verified from source definitions and, for the installed layout, one built distribution. The Java-based packaging is transitional. The [architecture target](../../development/PROJECT-ARCHITECTURE.md) is one Rust executable supporting client and dedicated-server modes, at most one separately loaded Rust library, and no Java. [Target definition][architecture]
 
 ## Find the actual world and configuration
 
@@ -16,11 +16,11 @@ The working directory determines where `server.properties` and the default world
 | Launch route | Server properties | World folder |
 | --- | --- | --- |
 | Development `runServer` | `<repository>/run/server.properties` | `<repository>/run/world` |
-| Exported server script | `<MattMC>/server/server.properties` | `<MattMC>/server/world` |
+| Installed server script | `<MattMC>/run/server/server.properties` | `<MattMC>/run/server/world` |
 
 [Development directory][dev-launch] · [Shell directory][shell-directory] · [Windows directory][windows-directory] · [Settings and world selection][main-paths] · [Default name][properties] · [World path resolution][world-path]
 
-The exported scripts run inside `server/`, even though the packaging README describes `server/run/`. Use the launcher-derived locations above for these unchanged scripts. [Packaging README][packaging-readme] · [Shell directory][shell-directory] · [Windows directory][windows-directory]
+Because the server lives inside `MattMC/run/`, game updates keep its world and settings (they only replace the launchers and server README there), and Sync Up/Down carries it along with the rest of `run/`. Older installs kept the server in `MattMC/server/`; move that folder's contents into `MattMC/run/server/` yourself to keep using that world. [Packaging README][packaging-readme] · [Shell directory][shell-directory] · [Windows directory][windows-directory]
 
 A custom launch can change the world base with `--universe` and select a world with `--world`; otherwise `level-name` selects it. The default base is the working directory (`.`). Those world options do not move `server.properties`. The exported scripts do not expose argument forwarding, so appending those options to a script is not a supported recipe here. [World options][world-options] · [Settings and selection][main-paths] · [Shell launch arguments][shell-launch] · [Windows launch arguments][windows-launch]
 
@@ -50,7 +50,7 @@ For view/simulation distance and the empty-server pause setting, see [Ticks and 
 
 ## Sources and verification
 
-Source-reviewed on **2026-10-04** at `9bafc14d2e2943dcfe8a37e9e81dc001386b88bb`; the architecture target is cited at documentation commit `d723254d406f300bdcf2579d39dfd5a433e43869`. Command names, property keys and launcher filenames retain their source spelling.
+Source-reviewed on **2026-10-04** at `9bafc14d2e2943dcfe8a37e9e81dc001386b88bb`. The server location moved to `run/server/` on **2026-10-17**; that layout was checked by building the distribution and starting its server launcher, which created `server.properties` and `world/` in `run/server/`. The architecture target is cited at documentation commit `d723254d406f300bdcf2579d39dfd5a433e43869`. Command names, property keys and launcher filenames retain their source spelling.
 
 Verification did not launch a game/server, build or export a game distribution, or execute an administrative server command. No built archive, connection, successful disk write, backup copy, restoration or crash recovery was tested. This page establishes source-derived behavior, not a public-hosting or security configuration guide.
 
@@ -59,19 +59,19 @@ Related: [Local worlds](LocalWorlds.md) · [Multiplayer and LAN](MultiplayerAndL
 [quick-start]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/README.md#L21-L24
 [dev-launch]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/build.gradle#L863-L889
 [run-dev]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/DevUtils/RunDev.py#L126-L142
-[dist-layout]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/build.gradle#L1345-L1415
-[dist-scripts]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/build.gradle#L1429-L1470
-[shell-directory]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/packaging/run-server.sh#L8-L10
-[windows-directory]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/packaging/run-server.bat#L9-L28
-[shell-launch]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/packaging/run-server.sh#L39-L92
-[windows-launch]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/packaging/run-server.bat#L44-L69
+[dist-layout]: https://github.com/HungLo2020/MattMC/blob/master/build.gradle
+[dist-scripts]: https://github.com/HungLo2020/MattMC/blob/master/build.gradle
+[shell-directory]: https://github.com/HungLo2020/MattMC/blob/master/packaging/run-server.sh
+[windows-directory]: https://github.com/HungLo2020/MattMC/blob/master/packaging/run-server.bat
+[shell-launch]: https://github.com/HungLo2020/MattMC/blob/master/packaging/run-server.sh
+[windows-launch]: https://github.com/HungLo2020/MattMC/blob/master/packaging/run-server.bat
 [architecture]: https://github.com/HungLo2020/MattMC/blob/d723254d406f300bdcf2579d39dfd5a433e43869/docs/development/PROJECT-ARCHITECTURE.md#L1-L5
 [world-options]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/server/Main.java#L130-L132
 [main-paths]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/server/Main.java#L158-L171
 [properties]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/server/dedicated/DedicatedServerProperties.java#L54-L70
 [player-limit]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/server/dedicated/DedicatedServerProperties.java#L85-L95
 [world-path]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/world/level/storage/LevelStorageSource.java#L363-L383
-[packaging-readme]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/packaging/SERVER-README.md#L17-L34
+[packaging-readme]: https://github.com/HungLo2020/MattMC/blob/master/packaging/SERVER-README.md
 [list-paths]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/server/players/PlayerList.java#L101-L105
 [console-input]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java#L202-L218
 [console-dispatch]: https://github.com/HungLo2020/MattMC/blob/9bafc14d2e2943dcfe8a37e9e81dc001386b88bb/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java#L464-L479

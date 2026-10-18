@@ -1,6 +1,8 @@
 # MattMC Server
 
-This directory contains the server build for MattMC.
+This directory (`MattMC/run/server/`) contains the dedicated server launchers and
+is the server's working directory: `server.properties`, the world and the
+access lists are created here.
 
 ## Running the Server
 
@@ -14,12 +16,6 @@ This directory contains the server build for MattMC.
 run-server.bat
 ```
 
-## Server Configuration
-
-The server uses the same JAR files as the client, located in the `../lib` directory.
-
-Server files and world data are stored in the `run/` subdirectory.
-
 ## Server Settings
 
 - **Memory Allocation**: 2GB (default)
@@ -29,6 +25,7 @@ Server files and world data are stored in the `run/` subdirectory.
 
 ## Notes
 
-- The server shares the bundled JDK with the client (located at `../run/jdk/<platform>/`)
-- All dependencies are shared with the client in the `../lib/` directory
-- Server runtime files are isolated in the `server/run/` directory
+- The server shares the bundled JDK with the client (`MattMC/run/jdk/<platform>/`)
+  and its libraries and natives (`MattMC/lib/`, `MattMC/natives/`).
+- Updates replace these launchers and this README; your server data here is kept.
+- Sync Up/Down covers everything in `MattMC/run/`, including this server directory.

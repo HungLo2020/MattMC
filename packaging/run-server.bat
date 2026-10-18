@@ -6,15 +6,19 @@ REM Java version used in this distribution
 REM Note: Hardcoded because gradle.properties is not included in distributions
 set JAVA_VERSION=25
 
-REM Get the directory containing this script (should be in server directory)
+REM This script lives in MattMC\run\server, which is also the server's working
+REM directory: server.properties and the world are created here.
 cd /d "%~dp0"
 set SCRIPT_DIR=%CD%
+REM The install root holds lib\ and natives\; run\ holds the bundled JDK.
+for %%I in ("%SCRIPT_DIR%\..") do set "RUN_DIR=%%~fI"
+for %%I in ("%SCRIPT_DIR%\..\..") do set "INSTALL_DIR=%%~fI"
 
 REM Prefer bundled platform-specific JDK in distribution
 set "JAVA_CMD="
 for %%J in (
-    "%SCRIPT_DIR%\..\run\jdk\win-x64\bin\java.exe"
-    "%SCRIPT_DIR%\..\run\jdk\win-aarch64\bin\java.exe"
+    "%RUN_DIR%\jdk\win-x64\bin\java.exe"
+    "%RUN_DIR%\jdk\win-aarch64\bin\java.exe"
 ) do (
     if not defined JAVA_CMD if exist %%~J set "JAVA_CMD=%%~J"
 )
@@ -22,8 +26,8 @@ for %%J in (
 if not defined JAVA_CMD (
     echo Error: Bundled JDK not found.
     echo Expected one of:
-    echo   %SCRIPT_DIR%\..\run\jdk\win-x64\bin\java.exe
-    echo   %SCRIPT_DIR%\..\run\jdk\win-aarch64\bin\java.exe
+    echo   %RUN_DIR%\jdk\win-x64\bin\java.exe
+    echo   %RUN_DIR%\jdk\win-aarch64\bin\java.exe
     exit /b 1
 )
 
@@ -41,9 +45,9 @@ if not defined JAVA_OK (
 
 echo Using bundled JDK: %JAVA_CMD%
 
-REM Build classpath dynamically from all jars in ..\lib so mixed-platform native jars are safe.
+REM Build classpath dynamically from all jars in lib\ so mixed-platform native jars are safe.
 set "CLASSPATH="
-for %%F in ("%SCRIPT_DIR%\..\lib\*.jar") do (
+for %%F in ("%INSTALL_DIR%\lib\*.jar") do (
     if not defined CLASSPATH (
         set "CLASSPATH=%%~fF"
     ) else (
@@ -52,7 +56,7 @@ for %%F in ("%SCRIPT_DIR%\..\lib\*.jar") do (
 )
 
 if not defined CLASSPATH (
-    echo Error: no JAR files found in %SCRIPT_DIR%\..\lib
+    echo Error: no JAR files found in %INSTALL_DIR%\lib
     exit /b 1
 )
 
@@ -63,7 +67,7 @@ REM Remove --nogui to run with GUI
     -XX:+UseZGC ^
     -XX:+UseCompactObjectHeaders ^
     --enable-native-access=ALL-UNNAMED ^
-    -Dmattmc.rust.natives.dir="%SCRIPT_DIR%\..\natives" ^
+    -Dmattmc.rust.natives.dir="%INSTALL_DIR%\natives" ^
     -cp "!CLASSPATH!" ^
     net.minecraft.server.Main ^
     --nogui

@@ -192,7 +192,7 @@ def main() -> int:
     print("  run-mattmc.bat" if platform_name == "windows" else "  ./run-mattmc.sh")
     print("")
     print("To run the server:")
-    print(f"  cd {downloads_dir / PROJECT_NAME / 'server'}")
+    print(f"  cd {downloads_dir / PROJECT_NAME / 'run' / 'server'}")
     print("  run-server.bat" if platform_name == "windows" else "  ./run-server.sh")
     print("")
 

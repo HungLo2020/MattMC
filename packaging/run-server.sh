@@ -5,11 +5,15 @@
 # Note: Hardcoded because gradle.properties is not included in distributions
 JAVA_VERSION=25
 
-# Get the directory containing this script (should be in server directory)
+# This script lives in MattMC/run/server, which is also the server's working
+# directory: server.properties and the world are created here.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
+# The install root holds lib/ and natives/; run/ holds the bundled JDK.
+INSTALL_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+RUN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Require bundled platform-specific JDK - located in parent run directory
+# Require bundled platform-specific JDK in run/jdk
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 
@@ -36,10 +40,10 @@ else
     exit 1
 fi
 
-BUNDLED_JAVA="${SCRIPT_DIR}/../run/jdk/${PLATFORM}/bin/java"
+BUNDLED_JAVA="${RUN_DIR}/jdk/${PLATFORM}/bin/java"
 if [[ ! -f "$BUNDLED_JAVA" ]]; then
     echo "Error: Bundled JDK not found at: $BUNDLED_JAVA"
-    echo "Please ensure the distribution includes ../run/jdk/${PLATFORM}."
+    echo "Please ensure the distribution includes run/jdk/${PLATFORM}."
     exit 1
 fi
 
@@ -54,9 +58,9 @@ fi
 JAVA_CMD="$BUNDLED_JAVA"
 echo "Using bundled JDK ${JAVA_VERSION} (${PLATFORM})"
 
-# Build classpath dynamically from all jars in ../lib so mixed-platform native jars are safe.
+# Build classpath dynamically from all jars in lib/ so mixed-platform native jars are safe.
 CLASSPATH=""
-for jar in "$SCRIPT_DIR"/../lib/*.jar; do
+for jar in "$INSTALL_DIR"/lib/*.jar; do
     if [[ -f "$jar" ]]; then
         if [[ -z "$CLASSPATH" ]]; then
             CLASSPATH="$jar"
@@ -67,7 +71,7 @@ for jar in "$SCRIPT_DIR"/../lib/*.jar; do
 done
 
 if [[ -z "$CLASSPATH" ]]; then
-    echo "Error: no JAR files found in $SCRIPT_DIR/../lib"
+    echo "Error: no JAR files found in $INSTALL_DIR/lib"
     exit 1
 fi
 
@@ -86,7 +90,7 @@ fi
 
 $JAVA_CMD $JVM_ARGS \
     --enable-native-access=ALL-UNNAMED \
-    -Dmattmc.rust.natives.dir="$SCRIPT_DIR/../natives" \
+    -Dmattmc.rust.natives.dir="$INSTALL_DIR/natives" \
     -cp "$CLASSPATH" \
     net.minecraft.server.Main \
     --nogui

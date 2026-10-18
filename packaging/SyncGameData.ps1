@@ -30,7 +30,13 @@ function Resolve-RemoteSyncRoot {
 }
 
 $remoteSyncRootResolved = Resolve-RemoteSyncRoot -ExplicitRoot $RemoteSyncRoot
-$remoteDir = Join-Path $remoteSyncRootResolved $localName
+
+# Only MattMC\run is synchronized: worlds, settings, shader packs and the
+# dedicated server (run\server). The bundled JDK (run\jdk) is replaced by
+# updates instead and is never synced. Application files outside run\ are
+# never touched in either direction.
+$localRunDir = Join-Path $localDir 'run'
+$remoteRunDir = Join-Path (Join-Path $remoteSyncRootResolved $localName) 'run'
 
 function Invoke-RobocopySync {
     param(
@@ -38,10 +44,8 @@ function Invoke-RobocopySync {
         [string]$Destination
     )
 
-    $destinationLib = Join-Path $Destination 'lib'
-    $destinationRunJdk = Join-Path $Destination 'run\jdk'
-
-    # Pass 1: Mirror everything except lib/ (deletes enabled)
+    # Mirror one run tree onto the other (deletes enabled). Excluding jdk on
+    # both sides keeps it out of the copy and out of the purge.
     $robocopyArgs = @(
         $Source,
         $Destination,
@@ -53,8 +57,8 @@ function Invoke-RobocopySync {
         '/XJ',
         '/FFT',
         '/XD',
-        $destinationLib,
-        $destinationRunJdk,
+        (Join-Path $Source 'jdk'),
+        (Join-Path $Destination 'jdk'),
         '/NP'
     )
 
@@ -64,84 +68,42 @@ function Invoke-RobocopySync {
     if ($exitCode -ge 8) {
         throw "robocopy failed with exit code $exitCode"
     }
-
-    # Pass 2: Sync lib/ content without delete/purge (adds + overwrites only)
-    $sourceLib = Join-Path $Source 'lib'
-    if (Test-Path -LiteralPath $sourceLib) {
-        $robocopyLibArgs = @(
-            $sourceLib,
-            $destinationLib,
-            '/E',
-            '/COPY:DAT',
-            '/DCOPY:DAT',
-            '/R:2',
-            '/W:2',
-            '/XJ',
-            '/FFT',
-            '/NP'
-        )
-
-        & robocopy @robocopyLibArgs | Out-Host
-        $libExitCode = $LASTEXITCODE
-
-        if ($libExitCode -ge 8) {
-            throw "robocopy lib sync failed with exit code $libExitCode"
-        }
-    }
-
-    # Pass 3: Sync run/jdk content without delete/purge (adds + overwrites only)
-    $sourceRunJdk = Join-Path $Source 'run\jdk'
-    if (Test-Path -LiteralPath $sourceRunJdk) {
-        $robocopyRunJdkArgs = @(
-            $sourceRunJdk,
-            $destinationRunJdk,
-            '/E',
-            '/COPY:DAT',
-            '/DCOPY:DAT',
-            '/R:2',
-            '/W:2',
-            '/XJ',
-            '/FFT',
-            '/NP'
-        )
-
-        & robocopy @robocopyRunJdkArgs | Out-Host
-        $runJdkExitCode = $LASTEXITCODE
-
-        if ($runJdkExitCode -ge 8) {
-            throw "robocopy run/jdk sync failed with exit code $runJdkExitCode"
-        }
-    }
 }
 
 function Sync-Up {
-    if (-not (Test-Path -LiteralPath $remoteDir)) {
-        New-Item -ItemType Directory -Path $remoteDir -Force | Out-Null
+    if (-not (Test-Path -LiteralPath $localRunDir)) {
+        throw "Local run directory does not exist: $localRunDir"
+    }
+    if (-not (Test-Path -LiteralPath $remoteRunDir)) {
+        New-Item -ItemType Directory -Path $remoteRunDir -Force | Out-Null
     }
 
     Write-Host "Sync direction: up"
     Write-Host "Local  -> Remote"
-    Write-Host "From: $localDir"
-    Write-Host "To:   $remoteDir"
+    Write-Host "From: $localRunDir"
+    Write-Host "To:   $remoteRunDir"
 
-    Invoke-RobocopySync -Source $localDir -Destination $remoteDir
+    Invoke-RobocopySync -Source $localRunDir -Destination $remoteRunDir
 
-    Write-Host "Done. Remote mirrored from local (deletes enabled except destination lib/ and run/jdk/)."
+    Write-Host "Done. Remote run mirrored from local (deletes enabled, run\jdk excluded)."
 }
 
 function Sync-Down {
-    if (-not (Test-Path -LiteralPath $remoteDir)) {
-        throw "Remote directory does not exist: $remoteDir"
+    if (-not (Test-Path -LiteralPath $remoteRunDir)) {
+        throw "Remote run directory does not exist: $remoteRunDir"
+    }
+    if (-not (Test-Path -LiteralPath $localRunDir)) {
+        New-Item -ItemType Directory -Path $localRunDir -Force | Out-Null
     }
 
     Write-Host "Sync direction: down"
     Write-Host "Remote -> Local"
-    Write-Host "From: $remoteDir"
-    Write-Host "To:   $localDir"
+    Write-Host "From: $remoteRunDir"
+    Write-Host "To:   $localRunDir"
 
-    Invoke-RobocopySync -Source $remoteDir -Destination $localDir
+    Invoke-RobocopySync -Source $remoteRunDir -Destination $localRunDir
 
-    Write-Host "Done. Local mirrored from remote (deletes enabled except destination lib/ and run/jdk/)."
+    Write-Host "Done. Local run mirrored from remote (deletes enabled, run\jdk excluded)."
 }
 
 function Main {

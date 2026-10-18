@@ -183,7 +183,8 @@ def main() -> int:
     gradle = gradle_command(root, platform_name)
     lib_dir = install_root / "lib"
     natives_dir = install_root / "natives"
-    server_dir = install_root / "server"
+    # The dedicated server lives in run/server (its launchers and working directory).
+    server_dir = install_root / "run" / "server"
     packaging_dir = root / "packaging"
     built_natives_dir = root / "build" / "rust" / "native"
 

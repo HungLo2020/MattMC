@@ -115,6 +115,15 @@ function Get-PayloadRoot {
     throw "Unable to find MattMC payload root inside downloaded archive."
 }
 
+# Release contents fall into three groups:
+# - lib\ and natives\ are application files: replaced wholesale, so files a
+#   release dropped (for example an upgraded dependency's old jar, which the
+#   launchers would otherwise still put on the classpath) are removed.
+# - run\ holds persistent data (worlds, settings, run\server) and is merged:
+#   files the release ships there (bundled shader pack, server launchers) are
+#   overwritten and everything else is kept. run\jdk is the exception: the
+#   bundled JDK is replaced wholesale.
+# - Everything else (launch, sync, backup scripts) is overwritten in place.
 function Copy-UpdatePayload {
     param(
         [string]$SourceRoot,
@@ -122,6 +131,18 @@ function Copy-UpdatePayload {
     )
 
     Get-ChildItem -LiteralPath $SourceRoot -Force | ForEach-Object {
+        $destinationItem = Join-Path $DestinationRoot $_.Name
+        if ($_.Name -in @('lib', 'natives')) {
+            if (Test-Path -LiteralPath $destinationItem) {
+                Remove-Item -LiteralPath $destinationItem -Recurse -Force
+            }
+        }
+        elseif ($_.Name -eq 'run') {
+            $destinationJdk = Join-Path $destinationItem 'jdk'
+            if ((Test-Path -LiteralPath (Join-Path $_.FullName 'jdk')) -and (Test-Path -LiteralPath $destinationJdk)) {
+                Remove-Item -LiteralPath $destinationJdk -Recurse -Force
+            }
+        }
         Copy-Item -LiteralPath $_.FullName -Destination $DestinationRoot -Recurse -Force
     }
 }

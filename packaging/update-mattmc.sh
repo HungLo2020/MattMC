@@ -2,11 +2,17 @@
 set -euo pipefail
 
 REPO="${MATTMC_REPO:-HungLo2020/MattMC}"
+# Optional local release ZIP to apply instead of downloading the latest release.
+LOCAL_ARCHIVE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --repo)
             REPO="${2:?Missing value for --repo}"
+            shift 2
+            ;;
+        --archive)
+            LOCAL_ARCHIVE="${2:?Missing value for --archive}"
             shift 2
             ;;
         *)
@@ -142,6 +148,15 @@ payload_root() {
     return 1
 }
 
+# Release contents fall into three groups:
+# - lib/ and natives/ are application files: replaced wholesale, so files a
+#   release dropped (for example an upgraded dependency's old jar, which the
+#   launchers would otherwise still put on the classpath) are removed.
+# - run/ holds persistent data (worlds, settings, run/server/) and is merged:
+#   files the release ships there (bundled shader pack, server launchers) are
+#   overwritten and everything else is kept. run/jdk/ is the exception: the
+#   bundled JDK is replaced wholesale.
+# - Everything else (launch, sync, backup scripts) is overwritten in place.
 copy_update_payload() {
     local source_root="$1"
     local destination_root="$2"
@@ -157,9 +172,19 @@ copy_update_payload() {
 
     while IFS= read -r -d '' item; do
         base_name="$(basename "$item")"
-        if [[ "$base_name" == "update-mattmc.sh" ]]; then
-            continue
-        fi
+        case "$base_name" in
+            update-mattmc.sh)
+                continue
+                ;;
+            lib|natives)
+                rm -rf "${destination_root:?}/$base_name"
+                ;;
+            run)
+                if [[ -d "$item/jdk" ]]; then
+                    rm -rf "${destination_root:?}/run/jdk"
+                fi
+                ;;
+        esac
         cp -R "$item" "$destination_root"/
     done < <(find "$source_root" -mindepth 1 -maxdepth 1 -print0)
 
@@ -168,11 +193,8 @@ copy_update_payload() {
     fi
 }
 
-require_command curl
 require_command unzip
 
-PLATFORM="$(detect_platform)"
-API_URL="https://api.github.com/repos/$REPO/releases/latest"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/mattmc-update.XXXXXX")"
 PENDING_UPDATER=""
 
@@ -192,38 +214,52 @@ EXTRACT_DIR="$TMP_ROOT/extract"
 echo "MattMC updater"
 echo "Install: $INSTALL_DIR"
 
-curl -fsSL \
-    -H "Accept: application/vnd.github+json" \
-    -H "User-Agent: MattMC-Updater" \
-    "$API_URL" \
-    -o "$JSON_PATH"
+if [[ -n "$LOCAL_ARCHIVE" ]]; then
+    if [[ ! -f "$LOCAL_ARCHIVE" ]]; then
+        echo "Error: release archive not found: $LOCAL_ARCHIVE" >&2
+        exit 1
+    fi
+    EXPECTED_ASSET_NAME="$(basename "$LOCAL_ARCHIVE")"
+    echo "Applying local release archive: $LOCAL_ARCHIVE"
+    cp -f "$LOCAL_ARCHIVE" "$ZIP_PATH"
+else
+    require_command curl
+    PLATFORM="$(detect_platform)"
+    API_URL="https://api.github.com/repos/$REPO/releases/latest"
 
-LATEST_VERSION="$(json_get_latest_tag "$JSON_PATH")"
-if [[ -z "$LATEST_VERSION" ]]; then
-    echo "Error: unable to read latest release tag from GitHub response." >&2
-    exit 1
+    curl -fsSL \
+        -H "Accept: application/vnd.github+json" \
+        -H "User-Agent: MattMC-Updater" \
+        "$API_URL" \
+        -o "$JSON_PATH"
+
+    LATEST_VERSION="$(json_get_latest_tag "$JSON_PATH")"
+    if [[ -z "$LATEST_VERSION" ]]; then
+        echo "Error: unable to read latest release tag from GitHub response." >&2
+        exit 1
+    fi
+
+    ASSET_INFO="$(select_exact_asset "$JSON_PATH" "$PLATFORM" "$LATEST_VERSION" || true)"
+    if [[ -z "$ASSET_INFO" ]]; then
+        echo "Error: expected exact GitHub release asset not found: MattMC-Client-<version>-$PLATFORM.zip" >&2
+        exit 1
+    fi
+
+    ASSET_URL="$(printf '%s' "$ASSET_INFO" | cut -f1)"
+    LATEST_VERSION="$(printf '%s' "$ASSET_INFO" | cut -f2)"
+    EXPECTED_ASSET_NAME="$(printf '%s' "$ASSET_INFO" | cut -f3)"
+
+    echo "Release: $LATEST_VERSION"
+    echo "Expected asset: $EXPECTED_ASSET_NAME"
+    echo "Downloading: $(basename "$ASSET_URL")"
+
+    curl -fL \
+        -H "User-Agent: MattMC-Updater" \
+        "$ASSET_URL" \
+        -o "$ZIP_PATH"
 fi
-
-ASSET_INFO="$(select_exact_asset "$JSON_PATH" "$PLATFORM" "$LATEST_VERSION" || true)"
-if [[ -z "$ASSET_INFO" ]]; then
-    echo "Error: expected exact GitHub release asset not found: MattMC-Client-<version>-$PLATFORM.zip" >&2
-    exit 1
-fi
-
-ASSET_URL="$(printf '%s' "$ASSET_INFO" | cut -f1)"
-LATEST_VERSION="$(printf '%s' "$ASSET_INFO" | cut -f2)"
-EXPECTED_ASSET_NAME="$(printf '%s' "$ASSET_INFO" | cut -f3)"
-
-echo "Release: $LATEST_VERSION"
-echo "Expected asset: $EXPECTED_ASSET_NAME"
-echo "Downloading: $(basename "$ASSET_URL")"
 
 mkdir -p "$EXTRACT_DIR"
-curl -fL \
-    -H "User-Agent: MattMC-Updater" \
-    "$ASSET_URL" \
-    -o "$ZIP_PATH"
-
 unzip -q "$ZIP_PATH" -d "$EXTRACT_DIR"
 
 PAYLOAD_ROOT="$(payload_root "$EXTRACT_DIR")"

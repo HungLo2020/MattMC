@@ -6,8 +6,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_DIR="$SCRIPT_DIR"
 LOCAL_NAME="$(basename "$LOCAL_DIR")"
 
-REMOTE_SYNC_ROOT="/mnt/storage/Storage/Sync"
-REMOTE_DIR="$REMOTE_SYNC_ROOT/$LOCAL_NAME"
+# Only MattMC/run/ is synchronized: worlds, settings, shader packs and the
+# dedicated server (run/server/). The bundled JDK (run/jdk/) is replaced by
+# updates instead and is never synced. Application files outside run/ are
+# never touched in either direction.
+REMOTE_SYNC_ROOT="${MATTMC_SYNC_ROOT:-/mnt/storage/Storage/Sync}"
+LOCAL_RUN_DIR="$LOCAL_DIR/run"
+REMOTE_RUN_DIR="$REMOTE_SYNC_ROOT/$LOCAL_NAME/run"
 
 require_command() {
   local cmd="$1"
@@ -17,53 +22,50 @@ require_command() {
   fi
 }
 
-sync_with_lib_exception() {
+# Mirrors one run/ tree onto the other. --delete removes destination files
+# that are absent from the source; the excluded jdk/ is neither copied nor
+# deleted on either side.
+sync_run_dir() {
   local source_dir="$1"
   local destination_dir="$2"
 
   rsync -a --delete --human-readable --info=stats2,progress2 \
-    --exclude='/lib/***' \
-    --exclude='/run/jdk/***' \
+    --exclude='/jdk/' \
     "$source_dir/" "$destination_dir/"
-
-  if [[ -d "$source_dir/lib" ]]; then
-    rsync -a --human-readable --info=stats2,progress2 \
-      "$source_dir/lib/" "$destination_dir/lib/"
-  fi
-
-  if [[ -d "$source_dir/run/jdk" ]]; then
-    rsync -a --human-readable --info=stats2,progress2 \
-      "$source_dir/run/jdk/" "$destination_dir/run/jdk/"
-  fi
 }
 
 sync_up() {
-  mkdir -p "$REMOTE_DIR"
+  if [[ ! -d "$LOCAL_RUN_DIR" ]]; then
+    echo "Error: local run directory does not exist: $LOCAL_RUN_DIR"
+    exit 1
+  fi
+  mkdir -p "$REMOTE_RUN_DIR"
 
   echo "Sync direction: up"
   echo "Local  -> Remote"
-  echo "From: $LOCAL_DIR/"
-  echo "To:   $REMOTE_DIR/"
+  echo "From: $LOCAL_RUN_DIR/"
+  echo "To:   $REMOTE_RUN_DIR/"
 
-  sync_with_lib_exception "$LOCAL_DIR" "$REMOTE_DIR"
+  sync_run_dir "$LOCAL_RUN_DIR" "$REMOTE_RUN_DIR"
 
-  echo "Done. Remote mirrored from local (deletes enabled except destination lib/ and run/jdk/)."
+  echo "Done. Remote run/ mirrored from local (deletes enabled, run/jdk/ excluded)."
 }
 
 sync_down() {
-  if [[ ! -d "$REMOTE_DIR" ]]; then
-    echo "Error: remote directory does not exist: $REMOTE_DIR"
+  if [[ ! -d "$REMOTE_RUN_DIR" ]]; then
+    echo "Error: remote run directory does not exist: $REMOTE_RUN_DIR"
     exit 1
   fi
+  mkdir -p "$LOCAL_RUN_DIR"
 
   echo "Sync direction: down"
   echo "Remote -> Local"
-  echo "From: $REMOTE_DIR/"
-  echo "To:   $LOCAL_DIR/"
+  echo "From: $REMOTE_RUN_DIR/"
+  echo "To:   $LOCAL_RUN_DIR/"
 
-  sync_with_lib_exception "$REMOTE_DIR" "$LOCAL_DIR"
+  sync_run_dir "$REMOTE_RUN_DIR" "$LOCAL_RUN_DIR"
 
-  echo "Done. Local mirrored from remote (deletes enabled except destination lib/ and run/jdk/)."
+  echo "Done. Local run/ mirrored from remote (deletes enabled, run/jdk/ excluded)."
 }
 
 main() {
